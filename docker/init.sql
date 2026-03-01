@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS daily_logs (
   user_id TEXT NOT NULL REFERENCES profiles(telegram_id),
   content TEXT NOT NULL,
   sentiment TEXT,
-  embedding vector(1536),
+  embedding vector(768),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS document_sections (
   id BIGSERIAL PRIMARY KEY,
   document_id BIGINT NOT NULL REFERENCES user_documents(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
-  embedding vector(1536),
+  embedding vector(768),
   metadata JSONB DEFAULT '{}'
 );
 
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
   key TEXT NOT NULL,
   value TEXT NOT NULL,
   source TEXT,
-  embedding vector(1536),
+  embedding vector(768),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -81,7 +81,7 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_base_embedding ON knowledge_base
 
 -- Vector similarity search function
 CREATE OR REPLACE FUNCTION match_logs(
-  query_embedding vector(1536),
+  query_embedding vector(768),
   match_threshold float,
   match_count int,
   p_user_id text

@@ -1,26 +1,32 @@
-"""Memory store for conversation history and user context."""
+"""Memory store backed by pgvector for persistent RAG memory."""
+
+from typing import Any
+
+from jiki_agent.db.pool import get_pool
+from jiki_agent.db.repositories import knowledge as knowledge_repo
+from jiki_agent.embedding.service import embed_text
 
 
-class MemoryStore:
-    """Placeholder for persistent memory storage.
+async def save_knowledge(
+    user_id: str,
+    key: str,
+    value: str,
+    source: str = "conversation",
+) -> dict[str, Any]:
+    """Save a knowledge entry with embedding for later retrieval.
 
-    TODO: Implement with PostgreSQL checkpointer for LangGraph.
+    Args:
+        user_id: The user this knowledge belongs to.
+        key: Knowledge key (e.g. "favorite_food", "birthday").
+        value: The knowledge value.
+        source: Where this knowledge came from.
+
+    Returns:
+        The stored knowledge entry.
     """
-
-    def __init__(self) -> None:
-        self._store: dict[str, list[dict]] = {}
-
-    async def save_message(self, thread_id: str, message: dict) -> None:
-        """Save a message to the conversation history."""
-        if thread_id not in self._store:
-            self._store[thread_id] = []
-        self._store[thread_id].append(message)
-
-    async def get_history(self, thread_id: str, limit: int = 20) -> list[dict]:
-        """Retrieve recent conversation history for a thread."""
-        messages = self._store.get(thread_id, [])
-        return messages[-limit:]
-
-    async def clear(self, thread_id: str) -> None:
-        """Clear conversation history for a thread."""
-        self._store.pop(thread_id, None)
+    embedding = await embed_text(f"{key}: {value}")
+    pool = get_pool()
+    return await knowledge_repo.upsert(
+        pool, user_id=user_id, key=key, value=value,
+        source=source, embedding=embedding,
+    )

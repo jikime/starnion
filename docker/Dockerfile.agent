@@ -4,9 +4,11 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir uv
 
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock* ./
 RUN uv sync --no-dev
 
 COPY src/ src/
 
-CMD ["uv", "run", "python", "-m", "jiki_agent.telegram.bot"]
+EXPOSE 50051
+
+CMD ["uv", "run", "python", "-m", "jiki_agent"]

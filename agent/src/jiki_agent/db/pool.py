@@ -21,6 +21,7 @@ async def init_pool(conninfo: str) -> AsyncConnectionPool[Any]:
         conninfo=conninfo,
         min_size=2,
         max_size=10,
+        open=False,
     )
     await p.open()
     pool = p

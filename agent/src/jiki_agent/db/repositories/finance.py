@@ -110,6 +110,72 @@ async def get_monthly_summary(
             return [dict(r) for r in rows]
 
 
+async def get_weekly_summary(
+    pool: AsyncConnectionPool[Any],
+    user_id: str,
+    start_date: datetime,
+    end_date: datetime,
+) -> list[dict[str, Any]]:
+    """Get spending grouped by category for a date range.
+
+    Args:
+        pool: The async connection pool.
+        user_id: Telegram user ID.
+        start_date: Range start (inclusive).
+        end_date: Range end (exclusive).
+
+    Returns:
+        List of dicts with 'category' and 'total' keys.
+    """
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                """
+                SELECT category, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
+                FROM finances
+                WHERE user_id = %s
+                  AND created_at >= %s
+                  AND created_at < %s
+                GROUP BY category
+                ORDER BY total DESC
+                """,
+                (user_id, start_date, end_date),
+            )
+            rows = await cur.fetchall()
+            return [dict(r) for r in rows]
+
+
+async def get_recent(
+    pool: AsyncConnectionPool[Any],
+    user_id: str,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    """Fetch the most recent finance records for a user.
+
+    Args:
+        pool: The async connection pool.
+        user_id: Telegram user ID.
+        limit: Maximum number of records to return.
+
+    Returns:
+        List of finance record dicts ordered by newest first.
+    """
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                """
+                SELECT id, user_id, amount, category, description, created_at
+                FROM finances
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                LIMIT %s
+                """,
+                (user_id, limit),
+            )
+            rows = await cur.fetchall()
+            return [dict(r) for r in rows]
+
+
 def _month_range(month: str) -> tuple[datetime, datetime]:
     """Compute the start (inclusive) and end (exclusive) of a month.
 

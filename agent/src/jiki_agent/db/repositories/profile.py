@@ -42,6 +42,40 @@ async def upsert(
             return row  # type: ignore[return-value]
 
 
+async def update_preferences(
+    pool: AsyncConnectionPool[Any],
+    telegram_id: str,
+    preferences: dict,
+) -> dict[str, Any] | None:
+    """Update the preferences JSONB column for a user profile.
+
+    Args:
+        pool: The async connection pool.
+        telegram_id: Telegram user ID.
+        preferences: New preferences dict (replaces existing).
+
+    Returns:
+        The updated row, or None if user not found.
+    """
+    import json
+
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                """
+                UPDATE profiles
+                SET preferences = %s::jsonb, updated_at = NOW()
+                WHERE telegram_id = %s
+                RETURNING id, telegram_id, user_name, goals, preferences,
+                          created_at, updated_at
+                """,
+                (json.dumps(preferences), telegram_id),
+            )
+            row = await cur.fetchone()
+            await conn.commit()
+            return dict(row) if row else None
+
+
 async def get_by_telegram_id(
     pool: AsyncConnectionPool[Any],
     telegram_id: str,

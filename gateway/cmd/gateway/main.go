@@ -2,17 +2,23 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/jikime/jiki/gateway/internal/handler"
 	"github.com/jikime/jiki/gateway/internal/middleware"
+	"github.com/jikime/jiki/gateway/internal/scheduler"
+	"github.com/jikime/jiki/gateway/internal/telegram"
+	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
+	_ "github.com/lib/pq"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -31,6 +37,13 @@ type Config struct {
 			Port int    `yaml:"port"`
 		} `yaml:"agent_service"`
 	} `yaml:"grpc"`
+	Database struct {
+		URL string `yaml:"url"`
+	} `yaml:"database"`
+	Telegram struct {
+		BotToken string `yaml:"bot_token"`
+		Enabled  bool   `yaml:"enabled"`
+	} `yaml:"telegram"`
 	CORS struct {
 		AllowedOrigins []string `yaml:"allowed_origins"`
 		AllowedMethods []string `yaml:"allowed_methods"`
@@ -51,6 +64,18 @@ func loadConfig(path string) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
+	}
+
+	// Allow environment variable overrides.
+	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
+		cfg.Telegram.BotToken = token
+		cfg.Telegram.Enabled = true
+	}
+	if host := os.Getenv("GRPC_AGENT_HOST"); host != "" {
+		cfg.GRPC.AgentService.Host = host
+	}
+	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
+		cfg.Database.URL = dbURL
 	}
 
 	return &cfg, nil
@@ -86,6 +111,9 @@ func connectGRPC(cfg *Config) (*grpc.ClientConn, error) {
 }
 
 func main() {
+	// Load root .env (fallback to ../env if gateway is run from gateway/).
+	_ = godotenv.Load("../.env", ".env")
+
 	cfg, err := loadConfig("config.yaml")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
@@ -99,6 +127,44 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to configure gRPC connection")
 	}
 	defer grpcConn.Close()
+
+	// Connect to database for scheduler queries.
+	var db *sql.DB
+	if cfg.Database.URL != "" {
+		var dbErr error
+		db, dbErr = sql.Open("postgres", cfg.Database.URL)
+		if dbErr != nil {
+			log.Fatal().Err(dbErr).Msg("failed to open database")
+		}
+		defer db.Close()
+
+		if err := db.Ping(); err != nil {
+			log.Warn().Err(err).Msg("database ping failed (scheduler may not work)")
+		} else {
+			log.Info().Msg("database connected for scheduler")
+		}
+	}
+
+	// Global context for graceful shutdown.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start Telegram bot if enabled, and attach scheduler.
+	var sched *scheduler.Scheduler
+	if cfg.Telegram.Enabled && cfg.Telegram.BotToken != "" {
+		bot, botErr := telegram.NewBot(cfg.Telegram.BotToken, grpcConn)
+		if botErr != nil {
+			log.Fatal().Err(botErr).Msg("failed to initialise Telegram bot")
+		}
+		go bot.Run(ctx)
+
+		// Start cron scheduler for proactive notifications.
+		sched = scheduler.New(grpcConn, bot, db)
+		sched.Start()
+		defer sched.Stop()
+	} else {
+		log.Warn().Msg("Telegram bot disabled (no token provided)")
+	}
 
 	e := echo.New()
 	e.HideBanner = true
@@ -122,7 +188,43 @@ func main() {
 	chatHandler := handler.NewChatHandler(grpcConn)
 	api.POST("/chat", chatHandler.Chat)
 
-	// Graceful shutdown
+	// Manual report trigger for testing proactive notifications.
+	// POST /api/v1/report { "user_id": "12345", "chat_id": 12345 }
+	api.POST("/report", func(c echo.Context) error {
+		if sched == nil {
+			return c.JSON(http.StatusServiceUnavailable, map[string]string{
+				"error": "scheduler not available (telegram bot disabled)",
+			})
+		}
+
+		var req struct {
+			UserID string `json:"user_id"`
+			ChatID int64  `json:"chat_id"`
+		}
+		if err := c.Bind(&req); err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+		}
+		if req.UserID == "" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+		}
+		// If chat_id not provided, use user_id as chat_id (DM).
+		if req.ChatID == 0 {
+			if parsed, err := strconv.ParseInt(req.UserID, 10, 64); err == nil {
+				req.ChatID = parsed
+			}
+		}
+
+		if err := sched.GenerateAndSend(req.UserID, req.ChatID); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+
+		return c.JSON(http.StatusOK, map[string]string{
+			"status":  "sent",
+			"user_id": req.UserID,
+		})
+	})
+
+	// Start HTTP server.
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	go func() {
 		log.Info().Str("addr", addr).Msg("starting gateway server")
@@ -136,11 +238,12 @@ func main() {
 	<-quit
 
 	log.Info().Msg("shutting down server")
+	cancel() // Stop Telegram bot.
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
 
-	if err := e.Shutdown(ctx); err != nil {
+	if err := e.Shutdown(shutdownCtx); err != nil {
 		log.Fatal().Err(err).Msg("server forced shutdown")
 	}
 

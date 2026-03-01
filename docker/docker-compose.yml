@@ -17,6 +17,21 @@ services:
       timeout: 5s
       retries: 5
 
+  agent:
+    build:
+      context: ../agent
+      dockerfile: ../docker/Dockerfile.agent
+    container_name: jiki-agent
+    ports:
+      - "50051:50051"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - DATABASE_URL=postgres://jiki:${POSTGRES_PASSWORD:-jiki_dev_password}@postgres:5432/jiki?sslmode=disable
+      - GRPC_PORT=50051
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   gateway:
     build:
       context: ../gateway
@@ -24,27 +39,14 @@ services:
     container_name: jiki-gateway
     ports:
       - "8080:8080"
-      - "50051:50051"
-    environment:
-      - DATABASE_URL=postgres://jiki:${POSTGRES_PASSWORD:-jiki_dev_password}@postgres:5432/jiki?sslmode=disable
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  agent:
-    build:
-      context: ../agent
-      dockerfile: ../docker/Dockerfile.agent
-    container_name: jiki-agent
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GRPC_AGENT_HOST=agent
       - DATABASE_URL=postgres://jiki:${POSTGRES_PASSWORD:-jiki_dev_password}@postgres:5432/jiki?sslmode=disable
-      - GRPC_ADDRESS=gateway:50051
     depends_on:
       postgres:
         condition: service_healthy
-      gateway:
+      agent:
         condition: service_started
 
 volumes:

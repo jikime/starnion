@@ -4,10 +4,12 @@ package jiki.v1;
 
 option go_package = "github.com/jikime/jiki/gateway/gen/jiki/v1;jikiv1";
 
-// AgentService handles bidirectional streaming between Gateway and Agent.
+// AgentService handles communication between Gateway and Agent.
 service AgentService {
-  // Chat processes a user message and returns agent responses (streaming).
-  rpc Chat(stream ChatRequest) returns (stream ChatResponse);
+  // Chat processes a user message and returns the agent response.
+  rpc Chat(ChatRequest) returns (ChatResponse);
+  // GenerateReport produces a periodic summary report for a user.
+  rpc GenerateReport(ReportRequest) returns (ReportResponse);
 }
 
 message ChatRequest {
@@ -39,4 +41,14 @@ message FileInput {
   string file_type = 1;   // "image", "document", "audio"
   string file_url = 2;    // Storage URL (avoids 4MB gRPC limit)
   string file_name = 3;
+}
+
+message ReportRequest {
+  string user_id = 1;
+  string report_type = 2; // "weekly", "monthly"
+}
+
+message ReportResponse {
+  string content = 1;
+  string report_type = 2;
 }

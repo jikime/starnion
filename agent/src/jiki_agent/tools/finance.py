@@ -5,25 +5,10 @@ from datetime import datetime
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
+from jiki_agent.context import get_current_user
 from jiki_agent.db.pool import get_pool
 from jiki_agent.db.repositories import finance as finance_repo
-
-# ---------------------------------------------------------------------------
-# Module-level current user tracking (MVP simplification)
-# The telegram handler calls set_current_user() before invoking the agent.
-# ---------------------------------------------------------------------------
-_current_user_id: str = ""
-
-
-def set_current_user(user_id: str) -> None:
-    """Set the current user ID for tool invocations."""
-    global _current_user_id
-    _current_user_id = user_id
-
-
-def get_current_user() -> str:
-    """Return the current user ID."""
-    return _current_user_id
+from jiki_agent.db.repositories import profile as profile_repo
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +62,22 @@ async def save_finance(category: str, amount: int, description: str = "") -> str
         month=month,
     )
 
-    return f"{category} {amount:,}원 기록했어요. 이번 달 {category} 누적: {monthly_total:,}원"
+    result = f"{category} {amount:,}원 기록했어요. 이번 달 {category} 누적: {monthly_total:,}원"
+
+    # Check budget and warn if approaching/exceeding limit.
+    profile = await profile_repo.get_by_telegram_id(pool, telegram_id=user_id)
+    if profile:
+        preferences = profile.get("preferences", {}) or {}
+        budget = preferences.get("budget", {})
+        budget_amount = budget.get(category)
+        if budget_amount and budget_amount > 0:
+            pct = monthly_total / budget_amount * 100
+            if pct >= 100:
+                result += f"\n⚠️ {category} 예산 {budget_amount:,}원을 초과했어요! ({pct:.0f}%)"
+            elif pct >= 80:
+                result += f"\n📊 {category} 예산의 {pct:.0f}%를 사용했어요. ({monthly_total:,}원 / {budget_amount:,}원)"
+
+    return result
 
 
 @tool(args_schema=GetMonthlyTotalInput)
