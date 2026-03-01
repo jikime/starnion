@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package jiki.v1;
+
+option go_package = "github.com/jikime/jiki/gateway/gen/jiki/v1;jikiv1";
+
+// AgentService handles bidirectional streaming between Gateway and Agent.
+service AgentService {
+  // Chat processes a user message and returns agent responses (streaming).
+  rpc Chat(stream ChatRequest) returns (stream ChatResponse);
+}
+
+message ChatRequest {
+  string user_id = 1;
+  string message = 2;
+  string model = 3;
+  // Optional file input for multimodal processing.
+  FileInput file = 4;
+}
+
+message ChatResponse {
+  string content = 1;
+  ResponseType type = 2;
+  // Tool call information (when type = TOOL_CALL).
+  string tool_name = 3;
+  string tool_result = 4;
+}
+
+enum ResponseType {
+  RESPONSE_TYPE_UNSPECIFIED = 0;
+  TEXT = 1;
+  TOOL_CALL = 2;
+  TOOL_RESULT = 3;
+  ERROR = 4;
+  STREAM_END = 5;
+}
+
+message FileInput {
+  string file_type = 1;   // "image", "document", "audio"
+  string file_url = 2;    // Storage URL (avoids 4MB gRPC limit)
+  string file_name = 3;
+}

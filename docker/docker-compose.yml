@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: jiki-postgres
+    environment:
+      POSTGRES_DB: jiki
+      POSTGRES_USER: jiki
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jiki_dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jiki"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    build:
+      context: ../gateway
+      dockerfile: ../docker/Dockerfile.gateway
+    container_name: jiki-gateway
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    environment:
+      - DATABASE_URL=postgres://jiki:${POSTGRES_PASSWORD:-jiki_dev_password}@postgres:5432/jiki?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  agent:
+    build:
+      context: ../agent
+      dockerfile: ../docker/Dockerfile.agent
+    container_name: jiki-agent
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - DATABASE_URL=postgres://jiki:${POSTGRES_PASSWORD:-jiki_dev_password}@postgres:5432/jiki?sslmode=disable
+      - GRPC_ADDRESS=gateway:50051
+    depends_on:
+      postgres:
+        condition: service_healthy
+      gateway:
+        condition: service_started
+
+volumes:
+  postgres_data:
