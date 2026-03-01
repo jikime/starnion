@@ -78,7 +78,7 @@ async def create_agent(database_url: str):
         model=llm,
         tools=tools,
         checkpointer=checkpointer,
-        state_modifier=SYSTEM_PROMPT,
+        prompt=SYSTEM_PROMPT,
     )
 
     return agent

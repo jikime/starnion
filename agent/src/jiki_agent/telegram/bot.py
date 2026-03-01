@@ -1,5 +1,7 @@
 """Telegram bot handler for message processing."""
 
+import logging
+
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -14,6 +16,8 @@ from jiki_agent.db.pool import close_pool, get_pool, init_pool
 from jiki_agent.db.repositories import profile as profile_repo
 from jiki_agent.graph.agent import close_checkpointer, create_agent
 from jiki_agent.tools.finance import set_current_user
+
+logger = logging.getLogger(__name__)
 
 # Module-level agent reference, initialized on startup.
 _agent = None
@@ -38,17 +42,25 @@ async def start_command(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> 
     if message is None:
         return
 
-    user = update.effective_user
-    if user is not None:
-        pool = get_pool()
-        user_name = user.full_name or user.username or ""
-        await profile_repo.upsert(pool, telegram_id=str(user.id), user_name=user_name)
+    try:
+        user = update.effective_user
+        if user is not None:
+            pool = get_pool()
+            user_name = user.full_name or user.username or ""
+            await profile_repo.upsert(
+                pool, telegram_id=str(user.id), user_name=user_name,
+            )
 
-    await message.reply_text(
-        "안녕하세요! 저는 지기(jiki)예요.\n"
-        "가계부 기록, 지출 조회 등을 도와드릴게요.\n"
-        "편하게 말씀해 주세요!"
-    )
+        await message.reply_text(
+            "안녕하세요! 저는 지기(jiki)예요.\n"
+            "가계부 기록, 지출 조회 등을 도와드릴게요.\n"
+            "편하게 말씀해 주세요!"
+        )
+    except Exception:
+        logger.exception("Error in /start command")
+        await message.reply_text(
+            "잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요."
+        )
 
 
 async def handle_message(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -62,26 +74,40 @@ async def handle_message(update: Update, _context: ContextTypes.DEFAULT_TYPE) ->
     user_id = str(update.effective_user.id) if update.effective_user else chat_id
 
     if _agent is None:
-        await message.reply_text("서비스 초기화 중이에요. 잠시 후 다시 시도해 주세요.")
+        await message.reply_text(
+            "서비스 초기화 중이에요. 잠시 후 다시 시도해 주세요.",
+        )
         return
 
-    # Set current user so finance tools can access the user_id.
-    set_current_user(user_id)
+    try:
+        # Set current user so finance tools can access the user_id.
+        set_current_user(user_id)
 
-    # Ensure user profile exists.
-    pool = get_pool()
-    user_name = ""
-    if update.effective_user:
-        user_name = update.effective_user.full_name or update.effective_user.username or ""
-    await profile_repo.upsert(pool, telegram_id=user_id, user_name=user_name)
+        # Ensure user profile exists.
+        pool = get_pool()
+        user_name = ""
+        if update.effective_user:
+            user_name = (
+                update.effective_user.full_name
+                or update.effective_user.username
+                or ""
+            )
+        await profile_repo.upsert(
+            pool, telegram_id=user_id, user_name=user_name,
+        )
 
-    result = await _agent.ainvoke(
-        {"messages": [("human", user_message)]},
-        config={"configurable": {"thread_id": chat_id}},
-    )
+        result = await _agent.ainvoke(
+            {"messages": [("human", user_message)]},
+            config={"configurable": {"thread_id": chat_id}},
+        )
 
-    response = result["messages"][-1].content
-    await message.reply_text(response)
+        response = result["messages"][-1].content
+        await message.reply_text(response)
+    except Exception:
+        logger.exception("Error processing message: %s", user_message)
+        await message.reply_text(
+            "잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요."
+        )
 
 
 def create_bot() -> Application:
