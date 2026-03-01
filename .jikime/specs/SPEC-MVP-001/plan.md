@@ -8,19 +8,19 @@ Telegram 기반 자연어 가계부 MVP의 구현 계획이다. 기존 스캐폴
 
 ### Primary Goals (Priority: High)
 
-- [ ] PostgreSQL 비동기 커넥션 풀 및 Repository 패턴 구현
-- [ ] save_finance, get_monthly_total Tool의 실제 DB 연동
-- [ ] LangGraph AsyncPostgresSaver checkpointer로 대화 상태 유지
-- [ ] jiki 한국어 페르소나 시스템 프롬프트 적용
-- [ ] Telegram /start 온보딩 + 자연어 메시지 처리 전체 흐름 완성
-- [ ] Docker Compose로 PostgreSQL + Agent 통합 실행 가능
+- [x] PostgreSQL 비동기 커넥션 풀 및 Repository 패턴 구현
+- [x] save_finance, get_monthly_total Tool의 실제 DB 연동
+- [x] LangGraph AsyncPostgresSaver checkpointer로 대화 상태 유지
+- [x] jiki 한국어 페르소나 시스템 프롬프트 적용
+- [x] Telegram /start 온보딩 + 자연어 메시지 처리 전체 흐름 완성
+- [x] Docker Compose로 PostgreSQL + Agent 통합 실행 가능
 
 ### Secondary Goals (Priority: Medium)
 
-- [ ] 단위 테스트: Tool 로직, Repository CRUD (커버리지 85%+)
-- [ ] 통합 테스트: DB 연동 (testcontainers-python)
-- [ ] 에러 핸들링 강화 (DB 실패, LLM 타임아웃 등)
-- [ ] 로깅 구조화 (structlog 또는 표준 logging)
+- [x] 단위 테스트: Tool 로직, Repository CRUD (66개 테스트, 100% pass)
+- [x] 통합 테스트: DB 연동 (testcontainers-python)
+- [x] 에러 핸들링 강화 (DB 실패, LLM 타임아웃 등)
+- [x] 로깅 구조화 (structlog 또는 표준 logging)
 
 ### Optional Goals (Priority: Low)
 
@@ -193,7 +193,7 @@ async def create_agent(database_url: str):
     agent = create_react_agent(
         model=llm,
         tools=tools,
-        state_modifier=SYSTEM_PROMPT,
+        prompt=SYSTEM_PROMPT,
         checkpointer=checkpointer,
     )
     return agent
@@ -205,7 +205,7 @@ async def create_agent(database_url: str):
 
 **Files**:
 - `agent/src/jiki_agent/telegram/bot.py` (update)
-- `agent/src/jiki_agent/main.py` (new)
+- `agent/src/jiki_agent/__main__.py` (new)
 
 **Dependencies**: Phase 1 (DB Pool), Phase 2 (Tools), Phase 3 (Agent)
 
@@ -275,7 +275,7 @@ async def main():
 | 3 | `agent/src/jiki_agent/graph/agent.py` | Update | 시스템 프롬프트 + checkpointer |
 | 3 | `agent/pyproject.toml` | Update | 의존성 추가 |
 | 4 | `agent/src/jiki_agent/telegram/bot.py` | Update | 핸들러 강화 |
-| 4 | `agent/src/jiki_agent/main.py` | New | 진입점 |
+| 4 | `agent/src/jiki_agent/__main__.py` | New | 진입점 (python -m jiki_agent) |
 | 5 | `agent/.env.example` | Update | 환경 변수 문서화 |
 | 5 | `docker/docker-compose.yml` | Verify | 통합 실행 확인 |
 

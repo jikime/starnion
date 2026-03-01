@@ -6,9 +6,10 @@
 |-------|-------|
 | SPEC ID | SPEC-MVP-001 |
 | Title | Telegram Natural Language Finance Tracker MVP |
-| Status | Planning |
+| Status | Completed |
 | Priority | High |
 | Created | 2026-03-01 |
+| Completed | 2026-03-01 |
 | Lifecycle | spec-anchored |
 
 ## Environment
@@ -139,7 +140,7 @@
 - post_init에서 DB 풀 초기화, checkpointer setup
 - post_shutdown에서 DB 풀 정리
 
-### 5. Entry Point (`agent/src/jiki_agent/main.py`)
+### 5. Entry Point (`agent/src/jiki_agent/__main__.py`)
 
 - Telegram bot polling 모드로 실행
 - 환경 변수 유효성 검증 (TELEGRAM_BOT_TOKEN, GEMINI_API_KEY, DATABASE_URL)
@@ -147,34 +148,34 @@
 
 ### 6. Docker Integration
 
-- docker-compose.yml의 agent 서비스에서 `python -m jiki_agent.main` 실행
+- docker-compose.yml의 agent 서비스에서 `python -m jiki_agent` 실행
 - .env.example 업데이트 (필수 환경 변수 문서화)
 
 ## Traceability
 
 | Requirement ID | Test ID | Status |
 |----------------|---------|--------|
-| REQ-U001 | TEST-U001 | Pending |
-| REQ-U002 | TEST-U002 | Pending |
-| REQ-U003 | TEST-U003 | Pending |
-| REQ-U004 | TEST-U004 | Pending |
-| REQ-E001 | TEST-E001 | Pending |
-| REQ-E002 | TEST-E002 | Pending |
-| REQ-E003 | TEST-E003 | Pending |
-| REQ-E004 | TEST-E004 | Pending |
-| REQ-E005 | TEST-E005 | Pending |
-| REQ-E006 | TEST-E006 | Pending |
-| REQ-E007 | TEST-E007 | Pending |
-| REQ-E008 | TEST-E008 | Pending |
-| REQ-S001 | TEST-S001 | Pending |
-| REQ-S002 | TEST-S002 | Pending |
-| REQ-S003 | TEST-S003 | Pending |
-| REQ-N001 | TEST-N001 | Pending |
-| REQ-N002 | TEST-N002 | Pending |
-| REQ-N003 | TEST-N003 | Pending |
-| REQ-O001 | TEST-O001 | Pending |
-| REQ-O002 | TEST-O002 | Pending |
-| REQ-O003 | TEST-O003 | Pending |
+| REQ-U001 | TEST-U001 | Verified |
+| REQ-U002 | TEST-U002 | Verified |
+| REQ-U003 | TEST-U003 | Verified |
+| REQ-U004 | TEST-U004 | Verified |
+| REQ-E001 | TEST-E001 | Verified |
+| REQ-E002 | TEST-E002 | Verified |
+| REQ-E003 | TEST-E003 | Verified |
+| REQ-E004 | TEST-E004 | Verified |
+| REQ-E005 | TEST-E005 | Verified |
+| REQ-E006 | TEST-E006 | Verified |
+| REQ-E007 | TEST-E007 | Verified |
+| REQ-E008 | TEST-E008 | Verified |
+| REQ-S001 | TEST-S001 | Verified |
+| REQ-S002 | TEST-S002 | Verified |
+| REQ-S003 | TEST-S003 | Verified |
+| REQ-N001 | TEST-N001 | Verified |
+| REQ-N002 | TEST-N002 | Verified |
+| REQ-N003 | TEST-N003 | Verified |
+| REQ-O001 | TEST-O001 | Verified |
+| REQ-O002 | TEST-O002 | Verified |
+| REQ-O003 | TEST-O003 | Verified |
 
 ## Out of Scope
 

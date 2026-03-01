@@ -2,7 +2,7 @@
 
 **최종 수정일:** 2026-03-01
 **버전:** 0.1.0
-**상태:** Planning
+**상태:** MVP Implemented
 
 ---
 
@@ -143,51 +143,45 @@ def create_jiki_agent(tools: list, memory_manager):
     agent = create_react_agent(
         model=model,
         tools=tools,
-        state_modifier=system_prompt,
+        prompt=system_prompt,
     )
 
     return agent
 ```
 
-#### Tool 정의 (BaseTool + args_schema 필수)
+#### Tool 정의 (@tool 데코레이터 + args_schema)
 
 ```python
 # tools/finance.py
-from langchain_core.tools import BaseTool
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 class SaveFinanceInput(BaseModel):
     """금융 데이터 저장 Tool의 입력 스키마."""
-    amount: int = Field(description="금액 (원 단위)")
     category: str = Field(description="카테고리 (식비, 교통, 카페 등)")
+    amount: int = Field(description="금액 (원 단위)")
     description: str = Field(default="", description="설명")
 
-class SaveFinanceTool(BaseTool):
-    """수입/지출을 기록하는 Tool."""
+@tool(args_schema=SaveFinanceInput)
+async def save_finance(category: str, amount: int, description: str = "") -> str:
+    """수입 또는 지출 금액을 카테고리와 함께 기록합니다."""
+    user = get_current_user()
+    pool = get_pool()
 
-    name: str = "save_finance"
-    description: str = "수입 또는 지출 금액을 카테고리와 함께 기록합니다."
-    args_schema: type[BaseModel] = SaveFinanceInput  # Gemini 필수!
+    # DB에 저장
+    record = await finance_repo.create(
+        pool, user["user_id"], amount, category, description
+    )
 
-    async def _arun(self, amount: int, category: str, description: str = "") -> str:
-        # DB에 저장
-        record = await self.db.finances.create(
-            user_id=self.user_id,
-            amount=amount,
-            category=category,
-            description=description,
-        )
+    # 월간 누적 조회
+    monthly = await finance_repo.get_monthly_total(
+        pool, user["user_id"], category
+    )
 
-        # 월간 누적 조회
-        monthly = await self.db.finances.get_monthly_total(
-            user_id=self.user_id,
-            category=category,
-        )
-
-        return f"{category} {amount:,}원 기록. 이번 달 {category} 누적: {monthly:,}원"
+    return f"{category} {amount:,}원 기록했어요. 이번 달 {category} 누적: {monthly:,}원"
 ```
 
-> **주의사항**: LangChain + Gemini 조합에서는 BaseTool 하위 클래스에 반드시 `args_schema`를 명시해야 한다. 생략하면 Gemini가 파라미터를 `__arg1: STRING` 형태로 전달하여 Tool 실행이 실패한다.
+> **주의사항**: `@tool` 데코레이터에 `args_schema`를 명시하여 Gemini API 호환성을 확보한다. `Optional[T]` 패턴 사용 금지 (Gemini anyOf 버그 회피). 모듈 레벨 `set_current_user()`/`get_current_user()`로 Tool 실행 시 사용자 컨텍스트를 추적한다.
 
 #### 3계층 메모리 시스템
 
@@ -523,24 +517,32 @@ Gateway → Telegram: sendMessage API 호출
 ### 1. Repository 패턴 (데이터 접근 추상화)
 
 ```python
-# 인터페이스 정의
-class FinanceRepository(Protocol):
-    async def create(self, user_id: str, amount: int, category: str, description: str) -> Finance: ...
-    async def get_monthly_total(self, user_id: str, category: str, month: str) -> int: ...
-    async def get_by_period(self, user_id: str, start: datetime, end: datetime) -> list[Finance]: ...
+# db/repositories/finance.py
+from psycopg.rows import dict_row
 
-# PostgreSQL 구현
-class PostgresFinanceRepository:
-    def __init__(self, pool: asyncpg.Pool):
-        self.pool = pool
+async def create(pool, user_id: str, amount: int, category: str, description: str) -> dict:
+    """finances 테이블에 수입/지출 기록을 INSERT한다."""
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                "INSERT INTO finances (user_id, amount, category, description) "
+                "VALUES (%s, %s, %s, %s) RETURNING *",
+                (user_id, amount, category, description),
+            )
+            return await cur.fetchone()
 
-    async def create(self, user_id: str, amount: int, category: str, description: str) -> Finance:
-        row = await self.pool.fetchrow(
-            "INSERT INTO finances (user_id, amount, category, description) "
-            "VALUES ($1, $2, $3, $4) RETURNING *",
-            user_id, amount, category, description,
-        )
-        return Finance(**dict(row))
+async def get_monthly_total(pool, user_id: str, category: str, month: str = "") -> int:
+    """월별 카테고리 합계를 조회한다."""
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                "SELECT COALESCE(SUM(amount), 0) AS total FROM finances "
+                "WHERE user_id = %s AND category = %s "
+                "AND DATE_TRUNC('month', transaction_at) = DATE_TRUNC('month', CURRENT_DATE)",
+                (user_id, category),
+            )
+            row = await cur.fetchone()
+            return row["total"] if row else 0
 ```
 
 ### 2. 이벤트 기반 알림 (프로액티브 시스템)

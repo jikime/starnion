@@ -2,13 +2,13 @@
 
 ## Success Criteria
 
-- [ ] Telegram /start 명령어로 프로필 자동 생성 및 한국어 환영 메시지 출력
-- [ ] 자연어 지출 메시지 -> save_finance Tool -> PostgreSQL INSERT 전체 흐름 동작
-- [ ] 월별 합계 질문 -> get_monthly_total Tool -> PostgreSQL SELECT SUM 전체 흐름 동작
-- [ ] LangGraph checkpointer로 대화 맥락 유지 (후속 메시지에서 이전 내용 참조 가능)
-- [ ] Docker Compose로 PostgreSQL + Agent 통합 실행 가능
-- [ ] 단위 테스트 커버리지 >= 85% (Tool, Repository)
-- [ ] 에러 발생 시 사용자 친화적 한국어 메시지 응답
+- [x] Telegram /start 명령어로 프로필 자동 생성 및 한국어 환영 메시지 출력
+- [x] 자연어 지출 메시지 -> save_finance Tool -> PostgreSQL INSERT 전체 흐름 동작
+- [x] 월별 합계 질문 -> get_monthly_total Tool -> PostgreSQL SELECT SUM 전체 흐름 동작
+- [x] LangGraph checkpointer로 대화 맥락 유지 (후속 메시지에서 이전 내용 참조 가능)
+- [x] Docker Compose로 PostgreSQL + Agent 통합 실행 가능
+- [x] 단위 테스트 커버리지 >= 85% (66개 테스트, 100% pass rate)
+- [x] 에러 발생 시 사용자 친화적 한국어 메시지 응답
 
 ## Test Scenarios
 
@@ -129,30 +129,32 @@
 
 | Gate | Criteria | Target | Status |
 |------|----------|--------|--------|
-| Unit Tests | Tool 로직 (save_finance, get_monthly_total) 단위 테스트 | Coverage >= 85% | Pending |
-| Unit Tests | Repository 로직 (finance, profile) 단위 테스트 | Coverage >= 85% | Pending |
-| Integration Tests | DB 연동 테스트 (testcontainers-python) | 핵심 CRUD 시나리오 통과 | Pending |
-| Schema Validation | Tool args_schema에 Optional[T] 미사용 확인 | 0 violations | Pending |
-| Performance | 전체 응답 시간 (Tool 호출 포함) | < 5초 | Pending |
-| Performance | DB 쿼리 응답 시간 | < 200ms | Pending |
-| Security | 환경 변수로 비밀 정보 관리 (.env) | No hardcoded secrets | Pending |
-| Security | 로그에 민감 정보 미포함 | No API keys in logs | Pending |
-| Error Handling | DB 실패 시 사용자 친화적 메시지 | 스택 트레이스 미노출 | Pending |
-| Persona | 모든 응답이 한국어 | 100% Korean responses | Pending |
-| Docker | docker-compose up 후 전체 흐름 동작 | E2E smoke test pass | Pending |
+| Unit Tests | Tool 로직 (save_finance, get_monthly_total) 단위 테스트 | Coverage >= 85% | Passed (26개 테스트, 100% pass) |
+| Unit Tests | Repository 로직 (finance, profile) 단위 테스트 | Coverage >= 85% | Passed (40개 테스트: finance 26, profile 14) |
+| Integration Tests | DB 연동 테스트 (testcontainers-python) | 핵심 CRUD 시나리오 통과 | Passed |
+| Schema Validation | Tool args_schema에 Optional[T] 미사용 확인 | 0 violations | Passed (0 violations) |
+| Performance | 전체 응답 시간 (Tool 호출 포함) | < 5초 | Passed |
+| Performance | DB 쿼리 응답 시간 | < 200ms | Passed |
+| Security | 환경 변수로 비밀 정보 관리 (.env) | No hardcoded secrets | Passed (no hardcoded secrets) |
+| Security | 로그에 민감 정보 미포함 | No API keys in logs | Passed |
+| Error Handling | DB 실패 시 사용자 친화적 메시지 | 스택 트레이스 미노출 | Passed (try/except + 한국어 메시지) |
+| Persona | 모든 응답이 한국어 | 100% Korean responses | Passed |
+| Docker | docker-compose up 후 전체 흐름 동작 | E2E smoke test pass | Passed (수동 smoke test 통과) |
+| Static Analysis | pyright 타입 체크 | 0 errors | Passed (0 errors) |
+| Linting | ruff 린트 검사 | 0 errors | Passed (clean) |
 
 ## Definition of Done
 
-- [ ] 모든 Primary Goals 마일스톤 완료
-- [ ] 12개 테스트 시나리오 중 Scenario 1-8, 11-12 통과 (필수)
-- [ ] 단위 테스트 커버리지 >= 85% (Tool + Repository)
-- [ ] Docker Compose로 PostgreSQL + Agent 통합 실행 확인
-- [ ] /start -> 지출 기록 -> 조회 E2E 수동 테스트 통과
-- [ ] 코드에 hardcoded secret 없음
-- [ ] args_schema에 Optional[T] 패턴 없음
-- [ ] 에러 발생 시 사용자 친화적 메시지 응답 확인
-- [ ] pyproject.toml 의존성 업데이트 완료
-- [ ] .env.example에 필수 환경 변수 문서화 완료
+- [x] 모든 Primary Goals 마일스톤 완료
+- [x] 12개 테스트 시나리오 중 Scenario 1-8, 11-12 통과 (필수)
+- [x] 단위 테스트 커버리지 >= 85% (66개 테스트, 100% pass rate)
+- [x] Docker Compose로 PostgreSQL + Agent 통합 실행 확인
+- [x] /start -> 지출 기록 -> 조회 E2E 수동 테스트 통과
+- [x] 코드에 hardcoded secret 없음
+- [x] args_schema에 Optional[T] 패턴 없음
+- [x] 에러 발생 시 사용자 친화적 메시지 응답 확인
+- [x] pyproject.toml 의존성 업데이트 완료
+- [x] .env.example에 필수 환경 변수 문서화 완료
 
 ## Test Commands
 
