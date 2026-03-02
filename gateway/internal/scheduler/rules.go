@@ -488,3 +488,120 @@ func formatNumber(n int) string {
 	}
 	return result.String()
 }
+
+// --- Conversation Analysis Rule ---
+
+// runConversationAnalysisRule detects idle users and triggers background
+// conversation analysis. Results are stored in knowledge_base but NOT
+// sent to the user.
+//
+// Idle condition: user had messages, now idle for 30min-2hours, and
+// this idle session has not been analyzed yet.
+func (s *Scheduler) runConversationAnalysisRule() {
+	if s.tracker == nil {
+		return
+	}
+
+	activeUsers := s.tracker.ActiveUsers()
+	if len(activeUsers) == 0 {
+		return
+	}
+
+	now := time.Now()
+	var analyzeCount int
+
+	for telegramID, lastMsg := range activeUsers {
+		idle := now.Sub(lastMsg)
+
+		// Idle window: 30 minutes to 2 hours.
+		if idle < 30*time.Minute || idle > 2*time.Hour {
+			continue
+		}
+
+		// Skip during quiet hours.
+		if s.fatigue.isQuietHours() {
+			continue
+		}
+
+		// Dedup: skip if we already analyzed this idle session.
+		s.analysisMu.RLock()
+		lastAnalyzed, exists := s.analysisStates[telegramID]
+		s.analysisMu.RUnlock()
+		if exists && lastAnalyzed.Equal(lastMsg) {
+			continue
+		}
+
+		// Trigger background analysis via gRPC.
+		ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
+		resp, err := s.grpcClient.GenerateReport(ctx, &jikiv1.ReportRequest{
+			UserId:     telegramID,
+			ReportType: "conversation_analysis",
+		})
+		cancel()
+
+		if err != nil {
+			log.Error().Err(err).Str("user_id", telegramID).Msg("conversation analysis: gRPC failed")
+			continue
+		}
+
+		// Mark this idle session as analyzed.
+		s.analysisMu.Lock()
+		s.analysisStates[telegramID] = lastMsg
+		s.analysisMu.Unlock()
+
+		log.Info().
+			Str("user_id", telegramID).
+			Str("result", resp.Content).
+			Dur("idle", idle).
+			Msg("conversation analysis complete")
+		analyzeCount++
+	}
+
+	if analyzeCount > 0 {
+		log.Info().Int("analyzed", analyzeCount).Msg("conversation analysis batch finished")
+	}
+}
+
+// --- Memory Compaction Rule ---
+
+// runMemoryCompactionRule triggers weekly memory compaction for all active users.
+// Runs Monday 05:00 KST. Summarizes old daily_logs into weekly summaries
+// and removes originals to reduce storage. Background-only, no user notification.
+func (s *Scheduler) runMemoryCompactionRule() {
+	if s.db == nil {
+		return
+	}
+
+	users, err := s.getActiveUsers()
+	if err != nil {
+		log.Error().Err(err).Msg("memory compaction: failed to query active users")
+		return
+	}
+
+	if len(users) == 0 {
+		log.Debug().Msg("memory compaction: no active users")
+		return
+	}
+
+	log.Info().Int("users", len(users)).Msg("running memory compaction")
+
+	var successCount, failCount int
+	for _, u := range users {
+		ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+		resp, err := s.grpcClient.GenerateReport(ctx, &jikiv1.ReportRequest{
+			UserId:     u.telegramID,
+			ReportType: "memory_compaction",
+		})
+		cancel()
+
+		if err != nil {
+			log.Error().Err(err).Str("user_id", u.telegramID).Msg("memory compaction: gRPC failed")
+			failCount++
+			continue
+		}
+		log.Info().Str("user_id", u.telegramID).Str("result", resp.Content).Msg("memory compaction complete")
+		successCount++
+	}
+
+	log.Info().Int("success", successCount).Int("failed", failCount).Msg("memory compaction finished")
+}

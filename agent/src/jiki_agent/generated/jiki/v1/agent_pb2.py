@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13jiki/v1/agent.proto\x12\x07jiki.v1\"`\n\x0b\x43hatRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\r\n\x05model\x18\x03 \x01(\t\x12 \n\x04\x66ile\x18\x04 \x01(\x0b\x32\x12.jiki.v1.FileInput\"l\n\x0c\x43hatResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12#\n\x04type\x18\x02 \x01(\x0e\x32\x15.jiki.v1.ResponseType\x12\x11\n\ttool_name\x18\x03 \x01(\t\x12\x13\n\x0btool_result\x18\x04 \x01(\t\"C\n\tFileInput\x12\x11\n\tfile_type\x18\x01 \x01(\t\x12\x10\n\x08\x66ile_url\x18\x02 \x01(\t\x12\x11\n\tfile_name\x18\x03 \x01(\t\"5\n\rReportRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x13\n\x0breport_type\x18\x02 \x01(\t\"6\n\x0eReportResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12\x13\n\x0breport_type\x18\x02 \x01(\t*r\n\x0cResponseType\x12\x1d\n\x19RESPONSE_TYPE_UNSPECIFIED\x10\x00\x12\x08\n\x04TEXT\x10\x01\x12\r\n\tTOOL_CALL\x10\x02\x12\x0f\n\x0bTOOL_RESULT\x10\x03\x12\t\n\x05\x45RROR\x10\x04\x12\x0e\n\nSTREAM_END\x10\x05\x32\x86\x01\n\x0c\x41gentService\x12\x33\n\x04\x43hat\x12\x14.jiki.v1.ChatRequest\x1a\x15.jiki.v1.ChatResponse\x12\x41\n\x0eGenerateReport\x12\x16.jiki.v1.ReportRequest\x1a\x17.jiki.v1.ReportResponseB3Z1github.com/jikime/jiki/gateway/gen/jiki/v1;jikiv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13jiki/v1/agent.proto\x12\x07jiki.v1\"`\n\x0b\x43hatRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\r\n\x05model\x18\x03 \x01(\t\x12 \n\x04\x66ile\x18\x04 \x01(\x0b\x32\x12.jiki.v1.FileInput\"l\n\x0c\x43hatResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12#\n\x04type\x18\x02 \x01(\x0e\x32\x15.jiki.v1.ResponseType\x12\x11\n\ttool_name\x18\x03 \x01(\t\x12\x13\n\x0btool_result\x18\x04 \x01(\t\"C\n\tFileInput\x12\x11\n\tfile_type\x18\x01 \x01(\t\x12\x10\n\x08\x66ile_url\x18\x02 \x01(\t\x12\x11\n\tfile_name\x18\x03 \x01(\t\"5\n\rReportRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x13\n\x0breport_type\x18\x02 \x01(\t\"6\n\x0eReportResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12\x13\n\x0breport_type\x18\x02 \x01(\t*r\n\x0cResponseType\x12\x1d\n\x19RESPONSE_TYPE_UNSPECIFIED\x10\x00\x12\x08\n\x04TEXT\x10\x01\x12\r\n\tTOOL_CALL\x10\x02\x12\x0f\n\x0bTOOL_RESULT\x10\x03\x12\t\n\x05\x45RROR\x10\x04\x12\x0e\n\nSTREAM_END\x10\x05\x32\xc3\x01\n\x0c\x41gentService\x12\x33\n\x04\x43hat\x12\x14.jiki.v1.ChatRequest\x1a\x15.jiki.v1.ChatResponse\x12;\n\nChatStream\x12\x14.jiki.v1.ChatRequest\x1a\x15.jiki.v1.ChatResponse0\x01\x12\x41\n\x0eGenerateReport\x12\x16.jiki.v1.ReportRequest\x1a\x17.jiki.v1.ReportResponseB3Z1github.com/jikime/jiki/gateway/gen/jiki/v1;jikiv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -45,5 +45,5 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_REPORTRESPONSE']._serialized_start=364
   _globals['_REPORTRESPONSE']._serialized_end=418
   _globals['_AGENTSERVICE']._serialized_start=537
-  _globals['_AGENTSERVICE']._serialized_end=671
+  _globals['_AGENTSERVICE']._serialized_end=732
 # @@protoc_insertion_point(module_scope)

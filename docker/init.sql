@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS daily_logs (
   content TEXT NOT NULL,
   sentiment TEXT,
   embedding vector(768),
+  content_tsv tsvector,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS document_sections (
   document_id BIGINT NOT NULL REFERENCES user_documents(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
   embedding vector(768),
+  content_tsv tsvector,
   metadata JSONB DEFAULT '{}'
 );
 
@@ -60,6 +62,7 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
   value TEXT NOT NULL,
   source TEXT,
   embedding vector(768),
+  content_tsv tsvector,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -78,6 +81,11 @@ CREATE INDEX IF NOT EXISTS idx_document_sections_embedding ON document_sections
 
 CREATE INDEX IF NOT EXISTS idx_knowledge_base_embedding ON knowledge_base
   USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+
+-- GIN indexes for full-text search
+CREATE INDEX IF NOT EXISTS idx_daily_logs_content_tsv ON daily_logs USING gin(content_tsv);
+CREATE INDEX IF NOT EXISTS idx_knowledge_base_content_tsv ON knowledge_base USING gin(content_tsv);
+CREATE INDEX IF NOT EXISTS idx_document_sections_content_tsv ON document_sections USING gin(content_tsv);
 
 -- Vector similarity search function
 CREATE OR REPLACE FUNCTION match_logs(
@@ -106,3 +114,38 @@ BEGIN
   LIMIT match_count;
 END;
 $$;
+
+-- Trigger functions to auto-populate tsvector on INSERT/UPDATE
+
+CREATE OR REPLACE FUNCTION daily_logs_tsv_trigger() RETURNS trigger AS $$
+BEGIN
+  NEW.content_tsv := to_tsvector('simple', COALESCE(NEW.content, ''));
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION knowledge_base_tsv_trigger() RETURNS trigger AS $$
+BEGIN
+  NEW.content_tsv := to_tsvector('simple', COALESCE(NEW.key, '') || ' ' || COALESCE(NEW.value, ''));
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION document_sections_tsv_trigger() RETURNS trigger AS $$
+BEGIN
+  NEW.content_tsv := to_tsvector('simple', COALESCE(NEW.content, ''));
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_daily_logs_tsv
+  BEFORE INSERT OR UPDATE OF content ON daily_logs
+  FOR EACH ROW EXECUTE FUNCTION daily_logs_tsv_trigger();
+
+CREATE TRIGGER trg_knowledge_base_tsv
+  BEFORE INSERT OR UPDATE OF key, value ON knowledge_base
+  FOR EACH ROW EXECUTE FUNCTION knowledge_base_tsv_trigger();
+
+CREATE TRIGGER trg_document_sections_tsv
+  BEFORE INSERT OR UPDATE OF content ON document_sections
+  FOR EACH ROW EXECUTE FUNCTION document_sections_tsv_trigger();

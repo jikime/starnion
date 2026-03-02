@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -229,36 +230,153 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		Bool("has_file", chatReq.File != nil).
 		Msg("processing telegram message")
 
-	// 1. Set 👀 reaction on the user's message to acknowledge receipt (openclaw pattern).
+	// 1. Set 👀 reaction on the user's message to acknowledge receipt.
 	b.setReaction(chatID, messageID, "👀")
 
-	// 2. Start typing indicator loop (sendChatAction "typing" every 4s).
-	//    Telegram typing status expires after ~5s, so we repeat it.
-	typingCtx, typingCancel := context.WithCancel(ctx)
-	go b.typingLoop(typingCtx, chatID)
+	// 2. Try streaming first, fallback to unary on error.
+	if err := b.handleMessageStream(ctx, chatID, messageID, userID, chatReq); err != nil {
+		log.Warn().Err(err).Str("user_id", userID).Msg("stream failed, falling back to unary")
+		b.handleMessageUnary(ctx, chatID, messageID, userID, chatReq)
+	}
+}
 
-	// 3. Call agent via gRPC.
+// handleMessageStream processes a chat request via server-side streaming.
+// Sends an initial message to Telegram and progressively edits it as tokens arrive.
+func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID int, userID string, req *jikiv1.ChatRequest) error {
 	reqCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 
-	resp, err := b.grpcClient.Chat(reqCtx, chatReq)
+	stream, err := b.grpcClient.ChatStream(reqCtx, req)
+	if err != nil {
+		return fmt.Errorf("open stream: %w", err)
+	}
 
-	// 4. Stop typing indicator.
+	var (
+		accumulated strings.Builder
+		sentMsgID   int
+		lastEdit    time.Time
+		lastLen     int
+	)
+	const editInterval = 500 * time.Millisecond
+
+	for {
+		resp, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			// If we already sent a partial message, complete it with error note.
+			if sentMsgID != 0 {
+				accumulated.WriteString("\n\n_(stream interrupted)_")
+				edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, accumulated.String())
+				b.api.Send(edit)
+				b.setReaction(chatID, messageID, "😢")
+				return nil
+			}
+			return fmt.Errorf("recv: %w", err)
+		}
+
+		switch resp.Type {
+		case jikiv1.ResponseType_TEXT:
+			accumulated.WriteString(resp.Content)
+
+			// First text chunk: send a new message.
+			if sentMsgID == 0 {
+				sent, sendErr := b.api.Send(tgbotapi.NewMessage(chatID, accumulated.String()))
+				if sendErr != nil {
+					return fmt.Errorf("send initial: %w", sendErr)
+				}
+				sentMsgID = sent.MessageID
+				lastEdit = time.Now()
+				lastLen = accumulated.Len()
+				continue
+			}
+
+			// Throttled edit: respect Telegram rate limits.
+			if time.Since(lastEdit) >= editInterval && accumulated.Len() > lastLen {
+				edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, accumulated.String())
+				b.api.Send(edit) // best-effort
+				lastEdit = time.Now()
+				lastLen = accumulated.Len()
+			}
+
+		case jikiv1.ResponseType_STREAM_END:
+			// Final edit with Markdown formatting.
+			if sentMsgID != 0 && accumulated.Len() > lastLen {
+				final := accumulated.String()
+				edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, final)
+				edit.ParseMode = "Markdown"
+				if _, editErr := b.api.Send(edit); editErr != nil {
+					// Markdown parse failure → retry as plain text.
+					edit.ParseMode = ""
+					b.api.Send(edit)
+				}
+			} else if sentMsgID == 0 && accumulated.Len() > 0 {
+				// No edits were sent yet, send accumulated text as new message.
+				if err := b.SendMessage(chatID, accumulated.String()); err != nil {
+					log.Error().Err(err).Msg("failed to send final stream message")
+				}
+			}
+			b.setReaction(chatID, messageID, "👍")
+			return nil
+
+		case jikiv1.ResponseType_ERROR:
+			errText := resp.Content
+			if errText == "" {
+				errText = "잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요."
+			}
+			if sentMsgID == 0 {
+				b.SendMessage(chatID, errText)
+			} else {
+				accumulated.WriteString("\n\n" + errText)
+				edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, accumulated.String())
+				b.api.Send(edit)
+			}
+			b.setReaction(chatID, messageID, "😢")
+			return nil
+
+		case jikiv1.ResponseType_TOOL_CALL, jikiv1.ResponseType_TOOL_RESULT:
+			// Currently ignored; could show "searching..." status in the future.
+		}
+	}
+
+	// Stream ended without explicit STREAM_END (graceful handling).
+	if sentMsgID != 0 && accumulated.Len() > lastLen {
+		final := accumulated.String()
+		edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, final)
+		edit.ParseMode = "Markdown"
+		if _, editErr := b.api.Send(edit); editErr != nil {
+			edit.ParseMode = ""
+			b.api.Send(edit)
+		}
+	} else if sentMsgID == 0 && accumulated.Len() > 0 {
+		b.SendMessage(chatID, accumulated.String())
+	}
+	b.setReaction(chatID, messageID, "👍")
+	return nil
+}
+
+// handleMessageUnary processes a chat request via unary gRPC call (fallback).
+func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID int, userID string, req *jikiv1.ChatRequest) {
+	typingCtx, typingCancel := context.WithCancel(ctx)
+	go b.typingLoop(typingCtx, chatID)
+
+	reqCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	defer cancel()
+
+	resp, err := b.grpcClient.Chat(reqCtx, req)
 	typingCancel()
 
 	if err != nil {
-		log.Error().Err(err).Str("user_id", userID).Msg("gRPC chat failed")
-		// Set error reaction.
+		log.Error().Err(err).Str("user_id", userID).Msg("gRPC chat (unary) failed")
 		b.setReaction(chatID, messageID, "😢")
 		reply := tgbotapi.NewMessage(chatID, "잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요.")
 		b.api.Send(reply)
 		return
 	}
 
-	// 5. Replace 👀 with ✅ to indicate completion.
 	b.setReaction(chatID, messageID, "👍")
 
-	// 6. Send the response.
 	if err := b.SendMessage(chatID, resp.Content); err != nil {
 		log.Error().Err(err).Str("user_id", userID).Msg("failed to send telegram reply")
 	}

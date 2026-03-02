@@ -1,5 +1,11 @@
-"""3-layer memory retriever: short-term + long-term (daily_logs) + entity (knowledge_base) + finance."""
+"""Hybrid memory retriever: Vector + Full-Text Search with RRF merge.
 
+Searches across 4 sources (daily_logs, knowledge_base, document_sections,
+finances) using both vector similarity and full-text search, then merges
+results via Reciprocal Rank Fusion (RRF).
+"""
+
+import asyncio
 import logging
 from typing import Any
 
@@ -12,6 +18,59 @@ from jiki_agent.embedding.service import embed_text
 
 logger = logging.getLogger(__name__)
 
+# RRF constant from the original paper (Cormack et al., 2009).
+RRF_K = 60
+
+
+def _rrf_merge(
+    vector_results: list[dict[str, Any]],
+    fulltext_results: list[dict[str, Any]],
+    id_key: str = "id",
+    k: int = RRF_K,
+) -> list[dict[str, Any]]:
+    """Merge vector and full-text results using Reciprocal Rank Fusion.
+
+    For each result list, the RRF score contribution is 1 / (k + rank + 1)
+    where rank is the 0-based position in the list.  Results appearing in
+    both lists get summed scores.
+
+    Args:
+        vector_results: Results from vector similarity search.
+        fulltext_results: Results from full-text search.
+        id_key: Dictionary key used to identify unique results.
+        k: RRF constant (default 60).
+
+    Returns:
+        Deduplicated results sorted by RRF score descending, with a
+        normalised ``similarity`` field in [0, 1].
+    """
+    scores: dict[Any, float] = {}
+    entries: dict[Any, dict[str, Any]] = {}
+
+    for rank, r in enumerate(vector_results):
+        rid = r[id_key]
+        scores[rid] = scores.get(rid, 0.0) + 1.0 / (k + rank + 1)
+        entries.setdefault(rid, r)
+
+    for rank, r in enumerate(fulltext_results):
+        rid = r[id_key]
+        scores[rid] = scores.get(rid, 0.0) + 1.0 / (k + rank + 1)
+        entries.setdefault(rid, r)
+
+    if not scores:
+        return []
+
+    # Normalise scores to [0, 1].
+    max_score = max(scores.values())
+    merged = []
+    for rid, score in scores.items():
+        entry = dict(entries[rid])
+        entry["similarity"] = score / max_score if max_score > 0 else 0.0
+        merged.append(entry)
+
+    merged.sort(key=lambda x: x["similarity"], reverse=True)
+    return merged
+
 
 async def search(
     query: str,
@@ -19,60 +78,68 @@ async def search(
     top_k: int = 5,
     threshold: float = 0.3,
 ) -> list[dict[str, Any]]:
-    """Search across all memory layers for relevant context.
+    """Search across all memory layers using hybrid vector + full-text search.
 
-    Combines results from:
-    - daily_logs (long-term, vector search)
-    - knowledge_base (entity, vector search)
-    - finances (recent records, text match)
-
-    Short-term memory (current conversation) is handled by the LangGraph
-    checkpointer and does not need explicit retrieval here.
+    Runs 7 queries in parallel (3 vector + 3 full-text + 1 finance),
+    merges per-source results via RRF, tags sources, and returns the
+    top_k results.
 
     Args:
         query: The search query text.
         user_id: Filter results to this user.
         top_k: Maximum total results to return.
-        threshold: Minimum cosine similarity score.
+        threshold: Minimum cosine similarity for vector search.
 
     Returns:
         Merged and ranked list of memory entries.
     """
     pool = get_pool()
-
-    # Vector-based search on daily_logs and knowledge_base.
     query_embedding = await embed_text(query)
 
-    log_results = await daily_log_repo.search_similar(
-        pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
-    )
-    knowledge_results = await knowledge_repo.search_similar(
-        pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
+    # Run all searches in parallel.
+    (
+        log_vec,
+        log_ft,
+        kb_vec,
+        kb_ft,
+        doc_vec,
+        doc_ft,
+        finance_results,
+    ) = await asyncio.gather(
+        daily_log_repo.search_similar(
+            pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
+        ),
+        daily_log_repo.search_fulltext(pool, user_id, query, top_k=top_k),
+        knowledge_repo.search_similar(
+            pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
+        ),
+        knowledge_repo.search_fulltext(pool, user_id, query, top_k=top_k),
+        document_repo.search_by_user(
+            pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
+        ),
+        document_repo.search_fulltext_by_user(pool, user_id, query, top_k=top_k),
+        finance_repo.get_recent(pool, user_id=user_id, limit=top_k),
     )
 
-    # Document sections (vector search across user's uploaded documents).
-    document_results = await document_repo.search_by_user(
-        pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
-    )
+    # Per-source RRF merge.
+    log_merged = _rrf_merge(log_vec, log_ft)
+    kb_merged = _rrf_merge(kb_vec, kb_ft)
+    doc_merged = _rrf_merge(doc_vec, doc_ft)
 
-    # Recent finance records (no embedding, use recent history).
-    finance_results = await finance_repo.get_recent(pool, user_id=user_id, limit=top_k)
-
-    # Tag results with their source layer.
-    for r in log_results:
+    # Tag sources.
+    for r in log_merged:
         r["source"] = "daily_log"
-    for r in knowledge_results:
+    for r in kb_merged:
         r["source"] = "knowledge"
-    for r in document_results:
+    for r in doc_merged:
         r["source"] = "document"
     for r in finance_results:
         r["source"] = "finance"
-        # Synthesize a content field for display.
         desc = f" ({r['description']})" if r.get("description") else ""
         r["content"] = f"{r['category']} {r['amount']:,}원{desc}"
-        r["similarity"] = 0.5  # Fixed score for recent records.
+        r["similarity"] = 0.5
 
-    merged = log_results + knowledge_results + document_results + finance_results
-    merged.sort(key=lambda x: x.get("similarity", 0), reverse=True)
+    all_results = log_merged + kb_merged + doc_merged + finance_results
+    all_results.sort(key=lambda x: x.get("similarity", 0), reverse=True)
 
-    return merged[:top_k]
+    return all_results[:top_k]

@@ -35,3 +35,15 @@ func (t *Tracker) LastMessageTime(telegramID string) (time.Time, bool) {
 	ts, ok := t.lastMessage[telegramID]
 	return ts, ok
 }
+
+// ActiveUsers returns a snapshot of all tracked users and their last message times.
+// The returned map is a copy safe for concurrent use by the caller.
+func (t *Tracker) ActiveUsers() map[string]time.Time {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	snapshot := make(map[string]time.Time, len(t.lastMessage))
+	for k, v := range t.lastMessage {
+		snapshot[k] = v
+	}
+	return snapshot
+}

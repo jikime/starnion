@@ -58,6 +58,11 @@ async def analyze_patterns(user_id: str) -> str:
     # 2. Collect sentiment data from daily_logs.
     recent_logs = await daily_log_repo.get_recent(pool, user_id, limit=30)
 
+    # 2b. Collect conversation analysis insights from knowledge_base.
+    conversation_insights = await knowledge_repo.get_by_key_prefix(
+        pool, user_id, "conversation:analysis:",
+    )
+
     # 3. Check minimum data requirement.
     if len(daily_totals) < 7:
         logger.info(
@@ -70,6 +75,7 @@ async def analyze_patterns(user_id: str) -> str:
     # 4. Build data summary for LLM.
     data_summary = _build_analysis_data(
         daily_totals, weekday_spending, recent_records, monthly, recent_logs,
+        conversation_insights,
     )
 
     # 5. Call LLM for structured pattern detection.
@@ -164,6 +170,7 @@ def _build_analysis_data(
     recent_records: list[dict],
     monthly: list[dict],
     recent_logs: list[dict],
+    conversation_insights: list[dict] | None = None,
 ) -> str:
     """Build a text summary of user data for the LLM pattern analysis prompt."""
     lines: list[str] = []
@@ -206,6 +213,23 @@ def _build_analysis_data(
             content_preview = log["content"][:80]
             sentiment_str = f" [{sentiment}]" if sentiment else ""
             lines.append(f"  {date_str}{sentiment_str}: {content_preview}")
+
+    # Conversation analysis insights.
+    if conversation_insights:
+        lines.append("\n[대화 분석 인사이트 (최근)]")
+        for entry in conversation_insights[:7]:
+            try:
+                data = json.loads(entry["value"])
+                date_key = entry["key"].replace("conversation:analysis:", "")
+                mood = data.get("overall_mood", "")
+                topics = ", ".join(data.get("topics", []))
+                lines.append(f"  {date_key} ({mood}): {topics}")
+                for insight in data.get("insights", [])[:3]:
+                    lines.append(
+                        f"    - [{insight.get('type', '')}] {insight.get('summary', '')}"
+                    )
+            except (json.JSONDecodeError, KeyError):
+                continue
 
     return "\n".join(lines)
 

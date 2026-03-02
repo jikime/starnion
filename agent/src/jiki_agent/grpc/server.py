@@ -20,6 +20,8 @@ from jiki.v1 import agent_pb2, agent_pb2_grpc  # noqa: E402
 from jiki_agent.context import set_current_user
 from jiki_agent.db.pool import get_pool
 from jiki_agent.db.repositories import profile as profile_repo
+from jiki_agent.tools.compaction import compact_memory
+from jiki_agent.tools.conversation import analyze_conversation
 from jiki_agent.tools.goal import evaluate_goals, generate_goal_status
 from jiki_agent.tools.pattern import analyze_patterns, generate_pattern_insight
 from jiki_agent.tools.report import (
@@ -36,6 +38,21 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
 
     def __init__(self, agent):
         self._agent = agent
+
+    @staticmethod
+    def _build_message(request) -> str:
+        """Build a combined message string from a ChatRequest."""
+        message = request.message
+        human_parts: list = [message] if message else []
+        file_input = request.file
+        if file_input and file_input.file_url:
+            file_text = (
+                f"[파일 첨부: type={file_input.file_type}, "
+                f"name={file_input.file_name}, "
+                f"url={file_input.file_url}]"
+            )
+            human_parts.append(file_text)
+        return "\n".join(human_parts) if human_parts else message
 
     async def Chat(self, request, context):
         """Handle a unary Chat request."""
@@ -56,22 +73,7 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
             pool = get_pool()
             await profile_repo.upsert(pool, telegram_id=user_id, user_name="")
 
-            # Build human message, optionally with file input.
-            human_parts: list = [message] if message else []
-            file_input = request.file
-            if file_input and file_input.file_url:
-                file_text = (
-                    f"[파일 첨부: type={file_input.file_type}, "
-                    f"name={file_input.file_name}, "
-                    f"url={file_input.file_url}]"
-                )
-                if not human_parts:
-                    human_parts.append(file_text)
-                else:
-                    human_parts.append(file_text)
-
-            combined_message = "\n".join(human_parts) if human_parts else message
-
+            combined_message = self._build_message(request)
             result = await self._invoke_agent(combined_message, user_id)
 
             raw_content = result["messages"][-1].content
@@ -90,6 +92,82 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
         except Exception:
             logger.exception("Error processing chat for user %s", user_id)
             return agent_pb2.ChatResponse(
+                content="잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요.",
+                type=agent_pb2.ERROR,
+            )
+
+    async def ChatStream(self, request, context):  # noqa: ARG002
+        """Handle a server-side streaming Chat request.
+
+        Streams token-level events from the LangGraph agent back to the
+        client using ``astream_events(version="v2")``.
+        """
+        user_id = request.user_id
+        message = request.message
+
+        if not user_id or not message:
+            yield agent_pb2.ChatResponse(
+                content="user_id and message are required",
+                type=agent_pb2.ERROR,
+            )
+            return
+
+        set_current_user(user_id)
+
+        try:
+            pool = get_pool()
+            await profile_repo.upsert(pool, telegram_id=user_id, user_name="")
+
+            combined_message = self._build_message(request)
+            config = {"configurable": {"thread_id": user_id}}
+            input_data = {"messages": [("human", combined_message)]}
+
+            async for event in self._agent.astream_events(
+                input_data, config=config, version="v2",
+            ):
+                kind = event["event"]
+
+                if kind == "on_chat_model_stream":
+                    chunk = event["data"]["chunk"]
+                    token = ""
+                    if hasattr(chunk, "content"):
+                        raw = chunk.content
+                        if isinstance(raw, str):
+                            token = raw
+                        elif isinstance(raw, list):
+                            token = "".join(
+                                b.get("text", str(b)) if isinstance(b, dict) else str(b)
+                                for b in raw
+                            )
+                    if token:
+                        yield agent_pb2.ChatResponse(
+                            content=token,
+                            type=agent_pb2.TEXT,
+                        )
+
+                elif kind == "on_tool_start":
+                    yield agent_pb2.ChatResponse(
+                        content="",
+                        type=agent_pb2.TOOL_CALL,
+                        tool_name=event.get("name", ""),
+                    )
+
+                elif kind == "on_tool_end":
+                    output = str(event["data"].get("output", ""))[:500]
+                    yield agent_pb2.ChatResponse(
+                        content="",
+                        type=agent_pb2.TOOL_RESULT,
+                        tool_result=output,
+                    )
+
+            yield agent_pb2.ChatResponse(
+                content="",
+                type=agent_pb2.STREAM_END,
+            )
+
+        except Exception:
+            logger.exception("Stream error for user %s", user_id)
+            yield agent_pb2.ChatResponse(
                 content="잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요.",
                 type=agent_pb2.ERROR,
             )
@@ -153,6 +231,10 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                 content = await evaluate_goals(user_id)
             elif report_type == "goal_status":
                 content = await generate_goal_status(user_id)
+            elif report_type == "conversation_analysis":
+                content = await analyze_conversation(user_id)
+            elif report_type == "memory_compaction":
+                content = await compact_memory(user_id)
             else:
                 content = await generate_weekly_report(user_id)
 

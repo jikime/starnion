@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
@@ -27,6 +28,10 @@ type Scheduler struct {
 	db         *sql.DB
 	fatigue    *fatigueManager
 	loc        *time.Location
+	// Activity tracker for idle detection (conversation analysis).
+	tracker        *activity.Tracker
+	analysisMu     sync.RWMutex
+	analysisStates map[string]time.Time // userID -> lastMsgTime when last analyzed
 }
 
 // New creates a Scheduler connected to the agent gRPC service and database.
@@ -39,12 +44,14 @@ func New(grpcConn *grpc.ClientConn, telegram TelegramSender, db *sql.DB, tracker
 	}
 
 	return &Scheduler{
-		cron:       cron.New(cron.WithLocation(loc)),
-		grpcClient: jikiv1.NewAgentServiceClient(grpcConn),
-		telegram:   telegram,
-		db:         db,
-		fatigue:    newFatigueManager(tracker, loc),
-		loc:        loc,
+		cron:           cron.New(cron.WithLocation(loc)),
+		grpcClient:     jikiv1.NewAgentServiceClient(grpcConn),
+		telegram:       telegram,
+		db:             db,
+		fatigue:        newFatigueManager(tracker, loc),
+		loc:            loc,
+		tracker:        tracker,
+		analysisStates: make(map[string]time.Time),
 	}
 }
 
@@ -66,10 +73,17 @@ func (s *Scheduler) Start() {
 		{"0 6 * * *", "pattern_analysis", s.runPatternAnalysisRule},
 		{"0 */3 * * *", "spending_anomaly", s.runSpendingAnomalyRule},
 		{"0 14 * * *", "pattern_insight", s.runPatternInsightRule},
+		{"*/10 * * * *", "conversation_analysis", s.runConversationAnalysisRule},
 
 		// Level 3: Autonomous Agent
 		{"0 7 * * *", "goal_evaluation", s.runGoalEvaluationRule},
 		{"0 12 * * 3", "goal_status", s.runGoalStatusRule},
+
+		// Level 4: User-Created Schedules
+		{"*/15 * * * *", "user_schedules", s.runUserSchedulesRule},
+
+		// Level 5: Maintenance
+		{"0 5 * * 1", "memory_compaction", s.runMemoryCompactionRule},
 	}
 
 	registered := 0

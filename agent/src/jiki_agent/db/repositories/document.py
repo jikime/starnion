@@ -77,6 +77,45 @@ async def create_section(
             return row  # type: ignore[return-value]
 
 
+async def search_fulltext_by_user(
+    pool: AsyncConnectionPool[Any],
+    user_id: str,
+    query_text: str,
+    top_k: int = 5,
+) -> list[dict[str, Any]]:
+    """Find document sections matching the query via full-text search.
+
+    Searches across all documents belonging to the user.
+
+    Args:
+        pool: The async connection pool.
+        user_id: Telegram user ID.
+        query_text: Raw search text (converted to tsquery internally).
+        top_k: Maximum results to return.
+
+    Returns:
+        List of section dicts with rank score and document title.
+    """
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                """
+                SELECT ds.id, ds.content, ds.metadata,
+                       ud.title AS doc_title,
+                       ts_rank(ds.content_tsv, plainto_tsquery('simple', %s)) AS rank
+                FROM document_sections ds
+                JOIN user_documents ud ON ud.id = ds.document_id
+                WHERE ud.user_id = %s
+                  AND ds.content_tsv @@ plainto_tsquery('simple', %s)
+                ORDER BY rank DESC
+                LIMIT %s
+                """,
+                (query_text, user_id, query_text, top_k),
+            )
+            rows = await cur.fetchall()
+            return [dict(r) for r in rows]
+
+
 async def search_sections(
     pool: AsyncConnectionPool[Any],
     document_id: int,

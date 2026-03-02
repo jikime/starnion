@@ -8,6 +8,8 @@ option go_package = "github.com/jikime/jiki/gateway/gen/jiki/v1;jikiv1";
 service AgentService {
   // Chat processes a user message and returns the agent response.
   rpc Chat(ChatRequest) returns (ChatResponse);
+  // ChatStream returns agent responses as a token stream.
+  rpc ChatStream(ChatRequest) returns (stream ChatResponse);
   // GenerateReport produces a periodic summary report for a user.
   rpc GenerateReport(ReportRequest) returns (ReportResponse);
 }

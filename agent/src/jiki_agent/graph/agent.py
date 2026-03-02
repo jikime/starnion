@@ -18,6 +18,7 @@ from jiki_agent.tools.daily_log import save_daily_log
 from jiki_agent.tools.finance import get_monthly_total, save_finance
 from jiki_agent.tools.goal import get_goals, set_goal, update_goal_status
 from jiki_agent.tools.memory import retrieve_memory
+from jiki_agent.tools.schedule import cancel_schedule, create_schedule, list_schedules
 from jiki_agent.tools.multimodal import process_document, process_image, process_voice
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,9 @@ async def create_agent(database_url: str):
         set_goal,
         get_goals,
         update_goal_status,
+        create_schedule,
+        list_schedules,
+        cancel_schedule,
     ]
 
     _checkpointer_cm = AsyncPostgresSaver.from_conn_string(database_url)

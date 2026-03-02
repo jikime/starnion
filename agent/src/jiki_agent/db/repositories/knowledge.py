@@ -80,6 +80,43 @@ async def search_similar(
             return [dict(r) for r in rows]
 
 
+async def search_fulltext(
+    pool: AsyncConnectionPool[Any],
+    user_id: str,
+    query_text: str,
+    top_k: int = 5,
+) -> list[dict[str, Any]]:
+    """Find knowledge entries matching the query via full-text search.
+
+    Searches across both key and value fields.
+
+    Args:
+        pool: The async connection pool.
+        user_id: Filter by user.
+        query_text: Raw search text (converted to tsquery internally).
+        top_k: Maximum results to return.
+
+    Returns:
+        List of dicts with id, key, value, rank, created_at.
+    """
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                """
+                SELECT id, key, value, source, created_at,
+                       ts_rank(content_tsv, plainto_tsquery('simple', %s)) AS rank
+                FROM knowledge_base
+                WHERE user_id = %s
+                  AND content_tsv @@ plainto_tsquery('simple', %s)
+                ORDER BY rank DESC
+                LIMIT %s
+                """,
+                (query_text, user_id, query_text, top_k),
+            )
+            rows = await cur.fetchall()
+            return [dict(r) for r in rows]
+
+
 async def delete_by_key(
     pool: AsyncConnectionPool[Any],
     user_id: str,

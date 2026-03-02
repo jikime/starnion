@@ -40,6 +40,11 @@ class AgentServiceStub(object):
                 request_serializer=jiki_dot_v1_dot_agent__pb2.ChatRequest.SerializeToString,
                 response_deserializer=jiki_dot_v1_dot_agent__pb2.ChatResponse.FromString,
                 _registered_method=True)
+        self.ChatStream = channel.unary_stream(
+                '/jiki.v1.AgentService/ChatStream',
+                request_serializer=jiki_dot_v1_dot_agent__pb2.ChatRequest.SerializeToString,
+                response_deserializer=jiki_dot_v1_dot_agent__pb2.ChatResponse.FromString,
+                _registered_method=True)
         self.GenerateReport = channel.unary_unary(
                 '/jiki.v1.AgentService/GenerateReport',
                 request_serializer=jiki_dot_v1_dot_agent__pb2.ReportRequest.SerializeToString,
@@ -58,6 +63,13 @@ class AgentServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ChatStream(self, request, context):
+        """ChatStream returns agent responses as a token stream.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GenerateReport(self, request, context):
         """GenerateReport produces a periodic summary report for a user.
         """
@@ -70,6 +82,11 @@ def add_AgentServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Chat': grpc.unary_unary_rpc_method_handler(
                     servicer.Chat,
+                    request_deserializer=jiki_dot_v1_dot_agent__pb2.ChatRequest.FromString,
+                    response_serializer=jiki_dot_v1_dot_agent__pb2.ChatResponse.SerializeToString,
+            ),
+            'ChatStream': grpc.unary_stream_rpc_method_handler(
+                    servicer.ChatStream,
                     request_deserializer=jiki_dot_v1_dot_agent__pb2.ChatRequest.FromString,
                     response_serializer=jiki_dot_v1_dot_agent__pb2.ChatResponse.SerializeToString,
             ),
@@ -105,6 +122,33 @@ class AgentService(object):
             request,
             target,
             '/jiki.v1.AgentService/Chat',
+            jiki_dot_v1_dot_agent__pb2.ChatRequest.SerializeToString,
+            jiki_dot_v1_dot_agent__pb2.ChatResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ChatStream(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/jiki.v1.AgentService/ChatStream',
             jiki_dot_v1_dot_agent__pb2.ChatRequest.SerializeToString,
             jiki_dot_v1_dot_agent__pb2.ChatResponse.FromString,
             options,
