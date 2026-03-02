@@ -13,6 +13,7 @@ import (
 
 	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
 	"github.com/jikime/jiki/gateway/internal/activity"
+	"github.com/jikime/jiki/gateway/internal/skill"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -20,14 +21,15 @@ import (
 
 // Bot wraps the Telegram bot API and forwards messages to the agent via gRPC.
 type Bot struct {
-	api        *tgbotapi.BotAPI
-	grpcClient jikiv1.AgentServiceClient
-	tracker    *activity.Tracker
-	db         *sql.DB
+	api          *tgbotapi.BotAPI
+	grpcClient   jikiv1.AgentServiceClient
+	tracker      *activity.Tracker
+	db           *sql.DB
+	skillService *skill.Service
 }
 
 // NewBot creates a new Telegram bot connected to the agent gRPC service.
-func NewBot(token string, grpcConn *grpc.ClientConn, tracker *activity.Tracker, db *sql.DB) (*Bot, error) {
+func NewBot(token string, grpcConn *grpc.ClientConn, tracker *activity.Tracker, db *sql.DB, skillSvc *skill.Service) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, fmt.Errorf("telegram bot init: %w", err)
@@ -36,10 +38,11 @@ func NewBot(token string, grpcConn *grpc.ClientConn, tracker *activity.Tracker, 
 	log.Info().Str("username", api.Self.UserName).Msg("Telegram bot authorised")
 
 	return &Bot{
-		api:        api,
-		grpcClient: jikiv1.NewAgentServiceClient(grpcConn),
-		tracker:    tracker,
-		db:         db,
+		api:          api,
+		grpcClient:   jikiv1.NewAgentServiceClient(grpcConn),
+		tracker:      tracker,
+		db:           db,
+		skillService: skillSvc,
 	}, nil
 }
 
@@ -156,6 +159,8 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			b.handleStart(chatID)
 		case "persona":
 			b.handlePersona(chatID)
+		case "skills":
+			b.handleSkills(chatID, userID)
 		}
 		return
 	}
@@ -197,6 +202,24 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			}
 			if chatReq.Message == "" {
 				chatReq.Message = "이 음성을 텍스트로 변환해주세요."
+			}
+		}
+	}
+
+	// Handle video messages.
+	if msg.Video != nil {
+		fileURL := b.getFileURL(msg.Video.FileID)
+		if fileURL != "" {
+			chatReq.File = &jikiv1.FileInput{
+				FileType: "video",
+				FileUrl:  fileURL,
+				FileName: "video.mp4",
+			}
+			if chatReq.Message == "" {
+				chatReq.Message = msg.Caption
+			}
+			if chatReq.Message == "" {
+				chatReq.Message = "이 비디오를 분석해주세요."
 			}
 		}
 	}
@@ -335,6 +358,9 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 			b.setReaction(chatID, messageID, "😢")
 			return nil
 
+		case jikiv1.ResponseType_FILE:
+			b.sendFile(chatID, resp.FileData, resp.FileName, resp.FileMime)
+
 		case jikiv1.ResponseType_TOOL_CALL, jikiv1.ResponseType_TOOL_RESULT:
 			// Currently ignored; could show "searching..." status in the future.
 		}
@@ -458,6 +484,31 @@ func (b *Bot) getFileURL(fileID string) string {
 	return file.Link(b.api.Token)
 }
 
+// sendFile sends a binary file to a Telegram chat, choosing the appropriate
+// send method based on MIME type (photo, voice, video, or generic document).
+func (b *Bot) sendFile(chatID int64, data []byte, name, mime string) {
+	if len(data) == 0 {
+		return
+	}
+	fileBytes := tgbotapi.FileBytes{Name: name, Bytes: data}
+
+	var msg tgbotapi.Chattable
+	switch {
+	case strings.HasPrefix(mime, "image/"):
+		msg = tgbotapi.NewPhoto(chatID, fileBytes)
+	case strings.HasPrefix(mime, "audio/"):
+		msg = tgbotapi.NewVoice(chatID, fileBytes)
+	case strings.HasPrefix(mime, "video/"):
+		msg = tgbotapi.NewVideo(chatID, fileBytes)
+	default:
+		msg = tgbotapi.NewDocument(chatID, fileBytes)
+	}
+
+	if _, err := b.api.Send(msg); err != nil {
+		log.Error().Err(err).Str("name", name).Str("mime", mime).Msg("failed to send file")
+	}
+}
+
 func (b *Bot) handleStart(chatID int64) {
 	text := "안녕하세요! 저는 지기(jiki)예요.\n" +
 		"가계부 기록, 지출 조회, 일상 기록 등을 도와드릴게요.\n" +
@@ -500,11 +551,16 @@ func (b *Bot) handlePersona(chatID int64) {
 	}
 }
 
-// handleCallback processes inline keyboard callbacks (e.g. persona selection).
+// handleCallback processes inline keyboard callbacks (e.g. persona selection, skill toggle).
 func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQuery) {
 	data := callback.Data
 	chatID := callback.Message.Chat.ID
 	userID := fmt.Sprintf("%d", callback.From.ID)
+
+	if strings.HasPrefix(data, "skill:toggle:") {
+		b.handleSkillToggle(ctx, callback, chatID, userID)
+		return
+	}
 
 	if !strings.HasPrefix(data, "persona:") {
 		return
@@ -547,4 +603,85 @@ func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQue
 	}
 
 	log.Info().Str("user_id", userID).Str("persona", personaID).Msg("persona changed")
+}
+
+// handleSkills sends an inline keyboard showing all toggleable skills.
+func (b *Bot) handleSkills(chatID int64, userID string) {
+	if b.skillService == nil {
+		b.SendMessage(chatID, "스킬 관리 기능이 아직 준비되지 않았어요.")
+		return
+	}
+
+	skills, err := b.skillService.GetUserSkills(userID)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("failed to get user skills")
+		b.SendMessage(chatID, "스킬 목록을 불러올 수 없어요.")
+		return
+	}
+
+	if len(skills) == 0 {
+		b.SendMessage(chatID, "등록된 스킬이 없어요.")
+		return
+	}
+
+	keyboard := b.buildSkillsKeyboard(skills)
+	msg := tgbotapi.NewMessage(chatID, "기능을 켜고 끌 수 있어요. 버튼을 눌러 토글하세요.")
+	msg.ReplyMarkup = keyboard
+	if _, err := b.api.Send(msg); err != nil {
+		log.Error().Err(err).Int64("chat_id", chatID).Msg("failed to send /skills keyboard")
+	}
+}
+
+// buildSkillsKeyboard creates an inline keyboard with toggle buttons for each skill.
+func (b *Bot) buildSkillsKeyboard(skills []skill.SkillView) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for i := 0; i < len(skills); i += 2 {
+		var row []tgbotapi.InlineKeyboardButton
+		for j := i; j < i+2 && j < len(skills); j++ {
+			s := skills[j]
+			status := "OFF"
+			if s.Enabled {
+				status = "ON"
+			}
+			label := fmt.Sprintf("%s %s [%s]", s.Emoji, s.Name, status)
+			row = append(row, tgbotapi.NewInlineKeyboardButtonData(label, "skill:toggle:"+s.ID))
+		}
+		rows = append(rows, row)
+	}
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+// handleSkillToggle processes a skill toggle callback.
+func (b *Bot) handleSkillToggle(ctx context.Context, callback *tgbotapi.CallbackQuery, chatID int64, userID string) {
+	skillID := strings.TrimPrefix(callback.Data, "skill:toggle:")
+
+	if b.skillService == nil {
+		return
+	}
+
+	enabled, err := b.skillService.Toggle(userID, skillID)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID).Str("skill_id", skillID).Msg("skill toggle failed")
+		callbackCfg := tgbotapi.NewCallback(callback.ID, "토글할 수 없는 스킬이에요.")
+		b.api.Request(callbackCfg)
+		return
+	}
+
+	status := "꺼짐"
+	if enabled {
+		status = "켜짐"
+	}
+
+	// Refresh the keyboard with updated states.
+	skills, err := b.skillService.GetUserSkills(userID)
+	if err == nil && len(skills) > 0 {
+		keyboard := b.buildSkillsKeyboard(skills)
+		edit := tgbotapi.NewEditMessageReplyMarkup(chatID, callback.Message.MessageID, keyboard)
+		b.api.Send(edit)
+	}
+
+	callbackCfg := tgbotapi.NewCallback(callback.ID, fmt.Sprintf("%s: %s", skillID, status))
+	b.api.Request(callbackCfg)
+
+	log.Info().Str("user_id", userID).Str("skill_id", skillID).Bool("enabled", enabled).Msg("skill toggled")
 }

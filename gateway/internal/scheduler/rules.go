@@ -29,6 +29,9 @@ func (s *Scheduler) runBudgetWarningRule() {
 	}
 
 	for _, u := range users {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "budget") {
+			continue
+		}
 		spending, err := getCategorySpending(ctx, s.db, u.telegramID)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", u.telegramID).Msg("budget warning: failed to query spending")
@@ -93,6 +96,9 @@ func (s *Scheduler) runDailySummaryRule() {
 	log.Info().Int("users", len(users)).Msg("generating daily summaries")
 
 	for _, u := range users {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "finance") {
+			continue
+		}
 		if err := s.sendGeneratedNotification(u, "daily_summary"); err != nil {
 			log.Error().Err(err).Str("user_id", u.telegramID).Msg("daily summary: send failed")
 		}
@@ -126,6 +132,9 @@ func (s *Scheduler) runInactiveReminderRule() {
 	message := "👋 요즘 어떻게 지내세요?\n\n기록을 남기신 지 좀 됐어요.\n간단하게라도 오늘 지출을 기록해 보는 건 어때요?"
 
 	for _, u := range users {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "proactive") {
+			continue
+		}
 		prefs := s.loadPreferences(u.telegramID)
 		if err := s.sendTemplateNotification(u.telegramID, u.chatID, prefs, message); err != nil {
 			log.Error().Err(err).Str("user_id", u.telegramID).Msg("inactive reminder: send failed")
@@ -164,6 +173,9 @@ func (s *Scheduler) runMonthlyClosingRule() {
 	log.Info().Int("users", len(users)).Msg("generating monthly closing reports")
 
 	for _, u := range users {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "finance") {
+			continue
+		}
 		if err := s.sendGeneratedNotification(u, "monthly_closing"); err != nil {
 			log.Error().Err(err).Str("user_id", u.telegramID).Msg("monthly closing: send failed")
 		}
@@ -194,6 +206,9 @@ func (s *Scheduler) runPatternAnalysisRule() {
 
 	var successCount, failCount int
 	for _, u := range users {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "pattern") {
+			continue
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 		resp, err := s.grpcClient.GenerateReport(ctx, &jikiv1.ReportRequest{
 			UserId:     u.telegramID,
@@ -234,6 +249,9 @@ func (s *Scheduler) runSpendingAnomalyRule() {
 	}
 
 	for _, u := range users {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "finance") {
+			continue
+		}
 		stats, err := getDailySpendingStats(ctx, s.db, u.telegramID)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", u.telegramID).Msg("spending anomaly: query failed")
@@ -287,6 +305,9 @@ func (s *Scheduler) runPatternInsightRule() {
 	var insightCount int
 
 	for _, u := range users {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "pattern") {
+			continue
+		}
 		patternJSON, err := getStoredPatterns(ctx, s.db, u.telegramID)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", u.telegramID).Msg("pattern insight: read failed")
@@ -351,6 +372,9 @@ func (s *Scheduler) runGoalEvaluationRule() {
 
 	var successCount, failCount int
 	for _, u := range users {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "goals") {
+			continue
+		}
 		rctx, rcancel := context.WithTimeout(context.Background(), 180*time.Second)
 		resp, err := s.grpcClient.GenerateReport(rctx, &jikiv1.ReportRequest{
 			UserId:     u.telegramID,
@@ -394,6 +418,9 @@ func (s *Scheduler) runGoalStatusRule() {
 	log.Info().Int("users", len(users)).Msg("generating goal status reports")
 
 	for _, u := range users {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "goals") {
+			continue
+		}
 		if err := s.sendGeneratedNotification(u, "goal_status"); err != nil {
 			log.Error().Err(err).Str("user_id", u.telegramID).Msg("goal status: send failed")
 		}
@@ -511,6 +538,10 @@ func (s *Scheduler) runConversationAnalysisRule() {
 	var analyzeCount int
 
 	for telegramID, lastMsg := range activeUsers {
+		if s.skillService != nil && !s.skillService.IsEnabled(telegramID, "diary") {
+			continue
+		}
+
 		idle := now.Sub(lastMsg)
 
 		// Idle window: 30 minutes to 2 hours.

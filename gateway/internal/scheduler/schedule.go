@@ -65,6 +65,9 @@ func (s *Scheduler) runUserSchedulesRule() {
 	var sentCount int
 
 	for _, entry := range entries {
+		if s.skillService != nil && !s.skillService.IsEnabled(entry.userID, "schedule") {
+			continue
+		}
 		if !isScheduleDue(entry, now) {
 			continue
 		}

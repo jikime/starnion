@@ -20,6 +20,7 @@ htmlcov/
 
 # Go
 gateway/gen/
+gateway/gateway
 *.exe
 *.test
 *.out

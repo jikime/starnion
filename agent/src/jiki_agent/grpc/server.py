@@ -18,13 +18,14 @@ if _generated_root not in sys.path:
 from jiki.v1 import agent_pb2, agent_pb2_grpc  # noqa: E402
 
 from jiki_agent.context import set_current_user
+from jiki_agent.skills.file_context import pop_pending_files
 from jiki_agent.db.pool import get_pool
 from jiki_agent.db.repositories import profile as profile_repo
-from jiki_agent.tools.compaction import compact_memory
-from jiki_agent.tools.conversation import analyze_conversation
-from jiki_agent.tools.goal import evaluate_goals, generate_goal_status
-from jiki_agent.tools.pattern import analyze_patterns, generate_pattern_insight
-from jiki_agent.tools.report import (
+from jiki_agent.skills.compaction.tools import compact_memory
+from jiki_agent.skills.conversation.tools import analyze_conversation
+from jiki_agent.skills.goals.tools import evaluate_goals, generate_goal_status
+from jiki_agent.skills.pattern.tools import analyze_patterns, generate_pattern_insight
+from jiki_agent.skills.report.tools import (
     generate_daily_summary,
     generate_monthly_closing,
     generate_weekly_report,
@@ -160,6 +161,15 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                         tool_result=output,
                     )
 
+            # Emit any pending file responses before closing the stream.
+            for pf in pop_pending_files():
+                yield agent_pb2.ChatResponse(
+                    type=agent_pb2.FILE,
+                    file_data=pf["data"],
+                    file_name=pf["name"],
+                    file_mime=pf["mime"],
+                )
+
             yield agent_pb2.ChatResponse(
                 content="",
                 type=agent_pb2.STREAM_END,
@@ -167,6 +177,7 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
 
         except Exception:
             logger.exception("Stream error for user %s", user_id)
+            pop_pending_files()  # Discard pending files on error.
             yield agent_pb2.ChatResponse(
                 content="잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요.",
                 type=agent_pb2.ERROR,

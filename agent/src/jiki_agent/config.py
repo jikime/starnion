@@ -20,6 +20,14 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql://user:password@localhost:5432/jiki"
 
+    # Google Cloud (TTS, etc.)
+    google_cloud_credentials: str = ""
+
+    # Google OAuth2 (Workspace integration)
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = ""
+
     # gRPC server
     grpc_port: int = 50051
 

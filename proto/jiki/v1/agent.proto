@@ -28,6 +28,10 @@ message ChatResponse {
   // Tool call information (when type = TOOL_CALL).
   string tool_name = 3;
   string tool_result = 4;
+  // File response fields (when type = FILE).
+  bytes file_data = 5;
+  string file_name = 6;
+  string file_mime = 7;
 }
 
 enum ResponseType {
@@ -37,6 +41,7 @@ enum ResponseType {
   TOOL_RESULT = 3;
   ERROR = 4;
   STREAM_END = 5;
+  FILE = 6;
 }
 
 message FileInput {

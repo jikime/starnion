@@ -15,6 +15,7 @@ import (
 	"github.com/jikime/jiki/gateway/internal/handler"
 	"github.com/jikime/jiki/gateway/internal/middleware"
 	"github.com/jikime/jiki/gateway/internal/scheduler"
+	"github.com/jikime/jiki/gateway/internal/skill"
 	"github.com/jikime/jiki/gateway/internal/telegram"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
@@ -153,17 +154,23 @@ func main() {
 	// Create shared activity tracker for conversation-aware notifications.
 	tracker := activity.NewTracker()
 
+	// Create skill service for per-user feature management.
+	var skillSvc *skill.Service
+	if db != nil {
+		skillSvc = skill.New(db)
+	}
+
 	// Start Telegram bot if enabled, and attach scheduler.
 	var sched *scheduler.Scheduler
 	if cfg.Telegram.Enabled && cfg.Telegram.BotToken != "" {
-		bot, botErr := telegram.NewBot(cfg.Telegram.BotToken, grpcConn, tracker, db)
+		bot, botErr := telegram.NewBot(cfg.Telegram.BotToken, grpcConn, tracker, db, skillSvc)
 		if botErr != nil {
 			log.Fatal().Err(botErr).Msg("failed to initialise Telegram bot")
 		}
 		go bot.Run(ctx)
 
 		// Start cron scheduler for proactive notifications.
-		sched = scheduler.New(grpcConn, bot, db, tracker)
+		sched = scheduler.New(grpcConn, bot, db, tracker, skillSvc)
 		sched.Start()
 		defer sched.Stop()
 	} else {
@@ -191,6 +198,12 @@ func main() {
 
 	chatHandler := handler.NewChatHandler(grpcConn)
 	api.POST("/chat", chatHandler.Chat)
+
+	// Google OAuth2 callback.
+	if db != nil {
+		googleHandler := handler.NewGoogleCallbackHandler(db)
+		e.GET("/auth/google/callback", googleHandler.Callback)
+	}
 
 	// Manual report trigger for testing proactive notifications.
 	// POST /api/v1/report { "user_id": "12345", "chat_id": 12345, "report_type": "weekly" }

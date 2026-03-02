@@ -10,6 +10,7 @@ import (
 
 	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
 	"github.com/jikime/jiki/gateway/internal/activity"
+	"github.com/jikime/jiki/gateway/internal/skill"
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -32,10 +33,11 @@ type Scheduler struct {
 	tracker        *activity.Tracker
 	analysisMu     sync.RWMutex
 	analysisStates map[string]time.Time // userID -> lastMsgTime when last analyzed
+	skillService   *skill.Service
 }
 
 // New creates a Scheduler connected to the agent gRPC service and database.
-func New(grpcConn *grpc.ClientConn, telegram TelegramSender, db *sql.DB, tracker *activity.Tracker) *Scheduler {
+func New(grpcConn *grpc.ClientConn, telegram TelegramSender, db *sql.DB, tracker *activity.Tracker, skillSvc *skill.Service) *Scheduler {
 	// Use KST (UTC+9) location for cron schedule.
 	loc, err := time.LoadLocation("Asia/Seoul")
 	if err != nil {
@@ -52,6 +54,7 @@ func New(grpcConn *grpc.ClientConn, telegram TelegramSender, db *sql.DB, tracker
 		loc:            loc,
 		tracker:        tracker,
 		analysisStates: make(map[string]time.Time),
+		skillService:   skillSvc,
 	}
 }
 
@@ -123,6 +126,9 @@ func (s *Scheduler) sendWeeklyReports() {
 
 	var successCount, failCount int
 	for _, u := range users {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "finance") {
+			continue
+		}
 		if err := s.GenerateAndSend(u.telegramID, u.chatID); err != nil {
 			log.Error().Err(err).Str("user_id", u.telegramID).Msg("weekly report failed")
 			failCount++

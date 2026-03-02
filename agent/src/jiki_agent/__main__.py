@@ -5,9 +5,10 @@ import logging
 import signal
 
 from jiki_agent.config import settings
-from jiki_agent.db.pool import close_pool, init_pool
+from jiki_agent.db.pool import close_pool, get_pool, init_pool
 from jiki_agent.graph.agent import close_checkpointer, create_agent
 from jiki_agent.grpc.server import serve
+from jiki_agent.skills.registry import register_skills
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 async def main() -> None:
     """Initialize resources and start the gRPC server."""
     await init_pool(settings.database_url)
+    await register_skills(get_pool())
     agent = await create_agent(settings.database_url)
 
     logger.info("Agent initialized, starting gRPC server on port %s", settings.grpc_port)
