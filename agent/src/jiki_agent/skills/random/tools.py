@@ -2,6 +2,7 @@
 
 import logging
 import random as random_lib
+import string as string_lib
 
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
@@ -13,8 +14,9 @@ logger = logging.getLogger(__name__)
 MAX_ITEMS = 100
 MAX_RANGE = 1_000_000_000
 MAX_COUNT = 100
+MAX_STRING_LENGTH = 200
 
-_VALID_MODES = {"choice", "number", "shuffle", "coin", "dice"}
+_VALID_MODES = {"choice", "number", "shuffle", "coin", "dice", "string"}
 
 
 class RandomPickInput(BaseModel):
@@ -24,7 +26,8 @@ class RandomPickInput(BaseModel):
         default="choice",
         description=(
             "랜덤 모드: choice (목록에서 선택), number (숫자 범위), "
-            "shuffle (섞기), coin (동전), dice (주사위)"
+            "shuffle (섞기), coin (동전), dice (주사위), "
+            "string (랜덤 문자열 생성)"
         ),
     )
     items: str = Field(
@@ -35,7 +38,19 @@ class RandomPickInput(BaseModel):
     max_val: int = Field(default=100, description="최대값 (number 모드)")
     count: int = Field(
         default=1,
-        description="선택 개수 (choice 모드) 또는 주사위 개수 (dice 모드)",
+        description="선택 개수 (choice 모드) 또는 주사위/문자열 개수 (dice/string 모드)",
+    )
+    length: int = Field(
+        default=16,
+        description="문자열 길이 (string 모드, 1-200)",
+    )
+    charset: str = Field(
+        default="alphanumeric",
+        description=(
+            "문자열 구성 (string 모드): "
+            "alphanumeric (영숫자), alpha (영문만), numeric (숫자만), "
+            "hex (16진수), password (영숫자+특수문자)"
+        ),
     )
 
 
@@ -47,8 +62,10 @@ async def random_pick(
     min_val: int = 1,
     max_val: int = 100,
     count: int = 1,
+    length: int = 16,
+    charset: str = "alphanumeric",
 ) -> str:
-    """랜덤 선택, 숫자 뽑기, 동전 던지기, 주사위 굴리기 등을 수행합니다."""
+    """랜덤 선택, 숫자 뽑기, 동전 던지기, 주사위 굴리기, 문자열 생성 등을 수행합니다."""
     mode = mode.strip().lower()
 
     if mode not in _VALID_MODES:
@@ -58,6 +75,36 @@ async def random_pick(
         )
 
     count = max(1, min(count, MAX_COUNT))
+
+    if mode == "string":
+        length = max(1, min(length, MAX_STRING_LENGTH))
+        charset = charset.strip().lower()
+
+        charset_map = {
+            "alphanumeric": string_lib.ascii_letters + string_lib.digits,
+            "alpha": string_lib.ascii_letters,
+            "numeric": string_lib.digits,
+            "hex": string_lib.hexdigits[:16],  # 0-9a-f
+            "password": string_lib.ascii_letters + string_lib.digits + "!@#$%^&*()-_=+",
+        }
+
+        chars = charset_map.get(charset)
+        if chars is None:
+            return (
+                "지원하지 않는 문자셋이에요. "
+                "사용 가능: alphanumeric, alpha, numeric, hex, password"
+            )
+
+        results = [
+            "".join(random_lib.choices(chars, k=length)) for _ in range(count)
+        ]
+
+        if count == 1:
+            return f"🎲 랜덤 문자열 ({charset}, {length}자):\n`{results[0]}`"
+        lines = [f"🎲 랜덤 문자열 {count}개 ({charset}, {length}자):"]
+        for i, r in enumerate(results):
+            lines.append(f"  {i + 1}. `{r}`")
+        return "\n".join(lines)
 
     if mode == "coin":
         results = [random_lib.choice(["앞면 🪙", "뒷면 🪙"]) for _ in range(count)]

@@ -2,7 +2,7 @@
 
 Tests cover:
 - ``RandomPickInput``: Pydantic schema
-- ``random_pick`` tool: All modes (choice, number, shuffle, coin, dice)
+- ``random_pick`` tool: All modes (choice, number, shuffle, coin, dice, string)
 """
 
 from __future__ import annotations
@@ -24,6 +24,8 @@ class TestRandomPickInput:
         assert model.min_val == 1
         assert model.max_val == 100
         assert model.count == 1
+        assert model.length == 16
+        assert model.charset == "alphanumeric"
 
     def test_custom(self):
         model = RandomPickInput(mode="dice", count=3)
@@ -154,3 +156,84 @@ class TestRandomPickShuffle:
         assert "순서 섞기" in result
         assert "A" in result
         assert "B" in result
+
+
+# =========================================================================
+# random_pick: string mode
+# =========================================================================
+class TestRandomPickString:
+    @pytest.mark.asyncio
+    async def test_default_string(self):
+        result = await random_pick.ainvoke({"mode": "string"})
+        assert "랜덤 문자열" in result
+        assert "alphanumeric" in result
+        assert "16자" in result
+
+    @pytest.mark.asyncio
+    async def test_custom_length(self):
+        result = await random_pick.ainvoke({"mode": "string", "length": 8})
+        assert "8자" in result
+
+    @pytest.mark.asyncio
+    async def test_password_charset(self):
+        result = await random_pick.ainvoke(
+            {"mode": "string", "charset": "password", "length": 20}
+        )
+        assert "password" in result
+        assert "20자" in result
+
+    @pytest.mark.asyncio
+    async def test_hex_charset(self):
+        result = await random_pick.ainvoke(
+            {"mode": "string", "charset": "hex", "length": 32}
+        )
+        assert "hex" in result
+        assert "32자" in result
+
+    @pytest.mark.asyncio
+    async def test_numeric_charset(self):
+        result = await random_pick.ainvoke(
+            {"mode": "string", "charset": "numeric", "length": 6}
+        )
+        assert "numeric" in result
+        # Extract the generated string between backticks.
+        import re
+        match = re.search(r"`([^`]+)`", result)
+        assert match
+        assert match.group(1).isdigit()
+
+    @pytest.mark.asyncio
+    async def test_alpha_charset(self):
+        result = await random_pick.ainvoke(
+            {"mode": "string", "charset": "alpha", "length": 10}
+        )
+        assert "alpha" in result
+        import re
+        match = re.search(r"`([^`]+)`", result)
+        assert match
+        assert match.group(1).isalpha()
+
+    @pytest.mark.asyncio
+    async def test_invalid_charset(self):
+        result = await random_pick.ainvoke(
+            {"mode": "string", "charset": "unknown"}
+        )
+        assert "지원하지 않는 문자셋" in result
+
+    @pytest.mark.asyncio
+    async def test_multiple_strings(self):
+        result = await random_pick.ainvoke(
+            {"mode": "string", "length": 8, "count": 3}
+        )
+        assert "3개" in result
+        assert "1." in result
+        assert "2." in result
+        assert "3." in result
+
+    @pytest.mark.asyncio
+    async def test_length_clamped(self):
+        """Length exceeding MAX_STRING_LENGTH is clamped to 200."""
+        result = await random_pick.ainvoke(
+            {"mode": "string", "length": 999}
+        )
+        assert "200자" in result
