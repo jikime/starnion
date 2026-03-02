@@ -41,6 +41,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/jiki_agent"]
+artifacts = ["src/jiki_agent/document/fonts/*.ttf"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
