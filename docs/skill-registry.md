@@ -162,9 +162,29 @@ agent/src/jiki_agent/
 │   │   ├── SKILL.md
 │   │   └── tools.py              ← calculate (ast safe eval)
 │   │
-│   └── reminder/                 ← ⏰ 알림 스킬
+│   ├── reminder/                 ← ⏰ 알림 스킬
+│   │   ├── SKILL.md
+│   │   └── tools.py              ← set_reminder, list_reminders, delete_reminder
+│   │
+│   ├── currency/                ← 💱 환율 스킬
+│   │   ├── SKILL.md
+│   │   └── tools.py              ← convert_currency, get_exchange_rate
+│   │
+│   ├── dday/                    ← 📆 디데이 스킬
+│   │   ├── SKILL.md
+│   │   └── tools.py              ← set_dday, list_ddays, delete_dday
+│   │
+│   ├── random/                  ← 🎲 랜덤 스킬
+│   │   ├── SKILL.md
+│   │   └── tools.py              ← random_pick
+│   │
+│   ├── memo/                    ← 🗒️ 메모 스킬
+│   │   ├── SKILL.md
+│   │   └── tools.py              ← save_memo, list_memos, delete_memo
+│   │
+│   └── unitconv/                ← 📐 단위변환 스킬
 │       ├── SKILL.md
-│       └── tools.py              ← set_reminder, list_reminders, delete_reminder
+│       └── tools.py              ← convert_unit
 │
 ├── db/
 │   ├── pool.py
@@ -278,7 +298,7 @@ async def dynamic_prompt(state: dict) -> list:
 
 ---
 
-## 스킬 맵 (21개)
+## 스킬 맵 (26개)
 
 ### 기존 기능 (9개)
 
@@ -294,7 +314,7 @@ async def dynamic_prompt(state: dict) -> list:
 | 8 | `proactive` | 🔔 능동 알림 | — | inactive_reminder | ON | 1 |
 | 9 | `compaction` | 🗜️ 메모리 압축 | — | memory_compaction | ON | 0 (시스템) |
 
-### 신규 기능 (12개) — 기존 multimodal 분해 + 신규
+### 신규 기능 (17개) — 기존 multimodal 분해 + 신규
 
 | # | ID | 이름 | 도구 | 기본값 | Level |
 |---|-----|------|------|--------|-------|
@@ -310,6 +330,11 @@ async def dynamic_prompt(state: dict) -> list:
 | 19 | `qrcode` | 🔲 QR코드 | generate_qrcode | ON | 1 |
 | 20 | `calculator` | 🧮 계산기 | calculate | ON | 1 |
 | 21 | `reminder` | ⏰ 알림 | set_reminder, list_reminders, delete_reminder | ON | 1 |
+| 22 | `currency` | 💱 환율 | convert_currency, get_exchange_rate | ON | 1 |
+| 23 | `dday` | 📆 디데이 | set_dday, list_ddays, delete_dday | ON | 1 |
+| 24 | `random` | 🎲 랜덤 | random_pick | ON | 1 |
+| 25 | `memo` | 🗒️ 메모 | save_memo, list_memos, delete_memo | ON | 1 |
+| 26 | `unitconv` | 📐 단위변환 | convert_unit | ON | 1 |
 
 ### Permission Level
 
@@ -466,9 +491,18 @@ Agent를 경유하지 않고 Gateway가 직접 처리하는 명령어.
     │                                   │
     │ 📌 유틸리티                       │
     │ [🔲QR코드 ✅] [🧮계산기 ✅]      │
+    │ [🎲랜덤 ✅]   [🗒️메모 ✅]       │
+    │ [📐단위변환 ✅]                   │
+    │                                   │
+    │ 📌 금융                           │
+    │ [💰가계부 ✅] [📊예산 ✅]        │
+    │ [💱환율 ✅]                       │
     │                                   │
     │ 📌 생산성                         │
     │ [📅일정 ✅]   [⏰알림 ✅]        │
+    │                                   │
+    │ 📌 라이프스타일                   │
+    │ [📔일기 ✅]   [📆디데이 ✅]      │
     │                                   │
     │ 📌 외부 연동                     │
     │ [🔗구글 ❌]                      │
@@ -700,6 +734,41 @@ SKILLS: dict[str, SkillDef] = {
         tools=["set_reminder", "list_reminders", "delete_reminder"],
         sort_order=21,
     ),
+    "currency": SkillDef(
+        id="currency", name="환율", emoji="💱",
+        description="실시간 환율 조회 및 통화 변환",
+        category="finance",
+        tools=["convert_currency", "get_exchange_rate"],
+        sort_order=22,
+    ),
+    "dday": SkillDef(
+        id="dday", name="디데이", emoji="📆",
+        description="중요한 날짜까지 남은 일수 추적",
+        category="lifestyle",
+        tools=["set_dday", "list_ddays", "delete_dday"],
+        sort_order=23,
+    ),
+    "random": SkillDef(
+        id="random", name="랜덤", emoji="🎲",
+        description="랜덤 선택, 숫자 뽑기, 동전/주사위",
+        category="utility",
+        tools=["random_pick"],
+        sort_order=24,
+    ),
+    "memo": SkillDef(
+        id="memo", name="메모", emoji="🗒️",
+        description="간편 메모 저장, 조회, 삭제",
+        category="utility",
+        tools=["save_memo", "list_memos", "delete_memo"],
+        sort_order=25,
+    ),
+    "unitconv": SkillDef(
+        id="unitconv", name="단위변환", emoji="📐",
+        description="길이, 무게, 온도, 부피, 면적, 데이터 단위 변환",
+        category="utility",
+        tools=["convert_unit"],
+        sort_order=26,
+    ),
     "websearch": SkillDef(
         id="websearch", name="웹 검색", emoji="🔍",
         description="인터넷 검색 및 웹페이지 정보 수집",
@@ -811,18 +880,22 @@ def skill_guard(skill_id: str):
 ```python
 from contextvars import ContextVar
 
-_pending_files: ContextVar[list] = ContextVar("pending_files", default=[])
+# default=None으로 설정하여 mutable default 공유 방지
+_pending_files: ContextVar[list | None] = ContextVar("pending_files", default=None)
 
 def add_pending_file(data: bytes, name: str, mime: str):
     """도구에서 호출 — 생성된 파일을 대기열에 추가."""
     files = _pending_files.get()
+    if files is None:
+        files = []
+        _pending_files.set(files)
     files.append({"data": data, "name": name, "mime": mime})
 
 def pop_pending_files() -> list:
     """gRPC 스트림에서 호출 — 대기 파일 꺼내고 초기화."""
     files = _pending_files.get()
-    _pending_files.set([])
-    return files
+    _pending_files.set(None)
+    return files if files else []
 ```
 
 ### 4. 도구 구현 예시
@@ -889,6 +962,11 @@ from jiki_agent.skills.calculator.tools import calculate
 from jiki_agent.skills.reminder.tools import (
     delete_reminder, list_reminders, set_reminder,
 )
+from jiki_agent.skills.currency.tools import convert_currency, get_exchange_rate
+from jiki_agent.skills.dday.tools import delete_dday, list_ddays, set_dday
+from jiki_agent.skills.random.tools import random_pick
+from jiki_agent.skills.memo.tools import delete_memo, list_memos, save_memo
+from jiki_agent.skills.unitconv.tools import convert_unit
 from jiki_agent.skills.google.tools import (
     google_auth, google_disconnect,
     google_calendar_create, google_calendar_list,
@@ -918,6 +996,11 @@ tools = [
     generate_qrcode,
     calculate,
     set_reminder, list_reminders, delete_reminder,
+    convert_currency, get_exchange_rate,
+    set_dday, list_ddays, delete_dday,
+    random_pick,
+    save_memo, list_memos, delete_memo,
+    convert_unit,
 ]
 
 # dynamic_prompt — 활성 스킬만 prompt에 주입
@@ -1225,6 +1308,103 @@ DB: knowledge_repo (기존 인프라 활용)
 - schedule 스킬과 독립 동작 (단순 메시지 알림 특화)
 - 추가 의존성 없음
 
+### `currency` — 환율
+
+API: Frankfurter (무료, API 키 불필요, https://api.frankfurter.app)
+
+| 기능 | 도구 | 구현 | 상태 |
+|------|------|------|------|
+| 통화 변환 | convert_currency | Frankfurter API (amount/from/to) | ✅ 구현 |
+| 환율 조회 | get_exchange_rate | Frankfurter API (from/to 다중) | ✅ 구현 |
+
+**특징:**
+- 9개 주요 통화 한국어 이름 매핑 (KRW, USD, EUR, JPY, GBP, CNY, CHF, CAD, AUD)
+- 금액 > 0 검증, 동일 통화 변환 단축 처리
+- 환율 날짜 표시 (API 제공)
+- 추가 의존성 없음 (httpx 기존 사용)
+
+### `dday` — 디데이
+
+DB: knowledge_repo (기존 인프라 활용)
+
+| 기능 | 도구 | 구현 | 상태 |
+|------|------|------|------|
+| 디데이 설정 | set_dday | knowledge_repo.upsert (dday: 접두사) | ✅ 구현 |
+| 디데이 조회 | list_ddays | knowledge_repo.get_by_key_prefix | ✅ 구현 |
+| 디데이 삭제 | delete_dday | knowledge_repo.delete_by_key | ✅ 구현 |
+
+**특징:**
+- 사용자당 최대 30개 디데이
+- YYYY-MM-DD 형식
+- D-N (미래), D-Day! (당일), D+N (과거) 자동 계산
+- 매년 반복(recurring) 옵션 — 반복 디데이는 과거여도 목록에 표시
+- include_past 옵션으로 지난 디데이 포함 조회
+- 날짜순 정렬 (가까운 날짜 먼저)
+- 추가 의존성 없음
+
+### `random` — 랜덤
+
+순수 Python (API/LLM 불필요)
+
+| 기능 | 도구 | 구현 | 상태 |
+|------|------|------|------|
+| 랜덤 선택 | random_pick | Python random 모듈 (5개 모드) | ✅ 구현 |
+
+**모드:**
+- `choice`: 쉼표 구분 목록에서 N개 무작위 선택
+- `number`: 범위 내 무작위 숫자 생성 (중복 없이)
+- `shuffle`: 목록 순서 무작위 섞기
+- `coin`: 동전 던지기 (앞면/뒷면)
+- `dice`: 주사위 굴리기 (합계 표시)
+
+**특징:**
+- 항목 수 제한 100개, 범위 제한 1~10억
+- 선택 개수 제한 100개
+- 미지정 모드 오류 안내
+- 추가 의존성 없음
+
+### `memo` — 메모
+
+DB: knowledge_repo (기존 인프라 활용)
+
+| 기능 | 도구 | 구현 | 상태 |
+|------|------|------|------|
+| 메모 저장 | save_memo | knowledge_repo.upsert (memo: 접두사) | ✅ 구현 |
+| 메모 조회 | list_memos | knowledge_repo.get_by_key_prefix + 태그 필터 | ✅ 구현 |
+| 메모 삭제 | delete_memo | knowledge_repo.delete_by_key | ✅ 구현 |
+
+**특징:**
+- 사용자당 최대 100개 메모
+- 내용 길이 제한 2,000자
+- 제목(선택), 태그(선택) 필드
+- 태그별 필터링, 조회 개수 제한 (1-50, 기본 10)
+- 최신순 정렬
+- 추가 의존성 없음
+
+### `unitconv` — 단위변환
+
+순수 Python (API/LLM 불필요)
+
+| 기능 | 도구 | 구현 | 상태 |
+|------|------|------|------|
+| 단위 변환 | convert_unit | 6개 카테고리 변환 테이블 | ✅ 구현 |
+
+**지원 카테고리:**
+- 길이: mm, cm, m, km, in, ft, yd, mi
+- 무게: mg, g, kg, lb, oz, ton
+- 온도: C, F, K (수식 기반 특수 처리)
+- 부피: ml, l, gal, cup, fl_oz
+- 면적: sqm, sqkm, sqft, pyeong(평), acre, ha
+- 데이터: B, KB, MB, GB, TB
+
+**특징:**
+- 한국 단위 `pyeong`(평) 지원 (3.30579 sqm)
+- 온도는 수식 변환 (C↔F: ×9/5+32, C↔K: +273.15)
+- 일반 단위는 factor 기반 변환 (value × from_factor / to_factor)
+- 다른 카테고리 간 변환 차단
+- 결과 포맷: 천단위 구분 + 소수점 최대 4자리
+- 추가 의존성 없음
+
 ---
 
 ## 의존성 추가
@@ -1303,6 +1483,11 @@ qrcode = { version = ">=8.0", extras = ["pil"] }
 | `skills/qrcode/SKILL.md` + `tools.py` | generate_qrcode (qrcode lib → PNG) |
 | `skills/calculator/SKILL.md` + `tools.py` | calculate (ast 안전 수식 평가) |
 | `skills/reminder/SKILL.md` + `tools.py` | set/list/delete_reminder (knowledge_repo) |
+| `skills/currency/SKILL.md` + `tools.py` | convert_currency + get_exchange_rate (Frankfurter API) |
+| `skills/dday/SKILL.md` + `tools.py` | set/list/delete_dday (knowledge_repo) |
+| `skills/random/SKILL.md` + `tools.py` | random_pick (Python random 모듈, 5개 모드) |
+| `skills/memo/SKILL.md` + `tools.py` | save/list/delete_memo (knowledge_repo) |
+| `skills/unitconv/SKILL.md` + `tools.py` | convert_unit (6개 카테고리, 순수 Python) |
 
 ### New Files — Go Gateway
 
@@ -1392,6 +1577,15 @@ Phase 9: Tier 1 Skills (번역/QR/계산기/알림)            ✅ 완료
   ├─ reminder/tools.py (set/list/delete_reminder via knowledge_repo)
   ├─ pyproject.toml: qrcode[pil]>=8.0 의존성 추가
   └─ 단위 테스트 223 → 317개 확장
+
+Phase 10: Tier 2 Skills (환율/디데이/랜덤/메모/단위변환)   ✅ 완료
+  ├─ currency/tools.py (convert_currency + get_exchange_rate via Frankfurter API)
+  ├─ dday/tools.py (set/list/delete_dday via knowledge_repo, 반복 지원)
+  ├─ random/tools.py (random_pick, 5개 모드: choice/number/shuffle/coin/dice)
+  ├─ memo/tools.py (save/list/delete_memo via knowledge_repo, 태그 필터)
+  ├─ unitconv/tools.py (convert_unit, 6개 카테고리, 온도 수식 변환)
+  ├─ 추가 의존성 없음 (httpx, knowledge_repo 기존 사용)
+  └─ 단위 테스트 317 → 415개 확장
 ```
 
 ---
@@ -1436,6 +1630,16 @@ print('OK')
 - **알림 설정**: "내일 오전 9시에 회의 알려줘" → 알림 예약 확인
 - **알림 조회**: "알림 목록 보여줘" → 활성 알림 목록
 - **알림 삭제**: "알림 취소해줘" → 알림 삭제 확인
+- **환율 변환**: "100달러 원화로 얼마야?" → 실시간 환율 변환 결과
+- **환율 조회**: "오늘 환율 알려줘" → USD 기준 주요 통화 환율
+- **디데이 설정**: "크리스마스 디데이 설정해줘" → D-day 설정 확인
+- **디데이 조회**: "디데이 목록 보여줘" → 남은 일수와 함께 목록
+- **랜덤 선택**: "짜장면, 짬뽕, 볶음밥 중에 골라줘" → 무작위 선택
+- **주사위**: "주사위 3개 굴려줘" → 주사위 결과 + 합계
+- **메모 저장**: "우유 사기 메모해줘" → 메모 저장 확인
+- **메모 조회**: "메모 보여줘" → 메모 목록 (태그 필터 지원)
+- **단위 변환**: "30평 몇 제곱미터야?" → 단위 변환 결과
+- **온도 변환**: "화씨 100도 섭씨로" → 37.78°C
 
 ### 3. DB 확인
 
@@ -1455,7 +1659,7 @@ ORDER BY s.sort_order;
 
 ## 테스트
 
-### 단위 테스트 (317개, 모두 통과)
+### 단위 테스트 (415개, 모두 통과)
 
 | 테스트 파일 | 범위 | 테스트 수 |
 |-------------|------|----------|
@@ -1475,20 +1679,26 @@ ORDER BY s.sort_order;
 | `test_qrcode_tools.py` | generate_qrcode, 입력 검증, 바이너리 출력 | 11 |
 | `test_calculator_tools.py` | calculate, safe_eval, 수식 포맷, 보안 차단 | 27 |
 | `test_reminder_tools.py` | set/list/delete_reminder, 입력 스키마 | 19 |
+| `test_currency_tools.py` | convert_currency, get_exchange_rate, API 에러 | 14 |
+| `test_dday_tools.py` | set/list/delete_dday, 날짜 검증, 반복 | 18 |
+| `test_random_tools.py` | random_pick 5개 모드, 엣지 케이스 | 16 |
+| `test_memo_tools.py` | save/list/delete_memo, 태그 필터 | 18 |
+| `test_unitconv_tools.py` | convert_unit 6개 카테고리, 검증 | 22 |
 | 기타 (image, audio, video, google 등) | 각 스킬 도구 | 41 |
+| 기타 (persona, scheduler, knowledge 등) | 인프라 | 10 |
 
 ```bash
 cd agent && uv run pytest tests/ -q
-# 317 passed
+# 415 passed
 ```
 
 ### 통합 검증
 
 ```bash
-# 레지스트리: 21개 스킬, 44개 도구
+# 레지스트리: 26개 스킬, 54개 도구
 # ALL_TOOLS 일치 확인
 # 역매핑 (tool→skill) 전수 확인
-# SKILL.md 로딩: 18개 문서
+# SKILL.md 로딩: 23개 문서
 # 파일 컨텍스트 파이프라인: OK
 # 문서 파서/생성기: OK (ReportLab PDF + 한글 지원)
 # Go 빌드 + vet: OK
@@ -1521,7 +1731,7 @@ STREAM_END → 최종 Markdown 포맷 (기존 로직 동일)
 - 사용자는 메시지 1개만 보이며, "생각중..." → "도구 사용중..." → 최종 응답으로 자연스럽게 전환
 - 에러/스트림 종료 시 고아 상태 메시지 자동 정리
 
-### 도구별 상태 메시지 (44개)
+### 도구별 상태 메시지 (54개)
 
 | 도구 | 상태 메시지 |
 |------|-------------|
@@ -1543,6 +1753,12 @@ STREAM_END → 최종 Markdown 포맷 (기존 로직 동일)
 | generate_qrcode | 🔲 QR 코드 생성중... |
 | calculate | 🧮 계산중... |
 | set_reminder / list_reminders / delete_reminder | ⏰ 알림 설정/조회/삭제중... |
+| convert_currency | 💱 환율 변환중... |
+| get_exchange_rate | 💱 환율 조회중... |
+| set_dday / list_ddays / delete_dday | 📆 디데이 설정/조회/삭제중... |
+| random_pick | 🎲 랜덤 선택중... |
+| save_memo / list_memos / delete_memo | 🗒️ 메모 저장/조회/삭제중... |
+| convert_unit | 📐 단위 변환중... |
 | google_calendar_* | 📅 구글 캘린더 조회/생성중... |
 | google_mail_* | 📧 메일 조회/전송중... |
 | google_docs_* / google_tasks_* / google_drive_* | 각 서비스별 상태 |
@@ -1572,5 +1788,5 @@ Bot:  "💭 생각중..."  →  "🔍 웹 검색중..."  →  "📄 웹페이지
 
 ---
 
-**상태**: ✅ 구현 완료 (Phase 1-9 + Tool Status)
+**상태**: ✅ 구현 완료 (Phase 1-10 + Tool Status)
 **날짜**: 2026-03-02
