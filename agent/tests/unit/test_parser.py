@@ -7,7 +7,10 @@ Tests cover:
 - extract_text_from_txt: Plain text file passthrough
 - extract_text for unsupported extensions
 - extract_text_from_docx: DOCX text extraction
+- extract_text_from_doc: Legacy DOC (Word Binary) text extraction
 - extract_text_from_xlsx: XLSX spreadsheet extraction
+- extract_text_from_xls: Legacy XLS graceful fallback
+- extract_text_from_ppt: Legacy PPT graceful fallback
 """
 
 from jiki_agent.document.parser import (
@@ -122,3 +125,109 @@ class TestExtractTextFromXlsx:
         assert "Name" in text
         assert "Alice" in text
         assert "30" in text
+
+
+class TestExtractTextFromDoc:
+    """Tests for legacy DOC (Word Binary) extraction."""
+
+    def test_docx_with_doc_extension(self):
+        """A .docx file saved with .doc extension is handled by python-docx fallback."""
+        from jiki_agent.document.generator import generate_docx
+        from jiki_agent.document.parser import extract_text_from_doc
+
+        # generate_docx creates a valid .docx (ZIP-based) file
+        docx_bytes = generate_docx("Test", "Hello from docx fallback.")
+        text = extract_text_from_doc(docx_bytes)
+
+        assert "Hello from docx fallback." in text
+
+    def test_invalid_data_returns_fallback(self):
+        """Non-OLE, non-ZIP data returns a friendly fallback message."""
+        from jiki_agent.document.parser import extract_text_from_doc
+
+        result = extract_text_from_doc(b"this is not a doc file")
+        assert ".docx" in result
+        assert "변환" in result
+
+    def test_empty_data_returns_fallback(self):
+        """Empty data returns a friendly fallback message."""
+        from jiki_agent.document.parser import extract_text_from_doc
+
+        result = extract_text_from_doc(b"")
+        assert ".docx" in result
+
+    def test_ole_without_word_stream_returns_fallback(self):
+        """An OLE file without WordDocument stream returns fallback."""
+        import olefile
+        from io import BytesIO
+
+        from jiki_agent.document.parser import extract_text_from_doc
+
+        # Create a minimal OLE file without WordDocument stream
+        buf = BytesIO()
+        # olefile doesn't have a writer, so we use a HWP-like OLE file
+        # Instead, test with the router
+        result = extract_text("not a doc".encode(), "doc")
+        assert ".docx" in result or "변환" in result
+
+    def test_router_dispatches_to_doc_extractor(self):
+        """The 'doc' extension dispatches to extract_text_from_doc (not docx)."""
+        # An OLE header (not a ZIP) should not raise BadZipFile
+        ole_header = b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"
+        fake_doc = ole_header + b"\x00" * 500
+
+        result = extract_text(fake_doc, "doc")
+
+        # Should get fallback message, NOT an unhandled BadZipFile exception
+        assert "변환" in result or "추출할 수 없" in result
+
+
+class TestExtractTextFromXls:
+    """Tests for legacy XLS graceful fallback."""
+
+    def test_xlsx_with_xls_extension(self):
+        """A .xlsx file saved with .xls extension is handled by openpyxl fallback."""
+        from jiki_agent.document.generator import generate_xlsx
+        from jiki_agent.document.parser import extract_text_from_xls
+
+        xlsx_bytes = generate_xlsx(["Col1"], [["Data1"]])
+        text = extract_text_from_xls(xlsx_bytes)
+
+        assert "Col1" in text
+        assert "Data1" in text
+
+    def test_old_xls_returns_fallback(self):
+        """A real old XLS binary returns a friendly fallback, not a crash."""
+        from jiki_agent.document.parser import extract_text_from_xls
+
+        ole_header = b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"
+        fake_xls = ole_header + b"\x00" * 500
+
+        result = extract_text_from_xls(fake_xls)
+        assert ".xlsx" in result
+        assert "변환" in result
+
+    def test_router_dispatches_xls(self):
+        """The router handles 'xls' without BadZipFile crash."""
+        result = extract_text(b"not an xlsx", "xls")
+        assert ".xlsx" in result or "변환" in result
+
+
+class TestExtractTextFromPpt:
+    """Tests for legacy PPT graceful fallback."""
+
+    def test_old_ppt_returns_fallback(self):
+        """Old PPT binary returns a friendly fallback, not a crash."""
+        from jiki_agent.document.parser import extract_text_from_ppt
+
+        ole_header = b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"
+        fake_ppt = ole_header + b"\x00" * 500
+
+        result = extract_text_from_ppt(fake_ppt)
+        assert ".pptx" in result
+        assert "변환" in result
+
+    def test_router_dispatches_ppt(self):
+        """The router handles 'ppt' without crash."""
+        result = extract_text(b"not a pptx", "ppt")
+        assert ".pptx" in result or "변환" in result

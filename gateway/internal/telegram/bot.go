@@ -454,8 +454,15 @@ func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID in
 
 	b.setReaction(chatID, messageID, "👍")
 
-	if err := b.SendMessage(chatID, resp.Content); err != nil {
-		log.Error().Err(err).Str("user_id", userID).Msg("failed to send telegram reply")
+	// Send file if the response contains file data (e.g., generated documents).
+	if len(resp.FileData) > 0 {
+		b.sendFile(chatID, resp.FileData, resp.FileName, resp.FileMime)
+	}
+
+	if resp.Content != "" {
+		if err := b.SendMessage(chatID, resp.Content); err != nil {
+			log.Error().Err(err).Str("user_id", userID).Msg("failed to send telegram reply")
+		}
 	}
 }
 
@@ -635,6 +642,7 @@ var toolStatusText = map[string]string{
 	"generate_hash":          "🔑 해시 생성중...",
 	"convert_color":          "🎨 색상 변환중...",
 	"get_horoscope":          "♈ 운세 조회중...",
+	"lookup_ip":              "📡 IP 조회중...",
 }
 
 // getToolStatus returns a Korean status message for the given tool name.

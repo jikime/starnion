@@ -335,6 +335,15 @@ SKILLS: dict[str, SkillDef] = {
         tools=["get_horoscope"],
         sort_order=32,
     ),
+    "ip": SkillDef(
+        id="ip",
+        name="IP 조회",
+        emoji="📡",
+        description="IP 주소 위치, ISP 정보 조회",
+        category="utility",
+        tools=["lookup_ip"],
+        sort_order=33,
+    ),
 }
 
 # tool_name -> skill_id reverse mapping (fast guard lookup)

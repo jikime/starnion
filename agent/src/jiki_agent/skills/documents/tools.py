@@ -13,6 +13,7 @@ from jiki_agent.document.generator import (
     generate_docx,
     generate_md,
     generate_pdf,
+    generate_pptx,
     generate_txt,
     generate_xlsx,
 )
@@ -34,15 +35,16 @@ class GenerateDocumentInput(BaseModel):
     content: str = Field(description="문서에 들어갈 내용")
     format: str = Field(
         default="pdf",
-        description="생성할 문서 포맷: pdf, docx, xlsx, md, txt",
+        description="생성할 문서 포맷: pdf, docx(워드), xlsx(엑셀), pptx(PPT/발표자료), md(마크다운), txt(텍스트)",
     )
-    title: str = Field(default="문서", description="문서 제목")
+    title: str = Field(default="문서", description="문서 제목 (파일명에 사용)")
 
 
 _MIME_TYPES = {
     "pdf": "application/pdf",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "md": "text/markdown",
     "txt": "text/plain",
 }
@@ -94,16 +96,18 @@ async def parse_document(file_url: str, file_name: str = "document.pdf") -> str:
 async def generate_document(
     content: str, format: str = "pdf", title: str = "문서",
 ) -> str:
-    """요청한 내용으로 문서를 생성합니다. PDF, DOCX, XLSX, MD, TXT 포맷을 지원합니다."""
+    """요청한 내용으로 문서 파일을 생성합니다. 사용자가 워드, 엑셀, PDF, PPT, 발표자료 등 문서 파일 생성을 요청하면 반드시 이 도구를 호출하세요. 포맷: pdf, docx(워드), xlsx(엑셀), pptx(PPT/발표자료), md, txt."""
     fmt = format.lower().strip(".")
     mime = _MIME_TYPES.get(fmt)
     if not mime:
-        return f"지원하지 않는 포맷이에요: {format}. pdf, docx, xlsx, md, txt 중에서 선택해주세요."
+        return f"지원하지 않는 포맷이에요: {format}. pdf, docx, xlsx, pptx, md, txt 중에서 선택해주세요."
 
     if fmt == "pdf":
         data = generate_pdf(title, content)
     elif fmt == "docx":
         data = generate_docx(title, content)
+    elif fmt == "pptx":
+        data = generate_pptx(title, content)
     elif fmt == "xlsx":
         # Parse simple table: first line = headers, rest = rows.
         lines = [line for line in content.strip().split("\n") if line.strip()]

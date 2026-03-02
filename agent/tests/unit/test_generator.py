@@ -12,6 +12,7 @@ from jiki_agent.document.generator import (
     generate_docx,
     generate_md,
     generate_pdf,
+    generate_pptx,
     generate_txt,
     generate_xlsx,
 )
@@ -98,6 +99,51 @@ class TestGenerateXlsx:
         result = generate_xlsx(["Col1", "Col2"], [])
         assert isinstance(result, bytes)
         assert len(result) > 0
+
+
+class TestGeneratePptx:
+    """Tests for generate_pptx."""
+
+    def test_returns_bytes(self):
+        """PPTX output is bytes."""
+        result = generate_pptx("Title", "Content")
+        assert isinstance(result, bytes)
+
+    def test_starts_with_zip_magic(self):
+        """PPTX files are ZIP archives (PK magic bytes)."""
+        result = generate_pptx("Title", "Content")
+        assert result[:2] == b"PK"
+
+    def test_nonempty_output(self):
+        """Output has non-trivial size."""
+        result = generate_pptx("Presentation", "Slide content here.")
+        assert len(result) > 100
+
+    def test_multiple_paragraphs(self):
+        """Multiple paragraphs produce a valid PPTX."""
+        content = "\n\n".join([f"Bullet {i}" for i in range(10)])
+        result = generate_pptx("Many Bullets", content)
+        assert isinstance(result, bytes)
+        assert len(result) > 100
+
+    def test_roundtrip_pptx(self):
+        """Generated PPTX can be parsed back by python-pptx."""
+        from io import BytesIO
+        from pptx import Presentation
+
+        result = generate_pptx("Test Title", "First point.\n\nSecond point.")
+        prs = Presentation(BytesIO(result))
+        # Title slide + 1 content slide = at least 2 slides.
+        assert len(prs.slides) >= 2
+        # Title slide should contain the title text.
+        title_text = prs.slides[0].shapes.title.text
+        assert "Test Title" in title_text
+
+    def test_korean_content(self):
+        """Korean content produces a valid PPTX."""
+        result = generate_pptx("발표자료", "첫 번째 항목.\n\n두 번째 항목.")
+        assert isinstance(result, bytes)
+        assert result[:2] == b"PK"
 
 
 class TestGenerateMd:

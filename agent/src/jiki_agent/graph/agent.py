@@ -74,6 +74,7 @@ from jiki_agent.skills.encode.tools import encode_decode
 from jiki_agent.skills.hash.tools import generate_hash
 from jiki_agent.skills.color.tools import convert_color
 from jiki_agent.skills.horoscope.tools import get_horoscope
+from jiki_agent.skills.ip.tools import lookup_ip
 from jiki_agent.skills.websearch.tools import web_fetch, web_search
 
 logger = logging.getLogger(__name__)
@@ -144,6 +145,7 @@ ALL_TOOLS = [
     generate_hash,
     convert_color,
     get_horoscope,
+    lookup_ip,
 ]
 
 # Module-level LLM instance (set during create_agent).

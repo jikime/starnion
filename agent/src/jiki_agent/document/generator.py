@@ -85,6 +85,51 @@ def generate_xlsx(headers: list[str], rows: list[list]) -> bytes:
     return buf.getvalue()
 
 
+def generate_pptx(title: str, content: str) -> bytes:
+    """Generate a PPTX presentation from text content.
+
+    The first slide is a title slide.  Each ``\\n\\n``-delimited paragraph
+    becomes a bullet on a content slide (new slide every 6 bullets).
+    """
+    from pptx import Presentation
+    from pptx.util import Inches, Pt
+
+    prs = Presentation()
+    prs.slide_width = Inches(13.333)
+    prs.slide_height = Inches(7.5)
+
+    # Title slide.
+    title_layout = prs.slide_layouts[0]
+    slide = prs.slides.add_slide(title_layout)
+    slide.shapes.title.text = title
+    if slide.placeholders[1]:
+        slide.placeholders[1].text = ""
+
+    # Content slides from paragraphs.
+    paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
+    bullets_per_slide = 6
+    for i in range(0, len(paragraphs), bullets_per_slide):
+        chunk = paragraphs[i:i + bullets_per_slide]
+        content_layout = prs.slide_layouts[1]
+        slide = prs.slides.add_slide(content_layout)
+        slide.shapes.title.text = title
+        body = slide.placeholders[1]
+        tf = body.text_frame
+        tf.clear()
+        for j, para_text in enumerate(chunk):
+            if j == 0:
+                tf.paragraphs[0].text = para_text
+                tf.paragraphs[0].font.size = Pt(18)
+            else:
+                p = tf.add_paragraph()
+                p.text = para_text
+                p.font.size = Pt(18)
+
+    buf = BytesIO()
+    prs.save(buf)
+    return buf.getvalue()
+
+
 def generate_md(title: str, content: str) -> bytes:
     """Generate a Markdown document."""
     text = f"# {title}\n\n{content}"

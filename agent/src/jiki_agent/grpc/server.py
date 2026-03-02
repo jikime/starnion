@@ -18,7 +18,7 @@ if _generated_root not in sys.path:
 from jiki.v1 import agent_pb2, agent_pb2_grpc  # noqa: E402
 
 from jiki_agent.context import set_current_user
-from jiki_agent.skills.file_context import pop_pending_files
+from jiki_agent.skills.file_context import init_pending_files, pop_pending_files
 from jiki_agent.db.pool import get_pool
 from jiki_agent.db.repositories import profile as profile_repo
 from jiki_agent.skills.compaction.tools import compact_memory
@@ -69,6 +69,7 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
             )
 
         set_current_user(user_id)
+        init_pending_files()
 
         try:
             pool = get_pool()
@@ -86,6 +87,19 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                 )
             else:
                 content = str(raw_content)
+
+            # Include the first pending file (if any) in the unary response.
+            files = pop_pending_files()
+            logger.debug("Chat: pop_pending_files returned %d file(s)", len(files))
+            if files:
+                pf = files[0]
+                return agent_pb2.ChatResponse(
+                    content=content,
+                    type=agent_pb2.FILE,
+                    file_data=pf["data"],
+                    file_name=pf["name"],
+                    file_mime=pf["mime"],
+                )
             return agent_pb2.ChatResponse(
                 content=content,
                 type=agent_pb2.TEXT,
@@ -114,6 +128,7 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
             return
 
         set_current_user(user_id)
+        init_pending_files()
 
         try:
             pool = get_pool()
