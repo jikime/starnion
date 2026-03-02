@@ -628,6 +628,13 @@ var toolStatusText = map[string]string{
 	"list_memos":             "🗒️ 메모 조회중...",
 	"delete_memo":            "🗒️ 메모 삭제중...",
 	"convert_unit":           "📐 단위 변환중...",
+	"get_world_time":         "🕐 세계시간 조회중...",
+	"convert_timezone":       "🕐 시간대 변환중...",
+	"count_text":             "✏️ 글자수 분석중...",
+	"encode_decode":          "🔐 인코딩 처리중...",
+	"generate_hash":          "🔑 해시 생성중...",
+	"convert_color":          "🎨 색상 변환중...",
+	"get_horoscope":          "♈ 운세 조회중...",
 }
 
 // getToolStatus returns a Korean status message for the given tool name.

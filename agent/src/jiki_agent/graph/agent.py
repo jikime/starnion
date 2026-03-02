@@ -68,6 +68,12 @@ from jiki_agent.skills.dday.tools import delete_dday, list_ddays, set_dday
 from jiki_agent.skills.random.tools import random_pick
 from jiki_agent.skills.memo.tools import delete_memo, list_memos, save_memo
 from jiki_agent.skills.unitconv.tools import convert_unit
+from jiki_agent.skills.timezone.tools import convert_timezone, get_world_time
+from jiki_agent.skills.wordcount.tools import count_text
+from jiki_agent.skills.encode.tools import encode_decode
+from jiki_agent.skills.hash.tools import generate_hash
+from jiki_agent.skills.color.tools import convert_color
+from jiki_agent.skills.horoscope.tools import get_horoscope
 from jiki_agent.skills.websearch.tools import web_fetch, web_search
 
 logger = logging.getLogger(__name__)
@@ -131,6 +137,13 @@ ALL_TOOLS = [
     list_memos,
     delete_memo,
     convert_unit,
+    get_world_time,
+    convert_timezone,
+    count_text,
+    encode_decode,
+    generate_hash,
+    convert_color,
+    get_horoscope,
 ]
 
 # Module-level LLM instance (set during create_agent).
