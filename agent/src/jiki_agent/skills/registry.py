@@ -200,6 +200,42 @@ SKILLS: dict[str, SkillDef] = {
         tools=["summarize_url", "summarize_text"],
         sort_order=17,
     ),
+    "translate": SkillDef(
+        id="translate",
+        name="번역",
+        emoji="🌐",
+        description="텍스트를 다국어로 번역 (한/영/일/중 등)",
+        category="information",
+        tools=["translate_text"],
+        sort_order=18,
+    ),
+    "qrcode": SkillDef(
+        id="qrcode",
+        name="QR코드",
+        emoji="🔲",
+        description="QR 코드 이미지 생성",
+        category="utility",
+        tools=["generate_qrcode"],
+        sort_order=19,
+    ),
+    "calculator": SkillDef(
+        id="calculator",
+        name="계산기",
+        emoji="🧮",
+        description="수학 수식 계산 (사칙연산, 함수, 상수)",
+        category="utility",
+        tools=["calculate"],
+        sort_order=20,
+    ),
+    "reminder": SkillDef(
+        id="reminder",
+        name="알림",
+        emoji="⏰",
+        description="간편 알림 예약 및 관리",
+        category="productivity",
+        tools=["set_reminder", "list_reminders", "delete_reminder"],
+        sort_order=21,
+    ),
 }
 
 # tool_name -> skill_id reverse mapping (fast guard lookup)

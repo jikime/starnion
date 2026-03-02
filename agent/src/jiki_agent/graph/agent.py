@@ -55,6 +55,14 @@ from jiki_agent.skills.schedule.tools import (
 from jiki_agent.skills.video.tools import analyze_video, generate_video
 from jiki_agent.skills.weather.tools import get_forecast, get_weather
 from jiki_agent.skills.summarize.tools import summarize_text, summarize_url
+from jiki_agent.skills.translate.tools import translate_text
+from jiki_agent.skills.qrcode.tools import generate_qrcode
+from jiki_agent.skills.calculator.tools import calculate
+from jiki_agent.skills.reminder.tools import (
+    delete_reminder,
+    list_reminders,
+    set_reminder,
+)
 from jiki_agent.skills.websearch.tools import web_fetch, web_search
 
 logger = logging.getLogger(__name__)
@@ -102,6 +110,12 @@ ALL_TOOLS = [
     get_forecast,
     summarize_url,
     summarize_text,
+    translate_text,
+    generate_qrcode,
+    calculate,
+    set_reminder,
+    list_reminders,
+    delete_reminder,
 ]
 
 # Module-level LLM instance (set during create_agent).
