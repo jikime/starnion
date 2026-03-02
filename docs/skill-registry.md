@@ -141,10 +141,14 @@ agent/src/jiki_agent/
 │   │   ├── SKILL.md
 │   │   └── tools.py              ← analyze_video, generate_video
 │   │
-│   └── google/                   ← 🔗 구글 연동 스킬
+│   ├── google/                   ← 🔗 구글 연동 스킬
+│   │   ├── SKILL.md
+│   │   ├── tools.py              ← @tool 함수 12개
+│   │   └── api.py                ← Google API 인증 헬퍼 (get_google_service)
+│   │
+│   └── websearch/                ← 🔍 웹 검색 스킬
 │       ├── SKILL.md
-│       ├── tools.py              ← @tool 함수 12개
-│       └── api.py                ← Google API 인증 헬퍼 (get_google_service)
+│       └── tools.py              ← web_search (Tavily), web_fetch (httpx + readability)
 │
 ├── db/
 │   ├── pool.py
@@ -258,7 +262,7 @@ async def dynamic_prompt(state: dict) -> list:
 
 ---
 
-## 스킬 맵 (14개)
+## 스킬 맵 (15개)
 
 ### 기존 기능 (9개)
 
@@ -274,7 +278,7 @@ async def dynamic_prompt(state: dict) -> list:
 | 8 | `proactive` | 🔔 능동 알림 | — | inactive_reminder | ON | 1 |
 | 9 | `compaction` | 🗜️ 메모리 압축 | — | memory_compaction | ON | 0 (시스템) |
 
-### 신규 기능 (5개) — 기존 multimodal 분해 + 신규
+### 신규 기능 (6개) — 기존 multimodal 분해 + 신규
 
 | # | ID | 이름 | 도구 | 기본값 | Level |
 |---|-----|------|------|--------|-------|
@@ -283,6 +287,7 @@ async def dynamic_prompt(state: dict) -> list:
 | 12 | `video` | 🎬 비디오 | analyze_video, generate_video | OFF | 2 (opt-in) |
 | 13 | `audio` | 🎵 오디오 | transcribe_audio, generate_audio | ON | 1 |
 | 14 | `google` | 🔗 구글 | google_auth + 10개 서비스 도구 | OFF | 2 (opt-in) |
+| 15 | `websearch` | 🔍 웹 검색 | web_search, web_fetch | ON | 1 |
 
 ### Permission Level
 
@@ -346,7 +351,7 @@ dynamic_prompt():
 사용자: "이번 달 지출 보고서 PDF로 만들어줘"
   → LLM → generate_document(content=지출데이터, format="pdf")
     → @skill_guard("documents")
-    → document/generator.py → fpdf2로 PDF 생성 → add_pending_file(bytes, name, mime)
+    → document/generator.py → ReportLab로 PDF 생성 → add_pending_file(bytes, name, mime)
     → return "보고서 생성 완료"
   → gRPC 스트림:
     1. TEXT: "3월 지출 보고서를 만들었어요!"
@@ -984,7 +989,7 @@ case jikiv1.ResponseType_FILE:
 | | PPTX | python-pptx | ✅ 구현 |
 | | HWP | olefile (best-effort) | ✅ 구현 |
 | | MD/TXT/CSV | built-in | ✅ 구현 |
-| **생성** | PDF | fpdf2 | ✅ 구현 |
+| **생성** | PDF | ReportLab | ✅ 구현 |
 | | DOCX | python-docx | ✅ 구현 |
 | | XLSX | openpyxl | ✅ 구현 |
 | | MD/TXT | built-in | ✅ 구현 |
@@ -1008,7 +1013,7 @@ case jikiv1.ResponseType_FILE:
 | 기능 | 구현 | 위치 | 상태 |
 |------|------|------|------|
 | STT (transcribe) | Gemini 음성→텍스트 | tools.py | ✅ 구현 (process_voice → transcribe_audio) |
-| TTS (generate) | Google Cloud Text-to-Speech | tools.py | ✅ 구현 |
+| TTS (generate) | Gemini TTS (tts-1) | tools.py | ✅ 구현 |
 
 ### `google` — 구글 워크스페이스
 
@@ -1023,6 +1028,21 @@ case jikiv1.ResponseType_FILE:
 | Drive | google_drive_upload, google_drive_list | tools.py |
 | Gmail | google_mail_send, google_mail_list | tools.py |
 
+### `websearch` — 웹 검색
+
+검색: Tavily API, 본문 추출: httpx + readability-lxml
+
+| 기능 | 도구 | 구현 | 상태 |
+|------|------|------|------|
+| 웹 검색 | web_search | Tavily AsyncTavilyClient (search_depth=basic) | ✅ 구현 |
+| URL 본문 추출 | web_fetch | httpx + readability-lxml (HTML), 텍스트/JSON 직반환 | ✅ 구현 |
+
+**web_fetch Content-Type 분기:**
+- `text/html` → readability-lxml 본문 추출 (실패 시 HTML 태그 strip fallback)
+- `text/plain`, `application/json`, `text/xml` → 원본 텍스트 반환
+- 바이너리 (pdf, image, audio, video) → `parse_document` 도구 안내
+- 안전장치: 30초 타임아웃, 5MB 크기 제한, max_length 절단
+
 ---
 
 ## 의존성 추가
@@ -1035,15 +1055,16 @@ python-docx = ">=1.1"
 openpyxl = ">=3.1"
 python-pptx = ">=1.0"
 olefile = ">=0.47"
-fpdf2 = ">=2.8"
-
-# Audio generation (TTS)
-google-cloud-texttospeech = ">=2.16"
+reportlab = ">=4.0"
 
 # Google Workspace
 google-api-python-client = ">=2.150"
 google-auth-oauthlib = ">=1.2"
 google-auth-httplib2 = ">=0.2"
+
+# Web Search
+tavily-python = ">=0.5"
+readability-lxml = ">=0.8"
 ```
 
 ---
@@ -1090,6 +1111,7 @@ google-auth-httplib2 = ">=0.2"
 | `skills/video/SKILL.md` + `tools.py` | analyze_video + generate_video |
 | `skills/google/SKILL.md` + `tools.py` | 12개 @tool 함수 |
 | `skills/google/api.py` | Google API 인증 헬퍼 (get_google_service) |
+| `skills/websearch/SKILL.md` + `tools.py` | web_search (Tavily) + web_fetch (httpx + readability) |
 
 ### New Files — Go Gateway
 
@@ -1154,6 +1176,13 @@ Phase 4: Google Workspace                          ✅ 완료
 Phase 5: Advanced Media                            ✅ 완료
   ├─ video/tools.py (Veo 2 생성)
   └─ 멀티모달 교차 검색 (RAG)
+
+Phase 6: Web Search + Quality                      ✅ 완료
+  ├─ websearch/tools.py (web_search via Tavily + web_fetch via httpx)
+  ├─ websearch/SKILL.md (LLM 지시문)
+  ├─ PDF 생성 fpdf2 → ReportLab 마이그레이션 (한글 지원 개선)
+  ├─ TTS Google Cloud → Gemini TTS 마이그레이션
+  └─ 단위 테스트 138 → 164개 확장
 ```
 
 ---
@@ -1204,7 +1233,7 @@ ORDER BY s.sort_order;
 
 ## 테스트
 
-### 단위 테스트 (138개, 모두 통과)
+### 단위 테스트 (164개, 모두 통과)
 
 | 테스트 파일 | 범위 | 테스트 수 |
 |-------------|------|----------|
@@ -1217,25 +1246,27 @@ ORDER BY s.sort_order;
 | `test_loader.py` | SKILL.md 파싱, progressive disclosure | 13 |
 | `test_parser.py` | extract_text 라우터, 포맷별 파서 | 12 |
 | `test_generator.py` | PDF/DOCX/XLSX/MD/TXT 생성기 | 15 |
+| `test_websearch_tools.py` | web_search, web_fetch, 헬퍼 함수 | 26 |
+| 기타 (image, audio, video, google 등) | 각 스킬 도구 | 41 |
 
 ```bash
 cd agent && uv run pytest tests/ -q
-# 138 passed in 0.53s
+# 164 passed
 ```
 
 ### 통합 검증
 
 ```bash
-# 레지스트리: 14개 스킬, 32개 도구
+# 레지스트리: 15개 스킬, 34개 도구
 # ALL_TOOLS 일치 확인
 # 역매핑 (tool→skill) 전수 확인
-# SKILL.md 로딩: 11개 문서
+# SKILL.md 로딩: 12개 문서
 # 파일 컨텍스트 파이프라인: OK
-# 문서 파서/생성기: OK
+# 문서 파서/생성기: OK (ReportLab PDF + 한글 지원)
 # Go 빌드 + vet: OK
 ```
 
 ---
 
-**상태**: ✅ 구현 완료 (Phase 1-5)
+**상태**: ✅ 구현 완료 (Phase 1-6)
 **날짜**: 2026-03-02
