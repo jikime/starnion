@@ -7,28 +7,54 @@ from pathlib import Path
 _FONT_DIR = Path(__file__).parent / "fonts"
 _NOTO_SANS_KR = _FONT_DIR / "NotoSansKR.ttf"
 
+# ReportLab font registration (module-level, runs once).
+_FONT_REGISTERED = False
+
+
+def _ensure_font() -> str:
+    """Register Noto Sans KR with ReportLab and return the font name."""
+    global _FONT_REGISTERED  # noqa: PLW0603
+    if not _FONT_REGISTERED and _NOTO_SANS_KR.exists():
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+
+        pdfmetrics.registerFont(TTFont("NotoSansKR", str(_NOTO_SANS_KR)))
+        _FONT_REGISTERED = True
+    return "NotoSansKR" if _FONT_REGISTERED else "Helvetica"
+
 
 def generate_pdf(title: str, content: str) -> bytes:
-    """Generate a PDF document with full Korean/CJK support."""
-    from fpdf import FPDF
+    """Generate a PDF document with full Korean/CJK support using ReportLab."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
-    pdf = FPDF()
-    pdf.add_page()
+    font_name = _ensure_font()
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        "KorTitle", fontName=font_name, fontSize=18, leading=24, spaceAfter=12,
+    ))
+    styles.add(ParagraphStyle(
+        "KorBody", fontName=font_name, fontSize=11, leading=16, spaceAfter=8,
+    ))
 
-    if _NOTO_SANS_KR.exists():
-        pdf.add_font("NotoSansKR", "", str(_NOTO_SANS_KR))
-        title_font = ("NotoSansKR", "", 16)
-        body_font = ("NotoSansKR", "", 11)
-    else:
-        title_font = ("Helvetica", "B", 16)
-        body_font = ("Helvetica", "", 11)
+    buf = BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        topMargin=20 * mm, bottomMargin=20 * mm,
+        leftMargin=20 * mm, rightMargin=20 * mm,
+    )
 
-    pdf.set_font(*title_font)
-    pdf.cell(0, 10, title, new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(5)
-    pdf.set_font(*body_font)
-    pdf.multi_cell(0, 6, content)
-    return bytes(pdf.output())
+    story: list = [Paragraph(title, styles["KorTitle"]), Spacer(1, 6 * mm)]
+    for para in content.split("\n\n"):
+        text = para.strip()
+        if text:
+            # Replace single newlines with <br/> for ReportLab.
+            story.append(Paragraph(text.replace("\n", "<br/>"), styles["KorBody"]))
+
+    doc.build(story)
+    return buf.getvalue()
 
 
 def generate_docx(title: str, content: str) -> bytes:
