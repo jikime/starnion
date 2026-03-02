@@ -88,8 +88,34 @@ def reset_current_user():
     Use this fixture (or request it explicitly) whenever tests touch
     ``set_current_user`` / ``get_current_user``.
     """
-    with patch("jiki_agent.tools.finance._current_user_id", ""):
-        yield
+    from jiki_agent.context import set_current_user
+    set_current_user("")
+    yield
+    set_current_user("")
+
+
+# ---------------------------------------------------------------------------
+# Auto-patch skill_guard to always allow (for tool unit tests)
+# ---------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _bypass_skill_guard():
+    """Bypass skill_guard for all tool tests.
+
+    The guard decorator calls get_pool() and skill_repo.is_enabled().
+    In unit tests we don't have a real DB, so we auto-patch these.
+    """
+    mock_pool = MagicMock()
+    with (
+        patch("jiki_agent.skills.guard.get_pool", return_value=mock_pool),
+        patch("jiki_agent.skills.guard.skill_repo") as mock_repo,
+    ):
+        mock_repo.is_enabled = AsyncMock(return_value=True)
+        # Also patch profile_repo used by finance tools for budget checking.
+        with patch(
+            "jiki_agent.skills.finance.tools.profile_repo"
+        ) as mock_profile:
+            mock_profile.get_by_telegram_id = AsyncMock(return_value=None)
+            yield
 
 
 # ---------------------------------------------------------------------------

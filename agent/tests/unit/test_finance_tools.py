@@ -14,13 +14,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from jiki_agent.tools.finance import (
+from jiki_agent.context import get_current_user, set_current_user
+from jiki_agent.skills.finance.tools import (
     GetMonthlyTotalInput,
     SaveFinanceInput,
-    get_current_user,
     get_monthly_total,
     save_finance,
-    set_current_user,
 )
 
 
@@ -137,8 +136,8 @@ class TestSaveFinanceTool:
         assert "사용자 정보를 확인할 수 없어요" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.tools.finance.finance_repo")
-    @patch("jiki_agent.tools.finance.get_pool")
+    @patch("jiki_agent.skills.finance.tools.finance_repo")
+    @patch("jiki_agent.skills.finance.tools.get_pool")
     async def test_records_expense_and_returns_confirmation(
         self,
         mock_get_pool: MagicMock,
@@ -162,8 +161,8 @@ class TestSaveFinanceTool:
         assert "기록했어요" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.tools.finance.finance_repo")
-    @patch("jiki_agent.tools.finance.get_pool")
+    @patch("jiki_agent.skills.finance.tools.finance_repo")
+    @patch("jiki_agent.skills.finance.tools.get_pool")
     async def test_calls_create_with_correct_args(
         self,
         mock_get_pool: MagicMock,
@@ -190,8 +189,8 @@ class TestSaveFinanceTool:
         )
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.tools.finance.finance_repo")
-    @patch("jiki_agent.tools.finance.get_pool")
+    @patch("jiki_agent.skills.finance.tools.finance_repo")
+    @patch("jiki_agent.skills.finance.tools.get_pool")
     async def test_calls_get_monthly_total_with_current_month(
         self,
         mock_get_pool: MagicMock,
@@ -217,8 +216,8 @@ class TestSaveFinanceTool:
         assert "-" in month_arg
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.tools.finance.finance_repo")
-    @patch("jiki_agent.tools.finance.get_pool")
+    @patch("jiki_agent.skills.finance.tools.finance_repo")
+    @patch("jiki_agent.skills.finance.tools.get_pool")
     async def test_default_empty_description(
         self,
         mock_get_pool: MagicMock,
@@ -238,8 +237,8 @@ class TestSaveFinanceTool:
         assert call_kwargs.kwargs["description"] == ""
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.tools.finance.finance_repo")
-    @patch("jiki_agent.tools.finance.get_pool")
+    @patch("jiki_agent.skills.finance.tools.finance_repo")
+    @patch("jiki_agent.skills.finance.tools.get_pool")
     async def test_number_formatting_in_response(
         self,
         mock_get_pool: MagicMock,
@@ -276,8 +275,8 @@ class TestGetMonthlyTotalTool:
         assert "사용자 정보를 확인할 수 없어요" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.tools.finance.finance_repo")
-    @patch("jiki_agent.tools.finance.get_pool")
+    @patch("jiki_agent.skills.finance.tools.finance_repo")
+    @patch("jiki_agent.skills.finance.tools.get_pool")
     async def test_specific_category_returns_total(
         self,
         mock_get_pool: MagicMock,
@@ -297,8 +296,8 @@ class TestGetMonthlyTotalTool:
         assert "총 지출" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.tools.finance.finance_repo")
-    @patch("jiki_agent.tools.finance.get_pool")
+    @patch("jiki_agent.skills.finance.tools.finance_repo")
+    @patch("jiki_agent.skills.finance.tools.get_pool")
     async def test_empty_category_returns_full_summary(
         self,
         mock_get_pool: MagicMock,
@@ -325,8 +324,8 @@ class TestGetMonthlyTotalTool:
         assert "20,000" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.tools.finance.finance_repo")
-    @patch("jiki_agent.tools.finance.get_pool")
+    @patch("jiki_agent.skills.finance.tools.finance_repo")
+    @patch("jiki_agent.skills.finance.tools.get_pool")
     async def test_empty_category_no_records_message(
         self,
         mock_get_pool: MagicMock,
@@ -344,8 +343,8 @@ class TestGetMonthlyTotalTool:
         assert "기록된 지출이 없어요" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.tools.finance.finance_repo")
-    @patch("jiki_agent.tools.finance.get_pool")
+    @patch("jiki_agent.skills.finance.tools.finance_repo")
+    @patch("jiki_agent.skills.finance.tools.get_pool")
     async def test_specific_category_calls_get_monthly_total(
         self,
         mock_get_pool: MagicMock,
@@ -365,8 +364,8 @@ class TestGetMonthlyTotalTool:
         mock_finance_repo.get_monthly_summary.assert_not_awaited()
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.tools.finance.finance_repo")
-    @patch("jiki_agent.tools.finance.get_pool")
+    @patch("jiki_agent.skills.finance.tools.finance_repo")
+    @patch("jiki_agent.skills.finance.tools.get_pool")
     async def test_empty_category_calls_get_monthly_summary(
         self,
         mock_get_pool: MagicMock,
@@ -386,8 +385,8 @@ class TestGetMonthlyTotalTool:
         mock_finance_repo.get_monthly_total.assert_not_awaited()
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.tools.finance.finance_repo")
-    @patch("jiki_agent.tools.finance.get_pool")
+    @patch("jiki_agent.skills.finance.tools.finance_repo")
+    @patch("jiki_agent.skills.finance.tools.get_pool")
     async def test_summary_line_format(
         self,
         mock_get_pool: MagicMock,
@@ -414,8 +413,8 @@ class TestGetMonthlyTotalTool:
         assert lines[2].strip().startswith("- transport:")
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.tools.finance.finance_repo")
-    @patch("jiki_agent.tools.finance.get_pool")
+    @patch("jiki_agent.skills.finance.tools.finance_repo")
+    @patch("jiki_agent.skills.finance.tools.get_pool")
     async def test_zero_total_for_specific_category(
         self,
         mock_get_pool: MagicMock,
@@ -434,8 +433,8 @@ class TestGetMonthlyTotalTool:
         assert "0" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.tools.finance.finance_repo")
-    @patch("jiki_agent.tools.finance.get_pool")
+    @patch("jiki_agent.skills.finance.tools.finance_repo")
+    @patch("jiki_agent.skills.finance.tools.get_pool")
     async def test_single_category_summary(
         self,
         mock_get_pool: MagicMock,
