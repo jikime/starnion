@@ -1348,7 +1348,7 @@ DB: knowledge_repo (기존 인프라 활용)
 
 | 기능 | 도구 | 구현 | 상태 |
 |------|------|------|------|
-| 랜덤 선택 | random_pick | Python random 모듈 (5개 모드) | ✅ 구현 |
+| 랜덤 선택 | random_pick | Python random 모듈 (6개 모드) | ✅ 구현 |
 
 **모드:**
 - `choice`: 쉼표 구분 목록에서 N개 무작위 선택
@@ -1356,10 +1356,19 @@ DB: knowledge_repo (기존 인프라 활용)
 - `shuffle`: 목록 순서 무작위 섞기
 - `coin`: 동전 던지기 (앞면/뒷면)
 - `dice`: 주사위 굴리기 (합계 표시)
+- `string`: 랜덤 문자열 생성 (5가지 charset)
+
+**charset (string 모드):**
+- `alphanumeric`: 영문+숫자 (기본값)
+- `alpha`: 영문만
+- `numeric`: 숫자만
+- `hex`: 16진수 (0-9, a-f)
+- `password`: 영문+숫자+특수문자
 
 **특징:**
 - 항목 수 제한 100개, 범위 제한 1~10억
 - 선택 개수 제한 100개
+- 문자열 길이 1-200 (기본값 16), count로 여러 개 생성 가능
 - 미지정 모드 오류 안내
 - 추가 의존성 없음
 
@@ -1485,7 +1494,7 @@ qrcode = { version = ">=8.0", extras = ["pil"] }
 | `skills/reminder/SKILL.md` + `tools.py` | set/list/delete_reminder (knowledge_repo) |
 | `skills/currency/SKILL.md` + `tools.py` | convert_currency + get_exchange_rate (Frankfurter API) |
 | `skills/dday/SKILL.md` + `tools.py` | set/list/delete_dday (knowledge_repo) |
-| `skills/random/SKILL.md` + `tools.py` | random_pick (Python random 모듈, 5개 모드) |
+| `skills/random/SKILL.md` + `tools.py` | random_pick (Python random 모듈, 6개 모드) |
 | `skills/memo/SKILL.md` + `tools.py` | save/list/delete_memo (knowledge_repo) |
 | `skills/unitconv/SKILL.md` + `tools.py` | convert_unit (6개 카테고리, 순수 Python) |
 
@@ -1581,11 +1590,11 @@ Phase 9: Tier 1 Skills (번역/QR/계산기/알림)            ✅ 완료
 Phase 10: Tier 2 Skills (환율/디데이/랜덤/메모/단위변환)   ✅ 완료
   ├─ currency/tools.py (convert_currency + get_exchange_rate via Frankfurter API)
   ├─ dday/tools.py (set/list/delete_dday via knowledge_repo, 반복 지원)
-  ├─ random/tools.py (random_pick, 5개 모드: choice/number/shuffle/coin/dice)
+  ├─ random/tools.py (random_pick, 6개 모드: choice/number/shuffle/coin/dice/string)
   ├─ memo/tools.py (save/list/delete_memo via knowledge_repo, 태그 필터)
   ├─ unitconv/tools.py (convert_unit, 6개 카테고리, 온도 수식 변환)
   ├─ 추가 의존성 없음 (httpx, knowledge_repo 기존 사용)
-  └─ 단위 테스트 317 → 415개 확장
+  └─ 단위 테스트 317 → 424개 확장
 ```
 
 ---
@@ -1636,6 +1645,8 @@ print('OK')
 - **디데이 조회**: "디데이 목록 보여줘" → 남은 일수와 함께 목록
 - **랜덤 선택**: "짜장면, 짬뽕, 볶음밥 중에 골라줘" → 무작위 선택
 - **주사위**: "주사위 3개 굴려줘" → 주사위 결과 + 합계
+- **랜덤 문자열**: "랜덤 문자열 만들어줘" → 16자 영숫자 문자열
+- **비밀번호 생성**: "비밀번호 생성해줘" → 특수문자 포함 문자열
 - **메모 저장**: "우유 사기 메모해줘" → 메모 저장 확인
 - **메모 조회**: "메모 보여줘" → 메모 목록 (태그 필터 지원)
 - **단위 변환**: "30평 몇 제곱미터야?" → 단위 변환 결과
@@ -1659,7 +1670,7 @@ ORDER BY s.sort_order;
 
 ## 테스트
 
-### 단위 테스트 (415개, 모두 통과)
+### 단위 테스트 (424개, 모두 통과)
 
 | 테스트 파일 | 범위 | 테스트 수 |
 |-------------|------|----------|
@@ -1681,7 +1692,7 @@ ORDER BY s.sort_order;
 | `test_reminder_tools.py` | set/list/delete_reminder, 입력 스키마 | 19 |
 | `test_currency_tools.py` | convert_currency, get_exchange_rate, API 에러 | 14 |
 | `test_dday_tools.py` | set/list/delete_dday, 날짜 검증, 반복 | 18 |
-| `test_random_tools.py` | random_pick 5개 모드, 엣지 케이스 | 16 |
+| `test_random_tools.py` | random_pick 6개 모드, 엣지 케이스 | 25 |
 | `test_memo_tools.py` | save/list/delete_memo, 태그 필터 | 18 |
 | `test_unitconv_tools.py` | convert_unit 6개 카테고리, 검증 | 22 |
 | 기타 (image, audio, video, google 등) | 각 스킬 도구 | 41 |
@@ -1689,7 +1700,7 @@ ORDER BY s.sort_order;
 
 ```bash
 cd agent && uv run pytest tests/ -q
-# 415 passed
+# 424 passed
 ```
 
 ### 통합 검증
