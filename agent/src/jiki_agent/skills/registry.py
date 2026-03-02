@@ -173,6 +173,15 @@ SKILLS: dict[str, SkillDef] = {
         permission_level=2,  # opt-in (OAuth2 required)
         sort_order=14,
     ),
+    "websearch": SkillDef(
+        id="websearch",
+        name="웹 검색",
+        emoji="🔍",
+        description="인터넷 검색 및 웹페이지 정보 수집",
+        category="information",
+        tools=["web_search", "web_fetch"],
+        sort_order=15,
+    ),
 }
 
 # tool_name -> skill_id reverse mapping (fast guard lookup)

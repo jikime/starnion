@@ -53,6 +53,7 @@ from jiki_agent.skills.schedule.tools import (
     list_schedules,
 )
 from jiki_agent.skills.video.tools import analyze_video, generate_video
+from jiki_agent.skills.websearch.tools import web_fetch, web_search
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,8 @@ ALL_TOOLS = [
     google_drive_list,
     google_mail_send,
     google_mail_list,
+    web_search,
+    web_fetch,
 ]
 
 # Module-level LLM instance (set during create_agent).

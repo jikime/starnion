@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = ""
 
+    # Tavily (Web Search)
+    tavily_api_key: str = ""
+
     # gRPC server
     grpc_port: int = 50051
 
