@@ -63,6 +63,11 @@ from jiki_agent.skills.reminder.tools import (
     list_reminders,
     set_reminder,
 )
+from jiki_agent.skills.currency.tools import convert_currency, get_exchange_rate
+from jiki_agent.skills.dday.tools import delete_dday, list_ddays, set_dday
+from jiki_agent.skills.random.tools import random_pick
+from jiki_agent.skills.memo.tools import delete_memo, list_memos, save_memo
+from jiki_agent.skills.unitconv.tools import convert_unit
 from jiki_agent.skills.websearch.tools import web_fetch, web_search
 
 logger = logging.getLogger(__name__)
@@ -116,6 +121,16 @@ ALL_TOOLS = [
     set_reminder,
     list_reminders,
     delete_reminder,
+    convert_currency,
+    get_exchange_rate,
+    set_dday,
+    list_ddays,
+    delete_dday,
+    random_pick,
+    save_memo,
+    list_memos,
+    delete_memo,
+    convert_unit,
 ]
 
 # Module-level LLM instance (set during create_agent).

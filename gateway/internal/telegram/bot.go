@@ -618,6 +618,16 @@ var toolStatusText = map[string]string{
 	"google_drive_list":      "📁 구글 드라이브 조회중...",
 	"google_mail_list":       "📧 메일 조회중...",
 	"google_mail_send":       "📧 메일 전송중...",
+	"convert_currency":       "💱 환율 변환중...",
+	"get_exchange_rate":      "💱 환율 조회중...",
+	"set_dday":               "📆 디데이 설정중...",
+	"list_ddays":             "📆 디데이 조회중...",
+	"delete_dday":            "📆 디데이 삭제중...",
+	"random_pick":            "🎲 랜덤 선택중...",
+	"save_memo":              "🗒️ 메모 저장중...",
+	"list_memos":             "🗒️ 메모 조회중...",
+	"delete_memo":            "🗒️ 메모 삭제중...",
+	"convert_unit":           "📐 단위 변환중...",
 }
 
 // getToolStatus returns a Korean status message for the given tool name.
