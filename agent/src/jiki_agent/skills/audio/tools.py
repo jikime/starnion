@@ -1,6 +1,8 @@
 """Voice/audio processing and generation tools."""
 
 import base64
+import io
+import wave
 
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
@@ -11,6 +13,13 @@ from jiki_agent.config import settings
 from jiki_agent.document.parser import fetch_file
 from jiki_agent.skills.file_context import add_pending_file
 from jiki_agent.skills.guard import skill_guard
+
+# Gemini TTS prebuilt voices.
+# See: https://ai.google.dev/gemini-api/docs/speech-generation
+GEMINI_TTS_VOICES = [
+    "Kore", "Puck", "Charon", "Fenrir",
+    "Aoede", "Leda", "Orus", "Zephyr",
+]
 
 
 class TranscribeAudioInput(BaseModel):
@@ -24,9 +33,20 @@ class GenerateAudioInput(BaseModel):
 
     text: str = Field(description="음성으로 변환할 텍스트")
     voice: str = Field(
-        default="ko-KR-Standard-A",
-        description="음성 모델 (ko-KR-Standard-A, ko-KR-Standard-B 등)",
+        default="Kore",
+        description="음성 모델 (Kore, Puck, Charon, Fenrir, Aoede, Leda, Orus, Zephyr)",
     )
+
+
+def _pcm_to_wav(pcm_data: bytes, sample_rate: int = 24000) -> bytes:
+    """Wrap raw PCM (16-bit mono) data in a WAV container."""
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)  # 16-bit
+        wf.setframerate(sample_rate)
+        wf.writeframes(pcm_data)
+    return buf.getvalue()
 
 
 @tool(args_schema=TranscribeAudioInput)
@@ -57,26 +77,33 @@ async def transcribe_audio(file_url: str) -> str:
 
 @tool(args_schema=GenerateAudioInput)
 @skill_guard("audio")
-async def generate_audio(text: str, voice: str = "ko-KR-Standard-A") -> str:
+async def generate_audio(text: str, voice: str = "Kore") -> str:
     """텍스트를 음성으로 변환(TTS)합니다."""
-    from google.cloud import texttospeech_v1 as tts
+    from google import genai
+    from google.genai import types
 
-    client = tts.TextToSpeechAsyncClient()
+    if voice not in GEMINI_TTS_VOICES:
+        voice = "Kore"
 
-    synthesis_input = tts.SynthesisInput(text=text)
-    voice_params = tts.VoiceSelectionParams(
-        language_code="ko-KR",
-        name=voice,
+    client = genai.Client(api_key=settings.gemini_api_key)
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash-preview-tts",
+        contents=text,
+        config=types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                        voice_name=voice,
+                    ),
+                ),
+            ),
+        ),
     )
-    audio_config = tts.AudioConfig(
-        audio_encoding=tts.AudioEncoding.OGG_OPUS,
-    )
 
-    response = await client.synthesize_speech(
-        input=synthesis_input,
-        voice=voice_params,
-        audio_config=audio_config,
-    )
+    pcm_data = response.candidates[0].content.parts[0].inline_data.data
+    wav_bytes = _pcm_to_wav(pcm_data)
 
-    add_pending_file(response.audio_content, "speech.ogg", "audio/ogg")
+    add_pending_file(wav_bytes, "speech.wav", "audio/wav")
     return "음성을 생성했어요."

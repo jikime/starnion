@@ -496,8 +496,10 @@ func (b *Bot) sendFile(chatID int64, data []byte, name, mime string) {
 	switch {
 	case strings.HasPrefix(mime, "image/"):
 		msg = tgbotapi.NewPhoto(chatID, fileBytes)
-	case strings.HasPrefix(mime, "audio/"):
+	case mime == "audio/ogg":
 		msg = tgbotapi.NewVoice(chatID, fileBytes)
+	case strings.HasPrefix(mime, "audio/"):
+		msg = tgbotapi.NewAudio(chatID, fileBytes)
 	case strings.HasPrefix(mime, "video/"):
 		msg = tgbotapi.NewVideo(chatID, fileBytes)
 	default:

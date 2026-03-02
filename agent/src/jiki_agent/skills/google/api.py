@@ -1,33 +1,31 @@
 """Google API authentication helper."""
 
-from googleapiclient.discovery import build
+from __future__ import annotations
+
+from googleapiclient.discovery import build  # type: ignore[import-untyped]
 from google.oauth2.credentials import Credentials
 
 from jiki_agent.config import settings
 from jiki_agent.db.pool import get_pool
 from jiki_agent.db.repositories import google as google_repo
 
+# Friendly message returned when the user has no linked Google account.
+NOT_LINKED_MSG = "구글 계정이 연동되지 않았어요. '구글 연동해줘'라고 말씀해주세요."
 
-async def get_google_service(user_id: str, service_name: str, version: str):
+
+async def get_google_service(
+    user_id: str, service_name: str, version: str,
+):
     """Get an authenticated Google API service for a user.
 
-    Args:
-        user_id: The user's Telegram ID.
-        service_name: Google API service name (e.g. "calendar", "drive").
-        version: API version (e.g. "v3").
-
     Returns:
-        A Google API service resource.
-
-    Raises:
-        ValueError: If the user has no linked Google account.
+        A Google API service resource, or *None* if the user has no
+        linked Google account (token missing or refresh failed).
     """
     pool = get_pool()
     token = await google_repo.refresh_if_expired(pool, user_id)
     if not token:
-        raise ValueError(
-            "구글 계정이 연동되지 않았어요. '구글 연동해줘'라고 말씀해주세요."
-        )
+        return None
 
     creds = Credentials(
         token=token["access_token"],

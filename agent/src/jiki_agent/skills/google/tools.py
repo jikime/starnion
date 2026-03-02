@@ -9,7 +9,7 @@ from jiki_agent.config import settings
 from jiki_agent.context import get_current_user
 from jiki_agent.db.pool import get_pool
 from jiki_agent.db.repositories import google as google_repo
-from jiki_agent.skills.google.api import get_google_service
+from jiki_agent.skills.google.api import NOT_LINKED_MSG, get_google_service
 from jiki_agent.skills.guard import skill_guard
 
 
@@ -51,6 +51,7 @@ async def google_auth() -> str:
             },
         },
         scopes=SCOPES,
+        autogenerate_code_verifier=False,
     )
     flow.redirect_uri = settings.google_redirect_uri
 
@@ -58,9 +59,16 @@ async def google_auth() -> str:
         access_type="offline",
         prompt="consent",
         state=user_id,
+        include_granted_scopes="true",
     )
 
-    return f"아래 링크를 눌러 구글 계정을 연동해주세요:\n{auth_url}"
+    # Telegram Markdown interprets '_' as italic markup, which corrupts
+    # OAuth query-parameter names (e.g. response_type → responsetype).
+    # Percent-encoding underscores in the query string keeps the URL valid
+    # while preventing Markdown from eating them.
+    safe_url = auth_url.replace("_", "%5F")
+
+    return f"아래 링크를 눌러 구글 계정을 연동해주세요:\n{safe_url}"
 
 
 @tool
@@ -107,6 +115,8 @@ async def google_calendar_create(
         return "사용자 정보를 확인할 수 없어요."
 
     service = await get_google_service(user_id, "calendar", "v3")
+    if service is None:
+        return NOT_LINKED_MSG
     event = {
         "summary": title,
         "description": description,
@@ -128,6 +138,8 @@ async def google_calendar_list(max_results: int = 10) -> str:
         return "사용자 정보를 확인할 수 없어요."
 
     service = await get_google_service(user_id, "calendar", "v3")
+    if service is None:
+        return NOT_LINKED_MSG
     now = datetime.now(timezone.utc).isoformat()
     result = (
         service.events()
@@ -179,6 +191,8 @@ async def google_docs_create(title: str, content: str = "") -> str:
         return "사용자 정보를 확인할 수 없어요."
 
     service = await get_google_service(user_id, "docs", "v1")
+    if service is None:
+        return NOT_LINKED_MSG
     doc = service.documents().create(body={"title": title}).execute()
     doc_id = doc.get("documentId", "")
 
@@ -202,6 +216,8 @@ async def google_docs_read(document_id: str) -> str:
         return "사용자 정보를 확인할 수 없어요."
 
     service = await get_google_service(user_id, "docs", "v1")
+    if service is None:
+        return NOT_LINKED_MSG
     doc = service.documents().get(documentId=document_id).execute()
 
     title = doc.get("title", "")
@@ -249,6 +265,8 @@ async def google_tasks_create(
         return "사용자 정보를 확인할 수 없어요."
 
     service = await get_google_service(user_id, "tasks", "v1")
+    if service is None:
+        return NOT_LINKED_MSG
     task_body: dict = {"title": title}
     if notes:
         task_body["notes"] = notes
@@ -268,6 +286,8 @@ async def google_tasks_list(max_results: int = 20) -> str:
         return "사용자 정보를 확인할 수 없어요."
 
     service = await get_google_service(user_id, "tasks", "v1")
+    if service is None:
+        return NOT_LINKED_MSG
     result = (
         service.tasks()
         .list(tasklist="@default", maxResults=max_results, showCompleted=False)
@@ -313,9 +333,9 @@ async def google_drive_upload(
     """구글 드라이브에 파일을 업로드합니다."""
     from io import BytesIO
 
-    from googleapiclient.http import MediaIoBaseUpload
+    from googleapiclient.http import MediaIoBaseUpload  # type: ignore[import-untyped]
 
-    from jiki_agent.document.parser import fetch_file
+    from jiki_agent.document.parser import fetch_file  # type: ignore[import-not-found]
 
     user_id = get_current_user()
     if not user_id:
@@ -323,6 +343,8 @@ async def google_drive_upload(
 
     data = await fetch_file(file_url)
     service = await get_google_service(user_id, "drive", "v3")
+    if service is None:
+        return NOT_LINKED_MSG
 
     file_metadata = {"name": file_name}
     media = MediaIoBaseUpload(BytesIO(data), mimetype=mime_type)
@@ -345,6 +367,8 @@ async def google_drive_list(query: str = "", max_results: int = 10) -> str:
         return "사용자 정보를 확인할 수 없어요."
 
     service = await get_google_service(user_id, "drive", "v3")
+    if service is None:
+        return NOT_LINKED_MSG
     q = f"name contains '{query}'" if query else None
     result = (
         service.files()
@@ -394,6 +418,8 @@ async def google_mail_send(to: str, subject: str, body: str) -> str:
         return "사용자 정보를 확인할 수 없어요."
 
     service = await get_google_service(user_id, "gmail", "v1")
+    if service is None:
+        return NOT_LINKED_MSG
 
     message = MIMEText(body)
     message["to"] = to
@@ -416,6 +442,8 @@ async def google_mail_list(query: str = "is:unread", max_results: int = 10) -> s
         return "사용자 정보를 확인할 수 없어요."
 
     service = await get_google_service(user_id, "gmail", "v1")
+    if service is None:
+        return NOT_LINKED_MSG
     result = (
         service.users()
         .messages()

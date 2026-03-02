@@ -23,7 +23,6 @@ dependencies = [
     "python-pptx>=1.0",
     "olefile>=0.47",
     "fpdf2>=2.8",
-    "google-cloud-texttospeech>=2.16",
     "google-api-python-client>=2.150",
     "google-auth-oauthlib>=1.2",
     "google-auth-httplib2>=0.2",
