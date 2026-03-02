@@ -20,7 +20,13 @@ from jiki.v1 import agent_pb2, agent_pb2_grpc  # noqa: E402
 from jiki_agent.context import set_current_user
 from jiki_agent.db.pool import get_pool
 from jiki_agent.db.repositories import profile as profile_repo
-from jiki_agent.tools.report import generate_weekly_report
+from jiki_agent.tools.goal import evaluate_goals, generate_goal_status
+from jiki_agent.tools.pattern import analyze_patterns, generate_pattern_insight
+from jiki_agent.tools.report import (
+    generate_daily_summary,
+    generate_monthly_closing,
+    generate_weekly_report,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +141,18 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
         try:
             if report_type == "weekly":
                 content = await generate_weekly_report(user_id)
+            elif report_type == "daily_summary":
+                content = await generate_daily_summary(user_id)
+            elif report_type == "monthly_closing":
+                content = await generate_monthly_closing(user_id)
+            elif report_type == "pattern_analysis":
+                content = await analyze_patterns(user_id)
+            elif report_type == "pattern_insight":
+                content = await generate_pattern_insight(user_id)
+            elif report_type == "goal_evaluate":
+                content = await evaluate_goals(user_id)
+            elif report_type == "goal_status":
+                content = await generate_goal_status(user_id)
             else:
                 content = await generate_weekly_report(user_id)
 

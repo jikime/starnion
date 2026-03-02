@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jikime/jiki/gateway/internal/activity"
 	"github.com/jikime/jiki/gateway/internal/handler"
 	"github.com/jikime/jiki/gateway/internal/middleware"
 	"github.com/jikime/jiki/gateway/internal/scheduler"
@@ -149,17 +150,20 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Create shared activity tracker for conversation-aware notifications.
+	tracker := activity.NewTracker()
+
 	// Start Telegram bot if enabled, and attach scheduler.
 	var sched *scheduler.Scheduler
 	if cfg.Telegram.Enabled && cfg.Telegram.BotToken != "" {
-		bot, botErr := telegram.NewBot(cfg.Telegram.BotToken, grpcConn)
+		bot, botErr := telegram.NewBot(cfg.Telegram.BotToken, grpcConn, tracker, db)
 		if botErr != nil {
 			log.Fatal().Err(botErr).Msg("failed to initialise Telegram bot")
 		}
 		go bot.Run(ctx)
 
 		// Start cron scheduler for proactive notifications.
-		sched = scheduler.New(grpcConn, bot, db)
+		sched = scheduler.New(grpcConn, bot, db, tracker)
 		sched.Start()
 		defer sched.Stop()
 	} else {
@@ -189,7 +193,7 @@ func main() {
 	api.POST("/chat", chatHandler.Chat)
 
 	// Manual report trigger for testing proactive notifications.
-	// POST /api/v1/report { "user_id": "12345", "chat_id": 12345 }
+	// POST /api/v1/report { "user_id": "12345", "chat_id": 12345, "report_type": "weekly" }
 	api.POST("/report", func(c echo.Context) error {
 		if sched == nil {
 			return c.JSON(http.StatusServiceUnavailable, map[string]string{
@@ -198,14 +202,18 @@ func main() {
 		}
 
 		var req struct {
-			UserID string `json:"user_id"`
-			ChatID int64  `json:"chat_id"`
+			UserID     string `json:"user_id"`
+			ChatID     int64  `json:"chat_id"`
+			ReportType string `json:"report_type"`
 		}
 		if err := c.Bind(&req); err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 		}
 		if req.UserID == "" {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+		}
+		if req.ReportType == "" {
+			req.ReportType = "weekly"
 		}
 		// If chat_id not provided, use user_id as chat_id (DM).
 		if req.ChatID == 0 {
@@ -214,13 +222,14 @@ func main() {
 			}
 		}
 
-		if err := sched.GenerateAndSend(req.UserID, req.ChatID); err != nil {
+		if err := sched.GenerateAndSendType(req.UserID, req.ChatID, req.ReportType); err != nil {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
 		return c.JSON(http.StatusOK, map[string]string{
-			"status":  "sent",
-			"user_id": req.UserID,
+			"status":      "sent",
+			"user_id":     req.UserID,
+			"report_type": req.ReportType,
 		})
 	})
 

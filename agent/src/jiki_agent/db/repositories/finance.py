@@ -176,6 +176,76 @@ async def get_recent(
             return [dict(r) for r in rows]
 
 
+async def get_daily_totals(
+    pool: AsyncConnectionPool[Any],
+    user_id: str,
+    days: int = 30,
+) -> list[dict[str, Any]]:
+    """Get daily spending totals for the last N days.
+
+    Args:
+        pool: The async connection pool.
+        user_id: Telegram user ID.
+        days: Number of days to look back.
+
+    Returns:
+        List of dicts with 'date' (date) and 'total' (int) keys.
+    """
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                """
+                SELECT DATE(created_at AT TIME ZONE 'Asia/Seoul') AS date,
+                       COALESCE(SUM(amount), 0) AS total
+                FROM finances
+                WHERE user_id = %s
+                  AND created_at >= (NOW() AT TIME ZONE 'Asia/Seoul' - make_interval(days => %s))::date
+                GROUP BY DATE(created_at AT TIME ZONE 'Asia/Seoul')
+                ORDER BY date DESC
+                """,
+                (user_id, days),
+            )
+            rows = await cur.fetchall()
+            return [dict(r) for r in rows]
+
+
+async def get_weekday_spending(
+    pool: AsyncConnectionPool[Any],
+    user_id: str,
+    days: int = 60,
+) -> list[dict[str, Any]]:
+    """Get average spending by weekday and category for the last N days.
+
+    Uses PostgreSQL ISODOW: 1=Monday through 7=Sunday.
+
+    Args:
+        pool: The async connection pool.
+        user_id: Telegram user ID.
+        days: Number of days to look back.
+
+    Returns:
+        List of dicts with weekday, category, avg_amount, total_count keys.
+    """
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                """
+                SELECT EXTRACT(ISODOW FROM created_at AT TIME ZONE 'Asia/Seoul')::int AS weekday,
+                       category,
+                       AVG(amount)::int AS avg_amount,
+                       COUNT(*) AS total_count
+                FROM finances
+                WHERE user_id = %s
+                  AND created_at >= NOW() - make_interval(days => %s)
+                GROUP BY weekday, category
+                ORDER BY weekday, avg_amount DESC
+                """,
+                (user_id, days),
+            )
+            rows = await cur.fetchall()
+            return [dict(r) for r in rows]
+
+
 def _month_range(month: str) -> tuple[datetime, datetime]:
     """Compute the start (inclusive) and end (exclusive) of a month.
 

@@ -2,13 +2,16 @@ package telegram
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
+	"github.com/jikime/jiki/gateway/internal/activity"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -18,10 +21,12 @@ import (
 type Bot struct {
 	api        *tgbotapi.BotAPI
 	grpcClient jikiv1.AgentServiceClient
+	tracker    *activity.Tracker
+	db         *sql.DB
 }
 
 // NewBot creates a new Telegram bot connected to the agent gRPC service.
-func NewBot(token string, grpcConn *grpc.ClientConn) (*Bot, error) {
+func NewBot(token string, grpcConn *grpc.ClientConn, tracker *activity.Tracker, db *sql.DB) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, fmt.Errorf("telegram bot init: %w", err)
@@ -32,6 +37,8 @@ func NewBot(token string, grpcConn *grpc.ClientConn) (*Bot, error) {
 	return &Bot{
 		api:        api,
 		grpcClient: jikiv1.NewAgentServiceClient(grpcConn),
+		tracker:    tracker,
+		db:         db,
 	}, nil
 }
 
@@ -52,6 +59,10 @@ func (b *Bot) Run(ctx context.Context) {
 			log.Info().Msg("Telegram bot stopped")
 			return
 		case update := <-updates:
+			if update.CallbackQuery != nil {
+				go b.handleCallback(ctx, update.CallbackQuery)
+				continue
+			}
 			if update.Message == nil {
 				continue
 			}
@@ -132,9 +143,19 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
 	messageID := msg.MessageID
 
-	// Handle /start command.
-	if msg.IsCommand() && msg.Command() == "start" {
-		b.handleStart(chatID)
+	// Record user activity for proactive notification deferral.
+	if b.tracker != nil {
+		b.tracker.RecordMessage(userID)
+	}
+
+	// Handle commands.
+	if msg.IsCommand() {
+		switch msg.Command() {
+		case "start":
+			b.handleStart(chatID)
+		case "persona":
+			b.handlePersona(chatID)
+		}
 		return
 	}
 
@@ -248,8 +269,9 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 // Inspired by openclaw's typing keepalive pattern with circuit breaker for 401 errors.
 func (b *Bot) typingLoop(ctx context.Context, chatID int64) {
 	// Send initial typing action immediately.
+	// Use Request instead of Send because sendChatAction returns bool, not Message.
 	action := tgbotapi.NewChatAction(chatID, tgbotapi.ChatTyping)
-	if _, err := b.api.Send(action); err != nil {
+	if _, err := b.api.Request(action); err != nil {
 		log.Debug().Err(err).Int64("chat_id", chatID).Msg("initial typing action failed")
 		return // Don't loop if first attempt fails (circuit breaker).
 	}
@@ -266,7 +288,7 @@ func (b *Bot) typingLoop(ctx context.Context, chatID int64) {
 			return
 		case <-ticker.C:
 			action := tgbotapi.NewChatAction(chatID, tgbotapi.ChatTyping)
-			if _, err := b.api.Send(action); err != nil {
+			if _, err := b.api.Request(action); err != nil {
 				consecutiveFailures++
 				log.Debug().Err(err).Int("failures", consecutiveFailures).Msg("typing action failed")
 				if consecutiveFailures >= maxFailures {
@@ -326,4 +348,85 @@ func (b *Bot) handleStart(chatID int64) {
 	if _, err := b.api.Send(msg); err != nil {
 		log.Error().Err(err).Int64("chat_id", chatID).Msg("failed to send /start reply")
 	}
+}
+
+// personaNames maps persona IDs to display labels with emoji.
+var personaNames = map[string]string{
+	"assistant": "\U0001f916 기본 비서",
+	"finance":   "\U0001f4ca 금융 전문가",
+	"buddy":     "\U0001f60a 친한 친구",
+	"coach":     "\U0001f4aa 재정 코치",
+	"analyst":   "\U0001f50d 데이터 분석가",
+}
+
+// handlePersona sends an inline keyboard for persona selection.
+func (b *Bot) handlePersona(chatID int64) {
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("\U0001f916 기본 비서", "persona:assistant"),
+			tgbotapi.NewInlineKeyboardButtonData("\U0001f4ca 금융 전문가", "persona:finance"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("\U0001f60a 친한 친구", "persona:buddy"),
+			tgbotapi.NewInlineKeyboardButtonData("\U0001f4aa 재정 코치", "persona:coach"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("\U0001f50d 데이터 분석가", "persona:analyst"),
+		),
+	)
+
+	msg := tgbotapi.NewMessage(chatID, "어떤 스타일로 대화할까요? 선택해 주세요!")
+	msg.ReplyMarkup = keyboard
+	if _, err := b.api.Send(msg); err != nil {
+		log.Error().Err(err).Int64("chat_id", chatID).Msg("failed to send /persona keyboard")
+	}
+}
+
+// handleCallback processes inline keyboard callbacks (e.g. persona selection).
+func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQuery) {
+	data := callback.Data
+	chatID := callback.Message.Chat.ID
+	userID := fmt.Sprintf("%d", callback.From.ID)
+
+	if !strings.HasPrefix(data, "persona:") {
+		return
+	}
+
+	personaID := strings.TrimPrefix(data, "persona:")
+
+	// Validate persona ID.
+	if _, ok := personaNames[personaID]; !ok {
+		return
+	}
+
+	// Update persona in DB using JSONB merge (preserves existing keys like budget).
+	if b.db != nil {
+		dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+
+		_, err := b.db.ExecContext(dbCtx, `
+			UPDATE profiles
+			SET preferences = COALESCE(preferences, '{}'::jsonb) || $1::jsonb,
+			    updated_at = NOW()
+			WHERE telegram_id = $2
+		`, fmt.Sprintf(`{"persona":"%s"}`, personaID), userID)
+		if err != nil {
+			log.Error().Err(err).Str("user_id", userID).Str("persona", personaID).Msg("failed to update persona")
+		}
+	}
+
+	// Replace the keyboard message with a confirmation.
+	confirmText := fmt.Sprintf("%s 모드로 전환했어요!", personaNames[personaID])
+	edit := tgbotapi.NewEditMessageText(chatID, callback.Message.MessageID, confirmText)
+	if _, err := b.api.Send(edit); err != nil {
+		log.Debug().Err(err).Msg("failed to edit persona confirmation message")
+	}
+
+	// Answer the callback to dismiss the loading indicator.
+	callbackCfg := tgbotapi.NewCallback(callback.ID, "")
+	if _, err := b.api.Request(callbackCfg); err != nil {
+		log.Debug().Err(err).Msg("failed to answer callback query")
+	}
+
+	log.Info().Str("user_id", userID).Str("persona", personaID).Msg("persona changed")
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
+	"github.com/jikime/jiki/gateway/internal/activity"
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -18,16 +19,18 @@ type TelegramSender interface {
 	SendMessage(chatID int64, text string) error
 }
 
-// Scheduler manages periodic tasks such as weekly reports.
+// Scheduler manages periodic tasks such as weekly reports and proactive notifications.
 type Scheduler struct {
 	cron       *cron.Cron
 	grpcClient jikiv1.AgentServiceClient
 	telegram   TelegramSender
 	db         *sql.DB
+	fatigue    *fatigueManager
+	loc        *time.Location
 }
 
 // New creates a Scheduler connected to the agent gRPC service and database.
-func New(grpcConn *grpc.ClientConn, telegram TelegramSender, db *sql.DB) *Scheduler {
+func New(grpcConn *grpc.ClientConn, telegram TelegramSender, db *sql.DB, tracker *activity.Tracker) *Scheduler {
 	// Use KST (UTC+9) location for cron schedule.
 	loc, err := time.LoadLocation("Asia/Seoul")
 	if err != nil {
@@ -40,22 +43,46 @@ func New(grpcConn *grpc.ClientConn, telegram TelegramSender, db *sql.DB) *Schedu
 		grpcClient: jikiv1.NewAgentServiceClient(grpcConn),
 		telegram:   telegram,
 		db:         db,
+		fatigue:    newFatigueManager(tracker, loc),
+		loc:        loc,
 	}
 }
 
 // Start registers cron jobs and begins the scheduler.
 func (s *Scheduler) Start() {
-	// Weekly report: every Monday at 09:00 KST.
-	_, err := s.cron.AddFunc("0 9 * * 1", func() {
-		s.sendWeeklyReports()
-	})
-	if err != nil {
-		log.Error().Err(err).Msg("failed to register weekly report cron job")
-		return
+	jobs := []struct {
+		schedule string
+		name     string
+		fn       func()
+	}{
+		// Level 1: Rule-Based
+		{"0 9 * * 1", "weekly_report", s.sendWeeklyReports},
+		{"0 * * * *", "budget_warning", s.runBudgetWarningRule},
+		{"0 21 * * *", "daily_summary", s.runDailySummaryRule},
+		{"0 20 * * *", "inactive_reminder", s.runInactiveReminderRule},
+		{"0 21 28-31 * *", "monthly_closing", s.runMonthlyClosingRule},
+
+		// Level 2: Pattern-Learning
+		{"0 6 * * *", "pattern_analysis", s.runPatternAnalysisRule},
+		{"0 */3 * * *", "spending_anomaly", s.runSpendingAnomalyRule},
+		{"0 14 * * *", "pattern_insight", s.runPatternInsightRule},
+
+		// Level 3: Autonomous Agent
+		{"0 7 * * *", "goal_evaluation", s.runGoalEvaluationRule},
+		{"0 12 * * 3", "goal_status", s.runGoalStatusRule},
+	}
+
+	registered := 0
+	for _, j := range jobs {
+		if _, err := s.cron.AddFunc(j.schedule, j.fn); err != nil {
+			log.Error().Err(err).Str("job", j.name).Msg("failed to register cron job")
+		} else {
+			registered++
+		}
 	}
 
 	s.cron.Start()
-	log.Info().Msg("scheduler started (weekly report: Mon 09:00 KST)")
+	log.Info().Int("jobs", registered).Msg("scheduler started with proactive notification rules")
 }
 
 // Stop gracefully shuts down the scheduler.
@@ -97,32 +124,37 @@ func (s *Scheduler) sendWeeklyReports() {
 		Msg("weekly reports completed")
 }
 
-// GenerateAndSend generates a report for a user and sends it via Telegram.
+// GenerateAndSend generates a weekly report for a user and sends it via Telegram.
 // Exported so it can be called from HTTP endpoints for testing.
 func (s *Scheduler) GenerateAndSend(userID string, chatID int64) error {
+	return s.GenerateAndSendType(userID, chatID, "weekly")
+}
+
+// GenerateAndSendType generates a report of the given type and sends it via Telegram.
+func (s *Scheduler) GenerateAndSendType(userID string, chatID int64, reportType string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
 	resp, err := s.grpcClient.GenerateReport(ctx, &jikiv1.ReportRequest{
 		UserId:     userID,
-		ReportType: "weekly",
+		ReportType: reportType,
 	})
 	if err != nil {
-		log.Error().Err(err).Str("user_id", userID).Msg("failed to generate report")
-		return fmt.Errorf("generate report: %w", err)
+		log.Error().Err(err).Str("user_id", userID).Str("type", reportType).Msg("failed to generate report")
+		return fmt.Errorf("generate %s report: %w", reportType, err)
 	}
 
 	if resp.Content == "" {
-		log.Warn().Str("user_id", userID).Msg("empty report content, skipping send")
+		log.Warn().Str("user_id", userID).Str("type", reportType).Msg("empty report content, skipping send")
 		return nil
 	}
 
 	if err := s.telegram.SendMessage(chatID, resp.Content); err != nil {
-		log.Error().Err(err).Str("user_id", userID).Msg("failed to send report via telegram")
-		return fmt.Errorf("send report: %w", err)
+		log.Error().Err(err).Str("user_id", userID).Str("type", reportType).Msg("failed to send report via telegram")
+		return fmt.Errorf("send %s report: %w", reportType, err)
 	}
 
-	log.Info().Str("user_id", userID).Msg("weekly report sent")
+	log.Info().Str("user_id", userID).Str("type", reportType).Msg("report sent")
 	return nil
 }
 

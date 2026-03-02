@@ -80,6 +80,58 @@ async def search_similar(
             return [dict(r) for r in rows]
 
 
+async def delete_by_key(
+    pool: AsyncConnectionPool[Any],
+    user_id: str,
+    key: str,
+) -> None:
+    """Delete all knowledge base entries matching user_id and key.
+
+    Used before upsert to replace stale pattern data without duplicates.
+
+    Args:
+        pool: The async connection pool.
+        user_id: Telegram user ID.
+        key: Knowledge key to delete.
+    """
+    async with pool.connection() as conn:
+        await conn.execute(
+            "DELETE FROM knowledge_base WHERE user_id = %s AND key = %s",
+            (user_id, key),
+        )
+        await conn.commit()
+
+
+async def get_by_key_prefix(
+    pool: AsyncConnectionPool[Any],
+    user_id: str,
+    prefix: str,
+) -> list[dict[str, Any]]:
+    """Get all knowledge entries whose key starts with the given prefix.
+
+    Args:
+        pool: The async connection pool.
+        user_id: Telegram user ID.
+        prefix: Key prefix to match (e.g., "goal:").
+
+    Returns:
+        List of knowledge entries matching the prefix, ordered by created_at desc.
+    """
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                """
+                SELECT id, key, value, source, created_at
+                FROM knowledge_base
+                WHERE user_id = %s AND key LIKE %s
+                ORDER BY created_at DESC
+                """,
+                (user_id, prefix + "%"),
+            )
+            rows = await cur.fetchall()
+            return [dict(r) for r in rows]
+
+
 async def get_by_key(
     pool: AsyncConnectionPool[Any],
     user_id: str,
