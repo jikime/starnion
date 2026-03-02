@@ -1268,5 +1268,75 @@ cd agent && uv run pytest tests/ -q
 
 ---
 
-**상태**: ✅ 구현 완료 (Phase 1-6)
+## 실시간 진행 상태 표시 (Tool Status Message)
+
+Agent가 처리하는 동안 Telegram 채팅에 현재 상태를 실시간으로 표시하는 기능.
+Proto에 이미 존재하는 `TOOL_CALL` ResponseType과 `tool_name` 필드를 활용하여 Gateway만 수정.
+
+### 동작 방식
+
+```
+스트림 시작 → "💭 생각중..." 상태 메시지 전송 (statusMsgID 저장)
+  ↓
+TOOL_CALL → statusMsgID edit ("🔍 웹 검색중...")
+  ↓
+TOOL_CALL (2번째) → statusMsgID edit ("📄 웹페이지 읽는중...")
+  ↓
+첫 TEXT 도착 → statusMsgID를 sentMsgID로 전환 (상태 메시지를 응답 메시지로 재활용)
+  ↓
+TEXT 축적 + throttled edit (기존 로직 동일)
+  ↓
+STREAM_END → 최종 Markdown 포맷 (기존 로직 동일)
+```
+
+- 상태 메시지와 응답 메시지가 하나의 Telegram 메시지로 연결 (edit 패턴)
+- 사용자는 메시지 1개만 보이며, "생각중..." → "도구 사용중..." → 최종 응답으로 자연스럽게 전환
+- 에러/스트림 종료 시 고아 상태 메시지 자동 정리
+
+### 도구별 상태 메시지 (34개)
+
+| 도구 | 상태 메시지 |
+|------|-------------|
+| save_finance | 💰 가계부 기록중... |
+| get_monthly_total | 📊 지출 조회중... |
+| set_budget / get_budget_status | 📊 예산 설정/확인중... |
+| save_daily_log | 📔 일기 저장중... |
+| set_goal / get_goals / update_goal_status | 🎯 목표 설정/조회/업데이트중... |
+| create_schedule / list_schedules / cancel_schedule | 📅 일정 생성/조회/취소중... |
+| retrieve_memory | 🧠 기억 검색중... |
+| analyze_image / generate_image | 🖼️ 이미지 분석중... / 🎨 이미지 생성중... |
+| parse_document / generate_document | 📄 문서 분석/생성중... |
+| transcribe_audio / generate_audio | 🎵 음성 인식/생성중... |
+| analyze_video / generate_video | 🎬 비디오 분석/생성중... |
+| web_search / web_fetch | 🔍 웹 검색중... / 📄 웹페이지 읽는중... |
+| google_calendar_* | 📅 구글 캘린더 조회/생성중... |
+| google_mail_* | 📧 메일 조회/전송중... |
+| google_docs_* / google_tasks_* / google_drive_* | 각 서비스별 상태 |
+| (미등록 도구) | ⏳ {도구명} 처리중... (fallback) |
+
+### UX 시나리오
+
+```
+# 직접 응답
+User: "안녕!"
+Bot:  "💭 생각중..."  →  "안녕하세요! 오늘 뭘 도와드릴까요?"
+
+# 단일 도구 호출
+User: "오늘 점심 만원 식비"
+Bot:  "💭 생각중..."  →  "💰 가계부 기록중..."  →  "점심 식비 10,000원 기록했어요!"
+
+# 다중 도구 호출
+User: "비트코인 현재 가격 검색해서 알려줘"
+Bot:  "💭 생각중..."  →  "🔍 웹 검색중..."  →  "📄 웹페이지 읽는중..."  →  "비트코인 현재 가격은..."
+```
+
+### 변경 파일
+
+| File | Changes |
+|------|---------|
+| `gateway/internal/telegram/bot.go` | `toolStatusText` 맵 + `getToolStatus()` + `statusMsgID` lifecycle |
+
+---
+
+**상태**: ✅ 구현 완료 (Phase 1-6 + Tool Status)
 **날짜**: 2026-03-02

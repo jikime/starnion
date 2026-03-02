@@ -277,10 +277,17 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 	var (
 		accumulated strings.Builder
 		sentMsgID   int
+		statusMsgID int // Status message ("생각중...", "도구 XXX 사용중...")
 		lastEdit    time.Time
 		lastLen     int
 	)
 	const editInterval = 500 * time.Millisecond
+
+	// Send initial "thinking" status message.
+	thinkMsg := tgbotapi.NewMessage(chatID, "💭 생각중...")
+	if sent, sendErr := b.api.Send(thinkMsg); sendErr == nil {
+		statusMsgID = sent.MessageID
+	}
 
 	for {
 		resp, err := stream.Recv()
@@ -288,6 +295,11 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 			break
 		}
 		if err != nil {
+			// Clean up status message on stream error.
+			if statusMsgID != 0 && sentMsgID == 0 {
+				deleteMsg := tgbotapi.NewDeleteMessage(chatID, statusMsgID)
+				b.api.Request(deleteMsg)
+			}
 			// If we already sent a partial message, complete it with error note.
 			if sentMsgID != 0 {
 				accumulated.WriteString("\n\n_(stream interrupted)_")
@@ -303,13 +315,21 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 		case jikiv1.ResponseType_TEXT:
 			accumulated.WriteString(resp.Content)
 
-			// First text chunk: send a new message.
+			// First text chunk: transition status message or send new.
 			if sentMsgID == 0 {
-				sent, sendErr := b.api.Send(tgbotapi.NewMessage(chatID, accumulated.String()))
-				if sendErr != nil {
-					return fmt.Errorf("send initial: %w", sendErr)
+				if statusMsgID != 0 {
+					// Reuse status message as the response message.
+					sentMsgID = statusMsgID
+					statusMsgID = 0
+					edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, accumulated.String())
+					b.api.Send(edit) // best-effort
+				} else {
+					sent, sendErr := b.api.Send(tgbotapi.NewMessage(chatID, accumulated.String()))
+					if sendErr != nil {
+						return fmt.Errorf("send initial: %w", sendErr)
+					}
+					sentMsgID = sent.MessageID
 				}
-				sentMsgID = sent.MessageID
 				lastEdit = time.Now()
 				lastLen = accumulated.Len()
 				continue
@@ -324,6 +344,16 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 			}
 
 		case jikiv1.ResponseType_STREAM_END:
+			// Transition status message if text accumulated but not yet sent.
+			if statusMsgID != 0 && sentMsgID == 0 && accumulated.Len() > 0 {
+				sentMsgID = statusMsgID
+				statusMsgID = 0
+			}
+			// Delete orphaned status message (no response text at all).
+			if statusMsgID != 0 && sentMsgID == 0 {
+				deleteMsg := tgbotapi.NewDeleteMessage(chatID, statusMsgID)
+				b.api.Request(deleteMsg)
+			}
 			// Final edit with Markdown formatting.
 			if sentMsgID != 0 && accumulated.Len() > lastLen {
 				final := accumulated.String()
@@ -348,6 +378,11 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 			if errText == "" {
 				errText = "잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요."
 			}
+			// Reuse status message for error display.
+			if statusMsgID != 0 && sentMsgID == 0 {
+				sentMsgID = statusMsgID
+				statusMsgID = 0
+			}
 			if sentMsgID == 0 {
 				b.SendMessage(chatID, errText)
 			} else {
@@ -361,12 +396,28 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 		case jikiv1.ResponseType_FILE:
 			b.sendFile(chatID, resp.FileData, resp.FileName, resp.FileMime)
 
-		case jikiv1.ResponseType_TOOL_CALL, jikiv1.ResponseType_TOOL_RESULT:
-			// Currently ignored; could show "searching..." status in the future.
+		case jikiv1.ResponseType_TOOL_CALL:
+			// Update status message with tool-specific text.
+			if statusMsgID != 0 {
+				statusText := getToolStatus(resp.ToolName)
+				edit := tgbotapi.NewEditMessageText(chatID, statusMsgID, statusText)
+				b.api.Send(edit) // best-effort
+			}
+
+		case jikiv1.ResponseType_TOOL_RESULT:
+			// Ignored; tool results are processed internally by the agent.
 		}
 	}
 
 	// Stream ended without explicit STREAM_END (graceful handling).
+	if statusMsgID != 0 && sentMsgID == 0 && accumulated.Len() > 0 {
+		sentMsgID = statusMsgID
+		statusMsgID = 0
+	}
+	if statusMsgID != 0 && sentMsgID == 0 {
+		deleteMsg := tgbotapi.NewDeleteMessage(chatID, statusMsgID)
+		b.api.Request(deleteMsg)
+	}
 	if sentMsgID != 0 && accumulated.Len() > lastLen {
 		final := accumulated.String()
 		edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, final)
@@ -519,6 +570,52 @@ func (b *Bot) handleStart(chatID int64) {
 	if _, err := b.api.Send(msg); err != nil {
 		log.Error().Err(err).Int64("chat_id", chatID).Msg("failed to send /start reply")
 	}
+}
+
+// toolStatusText maps tool names to Korean status messages with emoji.
+var toolStatusText = map[string]string{
+	"save_finance":           "💰 가계부 기록중...",
+	"get_monthly_total":      "📊 지출 조회중...",
+	"set_budget":             "📊 예산 설정중...",
+	"get_budget_status":      "📊 예산 확인중...",
+	"save_daily_log":         "📔 일기 저장중...",
+	"set_goal":               "🎯 목표 설정중...",
+	"get_goals":              "🎯 목표 조회중...",
+	"update_goal_status":     "🎯 목표 업데이트중...",
+	"create_schedule":        "📅 일정 생성중...",
+	"list_schedules":         "📅 일정 조회중...",
+	"cancel_schedule":        "📅 일정 취소중...",
+	"retrieve_memory":        "🧠 기억 검색중...",
+	"analyze_image":          "🖼️ 이미지 분석중...",
+	"generate_image":         "🎨 이미지 생성중...",
+	"parse_document":         "📄 문서 분석중...",
+	"generate_document":      "📄 문서 생성중...",
+	"transcribe_audio":       "🎵 음성 인식중...",
+	"generate_audio":         "🎵 음성 생성중...",
+	"analyze_video":          "🎬 비디오 분석중...",
+	"generate_video":         "🎬 비디오 생성중...",
+	"web_search":             "🔍 웹 검색중...",
+	"web_fetch":              "📄 웹페이지 읽는중...",
+	"google_auth":            "🔗 구글 연동중...",
+	"google_disconnect":      "🔗 구글 연동 해제중...",
+	"google_calendar_list":   "📅 구글 캘린더 조회중...",
+	"google_calendar_create": "📅 구글 캘린더 생성중...",
+	"google_docs_create":     "📝 구글 문서 생성중...",
+	"google_docs_read":       "📝 구글 문서 읽는중...",
+	"google_tasks_list":      "✅ 구글 태스크 조회중...",
+	"google_tasks_create":    "✅ 구글 태스크 생성중...",
+	"google_drive_upload":    "📁 구글 드라이브 업로드중...",
+	"google_drive_list":      "📁 구글 드라이브 조회중...",
+	"google_mail_list":       "📧 메일 조회중...",
+	"google_mail_send":       "📧 메일 전송중...",
+}
+
+// getToolStatus returns a Korean status message for the given tool name.
+func getToolStatus(toolName string) string {
+	if text, ok := toolStatusText[toolName]; ok {
+		return text
+	}
+	return fmt.Sprintf("⏳ %s 처리중...", toolName)
 }
 
 // personaNames maps persona IDs to display labels with emoji.
