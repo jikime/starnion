@@ -262,7 +262,7 @@ async def dynamic_prompt(state: dict) -> list:
 
 ---
 
-## 스킬 맵 (15개)
+## 스킬 맵 (16개)
 
 ### 기존 기능 (9개)
 
@@ -278,7 +278,7 @@ async def dynamic_prompt(state: dict) -> list:
 | 8 | `proactive` | 🔔 능동 알림 | — | inactive_reminder | ON | 1 |
 | 9 | `compaction` | 🗜️ 메모리 압축 | — | memory_compaction | ON | 0 (시스템) |
 
-### 신규 기능 (6개) — 기존 multimodal 분해 + 신규
+### 신규 기능 (7개) — 기존 multimodal 분해 + 신규
 
 | # | ID | 이름 | 도구 | 기본값 | Level |
 |---|-----|------|------|--------|-------|
@@ -288,6 +288,7 @@ async def dynamic_prompt(state: dict) -> list:
 | 13 | `audio` | 🎵 오디오 | transcribe_audio, generate_audio | ON | 1 |
 | 14 | `google` | 🔗 구글 | google_auth + 10개 서비스 도구 | OFF | 2 (opt-in) |
 | 15 | `websearch` | 🔍 웹 검색 | web_search, web_fetch | ON | 1 |
+| 16 | `weather` | 🌤️ 날씨 | get_weather, get_forecast | ON | 1 |
 
 ### Permission Level
 
@@ -640,6 +641,20 @@ SKILLS: dict[str, SkillDef] = {
         sort_order=99,
     ),
     # --- 신규 스킬 ---
+    "websearch": SkillDef(
+        id="websearch", name="웹 검색", emoji="🔍",
+        description="인터넷 검색 및 웹페이지 정보 수집",
+        category="information",
+        tools=["web_search", "web_fetch"],
+        sort_order=15,
+    ),
+    "weather": SkillDef(
+        id="weather", name="날씨", emoji="🌤️",
+        description="현재 날씨 및 일기예보 조회",
+        category="information",
+        tools=["get_weather", "get_forecast"],
+        sort_order=16,
+    ),
     "documents": SkillDef(
         id="documents", name="문서", emoji="📄",
         description="문서 파싱(PDF/DOCX/HWP/XLSX/PPTX/MD/TXT) 및 생성",
@@ -1043,6 +1058,21 @@ case jikiv1.ResponseType_FILE:
 - 바이너리 (pdf, image, audio, video) → `parse_document` 도구 안내
 - 안전장치: 30초 타임아웃, 5MB 크기 제한, max_length 절단
 
+### `weather` — 날씨
+
+API: Open-Meteo (무료, API 키 불필요), Geocoding: Open-Meteo Geocoding API
+
+| 기능 | 도구 | 구현 | 상태 |
+|------|------|------|------|
+| 현재 날씨 | get_weather | Open-Meteo Current Weather (기온/체감/습도/풍속/WMO코드) | ✅ 구현 |
+| 일간 예보 | get_forecast | Open-Meteo Daily Forecast (최고/최저/강수확률, 1~7일) | ✅ 구현 |
+
+**특징:**
+- 도시명 → 위도/경도 자동 변환 (한국어/영어 도시명 지원)
+- WMO Weather Code → 한국어 날씨 상태 + 이모지 변환 (27개 코드 매핑)
+- 위치 미지정 시 "서울" 기본값
+- 추가 의존성 없음 (httpx 기존 사용)
+
 ---
 
 ## 의존성 추가
@@ -1112,6 +1142,7 @@ readability-lxml = ">=0.8"
 | `skills/google/SKILL.md` + `tools.py` | 12개 @tool 함수 |
 | `skills/google/api.py` | Google API 인증 헬퍼 (get_google_service) |
 | `skills/websearch/SKILL.md` + `tools.py` | web_search (Tavily) + web_fetch (httpx + readability) |
+| `skills/weather/SKILL.md` + `tools.py` | get_weather + get_forecast (Open-Meteo API) |
 
 ### New Files — Go Gateway
 
@@ -1183,6 +1214,11 @@ Phase 6: Web Search + Quality                      ✅ 완료
   ├─ PDF 생성 fpdf2 → ReportLab 마이그레이션 (한글 지원 개선)
   ├─ TTS Google Cloud → Gemini TTS 마이그레이션
   └─ 단위 테스트 138 → 164개 확장
+
+Phase 7: Weather                                     ✅ 완료
+  ├─ weather/tools.py (get_weather + get_forecast via Open-Meteo)
+  ├─ weather/SKILL.md (LLM 지시문)
+  └─ 단위 테스트 164 → 188개 확장
 ```
 
 ---
@@ -1233,7 +1269,7 @@ ORDER BY s.sort_order;
 
 ## 테스트
 
-### 단위 테스트 (164개, 모두 통과)
+### 단위 테스트 (188개, 모두 통과)
 
 | 테스트 파일 | 범위 | 테스트 수 |
 |-------------|------|----------|
@@ -1247,20 +1283,21 @@ ORDER BY s.sort_order;
 | `test_parser.py` | extract_text 라우터, 포맷별 파서 | 12 |
 | `test_generator.py` | PDF/DOCX/XLSX/MD/TXT 생성기 | 15 |
 | `test_websearch_tools.py` | web_search, web_fetch, 헬퍼 함수 | 26 |
+| `test_weather_tools.py` | get_weather, get_forecast, WMO코드, geocode | 24 |
 | 기타 (image, audio, video, google 등) | 각 스킬 도구 | 41 |
 
 ```bash
 cd agent && uv run pytest tests/ -q
-# 164 passed
+# 188 passed
 ```
 
 ### 통합 검증
 
 ```bash
-# 레지스트리: 15개 스킬, 34개 도구
+# 레지스트리: 16개 스킬, 36개 도구
 # ALL_TOOLS 일치 확인
 # 역매핑 (tool→skill) 전수 확인
-# SKILL.md 로딩: 12개 문서
+# SKILL.md 로딩: 13개 문서
 # 파일 컨텍스트 파이프라인: OK
 # 문서 파서/생성기: OK (ReportLab PDF + 한글 지원)
 # Go 빌드 + vet: OK
@@ -1293,7 +1330,7 @@ STREAM_END → 최종 Markdown 포맷 (기존 로직 동일)
 - 사용자는 메시지 1개만 보이며, "생각중..." → "도구 사용중..." → 최종 응답으로 자연스럽게 전환
 - 에러/스트림 종료 시 고아 상태 메시지 자동 정리
 
-### 도구별 상태 메시지 (34개)
+### 도구별 상태 메시지 (36개)
 
 | 도구 | 상태 메시지 |
 |------|-------------|
@@ -1309,6 +1346,7 @@ STREAM_END → 최종 Markdown 포맷 (기존 로직 동일)
 | transcribe_audio / generate_audio | 🎵 음성 인식/생성중... |
 | analyze_video / generate_video | 🎬 비디오 분석/생성중... |
 | web_search / web_fetch | 🔍 웹 검색중... / 📄 웹페이지 읽는중... |
+| get_weather / get_forecast | 🌤️ 날씨 조회중... / 🌤️ 일기예보 조회중... |
 | google_calendar_* | 📅 구글 캘린더 조회/생성중... |
 | google_mail_* | 📧 메일 조회/전송중... |
 | google_docs_* / google_tasks_* / google_drive_* | 각 서비스별 상태 |
@@ -1338,5 +1376,5 @@ Bot:  "💭 생각중..."  →  "🔍 웹 검색중..."  →  "📄 웹페이지
 
 ---
 
-**상태**: ✅ 구현 완료 (Phase 1-6 + Tool Status)
+**상태**: ✅ 구현 완료 (Phase 1-7 + Tool Status)
 **날짜**: 2026-03-02

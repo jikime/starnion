@@ -596,6 +596,8 @@ var toolStatusText = map[string]string{
 	"generate_video":         "🎬 비디오 생성중...",
 	"web_search":             "🔍 웹 검색중...",
 	"web_fetch":              "📄 웹페이지 읽는중...",
+	"get_weather":            "🌤️ 날씨 조회중...",
+	"get_forecast":           "🌤️ 일기예보 조회중...",
 	"google_auth":            "🔗 구글 연동중...",
 	"google_disconnect":      "🔗 구글 연동 해제중...",
 	"google_calendar_list":   "📅 구글 캘린더 조회중...",
