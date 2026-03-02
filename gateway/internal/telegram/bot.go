@@ -598,6 +598,8 @@ var toolStatusText = map[string]string{
 	"web_fetch":              "📄 웹페이지 읽는중...",
 	"get_weather":            "🌤️ 날씨 조회중...",
 	"get_forecast":           "🌤️ 일기예보 조회중...",
+	"summarize_url":          "📝 URL 요약중...",
+	"summarize_text":         "📝 텍스트 요약중...",
 	"google_auth":            "🔗 구글 연동중...",
 	"google_disconnect":      "🔗 구글 연동 해제중...",
 	"google_calendar_list":   "📅 구글 캘린더 조회중...",

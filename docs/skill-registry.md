@@ -262,7 +262,7 @@ async def dynamic_prompt(state: dict) -> list:
 
 ---
 
-## 스킬 맵 (16개)
+## 스킬 맵 (17개)
 
 ### 기존 기능 (9개)
 
@@ -278,7 +278,7 @@ async def dynamic_prompt(state: dict) -> list:
 | 8 | `proactive` | 🔔 능동 알림 | — | inactive_reminder | ON | 1 |
 | 9 | `compaction` | 🗜️ 메모리 압축 | — | memory_compaction | ON | 0 (시스템) |
 
-### 신규 기능 (7개) — 기존 multimodal 분해 + 신규
+### 신규 기능 (8개) — 기존 multimodal 분해 + 신규
 
 | # | ID | 이름 | 도구 | 기본값 | Level |
 |---|-----|------|------|--------|-------|
@@ -289,6 +289,7 @@ async def dynamic_prompt(state: dict) -> list:
 | 14 | `google` | 🔗 구글 | google_auth + 10개 서비스 도구 | OFF | 2 (opt-in) |
 | 15 | `websearch` | 🔍 웹 검색 | web_search, web_fetch | ON | 1 |
 | 16 | `weather` | 🌤️ 날씨 | get_weather, get_forecast | ON | 1 |
+| 17 | `summarize` | 📝 요약 | summarize_url, summarize_text | ON | 1 |
 
 ### Permission Level
 
@@ -1058,6 +1059,23 @@ case jikiv1.ResponseType_FILE:
 - 바이너리 (pdf, image, audio, video) → `parse_document` 도구 안내
 - 안전장치: 30초 타임아웃, 5MB 크기 제한, max_length 절단
 
+### `summarize` — 요약
+
+LLM: Gemini (기존 API 키 사용), URL Fetch: httpx + readability-lxml
+
+| 기능 | 도구 | 구현 | 상태 |
+|------|------|------|------|
+| URL 요약 | summarize_url | httpx로 URL 내용 추출 → Gemini LLM 요약 | ✅ 구현 |
+| 텍스트 요약 | summarize_text | 텍스트 → Gemini LLM 요약 | ✅ 구현 |
+
+**특징:**
+- 요약 스타일 3종: concise(짧게 ~200자), detailed(상세 ~500자), bullets(항목별)
+- 항상 한국어로 요약 출력
+- websearch 스킬과 독립 동작 (별도 토글 가능)
+- 바이너리 URL 자동 감지 및 차단
+- LLM 입력 길이 제한 (15,000자) + 다운로드 크기 제한 (5MB)
+- 추가 의존성 없음 (httpx, readability-lxml, langchain_google_genai 기존 사용)
+
 ### `weather` — 날씨
 
 API: Open-Meteo (무료, API 키 불필요), Geocoding: Open-Meteo Geocoding API
@@ -1143,6 +1161,7 @@ readability-lxml = ">=0.8"
 | `skills/google/api.py` | Google API 인증 헬퍼 (get_google_service) |
 | `skills/websearch/SKILL.md` + `tools.py` | web_search (Tavily) + web_fetch (httpx + readability) |
 | `skills/weather/SKILL.md` + `tools.py` | get_weather + get_forecast (Open-Meteo API) |
+| `skills/summarize/SKILL.md` + `tools.py` | summarize_url + summarize_text (Gemini LLM) |
 
 ### New Files — Go Gateway
 
@@ -1219,6 +1238,11 @@ Phase 7: Weather                                     ✅ 완료
   ├─ weather/tools.py (get_weather + get_forecast via Open-Meteo)
   ├─ weather/SKILL.md (LLM 지시문)
   └─ 단위 테스트 164 → 188개 확장
+
+Phase 8: Summarize                                    ✅ 완료
+  ├─ summarize/tools.py (summarize_url + summarize_text via Gemini LLM)
+  ├─ summarize/SKILL.md (LLM 지시문)
+  └─ 단위 테스트 188 → 223개 확장
 ```
 
 ---
@@ -1269,7 +1293,7 @@ ORDER BY s.sort_order;
 
 ## 테스트
 
-### 단위 테스트 (188개, 모두 통과)
+### 단위 테스트 (223개, 모두 통과)
 
 | 테스트 파일 | 범위 | 테스트 수 |
 |-------------|------|----------|
@@ -1284,20 +1308,21 @@ ORDER BY s.sort_order;
 | `test_generator.py` | PDF/DOCX/XLSX/MD/TXT 생성기 | 15 |
 | `test_websearch_tools.py` | web_search, web_fetch, 헬퍼 함수 | 26 |
 | `test_weather_tools.py` | get_weather, get_forecast, WMO코드, geocode | 24 |
+| `test_summarize_tools.py` | summarize_url, summarize_text, 프롬프트, HTML처리 | 35 |
 | 기타 (image, audio, video, google 등) | 각 스킬 도구 | 41 |
 
 ```bash
 cd agent && uv run pytest tests/ -q
-# 188 passed
+# 223 passed
 ```
 
 ### 통합 검증
 
 ```bash
-# 레지스트리: 16개 스킬, 36개 도구
+# 레지스트리: 17개 스킬, 38개 도구
 # ALL_TOOLS 일치 확인
 # 역매핑 (tool→skill) 전수 확인
-# SKILL.md 로딩: 13개 문서
+# SKILL.md 로딩: 14개 문서
 # 파일 컨텍스트 파이프라인: OK
 # 문서 파서/생성기: OK (ReportLab PDF + 한글 지원)
 # Go 빌드 + vet: OK
@@ -1330,7 +1355,7 @@ STREAM_END → 최종 Markdown 포맷 (기존 로직 동일)
 - 사용자는 메시지 1개만 보이며, "생각중..." → "도구 사용중..." → 최종 응답으로 자연스럽게 전환
 - 에러/스트림 종료 시 고아 상태 메시지 자동 정리
 
-### 도구별 상태 메시지 (36개)
+### 도구별 상태 메시지 (38개)
 
 | 도구 | 상태 메시지 |
 |------|-------------|
@@ -1347,6 +1372,7 @@ STREAM_END → 최종 Markdown 포맷 (기존 로직 동일)
 | analyze_video / generate_video | 🎬 비디오 분석/생성중... |
 | web_search / web_fetch | 🔍 웹 검색중... / 📄 웹페이지 읽는중... |
 | get_weather / get_forecast | 🌤️ 날씨 조회중... / 🌤️ 일기예보 조회중... |
+| summarize_url / summarize_text | 📝 URL 요약중... / 📝 텍스트 요약중... |
 | google_calendar_* | 📅 구글 캘린더 조회/생성중... |
 | google_mail_* | 📧 메일 조회/전송중... |
 | google_docs_* / google_tasks_* / google_drive_* | 각 서비스별 상태 |
@@ -1376,5 +1402,5 @@ Bot:  "💭 생각중..."  →  "🔍 웹 검색중..."  →  "📄 웹페이지
 
 ---
 
-**상태**: ✅ 구현 완료 (Phase 1-7 + Tool Status)
+**상태**: ✅ 구현 완료 (Phase 1-8 + Tool Status)
 **날짜**: 2026-03-02

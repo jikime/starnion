@@ -191,6 +191,15 @@ SKILLS: dict[str, SkillDef] = {
         tools=["get_weather", "get_forecast"],
         sort_order=16,
     ),
+    "summarize": SkillDef(
+        id="summarize",
+        name="요약",
+        emoji="📝",
+        description="URL 웹페이지 또는 텍스트를 AI로 요약",
+        category="information",
+        tools=["summarize_url", "summarize_text"],
+        sort_order=17,
+    ),
 }
 
 # tool_name -> skill_id reverse mapping (fast guard lookup)

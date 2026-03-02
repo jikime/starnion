@@ -54,6 +54,7 @@ from jiki_agent.skills.schedule.tools import (
 )
 from jiki_agent.skills.video.tools import analyze_video, generate_video
 from jiki_agent.skills.weather.tools import get_forecast, get_weather
+from jiki_agent.skills.summarize.tools import summarize_text, summarize_url
 from jiki_agent.skills.websearch.tools import web_fetch, web_search
 
 logger = logging.getLogger(__name__)
@@ -99,6 +100,8 @@ ALL_TOOLS = [
     web_fetch,
     get_weather,
     get_forecast,
+    summarize_url,
+    summarize_text,
 ]
 
 # Module-level LLM instance (set during create_agent).
