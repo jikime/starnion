@@ -146,9 +146,25 @@ agent/src/jiki_agent/
 │   │   ├── tools.py              ← @tool 함수 12개
 │   │   └── api.py                ← Google API 인증 헬퍼 (get_google_service)
 │   │
-│   └── websearch/                ← 🔍 웹 검색 스킬
+│   ├── websearch/                ← 🔍 웹 검색 스킬
+│   │   ├── SKILL.md
+│   │   └── tools.py              ← web_search (Tavily), web_fetch (httpx + readability)
+│   │
+│   ├── translate/                ← 🌐 번역 스킬
+│   │   ├── SKILL.md
+│   │   └── tools.py              ← translate_text (Gemini LLM)
+│   │
+│   ├── qrcode/                   ← 🔲 QR코드 스킬
+│   │   ├── SKILL.md
+│   │   └── tools.py              ← generate_qrcode (qrcode lib)
+│   │
+│   ├── calculator/               ← 🧮 계산기 스킬
+│   │   ├── SKILL.md
+│   │   └── tools.py              ← calculate (ast safe eval)
+│   │
+│   └── reminder/                 ← ⏰ 알림 스킬
 │       ├── SKILL.md
-│       └── tools.py              ← web_search (Tavily), web_fetch (httpx + readability)
+│       └── tools.py              ← set_reminder, list_reminders, delete_reminder
 │
 ├── db/
 │   ├── pool.py
@@ -262,7 +278,7 @@ async def dynamic_prompt(state: dict) -> list:
 
 ---
 
-## 스킬 맵 (17개)
+## 스킬 맵 (21개)
 
 ### 기존 기능 (9개)
 
@@ -278,7 +294,7 @@ async def dynamic_prompt(state: dict) -> list:
 | 8 | `proactive` | 🔔 능동 알림 | — | inactive_reminder | ON | 1 |
 | 9 | `compaction` | 🗜️ 메모리 압축 | — | memory_compaction | ON | 0 (시스템) |
 
-### 신규 기능 (8개) — 기존 multimodal 분해 + 신규
+### 신규 기능 (12개) — 기존 multimodal 분해 + 신규
 
 | # | ID | 이름 | 도구 | 기본값 | Level |
 |---|-----|------|------|--------|-------|
@@ -290,6 +306,10 @@ async def dynamic_prompt(state: dict) -> list:
 | 15 | `websearch` | 🔍 웹 검색 | web_search, web_fetch | ON | 1 |
 | 16 | `weather` | 🌤️ 날씨 | get_weather, get_forecast | ON | 1 |
 | 17 | `summarize` | 📝 요약 | summarize_url, summarize_text | ON | 1 |
+| 18 | `translate` | 🌐 번역 | translate_text | ON | 1 |
+| 19 | `qrcode` | 🔲 QR코드 | generate_qrcode | ON | 1 |
+| 20 | `calculator` | 🧮 계산기 | calculate | ON | 1 |
+| 21 | `reminder` | ⏰ 알림 | set_reminder, list_reminders, delete_reminder | ON | 1 |
 
 ### Permission Level
 
@@ -439,6 +459,16 @@ Agent를 경유하지 않고 Gateway가 직접 처리하는 명령어.
     │ 📌 미디어 & 문서                 │
     │ [📄문서 ✅]   [🖼️이미지 ✅]      │
     │ [🎵오디오 ✅] [🎬비디오 ❌]      │
+    │                                   │
+    │ 📌 정보                           │
+    │ [🔍웹검색 ✅] [🌤️날씨 ✅]       │
+    │ [📝요약 ✅]   [🌐번역 ✅]        │
+    │                                   │
+    │ 📌 유틸리티                       │
+    │ [🔲QR코드 ✅] [🧮계산기 ✅]      │
+    │                                   │
+    │ 📌 생산성                         │
+    │ [📅일정 ✅]   [⏰알림 ✅]        │
     │                                   │
     │ 📌 외부 연동                     │
     │ [🔗구글 ❌]                      │
@@ -642,6 +672,34 @@ SKILLS: dict[str, SkillDef] = {
         sort_order=99,
     ),
     # --- 신규 스킬 ---
+    "translate": SkillDef(
+        id="translate", name="번역", emoji="🌐",
+        description="텍스트를 다국어로 번역 (한/영/일/중 등)",
+        category="information",
+        tools=["translate_text"],
+        sort_order=18,
+    ),
+    "qrcode": SkillDef(
+        id="qrcode", name="QR코드", emoji="🔲",
+        description="QR 코드 이미지 생성",
+        category="utility",
+        tools=["generate_qrcode"],
+        sort_order=19,
+    ),
+    "calculator": SkillDef(
+        id="calculator", name="계산기", emoji="🧮",
+        description="수학 수식 계산 (사칙연산, 함수, 상수)",
+        category="utility",
+        tools=["calculate"],
+        sort_order=20,
+    ),
+    "reminder": SkillDef(
+        id="reminder", name="알림", emoji="⏰",
+        description="간편 알림 예약 및 관리",
+        category="productivity",
+        tools=["set_reminder", "list_reminders", "delete_reminder"],
+        sort_order=21,
+    ),
     "websearch": SkillDef(
         id="websearch", name="웹 검색", emoji="🔍",
         description="인터넷 검색 및 웹페이지 정보 수집",
@@ -824,6 +882,13 @@ from jiki_agent.skills.documents.tools import parse_document, generate_document
 from jiki_agent.skills.image.tools import analyze_image, generate_image
 from jiki_agent.skills.audio.tools import transcribe_audio, generate_audio
 from jiki_agent.skills.video.tools import analyze_video, generate_video
+from jiki_agent.skills.summarize.tools import summarize_url, summarize_text
+from jiki_agent.skills.translate.tools import translate_text
+from jiki_agent.skills.qrcode.tools import generate_qrcode
+from jiki_agent.skills.calculator.tools import calculate
+from jiki_agent.skills.reminder.tools import (
+    delete_reminder, list_reminders, set_reminder,
+)
 from jiki_agent.skills.google.tools import (
     google_auth, google_disconnect,
     google_calendar_create, google_calendar_list,
@@ -846,6 +911,13 @@ tools = [
     google_tasks_create, google_tasks_list,
     google_drive_upload, google_drive_list,
     google_mail_send, google_mail_list,
+    web_search, web_fetch,
+    get_weather, get_forecast,
+    summarize_url, summarize_text,
+    translate_text,
+    generate_qrcode,
+    calculate,
+    set_reminder, list_reminders, delete_reminder,
 ]
 
 # dynamic_prompt — 활성 스킬만 prompt에 주입
@@ -1091,6 +1163,68 @@ API: Open-Meteo (무료, API 키 불필요), Geocoding: Open-Meteo Geocoding API
 - 위치 미지정 시 "서울" 기본값
 - 추가 의존성 없음 (httpx 기존 사용)
 
+### `translate` — 번역
+
+LLM: Gemini (기존 API 키 사용)
+
+| 기능 | 도구 | 구현 | 상태 |
+|------|------|------|------|
+| 텍스트 번역 | translate_text | Gemini LLM 프롬프트 기반 번역 | ✅ 구현 |
+
+**특징:**
+- 지원 언어 7종: 한국어(ko), 영어(en), 일본어(ja), 중국어(zh), 스페인어(es), 프랑스어(fr), 독일어(de)
+- source_lang="auto" 자동 감지 (기본값)
+- 텍스트 길이 제한 10,000자
+- 추가 의존성 없음 (langchain_google_genai 기존 사용)
+
+### `qrcode` — QR코드 생성
+
+라이브러리: qrcode[pil] (Python)
+
+| 기능 | 도구 | 구현 | 상태 |
+|------|------|------|------|
+| QR 코드 생성 | generate_qrcode | qrcode 라이브러리 → PNG → add_pending_file | ✅ 구현 |
+
+**특징:**
+- URL, 텍스트, 연락처 정보 등 다양한 콘텐츠 지원
+- QR 박스 크기 조절 가능 (1-40, 기본값 10)
+- 콘텐츠 길이 제한 4,000자
+- 의존성: `qrcode[pil]>=8.0`
+
+### `calculator` — 계산기
+
+순수 Python (API/LLM 불필요)
+
+| 기능 | 도구 | 구현 | 상태 |
+|------|------|------|------|
+| 수식 계산 | calculate | ast.parse + 안전한 재귀 평가 | ✅ 구현 |
+
+**특징:**
+- 사칙연산, 거듭제곱, 나머지, 정수 나눗셈
+- math 함수: sqrt, abs, round, sin, cos, tan, log, log10, log2, ceil, floor
+- math 상수: pi, e
+- ast 기반 안전 평가 (eval 미사용, 임의 코드 실행 차단)
+- 큰 지수 제한 (>1000 차단)
+- 추가 의존성 없음
+
+### `reminder` — 알림
+
+DB: knowledge_repo (기존 인프라 활용)
+
+| 기능 | 도구 | 구현 | 상태 |
+|------|------|------|------|
+| 알림 예약 | set_reminder | knowledge_repo.upsert (reminder: 접두사) | ✅ 구현 |
+| 알림 조회 | list_reminders | knowledge_repo.get_by_key_prefix | ✅ 구현 |
+| 알림 삭제 | delete_reminder | knowledge_repo.delete_by_key + 상태 변경 | ✅ 구현 |
+
+**특징:**
+- 사용자당 최대 20개 활성 알림
+- YYYY-MM-DD HH:MM 형식 (KST)
+- 과거 시간 자동 거부
+- 알림 제목 선택 사항 (미지정 시 메시지 사용)
+- schedule 스킬과 독립 동작 (단순 메시지 알림 특화)
+- 추가 의존성 없음
+
 ---
 
 ## 의존성 추가
@@ -1113,6 +1247,9 @@ google-auth-httplib2 = ">=0.2"
 # Web Search
 tavily-python = ">=0.5"
 readability-lxml = ">=0.8"
+
+# QR Code
+qrcode = { version = ">=8.0", extras = ["pil"] }
 ```
 
 ---
@@ -1162,6 +1299,10 @@ readability-lxml = ">=0.8"
 | `skills/websearch/SKILL.md` + `tools.py` | web_search (Tavily) + web_fetch (httpx + readability) |
 | `skills/weather/SKILL.md` + `tools.py` | get_weather + get_forecast (Open-Meteo API) |
 | `skills/summarize/SKILL.md` + `tools.py` | summarize_url + summarize_text (Gemini LLM) |
+| `skills/translate/SKILL.md` + `tools.py` | translate_text (Gemini LLM 번역) |
+| `skills/qrcode/SKILL.md` + `tools.py` | generate_qrcode (qrcode lib → PNG) |
+| `skills/calculator/SKILL.md` + `tools.py` | calculate (ast 안전 수식 평가) |
+| `skills/reminder/SKILL.md` + `tools.py` | set/list/delete_reminder (knowledge_repo) |
 
 ### New Files — Go Gateway
 
@@ -1243,6 +1384,14 @@ Phase 8: Summarize                                    ✅ 완료
   ├─ summarize/tools.py (summarize_url + summarize_text via Gemini LLM)
   ├─ summarize/SKILL.md (LLM 지시문)
   └─ 단위 테스트 188 → 223개 확장
+
+Phase 9: Tier 1 Skills (번역/QR/계산기/알림)            ✅ 완료
+  ├─ translate/tools.py (translate_text via Gemini LLM, 7개 언어)
+  ├─ qrcode/tools.py (generate_qrcode via qrcode lib → PNG)
+  ├─ calculator/tools.py (calculate via ast 안전 평가, math 함수/상수)
+  ├─ reminder/tools.py (set/list/delete_reminder via knowledge_repo)
+  ├─ pyproject.toml: qrcode[pil]>=8.0 의존성 추가
+  └─ 단위 테스트 223 → 317개 확장
 ```
 
 ---
@@ -1279,6 +1428,14 @@ print('OK')
 - **요약 (텍스트)**: "이 내용 요약해줘: (긴 텍스트)" → AI 요약 반환
 - **요약 스타일**: "포인트별로 정리해줘" → bullets 스타일 / "자세히 요약해줘" → detailed 스타일
 - **요약 스킬 토글**: `/skills` → 요약 끄기 → "요약해줘" → 비활성 메시지 확인
+- **번역**: "이 문장 영어로 번역해줘: 안녕하세요" → 영어 번역 반환
+- **번역 (자동감지)**: "Translate to Japanese: Hello" → 일본어 번역 반환
+- **QR코드**: "https://example.com QR코드 만들어줘" → QR 이미지 수신
+- **계산기**: "sqrt(144) + 3^2" → 계산 결과 반환
+- **계산기 (안전)**: "import os" → 허용되지 않는 수식 오류
+- **알림 설정**: "내일 오전 9시에 회의 알려줘" → 알림 예약 확인
+- **알림 조회**: "알림 목록 보여줘" → 활성 알림 목록
+- **알림 삭제**: "알림 취소해줘" → 알림 삭제 확인
 
 ### 3. DB 확인
 
@@ -1298,7 +1455,7 @@ ORDER BY s.sort_order;
 
 ## 테스트
 
-### 단위 테스트 (223개, 모두 통과)
+### 단위 테스트 (317개, 모두 통과)
 
 | 테스트 파일 | 범위 | 테스트 수 |
 |-------------|------|----------|
@@ -1314,20 +1471,24 @@ ORDER BY s.sort_order;
 | `test_websearch_tools.py` | web_search, web_fetch, 헬퍼 함수 | 26 |
 | `test_weather_tools.py` | get_weather, get_forecast, WMO코드, geocode | 24 |
 | `test_summarize_tools.py` | summarize_url, summarize_text, 프롬프트, HTML처리 | 35 |
+| `test_translate_tools.py` | translate_text, 프롬프트 빌드, 지원 언어 | 17 |
+| `test_qrcode_tools.py` | generate_qrcode, 입력 검증, 바이너리 출력 | 11 |
+| `test_calculator_tools.py` | calculate, safe_eval, 수식 포맷, 보안 차단 | 27 |
+| `test_reminder_tools.py` | set/list/delete_reminder, 입력 스키마 | 19 |
 | 기타 (image, audio, video, google 등) | 각 스킬 도구 | 41 |
 
 ```bash
 cd agent && uv run pytest tests/ -q
-# 223 passed
+# 317 passed
 ```
 
 ### 통합 검증
 
 ```bash
-# 레지스트리: 17개 스킬, 38개 도구
+# 레지스트리: 21개 스킬, 44개 도구
 # ALL_TOOLS 일치 확인
 # 역매핑 (tool→skill) 전수 확인
-# SKILL.md 로딩: 14개 문서
+# SKILL.md 로딩: 18개 문서
 # 파일 컨텍스트 파이프라인: OK
 # 문서 파서/생성기: OK (ReportLab PDF + 한글 지원)
 # Go 빌드 + vet: OK
@@ -1360,7 +1521,7 @@ STREAM_END → 최종 Markdown 포맷 (기존 로직 동일)
 - 사용자는 메시지 1개만 보이며, "생각중..." → "도구 사용중..." → 최종 응답으로 자연스럽게 전환
 - 에러/스트림 종료 시 고아 상태 메시지 자동 정리
 
-### 도구별 상태 메시지 (38개)
+### 도구별 상태 메시지 (44개)
 
 | 도구 | 상태 메시지 |
 |------|-------------|
@@ -1378,6 +1539,10 @@ STREAM_END → 최종 Markdown 포맷 (기존 로직 동일)
 | web_search / web_fetch | 🔍 웹 검색중... / 📄 웹페이지 읽는중... |
 | get_weather / get_forecast | 🌤️ 날씨 조회중... / 🌤️ 일기예보 조회중... |
 | summarize_url / summarize_text | 📝 URL 요약중... / 📝 텍스트 요약중... |
+| translate_text | 🌐 번역중... |
+| generate_qrcode | 🔲 QR 코드 생성중... |
+| calculate | 🧮 계산중... |
+| set_reminder / list_reminders / delete_reminder | ⏰ 알림 설정/조회/삭제중... |
 | google_calendar_* | 📅 구글 캘린더 조회/생성중... |
 | google_mail_* | 📧 메일 조회/전송중... |
 | google_docs_* / google_tasks_* / google_drive_* | 각 서비스별 상태 |
@@ -1407,5 +1572,5 @@ Bot:  "💭 생각중..."  →  "🔍 웹 검색중..."  →  "📄 웹페이지
 
 ---
 
-**상태**: ✅ 구현 완료 (Phase 1-8 + Tool Status)
+**상태**: ✅ 구현 완료 (Phase 1-9 + Tool Status)
 **날짜**: 2026-03-02
