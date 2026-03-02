@@ -25,7 +25,7 @@ from jiki_agent.skills.diary.tools import save_daily_log
 from jiki_agent.skills.documents.tools import generate_document, parse_document
 from jiki_agent.skills.finance.tools import get_monthly_total, save_finance
 from jiki_agent.skills.goals.tools import get_goals, set_goal, update_goal_status
-from jiki_agent.skills.image.tools import analyze_image, generate_image
+from jiki_agent.skills.image.tools import analyze_image, edit_image, generate_image
 from jiki_agent.skills.loader import (
     build_skill_catalog,
     build_skill_instructions,
@@ -92,6 +92,7 @@ ALL_TOOLS = [
     get_budget_status,
     analyze_image,
     generate_image,
+    edit_image,
     parse_document,
     generate_document,
     transcribe_audio,

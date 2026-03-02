@@ -122,7 +122,7 @@ SKILLS: dict[str, SkillDef] = {
         emoji="🖼️",
         description="이미지 분석 (영수증, 사진, 스크린샷) 및 AI 이미지 생성",
         category="media",
-        tools=["analyze_image", "generate_image"],
+        tools=["analyze_image", "generate_image", "edit_image"],
         sort_order=10,
     ),
     "documents": SkillDef(

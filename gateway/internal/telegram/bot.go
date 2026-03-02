@@ -595,6 +595,7 @@ var toolStatusText = map[string]string{
 	"retrieve_memory":        "🧠 기억 검색중...",
 	"analyze_image":          "🖼️ 이미지 분석중...",
 	"generate_image":         "🎨 이미지 생성중...",
+	"edit_image":             "🖼️ 이미지 편집중...",
 	"parse_document":         "📄 문서 분석중...",
 	"generate_document":      "📄 문서 생성중...",
 	"transcribe_audio":       "🎵 음성 인식중...",
