@@ -131,7 +131,7 @@ agent/src/jiki_agent/
 │   │
 │   ├── image/                    ← 🖼️ 이미지 스킬
 │   │   ├── SKILL.md
-│   │   └── tools.py              ← analyze_image, generate_image
+│   │   └── tools.py              ← analyze_image, generate_image, edit_image
 │   │
 │   ├── audio/                    ← 🎵 오디오 스킬
 │   │   ├── SKILL.md
@@ -347,7 +347,7 @@ async def dynamic_prompt(state: dict) -> list:
 | # | ID | 이름 | 도구 | 기본값 | Level |
 |---|-----|------|------|--------|-------|
 | 10 | `documents` | 📄 문서 | parse_document, generate_document | ON | 1 |
-| 11 | `image` | 🖼️ 이미지 | analyze_image, generate_image | ON | 1 |
+| 11 | `image` | 🖼️ 이미지 | analyze_image, generate_image, edit_image | ON | 1 |
 | 12 | `video` | 🎬 비디오 | analyze_video, generate_video | OFF | 2 (opt-in) |
 | 13 | `audio` | 🎵 오디오 | transcribe_audio, generate_audio | ON | 1 |
 | 14 | `google` | 🔗 구글 | google_auth + 10개 서비스 도구 | OFF | 2 (opt-in) |
@@ -444,16 +444,33 @@ dynamic_prompt():
     FILE → tgbotapi.NewDocument() → Telegram 파일 전송
 ```
 
-**이미지 생성 (신규 패턴):**
+**이미지 생성 (generate_content API):**
 ```
 사용자: "귀여운 고양이 그림 그려줘"
-  → LLM → generate_image(prompt="귀여운 고양이", style="illustration")
+  → LLM → generate_image(prompt="귀여운 고양이", aspect_ratio="1:1")
     → @skill_guard("image")
-    → Gemini Imagen 3 API → image bytes
-    → add_pending_file(png_bytes, "cat.png", "image/png")
+    → Gemini generate_content (model=gemini-3.1-flash-image-preview,
+        response_modalities=["TEXT", "IMAGE"]) → image bytes
+    → add_pending_file(png_bytes, "generated.png", "image/png")
   → gRPC 스트림:
-    1. TEXT: "귀여운 고양이 그림을 그렸어요!"
-    2. FILE: {png_bytes, "cat.png", "image/png"}
+    1. TEXT: "'귀여운 고양이' 이미지를 생성했어요."
+    2. FILE: {png_bytes, "generated.png", "image/png"}
+    3. STREAM_END
+  → Gateway: FILE → tgbotapi.NewPhoto() → Telegram 사진 전송
+```
+
+**이미지 편집 (edit_image — 신규):**
+```
+사용자: [이미지 첨부] "배경을 바다로 바꿔줘"
+  → LLM → edit_image(file_url="...", prompt="배경을 바다로 바꿔줘")
+    → @skill_guard("image")
+    → fetch_file(file_url) → PIL.Image.open()
+    → Gemini generate_content (model=gemini-3.1-flash-image-preview,
+        contents=[prompt, image], response_modalities=["TEXT", "IMAGE"])
+    → add_pending_file(png_bytes, "edited.png", "image/png")
+  → gRPC 스트림:
+    1. TEXT: "이미지를 편집했어요: 배경을 바다로 바꿔줘"
+    2. FILE: {png_bytes, "edited.png", "image/png"}
     3. STREAM_END
   → Gateway: FILE → tgbotapi.NewPhoto() → Telegram 사진 전송
 ```
@@ -880,9 +897,9 @@ SKILLS: dict[str, SkillDef] = {
     ),
     "image": SkillDef(
         id="image", name="이미지", emoji="🖼️",
-        description="이미지 분석 및 AI 이미지 생성",
+        description="이미지 분석 (영수증, 사진, 스크린샷) 및 AI 이미지 생성/편집",
         category="media",
-        tools=["analyze_image", "generate_image"],
+        tools=["analyze_image", "generate_image", "edit_image"],
         sort_order=11,
     ),
     "audio": SkillDef(
@@ -1014,19 +1031,43 @@ async def save_finance(amount: int, ...) -> str:
 from jiki_agent.skills.guard import skill_guard
 from jiki_agent.skills.file_context import add_pending_file
 
-@skill_guard("image")
+_IMAGE_MODEL = "gemini-3.1-flash-image-preview"  # 이미지 생성/편집 전용 모델
+
 @tool(args_schema=AnalyzeImageInput)
+@skill_guard("image")
 async def analyze_image(file_url: str, user_query: str = "...") -> str:
-    # Gemini Vision API 직접 호출
+    # Gemini Vision API (settings.gemini_model 사용)
     ...
 
-@skill_guard("image")
 @tool(args_schema=GenerateImageInput)
-async def generate_image(prompt: str, style: str = "natural") -> str:
-    # Gemini Imagen 3 API 호출
-    image_bytes = ...
+@skill_guard("image")
+async def generate_image(prompt: str, aspect_ratio: str = "1:1") -> str:
+    # Gemini generate_content API (response_modalities=["TEXT", "IMAGE"])
+    client = genai.Client(api_key=settings.gemini_api_key)
+    response = client.models.generate_content(
+        model=_IMAGE_MODEL, contents=prompt,
+        config=types.GenerateContentConfig(
+            response_modalities=["TEXT", "IMAGE"],
+            image_config=types.ImageConfig(aspect_ratio=aspect_ratio),
+        ),
+    )
+    image_bytes = _extract_image_bytes(response)
     add_pending_file(image_bytes, "generated.png", "image/png")
     return f"'{prompt}' 이미지를 생성했어요."
+
+@tool(args_schema=EditImageInput)
+@skill_guard("image")
+async def edit_image(file_url: str, prompt: str) -> str:
+    # 첨부 이미지 + 프롬프트로 편집 (배경 변경, 스타일 변환 등)
+    image_data = await fetch_file(file_url)
+    image = Image.open(BytesIO(image_data))
+    response = client.models.generate_content(
+        model=_IMAGE_MODEL, contents=[prompt, image],
+        config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
+    )
+    image_bytes = _extract_image_bytes(response)
+    add_pending_file(image_bytes, "edited.png", "image/png")
+    return f"이미지를 편집했어요: {prompt}"
 
 # skills/google/tools.py — Google API 통합, api.py 헬퍼 사용
 from jiki_agent.skills.google.api import get_google_service
@@ -1053,7 +1094,7 @@ from jiki_agent.skills.goals.tools import set_goal, get_goals, update_goal_statu
 from jiki_agent.skills.schedule.tools import create_schedule, list_schedules, cancel_schedule
 from jiki_agent.skills.memory.tools import retrieve_memory
 from jiki_agent.skills.documents.tools import parse_document, generate_document
-from jiki_agent.skills.image.tools import analyze_image, generate_image
+from jiki_agent.skills.image.tools import analyze_image, edit_image, generate_image
 from jiki_agent.skills.audio.tools import transcribe_audio, generate_audio
 from jiki_agent.skills.video.tools import analyze_video, generate_video
 from jiki_agent.skills.summarize.tools import summarize_url, summarize_text
@@ -1089,7 +1130,7 @@ tools = [
     save_finance, get_monthly_total, set_budget, get_budget_status,
     save_daily_log, set_goal, get_goals, update_goal_status,
     create_schedule, list_schedules, cancel_schedule, retrieve_memory,
-    parse_document, generate_document, analyze_image, generate_image,
+    parse_document, generate_document, analyze_image, generate_image, edit_image,
     transcribe_audio, generate_audio, analyze_video, generate_video,
     google_auth, google_disconnect,
     google_calendar_create, google_calendar_list,
@@ -1288,8 +1329,9 @@ case jikiv1.ResponseType_FILE:
 
 | 기능 | 구현 | 위치 | 상태 |
 |------|------|------|------|
-| 분석 | Gemini 2.0 Flash multimodal | tools.py | ✅ 구현 (process_image → analyze_image) |
-| 생성 | Gemini Imagen 3 | tools.py | ✅ 구현 |
+| 분석 | Gemini multimodal (settings.gemini_model) | tools.py | ✅ 구현 |
+| 생성 | Gemini generate_content (gemini-3.1-flash-image-preview) | tools.py | ✅ 구현 |
+| 편집 | Gemini generate_content + PIL (gemini-3.1-flash-image-preview) | tools.py | ✅ 구현 |
 
 ### `video` — 비디오
 
@@ -1710,7 +1752,7 @@ qrcode = { version = ">=8.0", extras = ["pil"] }
 | `skills/documents/SKILL.md` + `tools.py` | parse_document + generate_document |
 | `document/generator.py` | PDF/DOCX/XLSX/PPTX/MD/TXT 생성기 (공유 모듈) |
 | `document/parser.py` | PDF/DOCX/DOC/XLSX/XLS/PPTX/PPT/HWP/MD/TXT/CSV 파서 + extract_text 라우터 (공유 모듈) |
-| `skills/image/SKILL.md` + `tools.py` | analyze_image + generate_image |
+| `skills/image/SKILL.md` + `tools.py` | analyze_image + generate_image + edit_image |
 | `skills/audio/SKILL.md` + `tools.py` | transcribe_audio + generate_audio |
 | `skills/video/SKILL.md` + `tools.py` | analyze_video + generate_video |
 | `skills/google/SKILL.md` + `tools.py` | 12개 @tool 함수 |
@@ -1787,7 +1829,7 @@ Phase 2: Documents (문서 확장)                    ✅ 완료
   └─ grpc/server.py: Chat()/ChatStream() 양쪽에서 init + pop 처리
 
 Phase 3: Media Generation (미디어 생성)            ✅ 완료
-  ├─ image/tools.py (analyze_image + generate_image via Imagen 3)
+  ├─ image/tools.py (analyze_image + generate_image + edit_image via Gemini generate_content)
   ├─ audio/tools.py (transcribe_audio + generate_audio via Cloud TTS)
   └─ video/tools.py (analyze_video + generate_video)
 
@@ -1863,6 +1905,20 @@ Phase 13: Document Pipeline Hardening                             ✅ 완료
   │   └─ bot.go handleMessageUnary(): FileData 필드 처리 + sendFile() 호출
   ├─ SKILL.md: 한국어 키워드 매핑 (워드/엑셀/PPT/발표자료) + 트리거 강화
   └─ 단위 테스트 510 → 527개 확장
+
+Phase 14: Image Skill Upgrade                                       ✅ 완료
+  ├─ generate_image: deprecated generate_images() → generate_content() API 전환
+  │   ├─ response_modalities=["TEXT", "IMAGE"] + ImageConfig(aspect_ratio)
+  │   ├─ 전용 모델 상수: _IMAGE_MODEL = "gemini-3.1-flash-image-preview"
+  │   └─ aspect_ratio 파라미터 추가 (1:1, 3:4, 4:3, 9:16, 16:9)
+  ├─ edit_image: 신규 도구 (첨부 이미지 + 프롬프트로 편집)
+  │   ├─ fetch_file() → PIL.Image.open() → generate_content()
+  │   └─ 배경 변경, 스타일 변환, 객체 추가/제거 등
+  ├─ _extract_image_bytes() 헬퍼: response에서 이미지 part 추출
+  ├─ registry.py: image tools에 "edit_image" 추가
+  ├─ agent.py: edit_image import + ALL_TOOLS 추가
+  ├─ bot.go: "edit_image" toolStatusText 추가
+  └─ 단위 테스트 527 → 545개 확장
 ```
 
 ---
@@ -1928,6 +1984,9 @@ print('OK')
 - **해시**: "hello의 SHA256 해시값" → 해시값 반환
 - **색상변환**: "#FF5733 RGB로 변환해줘" → RGB + HSL 변환 결과
 - **운세**: "사자자리 오늘 운세" → 별자리 운세 반환
+- **이미지 생성**: "귀여운 고양이 그려줘" → generate_image → Telegram 사진 수신
+- **이미지 생성 (비율)**: "16:9 풍경 사진 만들어줘" → aspect_ratio=16:9 적용 확인
+- **이미지 편집**: [이미지 첨부] "배경을 바다로 바꿔줘" → edit_image → 편집된 사진 수신
 - **IP 조회**: "8.8.8.8 어디 IP야?" → 위치/ISP 정보 반환
 - **공인 IP**: "내 IP 알려줘" → 서버 공인 IP + 위치 정보
 
@@ -1981,18 +2040,19 @@ ORDER BY s.sort_order;
 | `test_color_tools.py` | convert_color, HEX/RGB/이름/HSL, 이모지 | 18 |
 | `test_horoscope_tools.py` | get_horoscope, API 모킹, 에러 처리 | 9 |
 | `test_ip_tools.py` | lookup_ip, IP/공인IP 조회, API 모킹, 에러 처리 | 9 |
-| 기타 (image, audio, video, google 등) | 각 스킬 도구 | 41 |
+| `test_image_tools.py` | _extract_image_bytes, generate_image, edit_image, 스키마, aspect_ratio | 18 |
+| 기타 (audio, video, google 등) | 각 스킬 도구 | 23 |
 | 기타 (persona, scheduler, knowledge 등) | 인프라 | 10 |
 
 ```bash
 cd agent && uv run pytest tests/ -q
-# 527 passed
+# 545 passed
 ```
 
 ### 통합 검증
 
 ```bash
-# 레지스트리: 33개 스킬, 62개 도구
+# 레지스트리: 33개 스킬, 63개 도구
 # ALL_TOOLS 일치 확인
 # 역매핑 (tool→skill) 전수 확인
 # SKILL.md 로딩: 30개 문서
@@ -2028,7 +2088,7 @@ STREAM_END → 최종 Markdown 포맷 (기존 로직 동일)
 - 사용자는 메시지 1개만 보이며, "생각중..." → "도구 사용중..." → 최종 응답으로 자연스럽게 전환
 - 에러/스트림 종료 시 고아 상태 메시지 자동 정리
 
-### 도구별 상태 메시지 (62개)
+### 도구별 상태 메시지 (63개)
 
 | 도구 | 상태 메시지 |
 |------|-------------|
@@ -2039,7 +2099,7 @@ STREAM_END → 최종 Markdown 포맷 (기존 로직 동일)
 | set_goal / get_goals / update_goal_status | 🎯 목표 설정/조회/업데이트중... |
 | create_schedule / list_schedules / cancel_schedule | 📅 일정 생성/조회/취소중... |
 | retrieve_memory | 🧠 기억 검색중... |
-| analyze_image / generate_image | 🖼️ 이미지 분석중... / 🎨 이미지 생성중... |
+| analyze_image / generate_image / edit_image | 🖼️ 이미지 분석중... / 🎨 이미지 생성중... / 🖼️ 이미지 편집중... |
 | parse_document / generate_document | 📄 문서 분석/생성중... |
 | transcribe_audio / generate_audio | 🎵 음성 인식/생성중... |
 | analyze_video / generate_video | 🎬 비디오 분석/생성중... |
