@@ -13,6 +13,7 @@ import (
 
 	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
 	"github.com/jikime/jiki/gateway/internal/activity"
+	"github.com/jikime/jiki/gateway/internal/identity"
 	"github.com/jikime/jiki/gateway/internal/skill"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/rs/zerolog/log"
@@ -26,10 +27,11 @@ type Bot struct {
 	tracker      *activity.Tracker
 	db           *sql.DB
 	skillService *skill.Service
+	identitySvc  *identity.Service
 }
 
 // NewBot creates a new Telegram bot connected to the agent gRPC service.
-func NewBot(token string, grpcConn *grpc.ClientConn, tracker *activity.Tracker, db *sql.DB, skillSvc *skill.Service) (*Bot, error) {
+func NewBot(token string, grpcConn *grpc.ClientConn, tracker *activity.Tracker, db *sql.DB, skillSvc *skill.Service, identitySvc *identity.Service) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, fmt.Errorf("telegram bot init: %w", err)
@@ -43,6 +45,7 @@ func NewBot(token string, grpcConn *grpc.ClientConn, tracker *activity.Tracker, 
 		tracker:      tracker,
 		db:           db,
 		skillService: skillSvc,
+		identitySvc:  identitySvc,
 	}, nil
 }
 
@@ -143,9 +146,33 @@ func lastIndex(s, sep string) int {
 }
 
 func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
-	userID := fmt.Sprintf("%d", msg.From.ID)
+	// Resolve Telegram user to internal UUID.
+	telegramID := fmt.Sprintf("%d", msg.From.ID)
 	chatID := msg.Chat.ID
 	messageID := msg.MessageID
+
+	displayName := strings.TrimSpace(msg.From.FirstName + " " + msg.From.LastName)
+	userID := telegramID // fallback in case identity service is unavailable
+	if b.identitySvc != nil {
+		var err error
+		resolved, err := b.identitySvc.ResolveUserIDWithName(identity.PlatformTelegram, telegramID, displayName)
+		if err != nil {
+			log.Error().Err(err).Str("telegram_id", telegramID).Msg("identity resolve failed, using telegram_id")
+		} else {
+			userID = resolved
+			// Upsert a platform conversation so the web sidebar can show Telegram history.
+			// thread_id = telegramID (numeric) so history lookup hits the correct LangGraph checkpoints.
+			if b.db != nil {
+				if _, dbErr := b.db.ExecContext(ctx, `
+					INSERT INTO conversations (id, user_id, title, platform, thread_id)
+					VALUES ($1, $1, '텔레그램', 'telegram', $2)
+					ON CONFLICT (id) DO NOTHING
+				`, userID, telegramID); dbErr != nil {
+					log.Warn().Err(dbErr).Str("user_id", userID).Msg("telegram: upsert platform conversation failed")
+				}
+			}
+		}
+	}
 
 	// Record user activity for proactive notification deferral.
 	if b.tracker != nil {
@@ -161,14 +188,19 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			b.handlePersona(chatID)
 		case "skills":
 			b.handleSkills(chatID, userID)
+		case "link":
+			b.handleLink(chatID, userID)
 		}
 		return
 	}
 
 	// Build the gRPC request from message content.
+	// Always use telegramID as ThreadId so LangGraph checkpoints stay continuous
+	// regardless of whether identity resolution succeeded.
 	chatReq := &jikiv1.ChatRequest{
-		UserId:  userID,
-		Message: msg.Text,
+		UserId:   userID,
+		Message:  msg.Text,
+		ThreadId: telegramID,
 	}
 
 	// Handle photo messages.
@@ -579,6 +611,32 @@ func (b *Bot) handleStart(chatID int64) {
 	}
 }
 
+// handleLink generates a one-time pairing code and sends it to the user.
+// The user enters this code in the web app to link their accounts.
+func (b *Bot) handleLink(chatID int64, userID string) {
+	if b.identitySvc == nil {
+		b.SendMessage(chatID, "계정 연결 기능을 사용할 수 없어요.")
+		return
+	}
+
+	code, err := b.identitySvc.GenerateLinkCode(userID)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("failed to generate link code")
+		b.SendMessage(chatID, "코드 생성에 실패했어요. 잠시 후 다시 시도해 주세요.")
+		return
+	}
+
+	text := fmt.Sprintf(
+		"🔗 계정 연결 코드: *%s*\n\n"+
+			"웹 앱의 설정 → 계정 탭에서 이 코드를 입력하세요.\n"+
+			"_코드는 10분 후 만료됩니다._",
+		code,
+	)
+	if err := b.SendMessage(chatID, text); err != nil {
+		log.Error().Err(err).Int64("chat_id", chatID).Msg("failed to send link code")
+	}
+}
+
 // toolStatusText maps tool names to Korean status messages with emoji.
 var toolStatusText = map[string]string{
 	"save_finance":           "💰 가계부 기록중...",
@@ -690,7 +748,17 @@ func (b *Bot) handlePersona(chatID int64) {
 func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQuery) {
 	data := callback.Data
 	chatID := callback.Message.Chat.ID
-	userID := fmt.Sprintf("%d", callback.From.ID)
+
+	// Resolve Telegram user to internal UUID.
+	telegramID := fmt.Sprintf("%d", callback.From.ID)
+	userID := telegramID
+	if b.identitySvc != nil {
+		var err error
+		userID, err = b.identitySvc.ResolveUserID(identity.PlatformTelegram, telegramID)
+		if err != nil {
+			log.Warn().Err(err).Str("telegram_id", telegramID).Msg("identity resolve failed in callback")
+		}
+	}
 
 	if strings.HasPrefix(data, "skill:toggle:") {
 		b.handleSkillToggle(ctx, callback, chatID, userID)
@@ -717,7 +785,7 @@ func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQue
 			UPDATE profiles
 			SET preferences = COALESCE(preferences, '{}'::jsonb) || $1::jsonb,
 			    updated_at = NOW()
-			WHERE telegram_id = $2
+			WHERE uuid_id = $2
 		`, fmt.Sprintf(`{"persona":"%s"}`, personaID), userID)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userID).Str("persona", personaID).Msg("failed to update persona")

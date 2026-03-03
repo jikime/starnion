@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13jiki/v1/agent.proto\x12\x07jiki.v1\"`\n\x0b\x43hatRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\r\n\x05model\x18\x03 \x01(\t\x12 \n\x04\x66ile\x18\x04 \x01(\x0b\x32\x12.jiki.v1.FileInput\"\xa5\x01\n\x0c\x43hatResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12#\n\x04type\x18\x02 \x01(\x0e\x32\x15.jiki.v1.ResponseType\x12\x11\n\ttool_name\x18\x03 \x01(\t\x12\x13\n\x0btool_result\x18\x04 \x01(\t\x12\x11\n\tfile_data\x18\x05 \x01(\x0c\x12\x11\n\tfile_name\x18\x06 \x01(\t\x12\x11\n\tfile_mime\x18\x07 \x01(\t\"C\n\tFileInput\x12\x11\n\tfile_type\x18\x01 \x01(\t\x12\x10\n\x08\x66ile_url\x18\x02 \x01(\t\x12\x11\n\tfile_name\x18\x03 \x01(\t\"5\n\rReportRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x13\n\x0breport_type\x18\x02 \x01(\t\"6\n\x0eReportResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12\x13\n\x0breport_type\x18\x02 \x01(\t*|\n\x0cResponseType\x12\x1d\n\x19RESPONSE_TYPE_UNSPECIFIED\x10\x00\x12\x08\n\x04TEXT\x10\x01\x12\r\n\tTOOL_CALL\x10\x02\x12\x0f\n\x0bTOOL_RESULT\x10\x03\x12\t\n\x05\x45RROR\x10\x04\x12\x0e\n\nSTREAM_END\x10\x05\x12\x08\n\x04\x46ILE\x10\x06\x32\xc3\x01\n\x0c\x41gentService\x12\x33\n\x04\x43hat\x12\x14.jiki.v1.ChatRequest\x1a\x15.jiki.v1.ChatResponse\x12;\n\nChatStream\x12\x14.jiki.v1.ChatRequest\x1a\x15.jiki.v1.ChatResponse0\x01\x12\x41\n\x0eGenerateReport\x12\x16.jiki.v1.ReportRequest\x1a\x17.jiki.v1.ReportResponseB3Z1github.com/jikime/jiki/gateway/gen/jiki/v1;jikiv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13jiki/v1/agent.proto\x12\x07jiki.v1\"s\n\x0b\x43hatRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\r\n\x05model\x18\x03 \x01(\t\x12 \n\x04\x66ile\x18\x04 \x01(\x0b\x32\x12.jiki.v1.FileInput\x12\x11\n\tthread_id\x18\x05 \x01(\t\"\xa5\x01\n\x0c\x43hatResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12#\n\x04type\x18\x02 \x01(\x0e\x32\x15.jiki.v1.ResponseType\x12\x11\n\ttool_name\x18\x03 \x01(\t\x12\x13\n\x0btool_result\x18\x04 \x01(\t\x12\x11\n\tfile_data\x18\x05 \x01(\x0c\x12\x11\n\tfile_name\x18\x06 \x01(\t\x12\x11\n\tfile_mime\x18\x07 \x01(\t\"C\n\tFileInput\x12\x11\n\tfile_type\x18\x01 \x01(\t\x12\x10\n\x08\x66ile_url\x18\x02 \x01(\t\x12\x11\n\tfile_name\x18\x03 \x01(\t\"#\n\x0eHistoryRequest\x12\x11\n\tthread_id\x18\x01 \x01(\t\"/\n\x0eHistoryMessage\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\"<\n\x0fHistoryResponse\x12)\n\x08messages\x18\x01 \x03(\x0b\x32\x17.jiki.v1.HistoryMessage\"5\n\rReportRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x13\n\x0breport_type\x18\x02 \x01(\t\"6\n\x0eReportResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12\x13\n\x0breport_type\x18\x02 \x01(\t*|\n\x0cResponseType\x12\x1d\n\x19RESPONSE_TYPE_UNSPECIFIED\x10\x00\x12\x08\n\x04TEXT\x10\x01\x12\r\n\tTOOL_CALL\x10\x02\x12\x0f\n\x0bTOOL_RESULT\x10\x03\x12\t\n\x05\x45RROR\x10\x04\x12\x0e\n\nSTREAM_END\x10\x05\x12\x08\n\x04\x46ILE\x10\x06\x32\x84\x02\n\x0c\x41gentService\x12\x33\n\x04\x43hat\x12\x14.jiki.v1.ChatRequest\x1a\x15.jiki.v1.ChatResponse\x12;\n\nChatStream\x12\x14.jiki.v1.ChatRequest\x1a\x15.jiki.v1.ChatResponse0\x01\x12\x41\n\x0eGenerateReport\x12\x16.jiki.v1.ReportRequest\x1a\x17.jiki.v1.ReportResponse\x12?\n\nGetHistory\x12\x17.jiki.v1.HistoryRequest\x1a\x18.jiki.v1.HistoryResponseB3Z1github.com/jikime/jiki/gateway/gen/jiki/v1;jikiv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,18 +32,24 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'jiki.v1.agent_pb2', _global
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z1github.com/jikime/jiki/gateway/gen/jiki/v1;jikiv1'
-  _globals['_RESPONSETYPE']._serialized_start=478
-  _globals['_RESPONSETYPE']._serialized_end=602
+  _globals['_RESPONSETYPE']._serialized_start=645
+  _globals['_RESPONSETYPE']._serialized_end=769
   _globals['_CHATREQUEST']._serialized_start=32
-  _globals['_CHATREQUEST']._serialized_end=128
-  _globals['_CHATRESPONSE']._serialized_start=131
-  _globals['_CHATRESPONSE']._serialized_end=296
-  _globals['_FILEINPUT']._serialized_start=298
-  _globals['_FILEINPUT']._serialized_end=365
-  _globals['_REPORTREQUEST']._serialized_start=367
-  _globals['_REPORTREQUEST']._serialized_end=420
-  _globals['_REPORTRESPONSE']._serialized_start=422
-  _globals['_REPORTRESPONSE']._serialized_end=476
-  _globals['_AGENTSERVICE']._serialized_start=605
-  _globals['_AGENTSERVICE']._serialized_end=800
+  _globals['_CHATREQUEST']._serialized_end=147
+  _globals['_CHATRESPONSE']._serialized_start=150
+  _globals['_CHATRESPONSE']._serialized_end=315
+  _globals['_FILEINPUT']._serialized_start=317
+  _globals['_FILEINPUT']._serialized_end=384
+  _globals['_HISTORYREQUEST']._serialized_start=386
+  _globals['_HISTORYREQUEST']._serialized_end=421
+  _globals['_HISTORYMESSAGE']._serialized_start=423
+  _globals['_HISTORYMESSAGE']._serialized_end=470
+  _globals['_HISTORYRESPONSE']._serialized_start=472
+  _globals['_HISTORYRESPONSE']._serialized_end=532
+  _globals['_REPORTREQUEST']._serialized_start=534
+  _globals['_REPORTREQUEST']._serialized_end=587
+  _globals['_REPORTRESPONSE']._serialized_start=589
+  _globals['_REPORTRESPONSE']._serialized_end=643
+  _globals['_AGENTSERVICE']._serialized_start=772
+  _globals['_AGENTSERVICE']._serialized_end=1032
 # @@protoc_insertion_point(module_scope)

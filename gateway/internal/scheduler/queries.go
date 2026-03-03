@@ -13,20 +13,22 @@ import (
 
 // budgetUser represents a user who has budget preferences configured.
 type budgetUser struct {
-	telegramID  string
-	chatID      int64
+	userID      string         // internal UUID
+	chatID      int64          // Telegram chat ID
 	budgets     map[string]int // category -> monthly budget amount
 	preferences map[string]any // full preferences JSONB
 }
 
 // getBudgetUsers returns users who have budget preferences set.
+// Post-migration: join platform_identities to get Telegram chatID.
 func getBudgetUsers(ctx context.Context, db *sql.DB) ([]budgetUser, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT telegram_id, preferences
-		FROM profiles
-		WHERE preferences->'budget' IS NOT NULL
-		  AND jsonb_typeof(preferences->'budget') = 'object'
-		  AND (preferences->'budget')::text != '{}'
+		SELECT p.uuid_id, pi.platform_id, p.preferences
+		FROM profiles p
+		JOIN platform_identities pi ON pi.user_id = p.uuid_id AND pi.platform = 'telegram'
+		WHERE p.preferences->'budget' IS NOT NULL
+		  AND jsonb_typeof(p.preferences->'budget') = 'object'
+		  AND (p.preferences->'budget')::text != '{}'
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("query budget users: %w", err)
@@ -35,21 +37,21 @@ func getBudgetUsers(ctx context.Context, db *sql.DB) ([]budgetUser, error) {
 
 	var users []budgetUser
 	for rows.Next() {
-		var telegramID string
+		var userID, platformID string
 		var prefsJSON []byte
-		if err := rows.Scan(&telegramID, &prefsJSON); err != nil {
+		if err := rows.Scan(&userID, &platformID, &prefsJSON); err != nil {
 			return nil, fmt.Errorf("scan row: %w", err)
 		}
 
-		chatID, err := strconv.ParseInt(telegramID, 10, 64)
+		chatID, err := strconv.ParseInt(platformID, 10, 64)
 		if err != nil {
-			log.Warn().Str("telegram_id", telegramID).Msg("invalid telegram_id in budget query")
+			log.Warn().Str("user_id", userID).Str("platform_id", platformID).Msg("invalid telegram platform_id in budget query")
 			continue
 		}
 
 		var prefs map[string]any
 		if err := json.Unmarshal(prefsJSON, &prefs); err != nil {
-			log.Warn().Str("telegram_id", telegramID).Msg("invalid preferences JSON")
+			log.Warn().Str("user_id", userID).Msg("invalid preferences JSON")
 			continue
 		}
 
@@ -78,7 +80,7 @@ func getBudgetUsers(ctx context.Context, db *sql.DB) ([]budgetUser, error) {
 		}
 
 		users = append(users, budgetUser{
-			telegramID:  telegramID,
+			userID:      userID,
 			chatID:      chatID,
 			budgets:     budgets,
 			preferences: prefs,
@@ -89,14 +91,15 @@ func getBudgetUsers(ctx context.Context, db *sql.DB) ([]budgetUser, error) {
 }
 
 // getCategorySpending returns this month's spending by category for a user.
-func getCategorySpending(ctx context.Context, db *sql.DB, telegramID string) (map[string]int, error) {
+// userID is the internal UUID (finances.user_id is UUID post-migration).
+func getCategorySpending(ctx context.Context, db *sql.DB, userID string) (map[string]int, error) {
 	rows, err := db.QueryContext(ctx, `
 		SELECT category, COALESCE(SUM(amount), 0) AS total
 		FROM finances
 		WHERE user_id = $1
 		  AND created_at >= date_trunc('month', NOW() AT TIME ZONE 'Asia/Seoul')
 		GROUP BY category
-	`, telegramID)
+	`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("query category spending: %w", err)
 	}
@@ -116,10 +119,12 @@ func getCategorySpending(ctx context.Context, db *sql.DB, telegramID string) (ma
 }
 
 // getUsersWithRecordsToday returns users with finance records today (KST).
+// Post-migration: join platform_identities to get Telegram chatID.
 func getUsersWithRecordsToday(ctx context.Context, db *sql.DB) ([]activeUser, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT DISTINCT f.user_id
+		SELECT DISTINCT f.user_id, pi.platform_id
 		FROM finances f
+		JOIN platform_identities pi ON pi.user_id = f.user_id AND pi.platform = 'telegram'
 		WHERE f.created_at >= (CURRENT_DATE AT TIME ZONE 'Asia/Seoul')
 		  AND f.created_at < ((CURRENT_DATE + INTERVAL '1 day') AT TIME ZONE 'Asia/Seoul')
 	`)
@@ -132,16 +137,18 @@ func getUsersWithRecordsToday(ctx context.Context, db *sql.DB) ([]activeUser, er
 }
 
 // getInactiveUsers returns users with historical records but no activity in the last 3 days.
+// Post-migration: join platform_identities to get Telegram chatID.
 func getInactiveUsers(ctx context.Context, db *sql.DB) ([]activeUser, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT p.telegram_id
+		SELECT p.uuid_id, pi.platform_id
 		FROM profiles p
+		JOIN platform_identities pi ON pi.user_id = p.uuid_id AND pi.platform = 'telegram'
 		WHERE EXISTS (
-			SELECT 1 FROM finances f WHERE f.user_id = p.telegram_id
+			SELECT 1 FROM finances f WHERE f.user_id = p.uuid_id
 		)
 		AND NOT EXISTS (
 			SELECT 1 FROM finances f
-			WHERE f.user_id = p.telegram_id
+			WHERE f.user_id = p.uuid_id
 			  AND f.created_at >= NOW() - INTERVAL '3 days'
 		)
 	`)
@@ -154,10 +161,12 @@ func getInactiveUsers(ctx context.Context, db *sql.DB) ([]activeUser, error) {
 }
 
 // getUsersWithRecordsThisMonth returns users with finance records this month.
+// Post-migration: join platform_identities to get Telegram chatID.
 func getUsersWithRecordsThisMonth(ctx context.Context, db *sql.DB) ([]activeUser, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT DISTINCT f.user_id
+		SELECT DISTINCT f.user_id, pi.platform_id
 		FROM finances f
+		JOIN platform_identities pi ON pi.user_id = f.user_id AND pi.platform = 'telegram'
 		WHERE f.created_at >= date_trunc('month', NOW() AT TIME ZONE 'Asia/Seoul')
 	`)
 	if err != nil {
@@ -169,11 +178,12 @@ func getUsersWithRecordsThisMonth(ctx context.Context, db *sql.DB) ([]activeUser
 }
 
 // getUserPreferences returns the preferences JSONB for a user.
-func getUserPreferences(ctx context.Context, db *sql.DB, telegramID string) (map[string]any, error) {
+// userID is the internal UUID (profiles.uuid_id post-migration).
+func getUserPreferences(ctx context.Context, db *sql.DB, userID string) (map[string]any, error) {
 	var prefsJSON sql.NullString
 	err := db.QueryRowContext(ctx,
-		`SELECT preferences FROM profiles WHERE telegram_id = $1`,
-		telegramID,
+		`SELECT preferences FROM profiles WHERE uuid_id = $1`,
+		userID,
 	).Scan(&prefsJSON)
 	if err != nil {
 		return nil, fmt.Errorf("query preferences: %w", err)
@@ -206,7 +216,8 @@ type spendingStats struct {
 }
 
 // getDailySpendingStats returns today's total spending and the 30-day daily average.
-func getDailySpendingStats(ctx context.Context, db *sql.DB, telegramID string) (*spendingStats, error) {
+// userID is the internal UUID (finances.user_id is UUID post-migration).
+func getDailySpendingStats(ctx context.Context, db *sql.DB, userID string) (*spendingStats, error) {
 	var stats spendingStats
 
 	// Today's total spending.
@@ -216,7 +227,7 @@ func getDailySpendingStats(ctx context.Context, db *sql.DB, telegramID string) (
 		WHERE user_id = $1
 		  AND created_at >= (CURRENT_DATE AT TIME ZONE 'Asia/Seoul')
 		  AND created_at < ((CURRENT_DATE + INTERVAL '1 day') AT TIME ZONE 'Asia/Seoul')
-	`, telegramID).Scan(&stats.todayTotal)
+	`, userID).Scan(&stats.todayTotal)
 	if err != nil {
 		return nil, fmt.Errorf("query today spending: %w", err)
 	}
@@ -233,7 +244,7 @@ func getDailySpendingStats(ctx context.Context, db *sql.DB, telegramID string) (
 			  AND created_at < (CURRENT_DATE AT TIME ZONE 'Asia/Seoul')
 			GROUP BY day
 		) daily_totals
-	`, telegramID).Scan(&stats.dailyAvg, &stats.daysWithData)
+	`, userID).Scan(&stats.dailyAvg, &stats.daysWithData)
 	if err != nil {
 		return nil, fmt.Errorf("query daily average: %w", err)
 	}
@@ -242,7 +253,8 @@ func getDailySpendingStats(ctx context.Context, db *sql.DB, telegramID string) (
 }
 
 // getStoredPatterns reads the latest pattern analysis result from knowledge_base.
-func getStoredPatterns(ctx context.Context, db *sql.DB, telegramID string) (string, error) {
+// userID is the internal UUID (knowledge_base.user_id is UUID post-migration).
+func getStoredPatterns(ctx context.Context, db *sql.DB, userID string) (string, error) {
 	var value sql.NullString
 	err := db.QueryRowContext(ctx, `
 		SELECT value
@@ -250,7 +262,7 @@ func getStoredPatterns(ctx context.Context, db *sql.DB, telegramID string) (stri
 		WHERE user_id = $1 AND key = 'pattern:analysis_result'
 		ORDER BY created_at DESC
 		LIMIT 1
-	`, telegramID).Scan(&value)
+	`, userID).Scan(&value)
 	if err == sql.ErrNoRows || !value.Valid {
 		return "", nil
 	}
@@ -261,10 +273,12 @@ func getStoredPatterns(ctx context.Context, db *sql.DB, telegramID string) (stri
 }
 
 // getUsersWithGoals returns users with active goals in knowledge_base.
+// Post-migration: join platform_identities to get Telegram chatID.
 func getUsersWithGoals(ctx context.Context, db *sql.DB) ([]activeUser, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT DISTINCT kb.user_id
+		SELECT DISTINCT kb.user_id, pi.platform_id
 		FROM knowledge_base kb
+		JOIN platform_identities pi ON pi.user_id = kb.user_id AND pi.platform = 'telegram'
 		WHERE kb.key LIKE 'goal:%'
 		  AND kb.value::jsonb->>'status' = 'active'
 	`)
@@ -276,24 +290,24 @@ func getUsersWithGoals(ctx context.Context, db *sql.DB) ([]activeUser, error) {
 	return scanActiveUsers(rows)
 }
 
-// scanActiveUsers is a helper to scan telegram_id rows into activeUser slices.
+// scanActiveUsers scans rows returning (user_id UUID, platform_id Telegram ID) into activeUser slices.
 func scanActiveUsers(rows *sql.Rows) ([]activeUser, error) {
 	var users []activeUser
 	for rows.Next() {
-		var telegramID string
-		if err := rows.Scan(&telegramID); err != nil {
+		var userID, platformID string
+		if err := rows.Scan(&userID, &platformID); err != nil {
 			return nil, fmt.Errorf("scan row: %w", err)
 		}
 
-		chatID, err := strconv.ParseInt(telegramID, 10, 64)
+		chatID, err := strconv.ParseInt(platformID, 10, 64)
 		if err != nil {
-			log.Warn().Str("telegram_id", telegramID).Msg("invalid telegram_id, skipping")
+			log.Warn().Str("user_id", userID).Str("platform_id", platformID).Msg("invalid telegram platform_id, skipping")
 			continue
 		}
 
 		users = append(users, activeUser{
-			telegramID: telegramID,
-			chatID:     chatID,
+			userID: userID,
+			chatID: chatID,
 		})
 	}
 	return users, rows.Err()

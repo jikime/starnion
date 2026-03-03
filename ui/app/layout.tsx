@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Noto_Sans_KR } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { SessionProvider } from 'next-auth/react'
 import './globals.css'
 
 const notoSansKr = Noto_Sans_KR({ 
@@ -46,7 +47,9 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className={`${notoSansKr.variable} font-sans antialiased`}>
-        {children}
+        <SessionProvider>
+          {children}
+        </SessionProvider>
         <Analytics />
       </body>
     </html>

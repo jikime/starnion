@@ -43,11 +43,23 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - GRPC_AGENT_HOST=agent
       - DATABASE_URL=postgres://jiki:${POSTGRES_PASSWORD:-jiki_dev_password}@postgres:5432/jiki?sslmode=disable
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - MINIO_ENDPOINT=gilgeori-minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-gilgeori}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-gilgeori3893}
+      - MINIO_BUCKET=${MINIO_BUCKET:-jiki-files}
+    networks:
+      - default
+      - gilgeori_net
     depends_on:
       postgres:
         condition: service_healthy
       agent:
         condition: service_started
+
+networks:
+  gilgeori_net:
+    external: true
 
 volumes:
   postgres_data:

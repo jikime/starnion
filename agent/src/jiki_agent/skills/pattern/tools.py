@@ -135,7 +135,7 @@ async def generate_pattern_insight(user_id: str) -> str:
     monthly = await finance_repo.get_monthly_summary(pool, user_id=user_id, month=month)
 
     # Budget and persona info.
-    profile = await profile_repo.get_by_telegram_id(pool, telegram_id=user_id)
+    profile = await profile_repo.get_by_uuid_id(pool, uuid_id=user_id)
     budget = {}
     persona_id = DEFAULT_PERSONA
     if profile:

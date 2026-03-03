@@ -72,9 +72,19 @@ func (s *Scheduler) runUserSchedulesRule() {
 			continue
 		}
 
-		chatID, err := strconv.ParseInt(entry.userID, 10, 64)
-		if err != nil {
-			log.Warn().Str("user_id", entry.userID).Msg("user schedules: invalid user_id")
+		// Look up Telegram platform_id for this UUID user.
+		// knowledge_base.user_id is UUID post-migration 005.
+		var platformID string
+		if lookupErr := s.db.QueryRowContext(ctx,
+			`SELECT platform_id FROM platform_identities WHERE user_id = $1 AND platform = 'telegram'`,
+			entry.userID,
+		).Scan(&platformID); lookupErr != nil {
+			log.Warn().Str("user_id", entry.userID).Msg("user schedules: no telegram platform for user, skipping")
+			continue
+		}
+		chatID, chatErr := strconv.ParseInt(platformID, 10, 64)
+		if chatErr != nil {
+			log.Warn().Str("user_id", entry.userID).Str("platform_id", platformID).Msg("user schedules: invalid telegram platform_id, skipping")
 			continue
 		}
 

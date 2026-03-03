@@ -289,7 +289,7 @@ async def evaluate_goals(user_id: str) -> str:
     monthly = await finance_repo.get_monthly_summary(pool, user_id=user_id, month=month)
     daily_totals = await finance_repo.get_daily_totals(pool, user_id, days=30)
 
-    profile = await profile_repo.get_by_telegram_id(pool, telegram_id=user_id)
+    profile = await profile_repo.get_by_uuid_id(pool, uuid_id=user_id)
     budget = {}
     if profile:
         preferences = profile.get("preferences", {}) or {}
@@ -365,7 +365,7 @@ async def generate_goal_status(user_id: str) -> str:
     month = now.strftime("%Y-%m")
     monthly = await finance_repo.get_monthly_summary(pool, user_id=user_id, month=month)
 
-    profile = await profile_repo.get_by_telegram_id(pool, telegram_id=user_id)
+    profile = await profile_repo.get_by_uuid_id(pool, uuid_id=user_id)
     budget = {}
     persona_id = DEFAULT_PERSONA
     if profile:

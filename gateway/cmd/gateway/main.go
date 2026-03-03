@@ -11,12 +11,17 @@ import (
 	"syscall"
 	"time"
 
+	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
 	"github.com/jikime/jiki/gateway/internal/activity"
+	"github.com/jikime/jiki/gateway/internal/auth"
 	"github.com/jikime/jiki/gateway/internal/handler"
+	"github.com/jikime/jiki/gateway/internal/identity"
 	"github.com/jikime/jiki/gateway/internal/middleware"
 	"github.com/jikime/jiki/gateway/internal/scheduler"
 	"github.com/jikime/jiki/gateway/internal/skill"
+	"github.com/jikime/jiki/gateway/internal/storage"
 	"github.com/jikime/jiki/gateway/internal/telegram"
+	"github.com/jikime/jiki/gateway/internal/wschat"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
@@ -42,6 +47,9 @@ type Config struct {
 	Database struct {
 		URL string `yaml:"url"`
 	} `yaml:"database"`
+	Auth struct {
+		JWTSecret string `yaml:"jwt_secret"`
+	} `yaml:"auth"`
 	Telegram struct {
 		BotToken string `yaml:"bot_token"`
 		Enabled  bool   `yaml:"enabled"`
@@ -78,6 +86,9 @@ func loadConfig(path string) (*Config, error) {
 	}
 	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
 		cfg.Database.URL = dbURL
+	}
+	if secret := os.Getenv("JWT_SECRET"); secret != "" {
+		cfg.Auth.JWTSecret = secret
 	}
 
 	return &cfg, nil
@@ -124,6 +135,14 @@ func main() {
 
 	setupLogger(cfg)
 
+	// Derive JWT secret: prefer env, fall back to config, then a default for dev.
+	jwtSecret := cfg.Auth.JWTSecret
+	if jwtSecret == "" {
+		jwtSecret = "change-me-in-production"
+		log.Warn().Msg("JWT_SECRET not set, using insecure default (dev only)")
+	}
+	authSvc := auth.NewService(jwtSecret)
+
 	grpcConn, err := connectGRPC(cfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to configure gRPC connection")
@@ -160,10 +179,27 @@ func main() {
 		skillSvc = skill.New(db)
 	}
 
+	// Create identity service for platform-agnostic user resolution.
+	var identitySvc *identity.Service
+	if db != nil {
+		identitySvc = identity.New(db)
+	}
+
+	// Initialise MinIO for file storage (non-fatal if unavailable).
+	var minioStore *storage.MinIO
+	if s, err := storage.NewMinIO(); err != nil {
+		log.Warn().Err(err).Msg("MinIO unavailable — file uploads disabled")
+	} else {
+		minioStore = s
+	}
+
+	// Create WebSocket hub for web chat.
+	wsHub := wschat.NewHub(jikiv1.NewAgentServiceClient(grpcConn), db, minioStore)
+
 	// Start Telegram bot if enabled, and attach scheduler.
 	var sched *scheduler.Scheduler
 	if cfg.Telegram.Enabled && cfg.Telegram.BotToken != "" {
-		bot, botErr := telegram.NewBot(cfg.Telegram.BotToken, grpcConn, tracker, db, skillSvc)
+		bot, botErr := telegram.NewBot(cfg.Telegram.BotToken, grpcConn, tracker, db, skillSvc, identitySvc)
 		if botErr != nil {
 			log.Fatal().Err(botErr).Msg("failed to initialise Telegram bot")
 		}
@@ -193,11 +229,226 @@ func main() {
 		})
 	})
 
+	// Credential registration — creates a new user account with email + password.
+	// POST /auth/register → { "userId": "...", "email": "...", "name": "..." }
+	e.POST("/auth/register", func(c echo.Context) error {
+		if db == nil {
+			return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "database unavailable"})
+		}
+		var req struct {
+			Name     string `json:"name"`
+			Email    string `json:"email"`
+			Password string `json:"password"`
+		}
+		if err := c.Bind(&req); err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+		}
+		if req.Email == "" || req.Password == "" || req.Name == "" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "name, email and password are required"})
+		}
+
+		user, err := auth.Register(db, req.Name, req.Email, req.Password)
+		if err != nil {
+			if err == auth.ErrEmailTaken {
+				return c.JSON(http.StatusConflict, map[string]string{"error": "email already registered"})
+			}
+			log.Error().Err(err).Str("email", req.Email).Msg("register failed")
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "registration failed"})
+		}
+
+		log.Info().Str("user_id", user.UserID).Str("email", user.Email).Msg("new credential user registered")
+		return c.JSON(http.StatusCreated, map[string]string{
+			"userId": user.UserID,
+			"email":  user.Email,
+			"name":   user.Name,
+		})
+	})
+
+	// Credential login — verifies email + password, returns user info for session creation.
+	// POST /auth/login → { "userId": "...", "email": "...", "name": "..." }
+	e.POST("/auth/login", func(c echo.Context) error {
+		if db == nil {
+			return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "database unavailable"})
+		}
+		var req struct {
+			Email    string `json:"email"`
+			Password string `json:"password"`
+		}
+		if err := c.Bind(&req); err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+		}
+		if req.Email == "" || req.Password == "" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "email and password are required"})
+		}
+
+		user, err := auth.Login(db, req.Email, req.Password)
+		if err != nil {
+			if err == auth.ErrInvalidCreds {
+				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid email or password"})
+			}
+			log.Error().Err(err).Str("email", req.Email).Msg("login failed")
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "login failed"})
+		}
+
+		return c.JSON(http.StatusOK, map[string]string{
+			"userId": user.UserID,
+			"email":  user.Email,
+			"name":   user.Name,
+		})
+	})
+
+	// Account linking — merges a credential web account into an existing platform account.
+	// Requires a valid JWT (web user session) and a link code generated by the target account.
+	// POST /auth/link  Body: { "code": "JIKI-XXXXXX" }
+	//                  Response: { "userId": "<canonical-uuid>" }
+	e.POST("/auth/link", func(c echo.Context) error {
+		if db == nil {
+			return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "database unavailable"})
+		}
+		if identitySvc == nil {
+			return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "identity service unavailable"})
+		}
+
+		// Validate JWT to get the calling user's ID.
+		tokenStr := ""
+		if h := c.Request().Header.Get("Authorization"); len(h) > 7 {
+			tokenStr = h[7:] // strip "Bearer "
+		}
+		if tokenStr == "" {
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "missing token"})
+		}
+
+		claims, err := authSvc.ValidateToken(tokenStr)
+		if err != nil {
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid token"})
+		}
+		fromUserID := claims.UserID
+
+		var req struct {
+			Code string `json:"code"`
+		}
+		if err := c.Bind(&req); err != nil || req.Code == "" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "code is required"})
+		}
+
+		toUserID, err := identitySvc.MergeAndLink(fromUserID, req.Code)
+		if err != nil {
+			switch {
+			case err.Error() == "invalid link code":
+				return c.JSON(http.StatusBadRequest, map[string]string{"error": "잘못된 코드예요"})
+			case err.Error() == "link code expired":
+				return c.JSON(http.StatusBadRequest, map[string]string{"error": "코드가 만료되었어요"})
+			case err.Error() == "cannot link account to itself":
+				return c.JSON(http.StatusBadRequest, map[string]string{"error": "이미 연결된 계정이에요"})
+			}
+			log.Error().Err(err).Str("from_user_id", fromUserID).Msg("account link failed")
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "계정 연결에 실패했어요"})
+		}
+
+		log.Info().Str("from", fromUserID).Str("to", toUserID).Msg("account linked")
+		return c.JSON(http.StatusOK, map[string]string{"userId": toUserID})
+	})
+
+	// Anonymous token endpoint — issues a JWT for web users without a prior account.
+	// POST /auth/token  → { "token": "<jwt>" }
+	// The userID is resolved (or created) via identity service using a "web" session key.
+	e.POST("/auth/token", func(c echo.Context) error {
+		var req struct {
+			Platform   string `json:"platform"`    // default "web"
+			PlatformID string `json:"platform_id"` // opaque client ID (e.g. device fingerprint)
+		}
+		if err := c.Bind(&req); err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+		}
+		if req.Platform == "" {
+			req.Platform = identity.PlatformWeb
+		}
+		if req.PlatformID == "" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "platform_id is required"})
+		}
+		if identitySvc == nil {
+			return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "identity service unavailable"})
+		}
+
+		userID, err := identitySvc.ResolveUserID(req.Platform, req.PlatformID)
+		if err != nil {
+			log.Error().Err(err).Str("platform", req.Platform).Msg("token: identity resolve failed")
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "could not resolve user"})
+		}
+
+		token, err := authSvc.IssueToken(userID, req.Platform)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "could not issue token"})
+		}
+
+		return c.JSON(http.StatusOK, map[string]string{"token": token})
+	})
+
+	// WebSocket endpoint.
+	wsHandler := handler.NewWebSocketHandler(wsHub, authSvc)
+	e.GET("/ws", wsHandler.Connect)
+
 	// API routes
 	api := e.Group("/api/v1")
 
 	chatHandler := handler.NewChatHandler(grpcConn)
 	api.POST("/chat", chatHandler.Chat)
+
+	// Conversation management (requires DB).
+	if db != nil {
+		convHandler := handler.NewConversationHandler(db, grpcConn)
+		api.GET("/conversations", convHandler.List)
+		api.POST("/conversations", convHandler.Create)
+		api.PATCH("/conversations/:id", convHandler.UpdateTitle)
+
+		msgHandler := handler.NewMessageHandler(db, grpcConn)
+		api.GET("/conversations/:id/messages", msgHandler.List)
+
+		// Profile persona: GET/PATCH /api/v1/profile/persona?user_id=<uuid>
+		api.GET("/profile/persona", func(c echo.Context) error {
+			userID := c.QueryParam("user_id")
+			if userID == "" {
+				return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+			}
+			var persona string
+			err := db.QueryRowContext(c.Request().Context(), `
+				SELECT COALESCE(preferences->>'persona', 'assistant')
+				FROM profiles WHERE uuid_id = $1
+			`, userID).Scan(&persona)
+			if err != nil {
+				persona = "assistant" // default when no profile exists yet
+			}
+			return c.JSON(http.StatusOK, map[string]string{"persona": persona})
+		})
+
+		api.PATCH("/profile/persona", func(c echo.Context) error {
+			userID := c.QueryParam("user_id")
+			if userID == "" {
+				return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+			}
+			var body struct {
+				Persona string `json:"persona"`
+			}
+			if err := c.Bind(&body); err != nil || body.Persona == "" {
+				return c.JSON(http.StatusBadRequest, map[string]string{"error": "persona is required"})
+			}
+			_, err := db.ExecContext(c.Request().Context(), `
+				INSERT INTO profiles (uuid_id, preferences)
+				VALUES ($1, jsonb_build_object('persona', $2::text))
+				ON CONFLICT (uuid_id) DO UPDATE
+				SET preferences = jsonb_set(
+					COALESCE(profiles.preferences, '{}'::jsonb),
+					'{persona}',
+					to_jsonb($2::text)
+				), updated_at = NOW()
+			`, userID, body.Persona)
+			if err != nil {
+				log.Error().Err(err).Str("user_id", userID).Msg("profile: update persona failed")
+				return c.JSON(http.StatusInternalServerError, map[string]string{"error": "update failed"})
+			}
+			return c.JSON(http.StatusOK, map[string]string{"persona": body.Persona})
+		})
+	}
 
 	// Google OAuth2 callback.
 	if db != nil {

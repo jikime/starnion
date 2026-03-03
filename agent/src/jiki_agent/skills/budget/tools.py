@@ -44,7 +44,7 @@ async def set_budget(category: str, amount: int) -> str:
         return "사용자 정보를 확인할 수 없어요."
 
     pool = get_pool()
-    profile = await profile_repo.get_by_telegram_id(pool, telegram_id=user_id)
+    profile = await profile_repo.get_by_uuid_id(pool, uuid_id=user_id)
     if not profile:
         return "프로필 정보를 찾을 수 없어요."
 
@@ -53,7 +53,7 @@ async def set_budget(category: str, amount: int) -> str:
     budget[category] = amount
     preferences["budget"] = budget
 
-    await profile_repo.update_preferences(pool, telegram_id=user_id, preferences=preferences)
+    await profile_repo.update_preferences(pool, uuid_id=user_id, preferences=preferences)
 
     return f"{category} 월 예산을 {amount:,}원으로 설정했어요."
 
@@ -70,7 +70,7 @@ async def get_budget_status(category: str = "") -> str:
         return "사용자 정보를 확인할 수 없어요."
 
     pool = get_pool()
-    profile = await profile_repo.get_by_telegram_id(pool, telegram_id=user_id)
+    profile = await profile_repo.get_by_uuid_id(pool, uuid_id=user_id)
     if not profile:
         return "프로필 정보를 찾을 수 없어요."
 

@@ -61,7 +61,7 @@ async def save_finance(category: str, amount: int, description: str = "") -> str
     result = f"{category} {amount:,}원 기록했어요. 이번 달 {category} 누적: {monthly_total:,}원"
 
     # Check budget and warn if approaching/exceeding limit.
-    profile = await profile_repo.get_by_telegram_id(pool, telegram_id=user_id)
+    profile = await profile_repo.get_by_uuid_id(pool, uuid_id=user_id)
     if profile:
         preferences = profile.get("preferences", {}) or {}
         budget = preferences.get("budget", {})

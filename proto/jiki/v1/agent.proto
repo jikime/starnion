@@ -12,6 +12,8 @@ service AgentService {
   rpc ChatStream(ChatRequest) returns (stream ChatResponse);
   // GenerateReport produces a periodic summary report for a user.
   rpc GenerateReport(ReportRequest) returns (ReportResponse);
+  // GetHistory returns prior messages for a conversation thread.
+  rpc GetHistory(HistoryRequest) returns (HistoryResponse);
 }
 
 message ChatRequest {
@@ -20,6 +22,8 @@ message ChatRequest {
   string model = 3;
   // Optional file input for multimodal processing.
   FileInput file = 4;
+  // Optional conversation thread ID; defaults to user_id when empty.
+  string thread_id = 5;
 }
 
 message ChatResponse {
@@ -48,6 +52,19 @@ message FileInput {
   string file_type = 1;   // "image", "document", "audio"
   string file_url = 2;    // Storage URL (avoids 4MB gRPC limit)
   string file_name = 3;
+}
+
+message HistoryRequest {
+  string thread_id = 1;
+}
+
+message HistoryMessage {
+  string role = 1;    // "user" or "assistant"
+  string content = 2;
+}
+
+message HistoryResponse {
+  repeated HistoryMessage messages = 1;
 }
 
 message ReportRequest {

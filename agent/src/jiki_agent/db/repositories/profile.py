@@ -8,16 +8,16 @@ from psycopg_pool import AsyncConnectionPool
 
 async def upsert(
     pool: AsyncConnectionPool[Any],
-    telegram_id: str,
+    uuid_id: str,
     user_name: str,
 ) -> dict[str, Any]:
     """Insert or update a user profile and return the row.
 
-    On conflict (telegram_id already exists), updates user_name and updated_at.
+    On conflict (uuid_id already exists), updates user_name and updated_at.
 
     Args:
         pool: The async connection pool.
-        telegram_id: Telegram user ID (unique).
+        uuid_id: Canonical user UUID (users.id).
         user_name: Display name.
 
     Returns:
@@ -27,15 +27,18 @@ async def upsert(
         async with conn.cursor(row_factory=dict_row) as cur:
             await cur.execute(
                 """
-                INSERT INTO profiles (telegram_id, user_name)
+                INSERT INTO profiles (uuid_id, user_name)
                 VALUES (%s, %s)
-                ON CONFLICT (telegram_id)
-                DO UPDATE SET user_name = EXCLUDED.user_name,
-                              updated_at = NOW()
-                RETURNING id, telegram_id, user_name, goals, preferences,
+                ON CONFLICT (uuid_id)
+                DO UPDATE SET user_name = CASE
+                    WHEN EXCLUDED.user_name = '' THEN profiles.user_name
+                    ELSE EXCLUDED.user_name
+                END,
+                updated_at = NOW()
+                RETURNING id, uuid_id, telegram_id, user_name, goals, preferences,
                           created_at, updated_at
                 """,
-                (telegram_id, user_name),
+                (uuid_id, user_name),
             )
             row = await cur.fetchone()
             await conn.commit()
@@ -44,14 +47,14 @@ async def upsert(
 
 async def update_preferences(
     pool: AsyncConnectionPool[Any],
-    telegram_id: str,
+    uuid_id: str,
     preferences: dict,
 ) -> dict[str, Any] | None:
     """Update the preferences JSONB column for a user profile.
 
     Args:
         pool: The async connection pool.
-        telegram_id: Telegram user ID.
+        uuid_id: Canonical user UUID.
         preferences: New preferences dict (replaces existing).
 
     Returns:
@@ -65,26 +68,26 @@ async def update_preferences(
                 """
                 UPDATE profiles
                 SET preferences = %s::jsonb, updated_at = NOW()
-                WHERE telegram_id = %s
-                RETURNING id, telegram_id, user_name, goals, preferences,
+                WHERE uuid_id = %s
+                RETURNING id, uuid_id, telegram_id, user_name, goals, preferences,
                           created_at, updated_at
                 """,
-                (json.dumps(preferences), telegram_id),
+                (json.dumps(preferences), uuid_id),
             )
             row = await cur.fetchone()
             await conn.commit()
             return dict(row) if row else None
 
 
-async def get_by_telegram_id(
+async def get_by_uuid_id(
     pool: AsyncConnectionPool[Any],
-    telegram_id: str,
+    uuid_id: str,
 ) -> dict[str, Any] | None:
-    """Fetch a user profile by telegram_id.
+    """Fetch a user profile by canonical UUID.
 
     Args:
         pool: The async connection pool.
-        telegram_id: Telegram user ID.
+        uuid_id: Canonical user UUID (users.id).
 
     Returns:
         The profile row as a dictionary, or None if not found.
@@ -93,12 +96,12 @@ async def get_by_telegram_id(
         async with conn.cursor(row_factory=dict_row) as cur:
             await cur.execute(
                 """
-                SELECT id, telegram_id, user_name, goals, preferences,
+                SELECT id, uuid_id, telegram_id, user_name, goals, preferences,
                        created_at, updated_at
                 FROM profiles
-                WHERE telegram_id = %s
+                WHERE uuid_id = %s
                 """,
-                (telegram_id,),
+                (uuid_id,),
             )
             row = await cur.fetchone()
             return dict(row) if row else None

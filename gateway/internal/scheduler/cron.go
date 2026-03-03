@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strconv"
 	"sync"
 	"time"
 
@@ -32,7 +31,7 @@ type Scheduler struct {
 	// Activity tracker for idle detection (conversation analysis).
 	tracker        *activity.Tracker
 	analysisMu     sync.RWMutex
-	analysisStates map[string]time.Time // userID -> lastMsgTime when last analyzed
+	analysisStates map[string]time.Time // userID (UUID) -> lastMsgTime when last analyzed
 	skillService   *skill.Service
 }
 
@@ -126,11 +125,11 @@ func (s *Scheduler) sendWeeklyReports() {
 
 	var successCount, failCount int
 	for _, u := range users {
-		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "finance") {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.userID, "finance") {
 			continue
 		}
-		if err := s.GenerateAndSend(u.telegramID, u.chatID); err != nil {
-			log.Error().Err(err).Str("user_id", u.telegramID).Msg("weekly report failed")
+		if err := s.GenerateAndSend(u.userID, u.chatID); err != nil {
+			log.Error().Err(err).Str("user_id", u.userID).Msg("weekly report failed")
 			failCount++
 		} else {
 			successCount++
@@ -180,12 +179,12 @@ func (s *Scheduler) GenerateAndSendType(userID string, chatID int64, reportType 
 
 // activeUser represents a user eligible for proactive notifications.
 type activeUser struct {
-	telegramID string
-	chatID     int64
+	userID string // internal UUID (for gRPC / DB calls)
+	chatID int64  // Telegram chat ID (for message delivery)
 }
 
-// getActiveUsers queries the profiles table for users with finance records
-// in the last 30 days (i.e. active users who would benefit from a report).
+// getActiveUsers queries users with finance records in the last 30 days.
+// Post-migration: finances.user_id is UUID; JOIN platform_identities to get Telegram chatID.
 func (s *Scheduler) getActiveUsers() ([]activeUser, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not configured")
@@ -195,36 +194,16 @@ func (s *Scheduler) getActiveUsers() ([]activeUser, error) {
 	defer cancel()
 
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT DISTINCT p.telegram_id
-		FROM profiles p
-		JOIN finances f ON f.user_id = p.telegram_id
+		SELECT DISTINCT f.user_id, pi.platform_id
+		FROM finances f
+		JOIN platform_identities pi ON pi.user_id = f.user_id AND pi.platform = 'telegram'
 		WHERE f.created_at >= NOW() - INTERVAL '30 days'
-		ORDER BY p.telegram_id
+		ORDER BY f.user_id
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("query active users: %w", err)
 	}
 	defer rows.Close()
 
-	var users []activeUser
-	for rows.Next() {
-		var telegramID string
-		if err := rows.Scan(&telegramID); err != nil {
-			return nil, fmt.Errorf("scan row: %w", err)
-		}
-
-		// Telegram chat ID = telegram user ID for DMs.
-		chatID, err := strconv.ParseInt(telegramID, 10, 64)
-		if err != nil {
-			log.Warn().Str("telegram_id", telegramID).Msg("invalid telegram_id, skipping")
-			continue
-		}
-
-		users = append(users, activeUser{
-			telegramID: telegramID,
-			chatID:     chatID,
-		})
-	}
-
-	return users, rows.Err()
+	return scanActiveUsers(rows)
 }

@@ -10,6 +10,9 @@ grpc:
 database:
   url: ""  # Override with DATABASE_URL env var
 
+auth:
+  jwt_secret: ""  # Override with JWT_SECRET env var. Must be set in production.
+
 telegram:
   enabled: false
   bot_token: ""  # Override with TELEGRAM_BOT_TOKEN env var

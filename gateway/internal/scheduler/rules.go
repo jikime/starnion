@@ -29,12 +29,12 @@ func (s *Scheduler) runBudgetWarningRule() {
 	}
 
 	for _, u := range users {
-		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "budget") {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.userID, "budget") {
 			continue
 		}
-		spending, err := getCategorySpending(ctx, s.db, u.telegramID)
+		spending, err := getCategorySpending(ctx, s.db, u.userID)
 		if err != nil {
-			log.Error().Err(err).Str("user_id", u.telegramID).Msg("budget warning: failed to query spending")
+			log.Error().Err(err).Str("user_id", u.userID).Msg("budget warning: failed to query spending")
 			continue
 		}
 
@@ -65,8 +65,8 @@ func (s *Scheduler) runBudgetWarningRule() {
 		}
 
 		message := "⚠️ 예산 알림\n\n" + strings.Join(alerts, "\n\n")
-		if err := s.sendTemplateNotification(u.telegramID, u.chatID, u.preferences, message); err != nil {
-			log.Error().Err(err).Str("user_id", u.telegramID).Msg("budget warning: send failed")
+		if err := s.sendTemplateNotification(u.userID, u.chatID, u.preferences, message); err != nil {
+			log.Error().Err(err).Str("user_id", u.userID).Msg("budget warning: send failed")
 		}
 	}
 }
@@ -96,11 +96,11 @@ func (s *Scheduler) runDailySummaryRule() {
 	log.Info().Int("users", len(users)).Msg("generating daily summaries")
 
 	for _, u := range users {
-		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "finance") {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.userID, "finance") {
 			continue
 		}
 		if err := s.sendGeneratedNotification(u, "daily_summary"); err != nil {
-			log.Error().Err(err).Str("user_id", u.telegramID).Msg("daily summary: send failed")
+			log.Error().Err(err).Str("user_id", u.userID).Msg("daily summary: send failed")
 		}
 	}
 }
@@ -132,12 +132,12 @@ func (s *Scheduler) runInactiveReminderRule() {
 	message := "👋 요즘 어떻게 지내세요?\n\n기록을 남기신 지 좀 됐어요.\n간단하게라도 오늘 지출을 기록해 보는 건 어때요?"
 
 	for _, u := range users {
-		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "proactive") {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.userID, "proactive") {
 			continue
 		}
-		prefs := s.loadPreferences(u.telegramID)
-		if err := s.sendTemplateNotification(u.telegramID, u.chatID, prefs, message); err != nil {
-			log.Error().Err(err).Str("user_id", u.telegramID).Msg("inactive reminder: send failed")
+		prefs := s.loadPreferences(u.userID)
+		if err := s.sendTemplateNotification(u.userID, u.chatID, prefs, message); err != nil {
+			log.Error().Err(err).Str("user_id", u.userID).Msg("inactive reminder: send failed")
 		}
 	}
 }
@@ -173,11 +173,11 @@ func (s *Scheduler) runMonthlyClosingRule() {
 	log.Info().Int("users", len(users)).Msg("generating monthly closing reports")
 
 	for _, u := range users {
-		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "finance") {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.userID, "finance") {
 			continue
 		}
 		if err := s.sendGeneratedNotification(u, "monthly_closing"); err != nil {
-			log.Error().Err(err).Str("user_id", u.telegramID).Msg("monthly closing: send failed")
+			log.Error().Err(err).Str("user_id", u.userID).Msg("monthly closing: send failed")
 		}
 	}
 }
@@ -206,22 +206,22 @@ func (s *Scheduler) runPatternAnalysisRule() {
 
 	var successCount, failCount int
 	for _, u := range users {
-		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "pattern") {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.userID, "pattern") {
 			continue
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 		resp, err := s.grpcClient.GenerateReport(ctx, &jikiv1.ReportRequest{
-			UserId:     u.telegramID,
+			UserId:     u.userID,
 			ReportType: "pattern_analysis",
 		})
 		cancel()
 
 		if err != nil {
-			log.Error().Err(err).Str("user_id", u.telegramID).Msg("pattern analysis: gRPC failed")
+			log.Error().Err(err).Str("user_id", u.userID).Msg("pattern analysis: gRPC failed")
 			failCount++
 			continue
 		}
-		log.Info().Str("user_id", u.telegramID).Str("result", resp.Content).Msg("pattern analysis complete")
+		log.Info().Str("user_id", u.userID).Str("result", resp.Content).Msg("pattern analysis complete")
 		successCount++
 	}
 
@@ -249,12 +249,12 @@ func (s *Scheduler) runSpendingAnomalyRule() {
 	}
 
 	for _, u := range users {
-		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "finance") {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.userID, "finance") {
 			continue
 		}
-		stats, err := getDailySpendingStats(ctx, s.db, u.telegramID)
+		stats, err := getDailySpendingStats(ctx, s.db, u.userID)
 		if err != nil {
-			log.Error().Err(err).Str("user_id", u.telegramID).Msg("spending anomaly: query failed")
+			log.Error().Err(err).Str("user_id", u.userID).Msg("spending anomaly: query failed")
 			continue
 		}
 
@@ -278,9 +278,9 @@ func (s *Scheduler) runSpendingAnomalyRule() {
 			pct,
 		)
 
-		prefs := s.loadPreferences(u.telegramID)
-		if err := s.sendTemplateNotification(u.telegramID, u.chatID, prefs, message); err != nil {
-			log.Error().Err(err).Str("user_id", u.telegramID).Msg("spending anomaly: send failed")
+		prefs := s.loadPreferences(u.userID)
+		if err := s.sendTemplateNotification(u.userID, u.chatID, prefs, message); err != nil {
+			log.Error().Err(err).Str("user_id", u.userID).Msg("spending anomaly: send failed")
 		}
 	}
 }
@@ -305,12 +305,12 @@ func (s *Scheduler) runPatternInsightRule() {
 	var insightCount int
 
 	for _, u := range users {
-		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "pattern") {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.userID, "pattern") {
 			continue
 		}
-		patternJSON, err := getStoredPatterns(ctx, s.db, u.telegramID)
+		patternJSON, err := getStoredPatterns(ctx, s.db, u.userID)
 		if err != nil {
-			log.Error().Err(err).Str("user_id", u.telegramID).Msg("pattern insight: read failed")
+			log.Error().Err(err).Str("user_id", u.userID).Msg("pattern insight: read failed")
 			continue
 		}
 		if patternJSON == "" {
@@ -319,7 +319,7 @@ func (s *Scheduler) runPatternInsightRule() {
 
 		analysis, err := parsePatterns(patternJSON)
 		if err != nil {
-			log.Warn().Err(err).Str("user_id", u.telegramID).Msg("pattern insight: parse failed")
+			log.Warn().Err(err).Str("user_id", u.userID).Msg("pattern insight: parse failed")
 			continue
 		}
 
@@ -329,12 +329,12 @@ func (s *Scheduler) runPatternInsightRule() {
 		}
 
 		log.Info().
-			Str("user_id", u.telegramID).
+			Str("user_id", u.userID).
 			Int("triggered", len(triggered)).
 			Msg("pattern triggers matched, generating insight")
 
 		if err := s.sendGeneratedNotification(u, "pattern_insight"); err != nil {
-			log.Error().Err(err).Str("user_id", u.telegramID).Msg("pattern insight: send failed")
+			log.Error().Err(err).Str("user_id", u.userID).Msg("pattern insight: send failed")
 			continue
 		}
 		insightCount++
@@ -372,22 +372,22 @@ func (s *Scheduler) runGoalEvaluationRule() {
 
 	var successCount, failCount int
 	for _, u := range users {
-		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "goals") {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.userID, "goals") {
 			continue
 		}
 		rctx, rcancel := context.WithTimeout(context.Background(), 180*time.Second)
 		resp, err := s.grpcClient.GenerateReport(rctx, &jikiv1.ReportRequest{
-			UserId:     u.telegramID,
+			UserId:     u.userID,
 			ReportType: "goal_evaluate",
 		})
 		rcancel()
 
 		if err != nil {
-			log.Error().Err(err).Str("user_id", u.telegramID).Msg("goal evaluation: gRPC failed")
+			log.Error().Err(err).Str("user_id", u.userID).Msg("goal evaluation: gRPC failed")
 			failCount++
 			continue
 		}
-		log.Info().Str("user_id", u.telegramID).Str("result", resp.Content).Msg("goal evaluation complete")
+		log.Info().Str("user_id", u.userID).Str("result", resp.Content).Msg("goal evaluation complete")
 		successCount++
 	}
 
@@ -418,11 +418,11 @@ func (s *Scheduler) runGoalStatusRule() {
 	log.Info().Int("users", len(users)).Msg("generating goal status reports")
 
 	for _, u := range users {
-		if s.skillService != nil && !s.skillService.IsEnabled(u.telegramID, "goals") {
+		if s.skillService != nil && !s.skillService.IsEnabled(u.userID, "goals") {
 			continue
 		}
 		if err := s.sendGeneratedNotification(u, "goal_status"); err != nil {
-			log.Error().Err(err).Str("user_id", u.telegramID).Msg("goal status: send failed")
+			log.Error().Err(err).Str("user_id", u.userID).Msg("goal status: send failed")
 		}
 	}
 }
@@ -430,8 +430,8 @@ func (s *Scheduler) runGoalStatusRule() {
 // --- Helpers ---
 
 // sendTemplateNotification sends a pre-formatted message with fatigue checks.
-func (s *Scheduler) sendTemplateNotification(telegramID string, chatID int64, preferences map[string]any, message string) error {
-	if !s.fatigue.canNotify(telegramID, preferences) {
+func (s *Scheduler) sendTemplateNotification(userID string, chatID int64, preferences map[string]any, message string) error {
+	if !s.fatigue.canNotify(userID, preferences) {
 		return nil
 	}
 
@@ -439,15 +439,15 @@ func (s *Scheduler) sendTemplateNotification(telegramID string, chatID int64, pr
 		return fmt.Errorf("send template: %w", err)
 	}
 
-	s.fatigue.recordNotification(telegramID)
-	log.Info().Str("user_id", telegramID).Msg("proactive template notification sent")
+	s.fatigue.recordNotification(userID)
+	log.Info().Str("user_id", userID).Msg("proactive template notification sent")
 	return nil
 }
 
 // sendGeneratedNotification calls gRPC to generate a report, then sends it with fatigue checks.
 func (s *Scheduler) sendGeneratedNotification(user activeUser, reportType string) error {
-	prefs := s.loadPreferences(user.telegramID)
-	if !s.fatigue.canNotify(user.telegramID, prefs) {
+	prefs := s.loadPreferences(user.userID)
+	if !s.fatigue.canNotify(user.userID, prefs) {
 		return nil
 	}
 
@@ -455,7 +455,7 @@ func (s *Scheduler) sendGeneratedNotification(user activeUser, reportType string
 	defer cancel()
 
 	resp, err := s.grpcClient.GenerateReport(ctx, &jikiv1.ReportRequest{
-		UserId:     user.telegramID,
+		UserId:     user.userID,
 		ReportType: reportType,
 	})
 	if err != nil {
@@ -463,7 +463,7 @@ func (s *Scheduler) sendGeneratedNotification(user activeUser, reportType string
 	}
 
 	if resp.Content == "" {
-		log.Warn().Str("user_id", user.telegramID).Str("type", reportType).Msg("empty report, skipping")
+		log.Warn().Str("user_id", user.userID).Str("type", reportType).Msg("empty report, skipping")
 		return nil
 	}
 
@@ -471,21 +471,21 @@ func (s *Scheduler) sendGeneratedNotification(user activeUser, reportType string
 		return fmt.Errorf("send %s: %w", reportType, err)
 	}
 
-	s.fatigue.recordNotification(user.telegramID)
-	log.Info().Str("user_id", user.telegramID).Str("type", reportType).Msg("proactive generated notification sent")
+	s.fatigue.recordNotification(user.userID)
+	log.Info().Str("user_id", user.userID).Str("type", reportType).Msg("proactive generated notification sent")
 	return nil
 }
 
 // loadPreferences is a convenience wrapper for getUserPreferences.
-func (s *Scheduler) loadPreferences(telegramID string) map[string]any {
+func (s *Scheduler) loadPreferences(userID string) map[string]any {
 	if s.db == nil {
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	prefs, err := getUserPreferences(ctx, s.db, telegramID)
+	prefs, err := getUserPreferences(ctx, s.db, userID)
 	if err != nil {
-		log.Warn().Err(err).Str("user_id", telegramID).Msg("failed to load preferences")
+		log.Warn().Err(err).Str("user_id", userID).Msg("failed to load preferences")
 		return nil
 	}
 	return prefs
@@ -537,8 +537,8 @@ func (s *Scheduler) runConversationAnalysisRule() {
 	now := time.Now()
 	var analyzeCount int
 
-	for telegramID, lastMsg := range activeUsers {
-		if s.skillService != nil && !s.skillService.IsEnabled(telegramID, "diary") {
+	for userID, lastMsg := range activeUsers {
+		if s.skillService != nil && !s.skillService.IsEnabled(userID, "diary") {
 			continue
 		}
 
@@ -556,7 +556,7 @@ func (s *Scheduler) runConversationAnalysisRule() {
 
 		// Dedup: skip if we already analyzed this idle session.
 		s.analysisMu.RLock()
-		lastAnalyzed, exists := s.analysisStates[telegramID]
+		lastAnalyzed, exists := s.analysisStates[userID]
 		s.analysisMu.RUnlock()
 		if exists && lastAnalyzed.Equal(lastMsg) {
 			continue
@@ -565,23 +565,23 @@ func (s *Scheduler) runConversationAnalysisRule() {
 		// Trigger background analysis via gRPC.
 		ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 		resp, err := s.grpcClient.GenerateReport(ctx, &jikiv1.ReportRequest{
-			UserId:     telegramID,
+			UserId:     userID,
 			ReportType: "conversation_analysis",
 		})
 		cancel()
 
 		if err != nil {
-			log.Error().Err(err).Str("user_id", telegramID).Msg("conversation analysis: gRPC failed")
+			log.Error().Err(err).Str("user_id", userID).Msg("conversation analysis: gRPC failed")
 			continue
 		}
 
 		// Mark this idle session as analyzed.
 		s.analysisMu.Lock()
-		s.analysisStates[telegramID] = lastMsg
+		s.analysisStates[userID] = lastMsg
 		s.analysisMu.Unlock()
 
 		log.Info().
-			Str("user_id", telegramID).
+			Str("user_id", userID).
 			Str("result", resp.Content).
 			Dur("idle", idle).
 			Msg("conversation analysis complete")
@@ -620,17 +620,17 @@ func (s *Scheduler) runMemoryCompactionRule() {
 	for _, u := range users {
 		ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 		resp, err := s.grpcClient.GenerateReport(ctx, &jikiv1.ReportRequest{
-			UserId:     u.telegramID,
+			UserId:     u.userID,
 			ReportType: "memory_compaction",
 		})
 		cancel()
 
 		if err != nil {
-			log.Error().Err(err).Str("user_id", u.telegramID).Msg("memory compaction: gRPC failed")
+			log.Error().Err(err).Str("user_id", u.userID).Msg("memory compaction: gRPC failed")
 			failCount++
 			continue
 		}
-		log.Info().Str("user_id", u.telegramID).Str("result", resp.Content).Msg("memory compaction complete")
+		log.Info().Str("user_id", u.userID).Str("result", resp.Content).Msg("memory compaction complete")
 		successCount++
 	}
 

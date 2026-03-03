@@ -41,7 +41,7 @@ async def generate_weekly_report(user_id: str) -> str:
     monthly = await finance_repo.get_monthly_summary(pool, user_id=user_id, month=month)
 
     # Budget and persona info.
-    profile = await profile_repo.get_by_telegram_id(pool, telegram_id=user_id)
+    profile = await profile_repo.get_by_uuid_id(pool, uuid_id=user_id)
     budget = {}
     persona_id = DEFAULT_PERSONA
     if profile:
@@ -124,7 +124,7 @@ async def generate_daily_summary(user_id: str) -> str:
     )
 
     # Budget and persona info.
-    profile = await profile_repo.get_by_telegram_id(pool, telegram_id=user_id)
+    profile = await profile_repo.get_by_uuid_id(pool, uuid_id=user_id)
     budget = {}
     persona_id = DEFAULT_PERSONA
     if profile:
@@ -198,7 +198,7 @@ async def generate_monthly_closing(user_id: str) -> str:
     prev_monthly = await finance_repo.get_monthly_summary(pool, user_id=user_id, month=prev_month)
 
     # Budget and persona info.
-    profile = await profile_repo.get_by_telegram_id(pool, telegram_id=user_id)
+    profile = await profile_repo.get_by_uuid_id(pool, uuid_id=user_id)
     budget = {}
     persona_id = DEFAULT_PERSONA
     if profile:

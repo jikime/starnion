@@ -1,6 +1,8 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState } from "react"
+import { useSession } from "next-auth/react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,7 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Cog, Sparkles, Bell, User } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Cog, Sparkles, Bell, User, Link, Loader2 } from "lucide-react"
 
 const skillCategories = {
   FINANCE: [
@@ -43,6 +46,45 @@ const personas = [
 ]
 
 export default function SettingsPage() {
+  const { update } = useSession()
+  const [linkCode, setLinkCode] = useState("")
+  const [linking, setLinking] = useState(false)
+  const [linkError, setLinkError] = useState("")
+  const [linkSuccess, setLinkSuccess] = useState(false)
+
+  const handleLink = async () => {
+    const code = linkCode.trim()
+    if (!code) return
+
+    setLinking(true)
+    setLinkError("")
+    setLinkSuccess(false)
+
+    try {
+      const res = await fetch("/api/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      })
+
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        setLinkError(data.error ?? "계정 연결에 실패했어요")
+        return
+      }
+
+      // Refresh session JWT with the new canonical userId.
+      await update({ userId: data.userId })
+      setLinkSuccess(true)
+      setLinkCode("")
+    } catch {
+      setLinkError("오류가 발생했어요. 잠시 후 다시 시도해 주세요.")
+    } finally {
+      setLinking(false)
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -233,28 +275,74 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="account">
-          <Card>
-            <CardHeader>
-              <CardTitle>계정 설정</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="name">이름</Label>
-                <Input id="name" defaultValue="사용자" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">이메일</Label>
-                <Input id="email" type="email" defaultValue="user@example.com" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="timezone">시간대</Label>
-                <Input id="timezone" defaultValue="Asia/Seoul" disabled />
-              </div>
-              <div className="flex justify-end">
-                <Button>저장</Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>계정 설정</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="name">이름</Label>
+                  <Input id="name" defaultValue="사용자" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">이메일</Label>
+                  <Input id="email" type="email" defaultValue="user@example.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="timezone">시간대</Label>
+                  <Input id="timezone" defaultValue="Asia/Seoul" disabled />
+                </div>
+                <div className="flex justify-end">
+                  <Button>저장</Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Link className="size-4" />
+                  계정 연결
+                </CardTitle>
+                <CardDescription>
+                  텔레그램에서 <code className="bg-muted px-1 rounded text-xs">/link</code> 명령어를 입력해 코드를 받아 입력하세요.
+                  연결 후 텔레그램과 웹에서 동일한 데이터를 사용할 수 있어요.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {linkSuccess ? (
+                  <Alert className="border-green-500">
+                    <AlertDescription className="text-green-600">
+                      계정이 연결되었어요! 이제 텔레그램과 웹에서 동일한 데이터를 사용해요.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <>
+                    {linkError && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{linkError}</AlertDescription>
+                      </Alert>
+                    )}
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="JIKI-XXXXXX"
+                        value={linkCode}
+                        onChange={(e) => setLinkCode(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => e.key === "Enter" && handleLink()}
+                        maxLength={11}
+                        className="font-mono"
+                      />
+                      <Button onClick={handleLink} disabled={linking || !linkCode.trim()}>
+                        {linking && <Loader2 className="mr-2 size-4 animate-spin" />}
+                        연결하기
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

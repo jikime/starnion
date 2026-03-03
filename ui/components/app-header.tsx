@@ -1,8 +1,11 @@
 "use client"
 
-import { Bell, Search, User, ExternalLink } from "lucide-react"
+import { Bell, Search, ExternalLink } from "lucide-react"
+import { signOut, useSession } from "next-auth/react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,10 +18,22 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Badge } from "@/components/ui/badge"
 
 export function AppHeader() {
+  const { data: session } = useSession()
+
+  const userName = session?.user?.name ?? "사용자"
+  const userEmail = session?.user?.email ?? ""
+  // Use first two chars of name (or first char each of two words) as initials.
+  const initials = userName
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+
   return (
     <header className="flex h-14 items-center gap-4 border-b border-border bg-background px-4 lg:px-6">
       <SidebarTrigger className="-ml-2" />
-      
+
       <div className="relative flex-1 max-w-md">
         <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -27,15 +42,17 @@ export function AppHeader() {
           className="pl-9 bg-muted/50 border-0 focus-visible:ring-1"
         />
       </div>
-      
-      <div className="flex items-center gap-2">
+
+      {/* Right-side actions */}
+      <div className="ml-auto flex items-center gap-1">
+        {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="size-5" />
-              <Badge 
-                variant="destructive" 
-                className="absolute -right-1 -top-1 size-5 items-center justify-center p-0 text-xs"
+              <Badge
+                variant="destructive"
+                className="absolute -right-1 -top-1 flex size-4 items-center justify-center p-0 text-[10px]"
               >
                 3
               </Badge>
@@ -60,24 +77,45 @@ export function AppHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {/* User avatar with session info */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <User className="size-5" />
+            <Button variant="ghost" size="icon" className="rounded-full">
+              <Avatar className="size-8">
+                <AvatarFallback className="bg-primary text-primary-foreground text-xs font-medium">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
               <span className="sr-only">사용자 메뉴</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>내 계정</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-sm font-medium truncate">{userName}</span>
+                {userEmail && (
+                  <span className="text-xs text-muted-foreground truncate">
+                    {userEmail}
+                  </span>
+                )}
+              </div>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>프로필</DropdownMenuItem>
-            <DropdownMenuItem>설정</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/settings?tab=account">설정</Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>로그아웃</DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive cursor-pointer"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+            >
+              로그아웃
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Button variant="outline" size="sm" className="hidden md:flex gap-2" asChild>
+        {/* Telegram shortcut */}
+        <Button variant="outline" size="sm" className="hidden md:flex gap-2 ml-1" asChild>
           <a href="https://t.me/jiki_bot" target="_blank" rel="noopener noreferrer">
             <ExternalLink className="size-4" />
             Telegram

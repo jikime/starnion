@@ -170,7 +170,7 @@ async def _get_enabled_context(user_id: str | None) -> tuple[str, list[str], str
     pool = get_pool()
 
     # Persona preference.
-    prof = await profile_repo.get_by_telegram_id(pool, user_id)
+    prof = await profile_repo.get_by_uuid_id(pool, user_id)
     if prof:
         prefs = prof.get("preferences") or {}
         persona_id = prefs.get("persona", DEFAULT_PERSONA)

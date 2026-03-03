@@ -34,6 +34,21 @@ from jiki_agent.skills.report.tools import (
 logger = logging.getLogger(__name__)
 
 
+def _flatten_content(content) -> str:
+    """Convert LangChain message content to a plain string.
+
+    Gemini returns content as a list of blocks; other models return a string.
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            block.get("text", str(block)) if isinstance(block, dict) else str(block)
+            for block in content
+        )
+    return str(content)
+
+
 class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
     """Concrete implementation of the AgentService gRPC interface."""
 
@@ -73,10 +88,11 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
 
         try:
             pool = get_pool()
-            await profile_repo.upsert(pool, telegram_id=user_id, user_name="")
+            await profile_repo.upsert(pool, uuid_id=user_id, user_name="")
 
             combined_message = self._build_message(request)
-            result = await self._invoke_agent(combined_message, user_id)
+            thread_id = request.thread_id or user_id
+            result = await self._invoke_agent(combined_message, thread_id)
 
             raw_content = result["messages"][-1].content
             # Gemini may return content as a list of blocks; flatten to string.
@@ -132,10 +148,11 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
 
         try:
             pool = get_pool()
-            await profile_repo.upsert(pool, telegram_id=user_id, user_name="")
+            await profile_repo.upsert(pool, uuid_id=user_id, user_name="")
 
             combined_message = self._build_message(request)
-            config = {"configurable": {"thread_id": user_id}}
+            thread_id = request.thread_id or user_id
+            config = {"configurable": {"thread_id": thread_id}}
             input_data = {"messages": [("human", combined_message)]}
 
             async for event in self._agent.astream_events(
@@ -229,6 +246,43 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                 )
             await conn.commit()
         logger.info("Cleared checkpoints for thread %s", thread_id)
+
+    async def GetHistory(self, request, context):  # noqa: ARG002
+        """Return prior messages for a conversation thread.
+
+        Uses LangGraph ``aget_state`` to retrieve the persisted message list
+        and returns only HumanMessage / AIMessage pairs (tool messages skipped).
+        """
+        thread_id = request.thread_id
+        if not thread_id:
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details("thread_id is required")
+            return agent_pb2.HistoryResponse()
+
+        try:
+            state = await self._agent.aget_state(
+                {"configurable": {"thread_id": thread_id}},
+            )
+            messages = state.values.get("messages", []) if state.values else []
+
+            history: list[agent_pb2.HistoryMessage] = []
+            for msg in messages:
+                role = type(msg).__name__  # HumanMessage, AIMessage, ToolMessage…
+                if role == "HumanMessage":
+                    content = _flatten_content(msg.content)
+                    if content:
+                        history.append(agent_pb2.HistoryMessage(role="user", content=content))
+                elif role == "AIMessage":
+                    content = _flatten_content(msg.content)
+                    if content:
+                        history.append(agent_pb2.HistoryMessage(role="assistant", content=content))
+                # ToolMessage / AIMessageChunk are skipped
+
+            return agent_pb2.HistoryResponse(messages=history)
+
+        except Exception:
+            logger.exception("GetHistory failed for thread %s", thread_id)
+            return agent_pb2.HistoryResponse()
 
     async def GenerateReport(self, request, context):
         """Generate a periodic report for the user."""

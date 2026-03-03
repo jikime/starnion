@@ -50,6 +50,11 @@ class AgentServiceStub(object):
                 request_serializer=jiki_dot_v1_dot_agent__pb2.ReportRequest.SerializeToString,
                 response_deserializer=jiki_dot_v1_dot_agent__pb2.ReportResponse.FromString,
                 _registered_method=True)
+        self.GetHistory = channel.unary_unary(
+                '/jiki.v1.AgentService/GetHistory',
+                request_serializer=jiki_dot_v1_dot_agent__pb2.HistoryRequest.SerializeToString,
+                response_deserializer=jiki_dot_v1_dot_agent__pb2.HistoryResponse.FromString,
+                _registered_method=True)
 
 
 class AgentServiceServicer(object):
@@ -77,6 +82,13 @@ class AgentServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetHistory(self, request, context):
+        """GetHistory returns prior messages for a conversation thread.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AgentServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -94,6 +106,11 @@ def add_AgentServiceServicer_to_server(servicer, server):
                     servicer.GenerateReport,
                     request_deserializer=jiki_dot_v1_dot_agent__pb2.ReportRequest.FromString,
                     response_serializer=jiki_dot_v1_dot_agent__pb2.ReportResponse.SerializeToString,
+            ),
+            'GetHistory': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetHistory,
+                    request_deserializer=jiki_dot_v1_dot_agent__pb2.HistoryRequest.FromString,
+                    response_serializer=jiki_dot_v1_dot_agent__pb2.HistoryResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -178,6 +195,33 @@ class AgentService(object):
             '/jiki.v1.AgentService/GenerateReport',
             jiki_dot_v1_dot_agent__pb2.ReportRequest.SerializeToString,
             jiki_dot_v1_dot_agent__pb2.ReportResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetHistory(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/jiki.v1.AgentService/GetHistory',
+            jiki_dot_v1_dot_agent__pb2.HistoryRequest.SerializeToString,
+            jiki_dot_v1_dot_agent__pb2.HistoryResponse.FromString,
             options,
             channel_credentials,
             insecure,
