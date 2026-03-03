@@ -21,7 +21,7 @@ export async function PATCH(
   const res = await fetch(`${API_URL}/api/v1/conversations/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: body.title }),
+    body: JSON.stringify({ user_id: session.user.id, title: body.title }),
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {

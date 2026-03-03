@@ -15,6 +15,7 @@ import (
 	"github.com/jikime/jiki/gateway/internal/activity"
 	"github.com/jikime/jiki/gateway/internal/identity"
 	"github.com/jikime/jiki/gateway/internal/skill"
+	"github.com/jikime/jiki/gateway/internal/storage"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -26,12 +27,13 @@ type Bot struct {
 	grpcClient   jikiv1.AgentServiceClient
 	tracker      *activity.Tracker
 	db           *sql.DB
+	store        *storage.MinIO
 	skillService *skill.Service
 	identitySvc  *identity.Service
 }
 
 // NewBot creates a new Telegram bot connected to the agent gRPC service.
-func NewBot(token string, grpcConn *grpc.ClientConn, tracker *activity.Tracker, db *sql.DB, skillSvc *skill.Service, identitySvc *identity.Service) (*Bot, error) {
+func NewBot(token string, grpcConn *grpc.ClientConn, tracker *activity.Tracker, db *sql.DB, store *storage.MinIO, skillSvc *skill.Service, identitySvc *identity.Service) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, fmt.Errorf("telegram bot init: %w", err)
@@ -44,6 +46,7 @@ func NewBot(token string, grpcConn *grpc.ClientConn, tracker *activity.Tracker, 
 		grpcClient:   jikiv1.NewAgentServiceClient(grpcConn),
 		tracker:      tracker,
 		db:           db,
+		store:        store,
 		skillService: skillSvc,
 		identitySvc:  identitySvc,
 	}, nil
@@ -54,6 +57,8 @@ func NewBot(token string, grpcConn *grpc.ClientConn, tracker *activity.Tracker, 
 func (b *Bot) Run(ctx context.Context) {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 30
+	// Do NOT set AllowedUpdates — letting Telegram send the default set
+	// avoids server-side caching issues that can suppress photo updates.
 
 	updates := b.api.GetUpdatesChan(u)
 
@@ -66,6 +71,14 @@ func (b *Bot) Run(ctx context.Context) {
 			log.Info().Msg("Telegram bot stopped")
 			return
 		case update := <-updates:
+			// Log every raw update to detect which types are actually arriving.
+			log.Debug().
+				Int("update_id", update.UpdateID).
+				Bool("has_message", update.Message != nil).
+				Bool("has_callback", update.CallbackQuery != nil).
+				Bool("has_edited", update.EditedMessage != nil).
+				Msg("telegram: raw update received")
+
 			if update.CallbackQuery != nil {
 				go b.handleCallback(ctx, update.CallbackQuery)
 				continue
@@ -146,6 +159,17 @@ func lastIndex(s, sep string) int {
 }
 
 func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
+	// Log every incoming message type for debugging.
+	log.Debug().
+		Int64("chat_id", msg.Chat.ID).
+		Bool("has_text", msg.Text != "").
+		Bool("has_photo", msg.Photo != nil && len(msg.Photo) > 0).
+		Bool("has_voice", msg.Voice != nil).
+		Bool("has_video", msg.Video != nil).
+		Bool("has_document", msg.Document != nil).
+		Bool("has_sticker", msg.Sticker != nil).
+		Msg("telegram: incoming message")
+
 	// Resolve Telegram user to internal UUID.
 	telegramID := fmt.Sprintf("%d", msg.From.ID)
 	chatID := msg.Chat.ID
@@ -153,6 +177,9 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 
 	displayName := strings.TrimSpace(msg.From.FirstName + " " + msg.From.LastName)
 	userID := telegramID // fallback in case identity service is unavailable
+	// convID is the conversation UUID used for message persistence.
+	// It is only valid when identity resolution succeeds (userID becomes a UUID, not telegramID).
+	convID := ""
 	if b.identitySvc != nil {
 		var err error
 		resolved, err := b.identitySvc.ResolveUserIDWithName(identity.PlatformTelegram, telegramID, displayName)
@@ -170,6 +197,10 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 				`, userID, telegramID); dbErr != nil {
 					log.Warn().Err(dbErr).Str("user_id", userID).Msg("telegram: upsert platform conversation failed")
 				}
+			}
+			// Only use userID as convID when resolution succeeded (it's a UUID, not telegramID).
+			if userID != telegramID {
+				convID = userID
 			}
 		}
 	}
@@ -203,17 +234,32 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		ThreadId: telegramID,
 	}
 
+	// mirrorCh receives the MinIO-mirrored attachment for the file (if any).
+	// Mirroring runs in a background goroutine so it never delays the agent call.
+	mirrorCh := make(chan storage.FileAttachment, 1)
+
 	// Handle photo messages.
 	if msg.Photo != nil && len(msg.Photo) > 0 {
 		// Pick the largest photo (last element).
 		photo := msg.Photo[len(msg.Photo)-1]
 		fileURL := b.getFileURL(photo.FileID)
 		if fileURL != "" {
+			// Pass the Telegram CDN URL to the agent for Gemini analysis.
+			// Mirror to MinIO in the background so it never blocks the response.
 			chatReq.File = &jikiv1.FileInput{
 				FileType: "image",
 				FileUrl:  fileURL,
 				FileName: "photo.jpg",
 			}
+			go func(u string) {
+				mirrorCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				if att, err := b.mirrorToStorage(mirrorCtx, "photo.jpg", "image/jpeg", u); err != nil {
+					log.Warn().Err(err).Msg("telegram: mirror photo to storage failed")
+				} else {
+					mirrorCh <- att
+				}
+			}(fileURL)
 			if chatReq.Message == "" {
 				chatReq.Message = msg.Caption
 			}
@@ -232,6 +278,15 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 				FileUrl:  fileURL,
 				FileName: "voice.ogg",
 			}
+			go func(u string) {
+				mirrorCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				if att, err := b.mirrorToStorage(mirrorCtx, "voice.ogg", "audio/ogg", u); err != nil {
+					log.Warn().Err(err).Msg("telegram: mirror voice to storage failed")
+				} else {
+					mirrorCh <- att
+				}
+			}(fileURL)
 			if chatReq.Message == "" {
 				chatReq.Message = "이 음성을 텍스트로 변환해주세요."
 			}
@@ -247,6 +302,15 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 				FileUrl:  fileURL,
 				FileName: "video.mp4",
 			}
+			go func(u string) {
+				mirrorCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				if att, err := b.mirrorToStorage(mirrorCtx, "video.mp4", "video/mp4", u); err != nil {
+					log.Warn().Err(err).Msg("telegram: mirror video to storage failed")
+				} else {
+					mirrorCh <- att
+				}
+			}(fileURL)
 			if chatReq.Message == "" {
 				chatReq.Message = msg.Caption
 			}
@@ -260,11 +324,25 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	if msg.Document != nil {
 		fileURL := b.getFileURL(msg.Document.FileID)
 		if fileURL != "" {
+			docMime := msg.Document.MimeType
+			if docMime == "" {
+				docMime = "application/octet-stream"
+			}
 			chatReq.File = &jikiv1.FileInput{
 				FileType: "document",
 				FileUrl:  fileURL,
 				FileName: msg.Document.FileName,
 			}
+			docName := msg.Document.FileName
+			go func(u, name, mime string) {
+				mirrorCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				if att, err := b.mirrorToStorage(mirrorCtx, name, mime, u); err != nil {
+					log.Warn().Err(err).Msg("telegram: mirror document to storage failed")
+				} else {
+					mirrorCh <- att
+				}
+			}(fileURL, docName, docMime)
 			if chatReq.Message == "" {
 				chatReq.Message = msg.Caption
 			}
@@ -276,6 +354,12 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 
 	// Skip if no content at all.
 	if chatReq.Message == "" && chatReq.File == nil {
+		log.Warn().
+			Int64("chat_id", msg.Chat.ID).
+			Bool("has_photo", msg.Photo != nil && len(msg.Photo) > 0).
+			Bool("has_voice", msg.Voice != nil).
+			Bool("has_document", msg.Document != nil).
+			Msg("telegram: skipping message — no text and no file (getFileURL may have failed)")
 		return
 	}
 
@@ -285,19 +369,33 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		Bool("has_file", chatReq.File != nil).
 		Msg("processing telegram message")
 
-	// 1. Set 👀 reaction on the user's message to acknowledge receipt.
+	// 1. Persist user message immediately (without attachment — mirror is still running).
+	//    When the background mirror goroutine finishes, it will UPDATE this row with the MinIO URL.
+	userMsgID := b.saveMessage(convID, "user", chatReq.Message, nil)
+	if userMsgID != "" && chatReq.File != nil {
+		go func(id string) {
+			select {
+			case att := <-mirrorCh:
+				b.updateMessageAttachment(id, []storage.FileAttachment{att})
+			case <-time.After(30 * time.Second):
+				log.Warn().Str("msg_id", id).Msg("telegram: mirror timed out, attachment not saved")
+			}
+		}(userMsgID)
+	}
+
+	// 2. Set 👀 reaction on the user's message to acknowledge receipt.
 	b.setReaction(chatID, messageID, "👀")
 
-	// 2. Try streaming first, fallback to unary on error.
-	if err := b.handleMessageStream(ctx, chatID, messageID, userID, chatReq); err != nil {
+	// 3. Try streaming first, fallback to unary on error.
+	if err := b.handleMessageStream(ctx, chatID, messageID, userID, convID, chatReq); err != nil {
 		log.Warn().Err(err).Str("user_id", userID).Msg("stream failed, falling back to unary")
-		b.handleMessageUnary(ctx, chatID, messageID, userID, chatReq)
+		b.handleMessageUnary(ctx, chatID, messageID, userID, convID, chatReq)
 	}
 }
 
 // handleMessageStream processes a chat request via server-side streaming.
 // Sends an initial message to Telegram and progressively edits it as tokens arrive.
-func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID int, userID string, req *jikiv1.ChatRequest) error {
+func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID int, userID, convID string, req *jikiv1.ChatRequest) error {
 	reqCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 
@@ -312,6 +410,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 		statusMsgID int // Status message ("생각중...", "도구 XXX 사용중...")
 		lastEdit    time.Time
 		lastLen     int
+		attachments []storage.FileAttachment
 	)
 	const editInterval = 500 * time.Millisecond
 
@@ -402,6 +501,10 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 					log.Error().Err(err).Msg("failed to send final stream message")
 				}
 			}
+			// Persist completed assistant message.
+			if accumulated.Len() > 0 || len(attachments) > 0 {
+				b.saveMessage(convID, "assistant", accumulated.String(), attachments)
+			}
 			b.setReaction(chatID, messageID, "👍")
 			return nil
 
@@ -427,6 +530,12 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 
 		case jikiv1.ResponseType_FILE:
 			b.sendFile(chatID, resp.FileData, resp.FileName, resp.FileMime)
+			// Upload to MinIO and collect attachment for DB persistence.
+			if att, uploadErr := b.uploadFileToStorage(reqCtx, resp.FileName, resp.FileMime, resp.FileData); uploadErr != nil {
+				log.Warn().Err(uploadErr).Str("file", resp.FileName).Msg("telegram: file upload to storage failed")
+			} else {
+				attachments = append(attachments, att)
+			}
 
 		case jikiv1.ResponseType_TOOL_CALL:
 			// Update status message with tool-specific text.
@@ -461,12 +570,16 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 	} else if sentMsgID == 0 && accumulated.Len() > 0 {
 		b.SendMessage(chatID, accumulated.String())
 	}
+	// Persist completed assistant message (EOF path).
+	if accumulated.Len() > 0 || len(attachments) > 0 {
+		b.saveMessage(convID, "assistant", accumulated.String(), attachments)
+	}
 	b.setReaction(chatID, messageID, "👍")
 	return nil
 }
 
 // handleMessageUnary processes a chat request via unary gRPC call (fallback).
-func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID int, userID string, req *jikiv1.ChatRequest) {
+func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID int, userID, convID string, req *jikiv1.ChatRequest) {
 	typingCtx, typingCancel := context.WithCancel(ctx)
 	go b.typingLoop(typingCtx, chatID)
 
@@ -486,15 +599,28 @@ func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID in
 
 	b.setReaction(chatID, messageID, "👍")
 
+	var attachments []storage.FileAttachment
+
 	// Send file if the response contains file data (e.g., generated documents).
 	if len(resp.FileData) > 0 {
 		b.sendFile(chatID, resp.FileData, resp.FileName, resp.FileMime)
+		// Upload to MinIO for persistence.
+		if att, uploadErr := b.uploadFileToStorage(reqCtx, resp.FileName, resp.FileMime, resp.FileData); uploadErr != nil {
+			log.Warn().Err(uploadErr).Str("file", resp.FileName).Msg("telegram: file upload to storage failed (unary)")
+		} else {
+			attachments = append(attachments, att)
+		}
 	}
 
 	if resp.Content != "" {
 		if err := b.SendMessage(chatID, resp.Content); err != nil {
 			log.Error().Err(err).Str("user_id", userID).Msg("failed to send telegram reply")
 		}
+	}
+
+	// Persist assistant message.
+	if resp.Content != "" || len(attachments) > 0 {
+		b.saveMessage(convID, "assistant", resp.Content, attachments)
 	}
 }
 
@@ -599,6 +725,84 @@ func (b *Bot) sendFile(chatID int64, data []byte, name, mime string) {
 	if _, err := b.api.Send(msg); err != nil {
 		log.Error().Err(err).Str("name", name).Str("mime", mime).Msg("failed to send file")
 	}
+}
+
+// mirrorToStorage downloads a file from srcURL (e.g. Telegram CDN) and uploads
+// it to MinIO for permanent, browser-accessible storage.
+// Telegram CDN URLs are signed/temporary; mirroring ensures the web UI can display them.
+func (b *Bot) mirrorToStorage(ctx context.Context, fileName, mime, srcURL string) (storage.FileAttachment, error) {
+	if b.store == nil {
+		return storage.FileAttachment{}, fmt.Errorf("storage not configured")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, srcURL, nil)
+	if err != nil {
+		return storage.FileAttachment{}, fmt.Errorf("create request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return storage.FileAttachment{}, fmt.Errorf("download %s: %w", fileName, err)
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return storage.FileAttachment{}, fmt.Errorf("read %s: %w", fileName, err)
+	}
+	return b.store.Upload(ctx, fileName, mime, data)
+}
+
+// saveMessage persists a chat message to the messages table.
+// Returns the generated message UUID so callers can update it later (e.g. add attachments).
+// convID must be a valid UUID (the resolved userID); returns "" and skips when empty or db is nil.
+func (b *Bot) saveMessage(convID, role, content string, attachments []storage.FileAttachment) string {
+	if b.db == nil || convID == "" {
+		return ""
+	}
+	var attJSON []byte
+	if len(attachments) > 0 {
+		var err error
+		attJSON, err = json.Marshal(attachments)
+		if err != nil {
+			log.Warn().Err(err).Msg("telegram: marshal attachments failed")
+		}
+	}
+	var msgID string
+	err := b.db.QueryRowContext(context.Background(), `
+		INSERT INTO messages (conversation_id, role, content, attachments)
+		VALUES ($1::uuid, $2, $3, $4)
+		RETURNING id
+	`, convID, role, content, attJSON).Scan(&msgID)
+	if err != nil {
+		log.Warn().Err(err).Str("conversation_id", convID).Msg("telegram: saveMessage failed")
+		return ""
+	}
+	return msgID
+}
+
+// updateMessageAttachment sets the attachments column on an already-saved message.
+// Used when a background mirror completes after the message was initially saved without attachments.
+func (b *Bot) updateMessageAttachment(msgID string, attachments []storage.FileAttachment) {
+	if b.db == nil || msgID == "" || len(attachments) == 0 {
+		return
+	}
+	attJSON, err := json.Marshal(attachments)
+	if err != nil {
+		log.Warn().Err(err).Msg("telegram: marshal attachments for update failed")
+		return
+	}
+	if _, err = b.db.ExecContext(context.Background(), `
+		UPDATE messages SET attachments = $1 WHERE id = $2::uuid
+	`, attJSON, msgID); err != nil {
+		log.Warn().Err(err).Str("msg_id", msgID).Msg("telegram: updateMessageAttachment failed")
+	}
+}
+
+// uploadFileToStorage uploads file bytes to MinIO and returns the attachment.
+// Returns an error when MinIO is not configured or upload fails.
+func (b *Bot) uploadFileToStorage(ctx context.Context, name, mime string, data []byte) (storage.FileAttachment, error) {
+	if b.store == nil {
+		return storage.FileAttachment{}, fmt.Errorf("storage not configured")
+	}
+	return b.store.Upload(ctx, name, mime, data)
 }
 
 func (b *Bot) handleStart(chatID int64) {

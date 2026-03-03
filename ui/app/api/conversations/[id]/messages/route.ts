@@ -19,6 +19,7 @@ export async function GET(
   const limit = url.searchParams.get("limit") ?? "30"
 
   const upstream = new URL(`${API_URL}/api/v1/conversations/${id}/messages`)
+  upstream.searchParams.set("user_id", session.user.id)
   if (before) upstream.searchParams.set("before", before)
   upstream.searchParams.set("limit", limit)
 

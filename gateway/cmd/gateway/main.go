@@ -199,7 +199,7 @@ func main() {
 	// Start Telegram bot if enabled, and attach scheduler.
 	var sched *scheduler.Scheduler
 	if cfg.Telegram.Enabled && cfg.Telegram.BotToken != "" {
-		bot, botErr := telegram.NewBot(cfg.Telegram.BotToken, grpcConn, tracker, db, skillSvc, identitySvc)
+		bot, botErr := telegram.NewBot(cfg.Telegram.BotToken, grpcConn, tracker, db, minioStore, skillSvc, identitySvc)
 		if botErr != nil {
 			log.Fatal().Err(botErr).Msg("failed to initialise Telegram bot")
 		}

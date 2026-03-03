@@ -97,19 +97,24 @@ func (h *ConversationHandler) Create(c echo.Context) error {
 }
 
 // UpdateTitle updates the title of a conversation (auto-titled from first message).
-// PATCH /api/v1/conversations/:id  Body: { "title": "..." }
+// PATCH /api/v1/conversations/:id  Body: { "user_id": "...", "title": "..." }
 func (h *ConversationHandler) UpdateTitle(c echo.Context) error {
 	id := c.Param("id")
 	var req struct {
-		Title string `json:"title"`
+		UserID string `json:"user_id"`
+		Title  string `json:"title"`
 	}
 	if err := c.Bind(&req); err != nil || req.Title == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "title is required"})
 	}
+	if req.UserID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	}
 
 	res, err := h.db.ExecContext(c.Request().Context(), `
-		UPDATE conversations SET title = $1, updated_at = NOW() WHERE id = $2
-	`, req.Title, id)
+		UPDATE conversations SET title = $1, updated_at = NOW()
+		WHERE id = $2 AND user_id = $3
+	`, req.Title, id, req.UserID)
 	if err != nil {
 		log.Error().Err(err).Str("id", id).Msg("conversations: update title failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "update failed"})

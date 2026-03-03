@@ -200,6 +200,19 @@ func (c *Client) writePump() {
 	}
 }
 
+// verifyConversationOwner checks that convID belongs to userID.
+// Returns true when the DB is unavailable (to avoid blocking dev mode).
+func (h *Hub) verifyConversationOwner(convID, userID string) bool {
+	if h.db == nil {
+		return true
+	}
+	var ownerID string
+	err := h.db.QueryRowContext(context.Background(),
+		`SELECT user_id FROM conversations WHERE id = $1::uuid`, convID,
+	).Scan(&ownerID)
+	return err == nil && ownerID == userID
+}
+
 // handleChatMessage opens a gRPC ChatStream and relays events to the browser.
 func (c *Client) handleChatMessage(frame InFrame) {
 	message, _ := frame.Params["message"].(string)
@@ -210,6 +223,13 @@ func (c *Client) handleChatMessage(frame InFrame) {
 
 	model, _ := frame.Params["model"].(string)
 	threadID, _ := frame.Params["thread_id"].(string)
+
+	// Verify the conversation belongs to this user (prevents cross-user writes via WebSocket).
+	if threadID != "" && !c.hub.verifyConversationOwner(threadID, c.userID) {
+		c.sendError(frame.ID, "conversation not found")
+		log.Warn().Str("user_id", c.userID).Str("thread_id", threadID).Msg("ws: unauthorized conversation access attempt")
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
@@ -287,6 +307,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 					"name": att.Name,
 					"mime": att.Mime,
 					"url":  att.URL,
+					"size": att.Size,
 				},
 			}
 

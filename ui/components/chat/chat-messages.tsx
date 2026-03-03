@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Bot, User, Wrench, Paperclip, Loader2 } from "lucide-react"
+import { Bot, User, Wrench, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ChatMessage, FileAttachment } from "@/hooks/use-chat"
 
@@ -17,23 +17,61 @@ interface ChatMessagesProps {
   onLoadMore?: () => void
 }
 
+function getExtColor(ext: string, mime: string): string {
+  if (mime.startsWith("image/")) return "bg-emerald-500"
+  if (mime.startsWith("audio/")) return "bg-purple-500"
+  if (mime.startsWith("video/")) return "bg-pink-500"
+  const map: Record<string, string> = {
+    pdf: "bg-red-500",
+    doc: "bg-blue-500", docx: "bg-blue-500",
+    xls: "bg-green-600", xlsx: "bg-green-600", csv: "bg-green-600",
+    ppt: "bg-orange-500", pptx: "bg-orange-500",
+    zip: "bg-amber-500", gz: "bg-amber-500", tar: "bg-amber-500",
+    rar: "bg-amber-500", "7z": "bg-amber-500",
+    txt: "bg-slate-500", md: "bg-slate-500",
+    js: "bg-yellow-500", ts: "bg-blue-400", tsx: "bg-blue-400",
+    py: "bg-indigo-500", go: "bg-cyan-500",
+  }
+  return map[ext] ?? "bg-slate-400"
+}
+
+function formatSize(bytes?: number): string {
+  if (!bytes) return ""
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 function FilePreview({ file }: { file: FileAttachment }) {
   if (!file.url) return null
+
   if (file.mime.startsWith("image/")) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={file.url} alt={file.name} className="mt-2 max-w-xs rounded-lg" />
     )
   }
+
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "file"
+  const badgeColor = getExtColor(ext, file.mime)
+  const size = formatSize(file.size)
+
   return (
     <a
       href={file.url}
-      target="_blank"
+      download={file.name}
       rel="noopener noreferrer"
-      className="mt-2 flex items-center gap-1.5 text-xs underline"
+      className="mt-2 flex items-center gap-3 rounded-xl bg-white/80 dark:bg-white/10 border border-black/8 dark:border-white/10 px-3 py-2.5 shadow-sm hover:bg-white dark:hover:bg-white/15 transition-colors min-w-0 max-w-[280px]"
     >
-      <Paperclip className="size-3" />
-      {file.name}
+      {/* Extension badge */}
+      <div className={cn("flex shrink-0 items-center justify-center rounded-lg w-10 h-10 text-white font-bold text-[10px] uppercase tracking-wide", badgeColor)}>
+        {ext.length > 4 ? ext.slice(0, 4) : ext}
+      </div>
+      {/* Filename + size */}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-semibold leading-snug text-foreground">{file.name}</p>
+        {size && <p className="mt-0.5 text-[11px] text-muted-foreground leading-none">{size}</p>}
+      </div>
     </a>
   )
 }

@@ -36,12 +36,16 @@ type messageRow struct {
 }
 
 // List returns paginated messages for a conversation (cursor-based, newest-first pages).
-// GET /api/v1/conversations/:id/messages?before=<uuid>&limit=30
+// GET /api/v1/conversations/:id/messages?user_id=<uuid>&before=<uuid>&limit=30
 //
 // Response: { "messages": [...], "has_more": bool, "next_cursor": "<uuid>"|null }
 // Messages are returned in chronological order (oldest first within the page).
 func (h *MessageHandler) List(c echo.Context) error {
 	convID := c.Param("id")
+	userID := c.QueryParam("user_id")
+	if userID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	}
 	before := c.QueryParam("before") // empty = latest page
 
 	limit := 30
@@ -52,6 +56,15 @@ func (h *MessageHandler) List(c echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
+
+	// Verify the conversation belongs to the requesting user.
+	var ownerID string
+	err := h.db.QueryRowContext(ctx,
+		`SELECT user_id FROM conversations WHERE id = $1::uuid`, convID,
+	).Scan(&ownerID)
+	if err != nil || ownerID != userID {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "conversation not found"})
+	}
 
 	// Lazy seed: if the messages table has no rows for this conversation,
 	// populate it from LangGraph history once.
@@ -67,7 +80,6 @@ func (h *MessageHandler) List(c echo.Context) error {
 
 	// Fetch limit+1 rows to determine has_more.
 	var rows *sql.Rows
-	var err error
 
 	if before == "" {
 		// Latest page: most recent `limit+1` messages.

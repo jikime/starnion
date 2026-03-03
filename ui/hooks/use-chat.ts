@@ -27,6 +27,7 @@ export interface FileAttachment {
   name: string
   mime: string
   url: string // MinIO public URL
+  size?: number // bytes
 }
 
 export interface ChatMessage {
@@ -206,31 +207,34 @@ export function useChat(activeThreadId: string | null) {
     (frame: OutFrame) => {
       if (frame.type !== "event" || !frame.id || !frame.event) return
 
-      const payload = frame.payload as Record<string, string> | undefined
+      const payload = frame.payload as Record<string, unknown> | undefined
       const requestID = frame.id
+
+      const str = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback)
 
       switch (frame.event) {
         case "text":
-          appendAssistantChunk(requestID, payload?.text ?? "")
+          appendAssistantChunk(requestID, str(payload?.text))
           break
         case "tool_call":
-          appendToolEvent(requestID, { tool: payload?.tool ?? "" })
+          appendToolEvent(requestID, { tool: str(payload?.tool) })
           break
         case "tool_result":
           appendToolEvent(requestID, {
-            tool: payload?.tool ?? "",
-            result: payload?.result,
+            tool: str(payload?.tool),
+            result: typeof payload?.result === "string" ? payload.result : undefined,
           })
           break
         case "file":
           appendFile(requestID, {
-            name: payload?.name ?? "file",
-            mime: payload?.mime ?? "application/octet-stream",
-            url: payload?.url ?? "",
+            name: str(payload?.name, "file"),
+            mime: str(payload?.mime, "application/octet-stream"),
+            url: str(payload?.url),
+            size: payload?.size != null ? Number(payload.size) : undefined,
           })
           break
         case "error":
-          appendAssistantChunk(requestID, `\n\n⚠️ ${payload?.message ?? "오류가 발생했어요."}`)
+          appendAssistantChunk(requestID, `\n\n⚠️ ${str(payload?.message, "오류가 발생했어요.")}`)
           finalizeAssistant(requestID)
           break
         case "done":
