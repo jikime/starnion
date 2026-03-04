@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -132,6 +135,111 @@ func (h *ModelsHandler) DeleteProvider(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "delete failed"})
 	}
 	return c.JSON(http.StatusOK, echo.Map{"ok": true})
+}
+
+// ValidateProvider POST /api/v1/providers/validate
+// Body: { provider, apiKey, baseUrl }
+// Returns { valid: true } or { valid: false, error: "..." }
+func (h *ModelsHandler) ValidateProvider(c echo.Context) error {
+	var body struct {
+		Provider string `json:"provider"`
+		APIKey   string `json:"apiKey"`
+		BaseURL  string `json:"baseUrl"`
+	}
+	if err := c.Bind(&body); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid body"})
+	}
+	if body.Provider == "" || body.APIKey == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "provider and apiKey required"})
+	}
+
+	valid, errMsg := probeProvider(body.Provider, body.APIKey, body.BaseURL)
+	if valid {
+		return c.JSON(http.StatusOK, echo.Map{"valid": true})
+	}
+	return c.JSON(http.StatusUnauthorized, echo.Map{"valid": false, "error": errMsg})
+}
+
+// probeProvider performs a lightweight HTTP probe to validate an API key.
+func probeProvider(provider, apiKey, baseURL string) (bool, string) {
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	switch provider {
+	case "anthropic":
+		// Minimal messages request — any non-401/403 means key is accepted
+		payload := map[string]interface{}{
+			"model":      "claude-3-haiku-20240307",
+			"max_tokens": 1,
+			"messages":   []map[string]string{{"role": "user", "content": "hi"}},
+		}
+		b, _ := json.Marshal(payload)
+		req, _ := http.NewRequest(http.MethodPost, "https://api.anthropic.com/v1/messages", bytes.NewReader(b))
+		req.Header.Set("x-api-key", apiKey)
+		req.Header.Set("anthropic-version", "2023-06-01")
+		req.Header.Set("content-type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return false, "Anthropic API에 연결할 수 없어요: " + err.Error()
+		}
+		defer resp.Body.Close()
+		// 401/403 = invalid key; anything else (400, 529…) = key is valid
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			return false, "API 키가 유효하지 않아요."
+		}
+		return true, ""
+
+	case "openai":
+		req, _ := http.NewRequest(http.MethodGet, "https://api.openai.com/v1/models", nil)
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return false, "OpenAI API에 연결할 수 없어요: " + err.Error()
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			return false, "API 키가 유효하지 않아요."
+		}
+		return true, ""
+
+	case "gemini":
+		url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models?key=%s", apiKey)
+		resp, err := client.Get(url)
+		if err != nil {
+			return false, "Google API에 연결할 수 없어요: " + err.Error()
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusUnauthorized ||
+			resp.StatusCode == http.StatusForbidden {
+			return false, "API 키가 유효하지 않아요."
+		}
+		return true, ""
+
+	case "zai":
+		req, _ := http.NewRequest(http.MethodGet, "https://api.z.ai/api/paas/v4/models", nil)
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return false, "Z.AI API에 연결할 수 없어요: " + err.Error()
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			return false, "API 키가 유효하지 않아요."
+		}
+		return true, ""
+
+	case "custom":
+		if baseURL == "" {
+			return false, "Base URL을 입력해주세요."
+		}
+		// For custom endpoints we skip validation (no standard probe URL)
+		return true, ""
+
+	default:
+		return false, "알 수 없는 프로바이더예요: " + provider
+	}
 }
 
 // ── Persona types ──────────────────────────────────────────────────────────

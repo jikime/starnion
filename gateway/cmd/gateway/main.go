@@ -478,6 +478,7 @@ func main() {
 		modelsHandler := handler.NewModelsHandler(db)
 		api.GET("/providers", modelsHandler.ListProviders)
 		api.POST("/providers", modelsHandler.UpsertProvider)
+		api.POST("/providers/validate", modelsHandler.ValidateProvider)
 		api.DELETE("/providers/:provider", modelsHandler.DeleteProvider)
 		api.GET("/personas", modelsHandler.ListPersonas)
 		api.POST("/personas", modelsHandler.CreatePersona)

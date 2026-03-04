@@ -310,16 +310,68 @@ export function ModelsView() {
   }
 
   const saveProvider = async (provider: string) => {
+    const newApiKey = apiKeys[provider] ?? ""
+    const baseUrl = baseUrls[provider] ?? ""
+    const saved = savedFor(provider)
+    const providerName = PROVIDER_META[provider]?.name ?? provider
+
+    // ── Pre-save validation ──────────────────────────────────────────────────
+
+    // Custom: base URL required
+    if (provider === "custom" && !baseUrl.trim()) {
+      showToast("Base URL을 입력해주세요.", false)
+      return
+    }
+
+    // Non-custom: must have either a new key OR an already-saved key
+    if (provider !== "custom" && !newApiKey && !saved?.hasKey) {
+      showToast("API 키를 입력해주세요.", false)
+      return
+    }
+
+    // Must select at least one model (except custom — models are free-form)
+    const models = provider === "custom"
+      ? customModels
+      : [...(enabledModels[provider] ?? [])]
+
+    if (provider !== "custom" && models.length === 0) {
+      showToast("사용할 모델을 하나 이상 선택해주세요.", false)
+      return
+    }
+
     setSavingProvider(provider)
     try {
-      const models = provider === "custom"
-        ? customModels
-        : [...(enabledModels[provider] ?? [])]
+      // ── API key validation (only when a new key is entered) ───────────────
+      if (newApiKey && provider !== "custom") {
+        showToast(`${providerName} API 키 확인 중...`, true)
+        let isValid = false
+        let validationError = "API 키가 유효하지 않아요."
+        try {
+          const vRes = await fetch("/api/settings/providers/validate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ provider, apiKey: newApiKey, baseUrl }),
+          })
+          const vData = await vRes.json().catch(() => ({} as Record<string, unknown>))
+          isValid = vRes.ok && (vData as { valid?: boolean }).valid === true
+          if (!isValid && (vData as { error?: string }).error) {
+            validationError = (vData as { error: string }).error
+          }
+        } catch {
+          validationError = "네트워크 오류로 API 키를 확인할 수 없어요."
+        }
 
+        if (!isValid) {
+          showToast(validationError, false)
+          return
+        }
+      }
+
+      // ── Save ─────────────────────────────────────────────────────────────
       const body: Record<string, unknown> = {
         provider,
-        apiKey: apiKeys[provider] ?? "",
-        baseUrl: baseUrls[provider] ?? "",
+        apiKey: newApiKey,
+        baseUrl,
         enabledModels: models,
       }
       const res = await fetch("/api/settings/providers", {
@@ -328,8 +380,7 @@ export function ModelsView() {
         body: JSON.stringify(body),
       })
       if (res.ok) {
-        showToast(`${PROVIDER_META[provider]?.name ?? provider} 저장됐어요.`)
-        // Clear the api key input (keep blank after save for security)
+        showToast(`${providerName} 저장됐어요.`)
         setApiKeys(prev => ({ ...prev, [provider]: "" }))
         fetchProviders()
       } else {
