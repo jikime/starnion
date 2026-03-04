@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
@@ -21,6 +22,16 @@ import (
 	"google.golang.org/grpc"
 )
 
+// policyCache caches per-user DM/Group policy to avoid a DB hit on every message.
+type policyCache struct {
+	mu          sync.RWMutex
+	dmPolicy    string
+	groupPolicy string
+	cachedAt    time.Time
+}
+
+const policyCacheTTL = 30 * time.Second
+
 // Bot wraps the Telegram bot API and forwards messages to the agent via gRPC.
 type Bot struct {
 	api          *tgbotapi.BotAPI
@@ -30,16 +41,22 @@ type Bot struct {
 	store        *storage.MinIO
 	skillService *skill.Service
 	identitySvc  *identity.Service
+
+	// ownerUserID is the web user who owns this bot instance.
+	ownerUserID string
+	// policy is an in-memory cache for DM/Group policy values.
+	policy policyCache
 }
 
 // NewBot creates a new Telegram bot connected to the agent gRPC service.
-func NewBot(token string, grpcConn *grpc.ClientConn, tracker *activity.Tracker, db *sql.DB, store *storage.MinIO, skillSvc *skill.Service, identitySvc *identity.Service) (*Bot, error) {
+// ownerUserID is the web platform user ID (UUID) that owns this bot token.
+func NewBot(token, ownerUserID string, grpcConn *grpc.ClientConn, tracker *activity.Tracker, db *sql.DB, store *storage.MinIO, skillSvc *skill.Service, identitySvc *identity.Service) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, fmt.Errorf("telegram bot init: %w", err)
 	}
 
-	log.Info().Str("username", api.Self.UserName).Msg("Telegram bot authorised")
+	log.Info().Str("username", api.Self.UserName).Str("owner", ownerUserID).Msg("Telegram bot authorised")
 
 	return &Bot{
 		api:          api,
@@ -49,7 +66,44 @@ func NewBot(token string, grpcConn *grpc.ClientConn, tracker *activity.Tracker, 
 		store:        store,
 		skillService: skillSvc,
 		identitySvc:  identitySvc,
+		ownerUserID:  ownerUserID,
 	}, nil
+}
+
+// loadPolicy returns the current DM/Group policy for this bot's owner.
+// Results are cached for policyCacheTTL to reduce DB load.
+func (b *Bot) loadPolicy() (dmPolicy, groupPolicy string) {
+	b.policy.mu.RLock()
+	if time.Since(b.policy.cachedAt) < policyCacheTTL {
+		dm, grp := b.policy.dmPolicy, b.policy.groupPolicy
+		b.policy.mu.RUnlock()
+		if dm != "" {
+			return dm, grp
+		}
+	}
+	b.policy.mu.RUnlock()
+
+	// Refresh from DB.
+	dm, grp := "allow", "allow"
+	if b.db != nil && b.ownerUserID != "" {
+		row := b.db.QueryRowContext(context.Background(), `
+			SELECT dm_policy, group_policy
+			FROM user_channel_settings
+			WHERE user_id = $1 AND channel = 'telegram'
+		`, b.ownerUserID)
+		var d, g string
+		if err := row.Scan(&d, &g); err == nil {
+			dm, grp = d, g
+		}
+	}
+
+	b.policy.mu.Lock()
+	b.policy.dmPolicy = dm
+	b.policy.groupPolicy = grp
+	b.policy.cachedAt = time.Now()
+	b.policy.mu.Unlock()
+
+	return dm, grp
 }
 
 // Run starts polling for Telegram updates and processing them.
@@ -192,7 +246,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			if b.db != nil {
 				if _, dbErr := b.db.ExecContext(ctx, `
 					INSERT INTO conversations (id, user_id, title, platform, thread_id)
-					VALUES ($1, $1, '텔레그램', 'telegram', $2)
+					VALUES ($1::uuid, $1::text, '텔레그램', 'telegram', $2)
 					ON CONFLICT (id) DO NOTHING
 				`, userID, telegramID); dbErr != nil {
 					log.Warn().Err(dbErr).Str("user_id", userID).Msg("telegram: upsert platform conversation failed")
@@ -209,6 +263,51 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	if b.tracker != nil {
 		b.tracker.RecordMessage(userID)
 	}
+
+	// ── Policy gate ──────────────────────────────────────────────────────────
+	// Enforce DM / Group policy before processing any user message or command.
+	if !msg.IsCommand() || (msg.IsCommand() && msg.Command() != "start" && msg.Command() != "link") {
+		dmPolicy, groupPolicy := b.loadPolicy()
+		isGroup := msg.Chat.IsGroup() || msg.Chat.IsSuperGroup()
+
+		if isGroup {
+			switch groupPolicy {
+			case "deny":
+				// Silently ignore all group messages.
+				return
+			case "mention":
+				// Only respond when the bot is @mentioned.
+				mentioned := false
+				for _, entity := range msg.Entities {
+					if entity.Type == "mention" {
+						mentionText := msg.Text[entity.Offset : entity.Offset+entity.Length]
+						if strings.EqualFold(mentionText, "@"+b.api.Self.UserName) {
+							mentioned = true
+							break
+						}
+					}
+				}
+				if !mentioned {
+					return
+				}
+			// "allow" — fall through, no restriction.
+			}
+		} else {
+			// Direct message.
+			switch dmPolicy {
+			case "deny":
+				b.SendMessage(chatID, "죄송해요, 현재 DM을 통한 메시지는 받지 않고 있어요.")
+				return
+			case "pairing":
+				if !b.isApprovedContact(telegramID) {
+					b.handlePairingRequest(chatID, telegramID, displayName, msg.Text)
+					return
+				}
+			// "allow" — fall through.
+			}
+		}
+	}
+	// ── End policy gate ───────────────────────────────────────────────────────
 
 	// Handle commands.
 	if msg.IsCommand() {
@@ -914,6 +1013,51 @@ func getToolStatus(toolName string) string {
 		return text
 	}
 	return fmt.Sprintf("⏳ %s 처리중...", toolName)
+}
+
+// isApprovedContact checks whether telegramID is in the owner's approved contacts list.
+func (b *Bot) isApprovedContact(telegramID string) bool {
+	if b.db == nil || b.ownerUserID == "" {
+		return true // fail-open when DB unavailable
+	}
+	var exists bool
+	err := b.db.QueryRowContext(context.Background(), `
+		SELECT EXISTS(
+			SELECT 1 FROM telegram_approved_contacts
+			WHERE owner_user_id = $1 AND telegram_id = $2
+		)
+	`, b.ownerUserID, telegramID).Scan(&exists)
+	if err != nil {
+		log.Warn().Err(err).Msg("isApprovedContact query failed, failing open")
+		return true
+	}
+	return exists
+}
+
+// handlePairingRequest creates or updates a pairing request and notifies the sender.
+func (b *Bot) handlePairingRequest(chatID int64, telegramID, displayName, messageText string) {
+	if b.db == nil || b.ownerUserID == "" {
+		b.SendMessage(chatID, "연결 요청을 처리할 수 없어요. 잠시 후 다시 시도해 주세요.")
+		return
+	}
+
+	_, err := b.db.ExecContext(context.Background(), `
+		INSERT INTO telegram_pairing_requests
+			(owner_user_id, telegram_id, display_name, message_text, status)
+		VALUES ($1, $2, $3, $4, 'pending')
+		ON CONFLICT (owner_user_id, telegram_id)
+		DO UPDATE SET
+			display_name  = EXCLUDED.display_name,
+			message_text  = EXCLUDED.message_text,
+			status        = 'pending',
+			requested_at  = NOW(),
+			resolved_at   = NULL
+	`, b.ownerUserID, telegramID, displayName, messageText)
+	if err != nil {
+		log.Warn().Err(err).Str("telegram_id", telegramID).Msg("handlePairingRequest: upsert failed")
+	}
+
+	b.SendMessage(chatID, "연결 요청을 보냈어요. 봇 소유자가 승인하면 대화를 시작할 수 있어요.")
 }
 
 // personaNames maps persona IDs to display labels with emoji.

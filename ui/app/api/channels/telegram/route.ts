@@ -1,0 +1,58 @@
+import { auth } from "@/auth"
+import { NextResponse } from "next/server"
+
+const API_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"
+
+export async function GET() {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+  }
+
+  const res = await fetch(
+    `${API_URL}/api/v1/channels/telegram?user_id=${encodeURIComponent(session.user.id)}`,
+    { cache: "no-store" }
+  )
+
+  if (!res.ok) {
+    return NextResponse.json(
+      { configured: false, enabled: false, accounts: [], status: "not-configured", dmPolicy: "allow", groupPolicy: "allow" },
+      { status: 200 }
+    )
+  }
+
+  const data = await res.json()
+  return NextResponse.json(data)
+}
+
+export async function POST(request: Request) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+  }
+
+  const body = await request.json().catch(() => null)
+  if (!body) {
+    return NextResponse.json({ error: "invalid request" }, { status: 400 })
+  }
+
+  const res = await fetch(
+    `${API_URL}/api/v1/channels/telegram?user_id=${encodeURIComponent(session.user.id)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  )
+
+  const data = await res.json().catch(() => ({}))
+
+  if (!res.ok) {
+    return NextResponse.json(
+      { error: data.error ?? "요청에 실패했어요" },
+      { status: res.status }
+    )
+  }
+
+  return NextResponse.json(data)
+}

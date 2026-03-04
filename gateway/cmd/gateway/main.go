@@ -196,22 +196,13 @@ func main() {
 	// Create WebSocket hub for web chat.
 	wsHub := wschat.NewHub(jikiv1.NewAgentServiceClient(grpcConn), db, minioStore)
 
-	// Start Telegram bot if enabled, and attach scheduler.
-	var sched *scheduler.Scheduler
-	if cfg.Telegram.Enabled && cfg.Telegram.BotToken != "" {
-		bot, botErr := telegram.NewBot(cfg.Telegram.BotToken, grpcConn, tracker, db, minioStore, skillSvc, identitySvc)
-		if botErr != nil {
-			log.Fatal().Err(botErr).Msg("failed to initialise Telegram bot")
-		}
-		go bot.Run(ctx)
+	// Start per-user Telegram bot pool.
+	// Pass the gateway root context so bot goroutines live for the process lifetime.
+	botManager := telegram.NewBotManager(ctx, grpcConn, tracker, db, minioStore, skillSvc, identitySvc)
+	botManager.ReloadAll()
 
-		// Start cron scheduler for proactive notifications.
-		sched = scheduler.New(grpcConn, bot, db, tracker, skillSvc)
-		sched.Start()
-		defer sched.Stop()
-	} else {
-		log.Warn().Msg("Telegram bot disabled (no token provided)")
-	}
+	// Start cron scheduler (no single global bot — scheduler uses BotManager).
+	var sched *scheduler.Scheduler
 
 	e := echo.New()
 	e.HideBanner = true
@@ -474,6 +465,14 @@ func main() {
 		api.DELETE("/integrations/notion", integrationHandler.NotionDisconnect)
 		api.PUT("/integrations/github", integrationHandler.GitHubConnect)
 		api.DELETE("/integrations/github", integrationHandler.GitHubDisconnect)
+
+		// Channel management endpoints (per-user, uses BotManager).
+		channelHandler := handler.NewChannelHandler(db, botManager)
+		api.GET("/channels/telegram", channelHandler.GetTelegram)
+		api.POST("/channels/telegram", channelHandler.UpdateTelegram)
+		api.GET("/channels/telegram/pairing", channelHandler.ListPairing)
+		api.POST("/channels/telegram/pairing/:id/approve", channelHandler.ApprovePairing)
+		api.POST("/channels/telegram/pairing/:id/deny", channelHandler.DenyPairing)
 	}
 
 	// Manual report trigger for testing proactive notifications.

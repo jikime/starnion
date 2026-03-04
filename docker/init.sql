@@ -269,3 +269,60 @@ DROP TRIGGER IF EXISTS trg_document_sections_tsv ON document_sections;
 CREATE TRIGGER trg_document_sections_tsv
     BEFORE INSERT OR UPDATE OF content ON document_sections
     FOR EACH ROW EXECUTE FUNCTION document_sections_tsv_trigger();
+
+-- =============================================================
+-- CHANNEL SETTINGS (migrations 013–015)
+-- =============================================================
+
+-- 013: Global bot-level channel settings (legacy fallback).
+CREATE TABLE IF NOT EXISTS channel_settings (
+    channel    TEXT        NOT NULL,
+    key        TEXT        NOT NULL,
+    value      TEXT        NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (channel, key)
+);
+INSERT INTO channel_settings (channel, key, value)
+VALUES ('telegram', 'dm_policy', 'allow'), ('telegram', 'group_policy', 'allow')
+ON CONFLICT DO NOTHING;
+
+-- 014: Per-user channel configuration (bot token, enabled, DM/Group policies).
+CREATE TABLE IF NOT EXISTS user_channel_settings (
+    user_id      TEXT        NOT NULL,
+    channel      TEXT        NOT NULL,
+    bot_token    TEXT        NOT NULL DEFAULT '',
+    enabled      BOOLEAN     NOT NULL DEFAULT FALSE,
+    dm_policy    TEXT        NOT NULL DEFAULT 'allow',
+    group_policy TEXT        NOT NULL DEFAULT 'allow',
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, channel)
+);
+CREATE INDEX IF NOT EXISTS idx_user_channel_settings_channel
+    ON user_channel_settings (channel);
+
+-- 015: Telegram pairing tables.
+CREATE TABLE IF NOT EXISTS telegram_approved_contacts (
+    id             UUID        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    owner_user_id  TEXT        NOT NULL,
+    telegram_id    TEXT        NOT NULL,
+    display_name   TEXT        NOT NULL DEFAULT '',
+    approved_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (owner_user_id, telegram_id)
+);
+CREATE INDEX IF NOT EXISTS idx_approved_contacts_owner
+    ON telegram_approved_contacts (owner_user_id);
+
+CREATE TABLE IF NOT EXISTS telegram_pairing_requests (
+    id             UUID        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    owner_user_id  TEXT        NOT NULL,
+    telegram_id    TEXT        NOT NULL,
+    display_name   TEXT        NOT NULL DEFAULT '',
+    message_text   TEXT        NOT NULL DEFAULT '',
+    requested_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status         TEXT        NOT NULL DEFAULT 'pending',
+    resolved_at    TIMESTAMPTZ,
+    UNIQUE (owner_user_id, telegram_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pairing_requests_owner_status
+    ON telegram_pairing_requests (owner_user_id, status);

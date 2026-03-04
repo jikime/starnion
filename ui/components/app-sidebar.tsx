@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
   MessageCircle,
+  Radio,
   Wallet,
   PieChart,
   TrendingUp,
@@ -41,6 +42,7 @@ import {
 const mainNav = [
   { title: "대시보드", icon: LayoutDashboard, href: "/" },
   { title: "웹챗", icon: MessageCircle, href: "/chat" },
+  { title: "채널", icon: Radio, href: "/channels" },
 ]
 
 const financeNav = [
