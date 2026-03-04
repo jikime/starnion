@@ -76,7 +76,7 @@ const toolsNav = [
 
 const settingsNav = [
   { title: "설정", icon: Settings, href: "/settings" },
-  { title: "구글 연동", icon: Link2, href: "/settings/google" },
+  { title: "연동", icon: Link2, href: "/settings/integrations" },
 ]
 
 export function AppSidebar() {

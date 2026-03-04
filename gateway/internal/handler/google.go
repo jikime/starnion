@@ -38,11 +38,17 @@ type tokenResponse struct {
 // It exchanges the authorization code for tokens and stores them in the database.
 func (h *GoogleCallbackHandler) Callback(c echo.Context) error {
 	code := c.QueryParam("code")
-	state := c.QueryParam("state") // state = user_id
+	state := c.QueryParam("state") // state = user_id  OR  "web:{user_id}"
 	errParam := c.QueryParam("error")
+
+	// Detect web-originated OAuth flow.
+	isWeb := strings.HasPrefix(state, "web:")
 
 	if errParam != "" {
 		log.Warn().Str("error", errParam).Msg("Google OAuth error")
+		if isWeb {
+			return c.Redirect(http.StatusFound, "/settings/integrations?error=google")
+		}
 		return c.HTML(http.StatusOK, "<h2>구글 연동이 취소되었어요.</h2><p>텔레그램으로 돌아가주세요.</p>")
 	}
 
@@ -51,6 +57,9 @@ func (h *GoogleCallbackHandler) Callback(c echo.Context) error {
 	}
 
 	userID := state
+	if isWeb {
+		userID = strings.TrimPrefix(state, "web:")
+	}
 
 	// Exchange code for tokens.
 	clientID := os.Getenv("GOOGLE_CLIENT_ID")
@@ -115,6 +124,9 @@ func (h *GoogleCallbackHandler) Callback(c echo.Context) error {
 
 	log.Info().Str("user_id", userID).Msg("Google OAuth tokens stored successfully")
 
+	if isWeb {
+		return c.Redirect(http.StatusFound, "/settings/integrations?connected=google")
+	}
 	return c.HTML(http.StatusOK,
 		"<h2>구글 계정 연동 완료!</h2>"+
 			"<p>텔레그램으로 돌아가서 구글 서비스를 사용해보세요.</p>"+

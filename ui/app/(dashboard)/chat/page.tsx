@@ -1,6 +1,7 @@
 "use client"
 
-import { useRef, useState, useEffect } from "react"
+import { useRef, useState, useEffect, Suspense } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { ChatSidebar, type Conversation } from "@/components/chat/chat-sidebar"
 import { ChatMessages } from "@/components/chat/chat-messages"
 import { ChatInput } from "@/components/chat/chat-input"
@@ -17,7 +18,11 @@ const PERSONAS = [
   { id: "analyst",   name: "데이터 분석가" },
 ]
 
-export default function ChatPage() {
+function ChatPageInner() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const urlId = searchParams.get("id")
+
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [persona, setPersona] = useState("assistant")
 
@@ -37,14 +42,22 @@ export default function ChatPage() {
       body: JSON.stringify({ persona: value }),
     }).catch(() => {})
   }
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
+
+  // Initialize from URL so page refresh / sidebar toggle preserves selection.
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(urlId)
   const [isReadonly, setIsReadonly] = useState(false)
-  // Tracks whether the first message in the current thread has been sent (for auto-title).
   const firstMsgSent = useRef(false)
-  // Callback ref so sidebar can update its title list from the parent.
   const updateTitleRef = useRef<((id: string, title: string) => void) | null>(null)
 
   const { messages, sendMessage, connState, isConnected, isStreaming, historyLoading, hasMore, loadingMore, loadMore } = useChat(activeThreadId)
+
+  // Keep URL in sync whenever the active thread changes.
+  const selectThread = (id: string, platform: string) => {
+    firstMsgSent.current = platform !== "web" // existing threads already have a title
+    setActiveThreadId(id)
+    setIsReadonly(platform !== "web")
+    router.replace(`/chat?id=${id}`)
+  }
 
   const handleSend = (text: string) => {
     sendMessage(text)
@@ -71,18 +84,18 @@ export default function ChatPage() {
     firstMsgSent.current = false
     setActiveThreadId(conv.id)
     setIsReadonly(false)
+    router.replace(`/chat?id=${conv.id}`)
   }
 
   const handleSelectThread = (id: string, platform: string) => {
-    firstMsgSent.current = true // Existing thread — title already set.
-    setActiveThreadId(id)
-    setIsReadonly(platform !== "web")
+    selectThread(id, platform)
   }
 
-  // Auto-select the most recent web conversation after sidebar loads.
+  // Auto-select only when there is no conversation in the URL yet.
   const handleSidebarLoad = (convs: Conversation[]) => {
+    if (activeThreadId) return // already selected — don't override
     const firstWeb = convs.find((c) => c.platform === "web")
-    if (firstWeb) handleSelectThread(firstWeb.id, firstWeb.platform)
+    if (firstWeb) selectThread(firstWeb.id, firstWeb.platform)
   }
 
   return (
@@ -138,12 +151,12 @@ export default function ChatPage() {
         </div>
 
         <ChatMessages
-            messages={messages}
-            historyLoading={historyLoading}
-            loadingMore={loadingMore}
-            hasMore={hasMore}
-            onLoadMore={loadMore}
-          />
+          messages={messages}
+          historyLoading={historyLoading}
+          loadingMore={loadingMore}
+          hasMore={hasMore}
+          onLoadMore={loadMore}
+        />
         <ChatInput
           onSend={handleSend}
           disabled={!isConnected || isStreaming || activeThreadId === null || isReadonly}
@@ -160,5 +173,13 @@ export default function ChatPage() {
         />
       </div>
     </div>
+  )
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense>
+      <ChatPageInner />
+    </Suspense>
   )
 }

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/google/uuid"
 	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
@@ -82,12 +83,13 @@ func (h *ConversationHandler) Create(c echo.Context) error {
 		req.Title = "새 대화"
 	}
 
+	newID := uuid.New().String()
 	var row conversationRow
 	err := h.db.QueryRowContext(c.Request().Context(), `
-		INSERT INTO conversations (user_id, title)
-		VALUES ($1, $2)
+		INSERT INTO conversations (id, user_id, title, thread_id)
+		VALUES ($1::uuid, $2, $3, $4)
 		RETURNING id, title, platform, created_at, updated_at
-	`, req.UserID, req.Title).Scan(&row.ID, &row.Title, &row.Platform, &row.CreatedAt, &row.UpdatedAt)
+	`, newID, req.UserID, req.Title, newID).Scan(&row.ID, &row.Title, &row.Platform, &row.CreatedAt, &row.UpdatedAt)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", req.UserID).Msg("conversations: create failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "create failed"})

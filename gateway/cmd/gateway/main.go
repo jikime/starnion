@@ -454,6 +454,16 @@ func main() {
 	if db != nil {
 		googleHandler := handler.NewGoogleCallbackHandler(db)
 		e.GET("/auth/google/callback", googleHandler.Callback)
+
+		// Integration management endpoints.
+		integrationHandler := handler.NewIntegrationHandler(db)
+		api.GET("/integrations/status", integrationHandler.Status)
+		api.GET("/integrations/google/auth-url", integrationHandler.GoogleAuthURL)
+		api.DELETE("/integrations/google", integrationHandler.GoogleDisconnect)
+		api.PUT("/integrations/notion", integrationHandler.NotionConnect)
+		api.DELETE("/integrations/notion", integrationHandler.NotionDisconnect)
+		api.PUT("/integrations/github", integrationHandler.GitHubConnect)
+		api.DELETE("/integrations/github", integrationHandler.GitHubDisconnect)
 	}
 
 	// Manual report trigger for testing proactive notifications.
