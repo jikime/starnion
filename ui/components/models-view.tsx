@@ -60,11 +60,11 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     keyHint: "AIzaSy...",
     keyUrl: "https://aistudio.google.com/app/apikey",
     models: [
-      { id: "gemini-2.5-pro",              name: "Gemini 2.5 Pro",       context: "1M" },
-      { id: "gemini-2.5-flash",            name: "Gemini 2.5 Flash",     context: "1M" },
-      { id: "gemini-2.0-flash",            name: "Gemini 2.0 Flash",     context: "1M" },
-      { id: "gemini-1.5-pro",              name: "Gemini 1.5 Pro",       context: "2M" },
-      { id: "gemini-1.5-flash",            name: "Gemini 1.5 Flash",     context: "1M" },
+      { id: "gemini-2.5-pro",              name: "Gemini 2.5 Pro",       context: "1M"   },
+      { id: "gemini-2.5-flash",            name: "Gemini 2.5 Flash",     context: "1M"   },
+      { id: "gemini-2.0-flash",            name: "Gemini 2.0 Flash",     context: "1M"   },
+      { id: "gemini-1.5-pro",              name: "Gemini 1.5 Pro",       context: "2M"   },
+      { id: "gemini-1.5-flash",            name: "Gemini 1.5 Flash",     context: "1M"   },
     ],
   },
   openai: {
@@ -73,14 +73,63 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     keyHint: "sk-...",
     keyUrl: "https://platform.openai.com/api-keys",
     models: [
-      { id: "gpt-4.1",                     name: "GPT-4.1",              context: "1M" },
-      { id: "gpt-4.1-mini",                name: "GPT-4.1 Mini",         context: "1M" },
-      { id: "gpt-4.1-nano",                name: "GPT-4.1 Nano",         context: "1M" },
+      { id: "gpt-4.1",                     name: "GPT-4.1",              context: "1M"   },
+      { id: "gpt-4.1-mini",                name: "GPT-4.1 Mini",         context: "1M"   },
+      { id: "gpt-4.1-nano",                name: "GPT-4.1 Nano",         context: "1M"   },
       { id: "gpt-4o",                      name: "GPT-4o",               context: "128K" },
       { id: "gpt-4o-mini",                 name: "GPT-4o Mini",          context: "128K" },
       { id: "o4-mini",                     name: "o4 Mini",              context: "200K" },
       { id: "o3",                          name: "o3",                   context: "200K" },
       { id: "o3-mini",                     name: "o3 Mini",              context: "200K" },
+    ],
+  },
+  xai: {
+    name: "xAI",
+    icon: "𝕏",
+    keyHint: "xai-...",
+    keyUrl: "https://console.x.ai/",
+    models: [
+      { id: "grok-3",                      name: "Grok 3",               context: "131K" },
+      { id: "grok-3-mini",                 name: "Grok 3 Mini",          context: "131K" },
+    ],
+  },
+  groq: {
+    name: "Groq",
+    icon: "⚡",
+    keyHint: "gsk_...",
+    keyUrl: "https://console.groq.com/keys",
+    models: [
+      { id: "llama-3.3-70b-versatile",     name: "Llama 3.3 70B",        context: "128K" },
+      { id: "llama-3.1-8b-instant",        name: "Llama 3.1 8B",         context: "128K" },
+    ],
+  },
+  mistral: {
+    name: "Mistral",
+    icon: "🌊",
+    keyHint: "...",
+    keyUrl: "https://console.mistral.ai/api-keys",
+    models: [
+      { id: "mistral-large-latest",        name: "Mistral Large",        context: "128K" },
+      { id: "mistral-small-latest",        name: "Mistral Small",        context: "32K"  },
+    ],
+  },
+  openrouter: {
+    name: "OpenRouter",
+    icon: "🔀",
+    keyHint: "sk-or-v1-...",
+    keyUrl: "https://openrouter.ai/settings/keys",
+    models: [
+      { id: "anthropic/claude-sonnet-4",   name: "Claude Sonnet 4",      context: "200K" },
+      { id: "openai/gpt-4o",              name: "GPT-4o",               context: "128K" },
+    ],
+  },
+  cerebras: {
+    name: "Cerebras",
+    icon: "🧠",
+    keyHint: "csk-...",
+    keyUrl: "https://cloud.cerebras.ai/",
+    models: [
+      { id: "llama-3.3-70b",              name: "Llama 3.3 70B",        context: "8K"   },
     ],
   },
   zai: {
@@ -105,7 +154,11 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
   },
 }
 
-const PROVIDER_ORDER = ["anthropic", "gemini", "openai", "zai", "custom"]
+const PROVIDER_ORDER = [
+  "anthropic", "gemini", "openai", "xai",
+  "groq", "mistral", "openrouter", "cerebras",
+  "zai", "custom",
+]
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
