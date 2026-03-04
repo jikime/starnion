@@ -473,6 +473,16 @@ func main() {
 		api.GET("/channels/telegram/pairing", channelHandler.ListPairing)
 		api.POST("/channels/telegram/pairing/:id/approve", channelHandler.ApprovePairing)
 		api.POST("/channels/telegram/pairing/:id/deny", channelHandler.DenyPairing)
+
+		// Per-user LLM provider and persona management.
+		modelsHandler := handler.NewModelsHandler(db)
+		api.GET("/providers", modelsHandler.ListProviders)
+		api.POST("/providers", modelsHandler.UpsertProvider)
+		api.DELETE("/providers/:provider", modelsHandler.DeleteProvider)
+		api.GET("/personas", modelsHandler.ListPersonas)
+		api.POST("/personas", modelsHandler.CreatePersona)
+		api.PUT("/personas/:id", modelsHandler.UpdatePersona)
+		api.DELETE("/personas/:id", modelsHandler.DeletePersona)
 	}
 
 	// Manual report trigger for testing proactive notifications.
