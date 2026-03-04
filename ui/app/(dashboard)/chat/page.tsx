@@ -8,7 +8,7 @@ import { ChatInput } from "@/components/chat/chat-input"
 import { useChat } from "@/hooks/use-chat"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { PanelLeftClose, PanelLeft, Wifi, WifiOff, Loader2 } from "lucide-react"
+import { PanelLeftClose, PanelLeft, WifiOff, Loader2 } from "lucide-react"
 
 const PERSONAS = [
   { id: "assistant", name: "기본 비서" },
@@ -125,7 +125,7 @@ function ChatPageInner() {
               )}
             </Button>
             <h1 className="text-lg font-semibold">웹챗</h1>
-            {connState === "connecting" && (
+            {isStreaming && (
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
             )}
             {connState === "error" && (
@@ -133,21 +133,12 @@ function ChatPageInner() {
             )}
           </div>
 
-          <Badge
-            variant={isConnected ? "default" : "secondary"}
-            className="gap-1"
-          >
-            {isConnected ? (
-              <Wifi className="size-3" />
-            ) : (
+          {connState === "error" && (
+            <Badge variant="secondary" className="gap-1">
               <WifiOff className="size-3" />
-            )}
-            {isConnected
-              ? "연결됨"
-              : connState === "connecting"
-              ? "연결중..."
-              : "연결 끊김"}
-          </Badge>
+              오류
+            </Badge>
+          )}
         </div>
 
         <ChatMessages

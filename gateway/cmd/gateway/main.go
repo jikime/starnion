@@ -394,6 +394,10 @@ func main() {
 	chatHandler := handler.NewChatHandler(grpcConn)
 	api.POST("/chat", chatHandler.Chat)
 
+	// AI SDK-compatible SSE streaming endpoint.
+	streamHandler := handler.NewChatStreamHandler(grpcConn, db, minioStore)
+	api.POST("/chat/stream", streamHandler.Stream)
+
 	// Conversation management (requires DB).
 	if db != nil {
 		convHandler := handler.NewConversationHandler(db, grpcConn)
