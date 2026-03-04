@@ -100,6 +100,27 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     keyHint: "sk-...",
     keyUrl: "https://platform.openai.com/api-keys",
     models: [
+      // GPT-5.3
+      { id: "gpt-5.3-codex",               name: "GPT-5.3 Codex",           context: "1M"   },
+      { id: "gpt-5.3-codex-spark",         name: "GPT-5.3 Codex Spark",     context: "1M"   },
+      // GPT-5.2
+      { id: "gpt-5.2",                     name: "GPT-5.2",                 context: "1M"   },
+      { id: "gpt-5.2-chat-latest",         name: "GPT-5.2 Chat Latest",     context: "1M"   },
+      { id: "gpt-5.2-codex",               name: "GPT-5.2 Codex",           context: "1M"   },
+      { id: "gpt-5.2-pro",                 name: "GPT-5.2 Pro",             context: "1M"   },
+      // GPT-5.1
+      { id: "gpt-5.1",                     name: "GPT-5.1",                 context: "1M"   },
+      { id: "gpt-5.1-chat-latest",         name: "GPT-5.1 Chat Latest",     context: "1M"   },
+      { id: "gpt-5.1-codex",               name: "GPT-5.1 Codex",           context: "1M"   },
+      { id: "gpt-5.1-codex-max",           name: "GPT-5.1 Codex Max",       context: "1M"   },
+      { id: "gpt-5.1-codex-mini",          name: "GPT-5.1 Codex Mini",      context: "1M"   },
+      // GPT-5
+      { id: "gpt-5",                       name: "GPT-5",                   context: "1M"   },
+      { id: "gpt-5-chat-latest",           name: "GPT-5 Chat Latest",       context: "1M"   },
+      { id: "gpt-5-codex",                 name: "GPT-5 Codex",             context: "1M"   },
+      { id: "gpt-5-mini",                  name: "GPT-5 Mini",              context: "1M"   },
+      { id: "gpt-5-nano",                  name: "GPT-5 Nano",              context: "1M"   },
+      { id: "gpt-5-pro",                   name: "GPT-5 Pro",               context: "1M"   },
       // GPT-4.1
       { id: "gpt-4.1",                     name: "GPT-4.1",                 context: "1M"   },
       { id: "gpt-4.1-mini",                name: "GPT-4.1 Mini",            context: "1M"   },
