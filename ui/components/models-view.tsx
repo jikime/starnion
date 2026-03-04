@@ -105,15 +105,19 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     keyHint: "zai-...",
     keyUrl: "https://platform.z.ai",
     models: [
-      // GLM-Z1
-      { id: "glm-z1-32b",                  name: "GLM-Z1 32B",              context: "128K" },
-      { id: "glm-z1-9b",                   name: "GLM-Z1 9B",               context: "128K" },
-      // GLM-4
-      { id: "glm-4-plus",                  name: "GLM-4 Plus",              context: "128K" },
-      { id: "glm-4-air",                   name: "GLM-4 Air",               context: "128K" },
-      { id: "glm-4-airx",                  name: "GLM-4 AirX",              context: "8K"   },
-      { id: "glm-4-flash",                 name: "GLM-4 Flash",             context: "128K" },
-      { id: "glm-4-long",                  name: "GLM-4 Long",              context: "1M"   },
+      // GLM-5
+      { id: "glm-5",                       name: "GLM-5",                   context: "128K" },
+      // GLM-4.7
+      { id: "glm-4.7",                     name: "GLM-4.7",                 context: "128K" },
+      { id: "glm-4.7-flash",               name: "GLM-4.7 Flash",           context: "128K" },
+      // GLM-4.6
+      { id: "glm-4.6",                     name: "GLM-4.6",                 context: "128K" },
+      { id: "glm-4.6v",                    name: "GLM-4.6V",                context: "128K" },
+      // GLM-4.5
+      { id: "glm-4.5",                     name: "GLM-4.5",                 context: "128K" },
+      { id: "glm-4.5-air",                 name: "GLM-4.5 Air",             context: "128K" },
+      { id: "glm-4.5-flash",               name: "GLM-4.5 Flash",           context: "128K" },
+      { id: "glm-4.5v",                    name: "GLM-4.5V",                context: "128K" },
     ],
   },
   custom: {
