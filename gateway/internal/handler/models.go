@@ -256,6 +256,64 @@ type personaResp struct {
 	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
+// builtinPersona defines one of the five built-in persona presets.
+type builtinPersona struct {
+	Name         string
+	Description  string
+	SystemPrompt string
+	IsDefault    bool
+}
+
+// builtinPersonas are seeded into user_personas on first visit.
+// Tones are derived from the Python agent's persona.py PERSONAS dict.
+var builtinPersonas = []builtinPersona{
+	{
+		Name:        "기본 비서",
+		Description: "일상적인 질문과 업무를 도와주는 기본 AI 비서",
+		SystemPrompt: "존댓말을 사용하되 딱딱하지 않게 (예: '~했어요', '~할게요')\n" +
+			"간결하고 핵심적인 정보 제공\n" +
+			"적절한 맥락 정보 추가 (누적 금액, 비율 등)\n" +
+			"과거 대화 맥락이 있으면 자연스럽게 활용",
+		IsDefault: true,
+	},
+	{
+		Name:        "금융 전문가",
+		Description: "재무 데이터와 수치 분석에 특화된 전문가",
+		SystemPrompt: "격식체를 사용합니다 (예: '~입니다', '~됩니다')\n" +
+			"전문 용어를 활용하되 이해하기 쉽게 설명합니다\n" +
+			"데이터와 수치를 중심으로 분석적으로 응답합니다\n" +
+			"재무 지표와 트렌드 분석을 포함합니다",
+		IsDefault: false,
+	},
+	{
+		Name:        "친한 친구",
+		Description: "편하게 대화할 수 있는 친근한 친구",
+		SystemPrompt: "반말을 사용합니다 (예: '~했어', '~할게', '~거든')\n" +
+			"이모지를 자주 사용합니다\n" +
+			"친근하고 재미있는 표현을 씁니다\n" +
+			"친구처럼 편하게 톡하는 느낌으로 대화합니다",
+		IsDefault: false,
+	},
+	{
+		Name:        "재정 코치",
+		Description: "목표 달성을 독려하고 실천 방법을 제안하는 코치",
+		SystemPrompt: "격려하는 톤을 사용합니다 (예: '~해봐요!', '~할 수 있어요!')\n" +
+			"목표 달성을 독려하며 긍정적인 피드백을 줍니다\n" +
+			"칭찬과 응원을 아끼지 않습니다\n" +
+			"구체적인 실천 방법을 제안합니다",
+		IsDefault: false,
+	},
+	{
+		Name:        "데이터 분석가",
+		Description: "수치와 통계를 기반으로 객관적으로 분석하는 전문가",
+		SystemPrompt: "객관적이고 간결하게 응답합니다\n" +
+			"수치, 퍼센트, 추세를 강조합니다\n" +
+			"감정적 표현을 최소화하고 팩트 위주로 전달합니다\n" +
+			"비교 분석과 통계적 관점을 제공합니다",
+		IsDefault: false,
+	},
+}
+
 // ListPersonas GET /api/v1/personas?user_id=
 func (h *ModelsHandler) ListPersonas(c echo.Context) error {
 	userID := c.QueryParam("user_id")
@@ -263,7 +321,24 @@ func (h *ModelsHandler) ListPersonas(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id required"})
 	}
 
-	rows, err := h.db.QueryContext(c.Request().Context(), `
+	ctx := c.Request().Context()
+
+	// Seed built-in personas on first visit (count == 0).
+	var count int
+	if err := h.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM user_personas WHERE user_id = $1`, userID,
+	).Scan(&count); err == nil && count == 0 {
+		for _, p := range builtinPersonas {
+			if _, err := h.db.ExecContext(ctx, `
+				INSERT INTO user_personas (user_id, name, description, provider, model, system_prompt, is_default)
+				VALUES ($1, $2, $3, '', '', $4, $5)
+			`, userID, p.Name, p.Description, p.SystemPrompt, p.IsDefault); err != nil {
+				log.Warn().Err(err).Str("persona", p.Name).Msg("seed builtin persona failed")
+			}
+		}
+	}
+
+	rows, err := h.db.QueryContext(ctx, `
 		SELECT id::text, name, description, provider, model, system_prompt, is_default, created_at, updated_at
 		FROM user_personas
 		WHERE user_id = $1
@@ -350,15 +425,24 @@ func (h *ModelsHandler) UpdatePersona(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid body"})
 	}
 
+	tx, err := h.db.BeginTx(c.Request().Context(), nil)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "tx begin failed"})
+	}
+	defer tx.Rollback() //nolint:errcheck
+
 	if body.IsDefault {
-		if _, err := h.db.ExecContext(c.Request().Context(),
+		if _, err := tx.ExecContext(c.Request().Context(),
 			`UPDATE user_personas SET is_default = FALSE WHERE user_id = $1`, userID,
 		); err != nil {
-			log.Warn().Err(err).Msg("clear default personas failed")
+			log.Error().Err(err).Msg("clear default personas failed")
+			return c.JSON(http.StatusInternalServerError, echo.Map{"error": "clear default failed"})
 		}
+		log.Info().Str("user_id", userID).Str("persona_id", id).
+			Str("name", body.Name).Msg("[Persona] setting as default")
 	}
 
-	res, err := h.db.ExecContext(c.Request().Context(), `
+	res, err := tx.ExecContext(c.Request().Context(), `
 		UPDATE user_personas SET
 			name          = $3,
 			description   = $4,
@@ -376,6 +460,14 @@ func (h *ModelsHandler) UpdatePersona(c echo.Context) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return c.JSON(http.StatusNotFound, echo.Map{"error": "not found"})
 	}
+	if err := tx.Commit(); err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "commit failed"})
+	}
+
+	log.Info().Str("user_id", userID).Str("persona_id", id).
+		Str("name", body.Name).Bool("is_default", body.IsDefault).
+		Str("provider", body.Provider).Str("model", body.Model).
+		Msg("[Persona] updated")
 	return c.JSON(http.StatusOK, echo.Map{"ok": true})
 }
 

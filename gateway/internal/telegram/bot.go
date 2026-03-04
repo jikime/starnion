@@ -1124,11 +1124,40 @@ func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQue
 		return
 	}
 
-	// Update persona in DB using JSONB merge (preserves existing keys like budget).
+	// personaNameByID maps Telegram persona IDs to the Korean names stored in user_personas.
+	personaNameByID := map[string]string{
+		"assistant": "기본 비서",
+		"finance":   "금융 전문가",
+		"buddy":     "친한 친구",
+		"coach":     "재정 코치",
+		"analyst":   "데이터 분석가",
+	}
+
 	if b.db != nil {
 		dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 
+		personaName := personaNameByID[personaID]
+
+		// Update user_personas: clear old default, set new default by name.
+		// This is the primary mechanism used by the Python agent.
+		tx, txErr := b.db.BeginTx(dbCtx, nil)
+		if txErr == nil {
+			_, err1 := tx.ExecContext(dbCtx,
+				`UPDATE user_personas SET is_default = FALSE WHERE user_id = $1`, userID)
+			_, err2 := tx.ExecContext(dbCtx,
+				`UPDATE user_personas SET is_default = TRUE, updated_at = NOW()
+				 WHERE user_id = $1 AND name = $2`, userID, personaName)
+			if err1 != nil || err2 != nil {
+				tx.Rollback() //nolint:errcheck
+				log.Error().Err(err1).Err(err2).Str("user_id", userID).
+					Str("persona", personaID).Msg("failed to update user_personas default")
+			} else if err := tx.Commit(); err != nil {
+				log.Error().Err(err).Str("user_id", userID).Msg("failed to commit persona tx")
+			}
+		}
+
+		// Also update profiles.preferences for backward compatibility.
 		_, err := b.db.ExecContext(dbCtx, `
 			UPDATE profiles
 			SET preferences = COALESCE(preferences, '{}'::jsonb) || $1::jsonb,
@@ -1136,7 +1165,7 @@ func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQue
 			WHERE uuid_id = $2
 		`, fmt.Sprintf(`{"persona":"%s"}`, personaID), userID)
 		if err != nil {
-			log.Error().Err(err).Str("user_id", userID).Str("persona", personaID).Msg("failed to update persona")
+			log.Error().Err(err).Str("user_id", userID).Str("persona", personaID).Msg("failed to update profiles persona")
 		}
 	}
 

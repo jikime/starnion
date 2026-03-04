@@ -79,7 +79,15 @@ def get_tone_instruction(persona_id: str) -> str:
     return f"응답 톤: {p['name']}\n{p['tone']}"
 
 
-def build_system_prompt(persona_id: str) -> str:
-    """Build full system prompt with persona-specific response style."""
+def build_system_prompt(persona_id: str, custom_prompt: str | None = None) -> str:
+    """Build full system prompt.
+
+    If ``custom_prompt`` is provided (user-defined persona system prompt),
+    it is appended after the base identity block.  Otherwise the built-in
+    tone for ``persona_id`` is used as the response-style section.
+    """
+    if custom_prompt and custom_prompt.strip():
+        return BASE_PROMPT + "\n\n" + custom_prompt.strip()
+
     p = get_persona(persona_id)
     return BASE_PROMPT + f"\n\n응답 스타일 ({p['name']}):\n{p['tone']}"

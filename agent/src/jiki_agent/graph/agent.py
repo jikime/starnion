@@ -4,6 +4,7 @@ Uses a custom StateGraph instead of create_react_agent to support
 dynamic tool binding — LLM only sees tools for enabled skills.
 """
 
+import hashlib
 import logging
 from typing import Any
 
@@ -18,6 +19,7 @@ from jiki_agent.context import get_current_user
 from jiki_agent.db.pool import get_pool
 from jiki_agent.db.repositories import profile as profile_repo
 from jiki_agent.db.repositories import skill as skill_repo
+from jiki_agent.db.repositories import provider as provider_repo
 from jiki_agent.persona import DEFAULT_PERSONA, build_system_prompt
 from jiki_agent.skills.audio.tools import generate_audio, transcribe_audio
 from jiki_agent.skills.budget.tools import get_budget_status, set_budget
@@ -149,47 +151,127 @@ ALL_TOOLS = [
     lookup_ip,
 ]
 
-# Module-level LLM instance (set during create_agent).
+# Module-level default LLM instance (fallback when no user persona is configured).
 _llm: ChatGoogleGenerativeAI | None = None
 
+# LLM instance cache: (provider, model, key_hash) → LLM object.
+# Avoids recreating identical clients on every request.
+_MAX_LLM_CACHE = 50
+_llm_cache: dict[tuple[str, str, str], Any] = {}
 
-async def _get_enabled_context(user_id: str | None) -> tuple[str, list[str], str, str]:
-    """Query user persona and enabled skills in a single pass.
+
+def _make_llm(provider: str, model: str, api_key: str, base_url: str = "") -> Any:
+    """Return a cached LangChain chat model for the given (provider, model, key).
+
+    Falls back to the global default Gemini instance if provider is unknown.
+    """
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()[:16]
+    cache_key = (provider, model, key_hash)
+    if cache_key in _llm_cache:
+        return _llm_cache[cache_key]
+
+    llm: Any
+    if provider == "anthropic":
+        from langchain_anthropic import ChatAnthropic  # lazy import
+        llm = ChatAnthropic(model=model, api_key=api_key)  # type: ignore[call-arg]
+    elif provider == "gemini":
+        llm = ChatGoogleGenerativeAI(model=model, google_api_key=api_key)
+    elif provider == "openai":
+        from langchain_openai import ChatOpenAI  # lazy import
+        llm = ChatOpenAI(model=model, api_key=api_key)  # type: ignore[call-arg]
+    elif provider == "zai":
+        from langchain_openai import ChatOpenAI  # lazy import
+        llm = ChatOpenAI(
+            model=model,
+            api_key=api_key,  # type: ignore[call-arg]
+            base_url=base_url or "https://api.z.ai/api/paas/v4",
+        )
+    elif provider == "custom" and base_url:
+        from langchain_openai import ChatOpenAI  # lazy import
+        llm = ChatOpenAI(
+            model=model,
+            api_key=api_key or "sk-none",  # type: ignore[call-arg]
+            base_url=base_url,
+        )
+    else:
+        return _llm  # global default Gemini
+
+    # Evict oldest entry when cache is full.
+    if len(_llm_cache) >= _MAX_LLM_CACHE:
+        _llm_cache.pop(next(iter(_llm_cache)))
+    _llm_cache[cache_key] = llm
+    return llm
+
+
+async def _get_enabled_context(
+    user_id: str | None,
+) -> tuple[str, list[str], str, str, Any, str | None]:
+    """Query user persona, enabled skills, and LLM override in a single pass.
 
     Returns:
-        (persona_id, enabled_tool_names, catalog_text, instructions_text)
+        (persona_id, enabled_tool_names, catalog_text, instructions_text,
+         llm_override, custom_system_prompt)
+
+        ``llm_override`` is None when the default Gemini instance should be used.
+        ``custom_system_prompt`` is the raw text from user_personas.system_prompt.
     """
     persona_id = DEFAULT_PERSONA
     enabled_tool_names: list[str] = []
     catalog_text = ""
     instructions_text = ""
+    llm_override = None
+    custom_system_prompt: str | None = None
 
     if not user_id:
-        return persona_id, enabled_tool_names, catalog_text, instructions_text
+        return persona_id, enabled_tool_names, catalog_text, instructions_text, llm_override, custom_system_prompt
 
     pool = get_pool()
 
-    # Persona preference.
-    prof = await profile_repo.get_by_uuid_id(pool, user_id)
-    if prof:
-        prefs = prof.get("preferences") or {}
-        persona_id = prefs.get("persona", DEFAULT_PERSONA)
+    # 1. User's default persona (user_personas table) — highest priority.
+    persona_row = await provider_repo.get_default_persona_with_provider(pool, user_id)
+    if persona_row:
+        prov = persona_row.get("provider", "")
+        model = persona_row.get("model", "")
+        api_key = persona_row.get("api_key", "")
+        base_url = persona_row.get("base_url", "")
+        persona_name = persona_row.get("persona_name", "")
+        custom_system_prompt = persona_row.get("system_prompt") or None
 
-    # Enabled skills (single DB query).
+        if prov and model and api_key:
+            llm_override = _make_llm(prov, model, api_key, base_url)
+            logger.info(
+                "[Persona] user=%s | persona='%s' | provider=%s | model=%s | custom_prompt=%s",
+                user_id, persona_name, prov, model,
+                "yes" if custom_system_prompt else "no",
+            )
+        else:
+            logger.info(
+                "[Persona] user=%s | persona='%s' | provider/model not configured → using default LLM",
+                user_id, persona_name,
+            )
+    else:
+        logger.info("[Persona] user=%s | no default persona found → using default LLM", user_id)
+
+    # 2. Fall back to legacy persona preference in profiles table.
+    if llm_override is None:
+        prof = await profile_repo.get_by_uuid_id(pool, user_id)
+        if prof:
+            prefs = prof.get("preferences") or {}
+            persona_id = prefs.get("persona", DEFAULT_PERSONA)
+
+    # 3. Enabled skills (single DB query).
     enabled = await skill_repo.get_enabled_skills(pool, user_id)
 
-    # Collect enabled tool names.
     for sid in enabled:
         skill_def = SKILLS.get(sid)
         if skill_def:
             enabled_tool_names.extend(skill_def.tools)
 
-    # Progressive disclosure: SKILL.md parsing.
     skill_docs = load_all_skill_docs(enabled)
     catalog_text = build_skill_catalog(skill_docs)
     instructions_text = build_skill_instructions(skill_docs)
 
-    return persona_id, enabled_tool_names, catalog_text, instructions_text
+    return persona_id, enabled_tool_names, catalog_text, instructions_text, llm_override, custom_system_prompt
 
 
 def _build_prompt(
@@ -197,9 +279,10 @@ def _build_prompt(
     enabled_tool_names: list[str],
     catalog_text: str,
     instructions_text: str,
+    custom_system_prompt: str | None = None,
 ) -> str:
     """Assemble the system prompt with progressive skill disclosure."""
-    prompt_text = build_system_prompt(persona_id)
+    prompt_text = build_system_prompt(persona_id, custom_prompt=custom_system_prompt)
 
     # Level 1: Skill catalog (name + description for awareness).
     if catalog_text:
@@ -218,33 +301,62 @@ def _build_prompt(
 
 
 async def _agent_node(state: MessagesState) -> dict:
-    """LLM node with dynamic tool binding.
+    """LLM node with dynamic tool binding and per-user model selection.
 
     On each invocation:
-      1. Queries the user's enabled skills (single DB round-trip).
-      2. Builds a system prompt with progressive disclosure.
-      3. Binds **only** the enabled tools to the LLM — the model
-         literally cannot see or call disabled tools.
-      4. Invokes the model and returns the response.
+      1. Queries the user's default persona (provider + model + api_key).
+      2. Creates/reuses a cached LLM instance for that provider/model.
+      3. Queries enabled skills and builds the system prompt.
+      4. Binds **only** the enabled tools to the LLM.
+      5. Invokes the model and returns the response.
     """
     assert _llm is not None, "LLM not initialised — call create_agent() first"
 
     user_id = get_current_user()
 
     try:
-        persona_id, enabled_tool_names, catalog_text, instructions_text = (
-            await _get_enabled_context(user_id)
-        )
+        (
+            persona_id,
+            enabled_tool_names,
+            catalog_text,
+            instructions_text,
+            llm_override,
+            custom_system_prompt,
+        ) = await _get_enabled_context(user_id)
     except Exception:
         logger.debug("Failed to load persona/skills, using defaults", exc_info=True)
         persona_id = DEFAULT_PERSONA
         enabled_tool_names = []
         catalog_text = ""
         instructions_text = ""
+        llm_override = None
+        custom_system_prompt = None
 
-    # Build system prompt.
+    # Resolve which LLM instance to use for this request.
+    active_llm = llm_override if llm_override is not None else _llm
+
+    if llm_override is None:
+        logger.info(
+            "[LLM] user=%s | using default LLM: %s / %s",
+            user_id,
+            type(_llm).__name__,
+            getattr(_llm, "model", getattr(_llm, "model_name", "unknown")),
+        )
+    else:
+        logger.info(
+            "[LLM] user=%s | using override LLM: %s / %s",
+            user_id,
+            type(active_llm).__name__,
+            getattr(active_llm, "model", getattr(active_llm, "model_name", "unknown")),
+        )
+
+    # Build system prompt (custom_system_prompt takes priority over persona_id tone).
     prompt_text = _build_prompt(
-        persona_id, enabled_tool_names, catalog_text, instructions_text,
+        persona_id,
+        enabled_tool_names,
+        catalog_text,
+        instructions_text,
+        custom_system_prompt=custom_system_prompt,
     )
     messages = [SystemMessage(content=prompt_text)] + state["messages"]
 
@@ -252,10 +364,9 @@ async def _agent_node(state: MessagesState) -> dict:
     if enabled_tool_names:
         enabled_tools = [t for t in ALL_TOOLS if t.name in set(enabled_tool_names)]
     else:
-        # Fallback: no user context → bind all tools.
         enabled_tools = ALL_TOOLS
 
-    bound_model = _llm.bind_tools(enabled_tools)
+    bound_model = active_llm.bind_tools(enabled_tools)
     response = await bound_model.ainvoke(messages)
 
     return {"messages": [response]}

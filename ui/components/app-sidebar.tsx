@@ -26,6 +26,7 @@ import {
   Link2,
   Bot,
   BrainCircuit,
+  UserCircle,
 } from "lucide-react"
 import {
   Sidebar,
@@ -79,7 +80,8 @@ const toolsNav = [
 
 const settingsNav = [
   { title: "설정", icon: Settings, href: "/settings" },
-  { title: "모델 & 페르소나", icon: BrainCircuit, href: "/settings/models" },
+  { title: "모델", icon: BrainCircuit, href: "/settings/models" },
+  { title: "페르소나", icon: UserCircle, href: "/settings/personas" },
   { title: "연동", icon: Link2, href: "/settings/integrations" },
 ]
 
