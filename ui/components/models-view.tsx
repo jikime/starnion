@@ -46,9 +46,20 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     keyHint: "sk-ant-api03-...",
     keyUrl: "https://console.anthropic.com/settings/keys",
     models: [
-      // Claude 4
+      // Claude Opus 4.x
+      { id: "claude-opus-4-6",             name: "Claude Opus 4.6",         context: "200K" },
+      { id: "claude-opus-4-5-20251101",    name: "Claude Opus 4.5 (Nov)",   context: "200K" },
+      { id: "claude-opus-4-5",             name: "Claude Opus 4.5",         context: "200K" },
+      { id: "claude-opus-4-1-20250805",    name: "Claude Opus 4.1 (Aug)",   context: "200K" },
+      { id: "claude-opus-4-1",             name: "Claude Opus 4.1",         context: "200K" },
       { id: "claude-opus-4-20250514",      name: "Claude Opus 4",           context: "200K" },
+      { id: "claude-opus-4-0",             name: "Claude Opus 4.0",         context: "200K" },
+      // Claude Sonnet 4.x
+      { id: "claude-sonnet-4-6",           name: "Claude Sonnet 4.6",       context: "200K" },
+      { id: "claude-sonnet-4-5-20250929",  name: "Claude Sonnet 4.5 (Sep)", context: "200K" },
+      { id: "claude-sonnet-4-5",           name: "Claude Sonnet 4.5",       context: "200K" },
       { id: "claude-sonnet-4-20250514",    name: "Claude Sonnet 4",         context: "200K" },
+      { id: "claude-sonnet-4-0",           name: "Claude Sonnet 4.0",       context: "200K" },
       // Claude 3.7
       { id: "claude-3-7-sonnet-20250219",  name: "Claude 3.7 Sonnet",       context: "200K" },
       { id: "claude-3-7-sonnet-latest",    name: "Claude 3.7 Sonnet Latest", context: "200K" },
