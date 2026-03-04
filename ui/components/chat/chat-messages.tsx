@@ -52,6 +52,16 @@ function FilePreview({ file }: { file: FileAttachment }) {
     )
   }
 
+  if (file.mime.startsWith("audio/")) {
+    return (
+      <div className="mt-2 max-w-xs rounded-xl border border-black/8 dark:border-white/10 bg-white/80 dark:bg-white/10 px-3 py-2 shadow-sm">
+        <p className="mb-1.5 truncate text-xs font-semibold text-foreground">{file.name}</p>
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+        <audio controls src={file.url} className="h-8 w-full" preload="metadata" />
+      </div>
+    )
+  }
+
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "file"
   const badgeColor = getExtColor(ext, file.mime)
   const size = formatSize(file.size)
@@ -84,6 +94,7 @@ export function ChatMessages({
   onLoadMore,
 }: ChatMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
   const topSentinelRef = useRef<HTMLDivElement>(null)
   // Stores scrollHeight before prepending older messages (0 = no pending restore).
   const prevScrollHeightRef = useRef(0)
@@ -111,6 +122,23 @@ export function ChatMessages({
       container.scrollTop = container.scrollHeight
     }
   }, [messages])
+
+  // ResizeObserver: re-scroll when content grows after images/files finish loading.
+  // Images are loaded asynchronously, so useLayoutEffect fires before they add height.
+  useEffect(() => {
+    const inner = innerRef.current
+    const container = containerRef.current
+    if (!inner || !container) return
+
+    const ro = new ResizeObserver(() => {
+      // Only auto-scroll when loadMore position-restore is not pending.
+      if (prevScrollHeightRef.current === 0 && isNearBottomRef.current) {
+        container.scrollTop = container.scrollHeight
+      }
+    })
+    ro.observe(inner)
+    return () => ro.disconnect()
+  }, [])
 
   // Track whether the user is near the bottom to decide on auto-scroll.
   const handleScroll = useCallback(() => {
@@ -144,7 +172,7 @@ export function ChatMessages({
       onScroll={handleScroll}
       className="flex-1 overflow-y-auto px-4 py-4"
     >
-      <div className="mx-auto max-w-2xl space-y-6">
+      <div ref={innerRef} className="mx-auto max-w-2xl space-y-6">
         {/* Top sentinel — triggers loadMore when scrolled into view */}
         <div ref={topSentinelRef} />
 

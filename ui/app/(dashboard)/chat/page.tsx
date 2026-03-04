@@ -4,7 +4,7 @@ import { useRef, useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { ChatSidebar, type Conversation } from "@/components/chat/chat-sidebar"
 import { ChatMessages } from "@/components/chat/chat-messages"
-import { ChatInput } from "@/components/chat/chat-input"
+import { ChatInput, type AttachedFile } from "@/components/chat/chat-input"
 import { useChat } from "@/hooks/use-chat"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -59,8 +59,9 @@ function ChatPageInner() {
     router.replace(`/chat?id=${id}`)
   }
 
-  const handleSend = (text: string) => {
-    sendMessage(text)
+  const handleSend = (text: string, files?: AttachedFile[]) => {
+    const sdkFiles = files?.map((f) => ({ url: f.url!, mime: f.mime }))
+    sendMessage(text, sdkFiles)
 
     // Auto-title from the first user message in this thread.
     if (activeThreadId && !firstMsgSent.current) {
@@ -149,7 +150,7 @@ function ChatPageInner() {
           onLoadMore={loadMore}
         />
         <ChatInput
-          onSend={handleSend}
+          onSend={(text, files) => handleSend(text, files)}
           disabled={!isConnected || isStreaming || activeThreadId === null || isReadonly}
           placeholder={
             isReadonly

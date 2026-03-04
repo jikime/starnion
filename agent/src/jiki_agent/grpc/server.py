@@ -17,6 +17,8 @@ if _generated_root not in sys.path:
 
 from jiki.v1 import agent_pb2, agent_pb2_grpc  # noqa: E402
 
+from langchain_core.messages import HumanMessage
+
 from jiki_agent.context import set_current_user
 from jiki_agent.skills.file_context import init_pending_files, pop_pending_files
 from jiki_agent.db.pool import get_pool
@@ -56,19 +58,41 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
         self._agent = agent
 
     @staticmethod
-    def _build_message(request) -> str:
-        """Build a combined message string from a ChatRequest."""
+    def _build_message(request):
+        """Build a LangChain message from a ChatRequest.
+
+        For image files, returns a multimodal HumanMessage with an image_url
+        content block so vision-capable models can analyze the image directly.
+        For all other file types, appends a text annotation to the message.
+
+        Returns either a (role, content) tuple or a HumanMessage instance —
+        both are accepted by LangGraph as human turn inputs.
+        """
         message = request.message
-        human_parts: list = [message] if message else []
         file_input = request.file
-        if file_input and file_input.file_url:
-            file_text = (
-                f"[파일 첨부: type={file_input.file_type}, "
-                f"name={file_input.file_name}, "
-                f"url={file_input.file_url}]"
-            )
-            human_parts.append(file_text)
-        return "\n".join(human_parts) if human_parts else message
+
+        if not file_input or not file_input.file_url:
+            return ("human", message)
+
+        if file_input.file_type == "image":
+            # True multimodal: pass the image URL directly to the LLM.
+            content: list = []
+            if message:
+                content.append({"type": "text", "text": message})
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": file_input.file_url},
+            })
+            return HumanMessage(content=content)
+
+        # Non-image files: append as text annotation.
+        file_text = (
+            f"[파일 첨부: type={file_input.file_type}, "
+            f"name={file_input.file_name}, "
+            f"url={file_input.file_url}]"
+        )
+        combined = f"{message}\n{file_text}" if message else file_text
+        return ("human", combined)
 
     async def Chat(self, request, context):
         """Handle a unary Chat request."""
@@ -90,9 +114,9 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
             pool = get_pool()
             await profile_repo.upsert(pool, uuid_id=user_id, user_name="")
 
-            combined_message = self._build_message(request)
+            human_input = self._build_message(request)
             thread_id = request.thread_id or user_id
-            result = await self._invoke_agent(combined_message, thread_id)
+            result = await self._invoke_agent(human_input, thread_id)
 
             raw_content = result["messages"][-1].content
             # Gemini may return content as a list of blocks; flatten to string.
@@ -150,10 +174,10 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
             pool = get_pool()
             await profile_repo.upsert(pool, uuid_id=user_id, user_name="")
 
-            combined_message = self._build_message(request)
+            human_input = self._build_message(request)
             thread_id = request.thread_id or user_id
             config = {"configurable": {"thread_id": thread_id}}
-            input_data = {"messages": [("human", combined_message)]}
+            input_data = {"messages": [human_input]}
 
             async for event in self._agent.astream_events(
                 input_data, config=config, version="v2",
@@ -215,12 +239,17 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                 type=agent_pb2.ERROR,
             )
 
-    async def _invoke_agent(self, message: str, thread_id: str):
-        """Invoke agent with automatic history reset on corrupted state."""
+    async def _invoke_agent(self, message, thread_id: str):
+        """Invoke agent with automatic history reset on corrupted state.
+
+        ``message`` can be a ``("human", text)`` tuple or a ``HumanMessage``
+        instance (used for multimodal inputs).
+        """
+        config = {"configurable": {"thread_id": thread_id}}
         try:
             return await self._agent.ainvoke(
-                {"messages": [("human", message)]},
-                config={"configurable": {"thread_id": thread_id}},
+                {"messages": [message]},
+                config=config,
             )
         except ValueError as e:
             if "tool_calls" in str(e) and "ToolMessage" in str(e):
@@ -229,8 +258,8 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                 )
                 await self._clear_checkpoints(thread_id)
                 return await self._agent.ainvoke(
-                    {"messages": [("human", message)]},
-                    config={"configurable": {"thread_id": thread_id}},
+                    {"messages": [message]},
+                    config=config,
                 )
             raise
 

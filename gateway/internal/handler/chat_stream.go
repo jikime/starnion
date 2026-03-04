@@ -34,11 +34,19 @@ func NewChatStreamHandler(conn *grpc.ClientConn, db *sql.DB, minio *storage.MinI
 	}
 }
 
+// fileInfo represents a user-attached file (already uploaded to MinIO).
+type fileInfo struct {
+	URL  string `json:"url"`
+	Name string `json:"name"`
+	Mime string `json:"mime"`
+}
+
 type streamRequest struct {
-	UserID   string `json:"user_id"`
-	Message  string `json:"message"`
-	ThreadID string `json:"thread_id,omitempty"`
-	Model    string `json:"model,omitempty"`
+	UserID   string     `json:"user_id"`
+	Message  string     `json:"message"`
+	ThreadID string     `json:"thread_id,omitempty"`
+	Model    string     `json:"model,omitempty"`
+	Files    []fileInfo `json:"files,omitempty"`
 }
 
 // Stream handles POST /api/v1/chat/stream.
@@ -54,8 +62,8 @@ type streamRequest struct {
 //	data: [DONE]
 func (h *ChatStreamHandler) Stream(c echo.Context) error {
 	var req streamRequest
-	if err := c.Bind(&req); err != nil || req.Message == "" || req.UserID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and message are required"})
+	if err := c.Bind(&req); err != nil || req.UserID == "" || (req.Message == "" && len(req.Files) == 0) {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and message (or files) are required"})
 	}
 
 	// Set SSE headers expected by AI SDK DefaultChatTransport.
@@ -89,11 +97,34 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 	// Unique ID for the text part (required by text-start/text-delta/text-end).
 	const textPartID = "txt"
 
+	// Map attached files to gRPC FileInput.
+	// The first file is sent as FileInput; additional files are appended as text annotations.
+	var fileInput *jikiv1.FileInput
+	message := req.Message
+	for i, f := range req.Files {
+		fileType := "document"
+		if strings.HasPrefix(f.Mime, "image/") {
+			fileType = "image"
+		} else if strings.HasPrefix(f.Mime, "audio/") {
+			fileType = "audio"
+		}
+		if i == 0 {
+			fileInput = &jikiv1.FileInput{
+				FileType: fileType,
+				FileUrl:  f.URL,
+				FileName: f.Name,
+			}
+		} else {
+			message += fmt.Sprintf("\n[파일 첨부: type=%s, name=%s, url=%s]", fileType, f.Name, f.URL)
+		}
+	}
+
 	stream, err := h.grpcClient.ChatStream(ctx, &jikiv1.ChatRequest{
 		UserId:   req.UserID,
-		Message:  req.Message,
+		Message:  message,
 		ThreadId: req.ThreadID,
 		Model:    req.Model,
+		File:     fileInput,
 	})
 	if err != nil {
 		log.Error().Err(err).Str("user_id", req.UserID).Msg("chat_stream: ChatStream open failed")
@@ -167,10 +198,14 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 				} else {
 					attachments = append(attachments, att)
 					// Emit AI SDK v6 file chunk — creates a FileUIPart in the UIMessage.
+					// name and size are non-standard extras; the frontend intercepts them
+					// via a custom fetch middleware before the AI SDK strips them.
 					sseEvent(map[string]any{
 						"type":      "file",
 						"url":       att.URL,
 						"mediaType": att.Mime,
+						"name":      att.Name,
+						"size":      att.Size,
 					})
 				}
 			} else {

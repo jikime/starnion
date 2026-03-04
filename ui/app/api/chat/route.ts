@@ -4,17 +4,30 @@ import { NextResponse } from "next/server"
 const API_URL = process.env.API_URL ?? "http://localhost:8080"
 
 // AI SDK v6 UIMessage part shape (subset we need)
-type UIPart = { type: string; text?: string }
+type TextPart = { type: "text"; text: string }
+type FilePart = { type: "file"; url: string; mediaType: string }
+type UIPart = TextPart | FilePart | { type: string }
 type UIMsg = { role: string; parts?: UIPart[]; content?: string }
 
 function extractText(msg: UIMsg): string {
   if (Array.isArray(msg.parts)) {
     return msg.parts
-      .filter((p) => p.type === "text")
-      .map((p) => p.text ?? "")
+      .filter((p): p is TextPart => p.type === "text")
+      .map((p) => p.text)
       .join("")
   }
   return typeof msg.content === "string" ? msg.content : ""
+}
+
+function extractFiles(msg: UIMsg): Array<{ url: string; name: string; mime: string }> {
+  if (!Array.isArray(msg.parts)) return []
+  return msg.parts
+    .filter((p): p is FilePart => p.type === "file" && typeof (p as FilePart).url === "string")
+    .map((p) => ({
+      url: p.url,
+      name: p.url.split("/").pop() ?? "file",
+      mime: p.mediaType,
+    }))
 }
 
 export async function POST(request: Request) {
@@ -36,7 +49,9 @@ export async function POST(request: Request) {
   }
 
   const messageText = extractText(lastUserMsg)
-  if (!messageText) {
+  const files = extractFiles(lastUserMsg)
+
+  if (!messageText && files.length === 0) {
     return NextResponse.json({ error: "empty message" }, { status: 400 })
   }
 
@@ -50,6 +65,7 @@ export async function POST(request: Request) {
       user_id: session.user.id,
       message: messageText,
       thread_id: threadId,
+      ...(files.length > 0 && { files }),
     }),
   }).catch(() => null)
 

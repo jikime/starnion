@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/minio/minio-go/v7"
@@ -98,12 +97,13 @@ func (m *MinIO) Upload(ctx context.Context, name, contentType string, data []byt
 	return FileAttachment{Name: name, Mime: contentType, URL: url, Size: int64(len(data))}, nil
 }
 
-// uniqueName generates a collision-resistant object name preserving the original extension.
+// uniqueName generates a collision-resistant object key in the form <uuid>/<original>
+// so that the last path segment is always the human-readable filename.
+// Example: "a3f8c1d2e5b6a7f0/vibe-coding.docx"
 func uniqueName(original string) string {
-	ext := filepath.Ext(original)
-	b := make([]byte, 16)
+	b := make([]byte, 8)
 	_, _ = rand.Read(b)
-	return hex.EncodeToString(b) + ext
+	return hex.EncodeToString(b) + "/" + original
 }
 
 func envOr(key, fallback string) string {

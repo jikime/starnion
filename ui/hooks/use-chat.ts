@@ -43,14 +43,23 @@ function textFromUIMessage(m: UIMessage): string {
     .join("")
 }
 
-function filesFromUIMessage(m: UIMessage): FileAttachment[] {
+type FileMeta = { name: string; size: number }
+
+function filesFromUIMessage(
+  m: UIMessage,
+  fileMeta: Map<string, FileMeta>,
+): FileAttachment[] {
   return m.parts
     .filter((p): p is { type: "file"; url: string; mediaType: string } => p.type === "file")
-    .map((p) => ({
-      name: p.url.split("/").pop() ?? p.mediaType.split("/")[1] ?? "file",
-      mime: p.mediaType,
-      url: p.url,
-    }))
+    .map((p) => {
+      const meta = fileMeta.get(p.url)
+      return {
+        name: meta?.name || p.url.split("/").pop() || "file",
+        mime: p.mediaType,
+        url: p.url,
+        size: meta?.size,
+      }
+    })
 }
 
 function toMessage(m: {
@@ -136,15 +145,86 @@ export function useChat(activeThreadId: string | null) {
 
   // ── AI SDK v6 streaming ──────────────────────────────────────────────────────
 
-  // Transport is created once. The `body` function is called at request time,
-  // so it always reads the latest thread_id via the ref.
-  const [transport] = useState(
-    () =>
-      new DefaultChatTransport({
-        api: "/api/chat",
-        body: () => ({ thread_id: activeThreadIdRef.current }),
+  // Captures name/size from raw SSE file chunks before the AI SDK strips extra fields.
+  // Keyed by the file URL emitted in the "file" SSE chunk.
+  const fileMetaRef = useRef(new Map<string, FileMeta>())
+
+  // Transport is created once. A custom fetch interceptor:
+  //  1. Captures name/size from raw "file" SSE chunks (non-standard fields the Go
+  //     gateway adds) and stores them in fileMetaRef.
+  //  2. STRIPS those extra fields from the chunk before the AI SDK's Zod schema
+  //     sees it — "file" chunks must only have {type, url, mediaType} or Zod
+  //     throws AI_TypeValidationError with "Unrecognized keys: name, size".
+  const [transport] = useState(() => {
+    const fileMeta = fileMetaRef
+    const decoder = new TextDecoder()
+    const encoder = new TextEncoder()
+
+    const interceptingFetch: typeof fetch = async (input, init) => {
+      const response = await globalThis.fetch(input as RequestInfo, init)
+      if (!response.body) return response
+
+      let buffer = ""
+
+      const transformed = response.body.pipeThrough(
+        new TransformStream<Uint8Array, Uint8Array>({
+          transform(chunk, controller) {
+            buffer += decoder.decode(chunk, { stream: true })
+
+            // SSE events are delimited by \n\n.
+            const events = buffer.split("\n\n")
+            // Last element may be an incomplete event — keep it in the buffer.
+            buffer = events.pop() ?? ""
+
+            let output = ""
+            for (const event of events) {
+              // Rewrite "data:" lines that carry file chunks.
+              const rewrittenLines = event.split("\n").map((line) => {
+                if (line.startsWith("data: ") && line !== "data: [DONE]") {
+                  try {
+                    const json = JSON.parse(line.slice(6))
+                    if (json.type === "file" && typeof json.url === "string") {
+                      // 1. Capture metadata before stripping.
+                      fileMeta.current.set(json.url, {
+                        name: typeof json.name === "string" ? json.name : "",
+                        size: typeof json.size === "number" ? json.size : 0,
+                      })
+                      // 2. Return only the fields the AI SDK schema allows.
+                      return `data: ${JSON.stringify({
+                        type: json.type,
+                        url: json.url,
+                        mediaType: json.mediaType,
+                      })}`
+                    }
+                  } catch { /* non-JSON lines pass through unchanged */ }
+                }
+                return line
+              })
+              output += rewrittenLines.join("\n") + "\n\n"
+            }
+
+            if (output) controller.enqueue(encoder.encode(output))
+          },
+
+          flush(controller) {
+            // Flush any remaining buffered data (e.g. the [DONE] sentinel).
+            if (buffer) controller.enqueue(encoder.encode(buffer))
+          },
+        }),
+      )
+
+      return new Response(transformed, {
+        status: response.status,
+        headers: response.headers,
       })
-  )
+    }
+
+    return new DefaultChatTransport({
+      api: "/api/chat",
+      body: () => ({ thread_id: activeThreadIdRef.current }),
+      fetch: interceptingFetch,
+    })
+  })
 
   const {
     messages: aiMessages,
@@ -168,7 +248,7 @@ export function useChat(activeThreadId: string | null) {
           role: "user",
           text: textFromUIMessage(userAIMsg),
           toolEvents: [],
-          files: [],
+          files: filesFromUIMessage(userAIMsg, fileMetaRef.current),
           streaming: false,
           timestamp: new Date(),
         })
@@ -179,7 +259,7 @@ export function useChat(activeThreadId: string | null) {
         role: "assistant",
         text: textFromUIMessage(message),
         toolEvents: [],
-        files: filesFromUIMessage(message),
+        files: filesFromUIMessage(message, fileMetaRef.current),
         streaming: false,
         timestamp: new Date(),
       })
@@ -208,7 +288,7 @@ export function useChat(activeThreadId: string | null) {
         role: m.role as MessageRole,
         text: textFromUIMessage(m),
         toolEvents: [],
-        files: [],
+        files: filesFromUIMessage(m, fileMetaRef.current),
         streaming: m.role === "assistant",
         timestamp: new Date(),
       }))
@@ -219,9 +299,19 @@ export function useChat(activeThreadId: string | null) {
   // ── Send ──────────────────────────────────────────────────────────────────
 
   const sendMsg = useCallback(
-    (text: string) => {
-      if (!text.trim()) return
-      sendMessage({ text })
+    (text: string, files?: Array<{ url: string; mime: string }>) => {
+      const hasText = text.trim().length > 0
+      const hasFiles = files && files.length > 0
+      if (!hasText && !hasFiles) return
+
+      const sdkFiles = hasFiles
+        ? files!.map((f) => ({ type: "file" as const, url: f.url, mediaType: f.mime }))
+        : undefined
+
+      sendMessage({
+        text: hasText ? text : " ", // AI SDK requires a non-empty text part
+        ...(sdkFiles && { files: sdkFiles }),
+      })
     },
     [sendMessage]
   )
@@ -233,7 +323,7 @@ export function useChat(activeThreadId: string | null) {
 
   return {
     messages,
-    sendMessage: sendMsg,
+    sendMessage: sendMsg as (text: string, files?: Array<{ url: string; mime: string }>) => void,
     connState,
     isConnected: !aiError,
     isStreaming,
