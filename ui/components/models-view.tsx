@@ -78,6 +78,10 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     keyHint: "AIzaSy...",
     keyUrl: "https://aistudio.google.com/app/apikey",
     models: [
+      // Gemini 3 (Preview)
+      { id: "gemini-3-pro-preview",        name: "Gemini 3 Pro Preview",    context: "1M"   },
+      { id: "gemini-3.1-pro-preview",      name: "Gemini 3.1 Pro Preview",  context: "1M"   },
+      { id: "gemini-3-flash-preview",      name: "Gemini 3 Flash Preview",  context: "1M"   },
       // Gemini 2.5
       { id: "gemini-2.5-pro",              name: "Gemini 2.5 Pro",          context: "1M"   },
       { id: "gemini-2.5-flash",            name: "Gemini 2.5 Flash",        context: "1M"   },
