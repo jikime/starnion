@@ -46,12 +46,16 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     keyHint: "sk-ant-api03-...",
     keyUrl: "https://console.anthropic.com/settings/keys",
     models: [
-      { id: "claude-opus-4-20250514",      name: "Claude Opus 4",        context: "200K" },
-      { id: "claude-sonnet-4-20250514",    name: "Claude Sonnet 4",      context: "200K" },
-      { id: "claude-haiku-3-5-20241022",   name: "Claude Haiku 3.5",     context: "200K" },
-      { id: "claude-3-5-sonnet-20241022",  name: "Claude 3.5 Sonnet",    context: "200K" },
-      { id: "claude-3-5-haiku-20241022",   name: "Claude 3.5 Haiku",     context: "200K" },
-      { id: "claude-3-opus-20240229",      name: "Claude 3 Opus",        context: "200K" },
+      // Claude 4
+      { id: "claude-opus-4-20250514",      name: "Claude Opus 4",           context: "200K" },
+      { id: "claude-sonnet-4-20250514",    name: "Claude Sonnet 4",         context: "200K" },
+      // Claude 3.5
+      { id: "claude-3-5-sonnet-20241022",  name: "Claude 3.5 Sonnet",       context: "200K" },
+      { id: "claude-3-5-haiku-20241022",   name: "Claude 3.5 Haiku",        context: "200K" },
+      // Claude 3
+      { id: "claude-3-opus-20240229",      name: "Claude 3 Opus",           context: "200K" },
+      { id: "claude-3-sonnet-20240229",    name: "Claude 3 Sonnet",         context: "200K" },
+      { id: "claude-3-haiku-20240307",     name: "Claude 3 Haiku",          context: "200K" },
     ],
   },
   gemini: {
@@ -60,11 +64,16 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     keyHint: "AIzaSy...",
     keyUrl: "https://aistudio.google.com/app/apikey",
     models: [
-      { id: "gemini-2.5-pro",              name: "Gemini 2.5 Pro",       context: "1M" },
-      { id: "gemini-2.5-flash",            name: "Gemini 2.5 Flash",     context: "1M" },
-      { id: "gemini-2.0-flash",            name: "Gemini 2.0 Flash",     context: "1M" },
-      { id: "gemini-1.5-pro",              name: "Gemini 1.5 Pro",       context: "2M" },
-      { id: "gemini-1.5-flash",            name: "Gemini 1.5 Flash",     context: "1M" },
+      // Gemini 2.5
+      { id: "gemini-2.5-pro",              name: "Gemini 2.5 Pro",          context: "1M"   },
+      { id: "gemini-2.5-flash",            name: "Gemini 2.5 Flash",        context: "1M"   },
+      // Gemini 2.0
+      { id: "gemini-2.0-flash",            name: "Gemini 2.0 Flash",        context: "1M"   },
+      { id: "gemini-2.0-flash-lite",       name: "Gemini 2.0 Flash Lite",   context: "1M"   },
+      // Gemini 1.5
+      { id: "gemini-1.5-pro",              name: "Gemini 1.5 Pro",          context: "2M"   },
+      { id: "gemini-1.5-flash",            name: "Gemini 1.5 Flash",        context: "1M"   },
+      { id: "gemini-1.5-flash-8b",         name: "Gemini 1.5 Flash 8B",     context: "1M"   },
     ],
   },
   openai: {
@@ -73,14 +82,21 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     keyHint: "sk-...",
     keyUrl: "https://platform.openai.com/api-keys",
     models: [
-      { id: "gpt-4.1",                     name: "GPT-4.1",              context: "1M" },
-      { id: "gpt-4.1-mini",                name: "GPT-4.1 Mini",         context: "1M" },
-      { id: "gpt-4.1-nano",                name: "GPT-4.1 Nano",         context: "1M" },
-      { id: "gpt-4o",                      name: "GPT-4o",               context: "128K" },
-      { id: "gpt-4o-mini",                 name: "GPT-4o Mini",          context: "128K" },
-      { id: "o4-mini",                     name: "o4 Mini",              context: "200K" },
-      { id: "o3",                          name: "o3",                   context: "200K" },
-      { id: "o3-mini",                     name: "o3 Mini",              context: "200K" },
+      // GPT-4.1
+      { id: "gpt-4.1",                     name: "GPT-4.1",                 context: "1M"   },
+      { id: "gpt-4.1-mini",                name: "GPT-4.1 Mini",            context: "1M"   },
+      { id: "gpt-4.1-nano",                name: "GPT-4.1 Nano",            context: "1M"   },
+      // GPT-4o
+      { id: "gpt-4o",                      name: "GPT-4o",                  context: "128K" },
+      { id: "gpt-4o-mini",                 name: "GPT-4o Mini",             context: "128K" },
+      // GPT-4
+      { id: "gpt-4-turbo",                 name: "GPT-4 Turbo",             context: "128K" },
+      // o-series
+      { id: "o4-mini",                     name: "o4 Mini",                 context: "200K" },
+      { id: "o3",                          name: "o3",                      context: "200K" },
+      { id: "o3-mini",                     name: "o3 Mini",                 context: "200K" },
+      { id: "o1",                          name: "o1",                      context: "200K" },
+      { id: "o1-mini",                     name: "o1 Mini",                 context: "128K" },
     ],
   },
   zai: {
@@ -89,10 +105,15 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     keyHint: "zai-...",
     keyUrl: "https://platform.z.ai",
     models: [
-      { id: "glm-z1-32b",                  name: "GLM-Z1 32B",           context: "128K" },
-      { id: "glm-z1-9b",                   name: "GLM-Z1 9B",            context: "128K" },
-      { id: "glm-4-plus",                  name: "GLM-4 Plus",           context: "128K" },
-      { id: "glm-4-flash",                 name: "GLM-4 Flash",          context: "128K" },
+      // GLM-Z1
+      { id: "glm-z1-32b",                  name: "GLM-Z1 32B",              context: "128K" },
+      { id: "glm-z1-9b",                   name: "GLM-Z1 9B",               context: "128K" },
+      // GLM-4
+      { id: "glm-4-plus",                  name: "GLM-4 Plus",              context: "128K" },
+      { id: "glm-4-air",                   name: "GLM-4 Air",               context: "128K" },
+      { id: "glm-4-airx",                  name: "GLM-4 AirX",              context: "8K"   },
+      { id: "glm-4-flash",                 name: "GLM-4 Flash",             context: "128K" },
+      { id: "glm-4-long",                  name: "GLM-4 Long",              context: "1M"   },
     ],
   },
   custom: {
