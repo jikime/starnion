@@ -49,12 +49,15 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
       // Claude 4
       { id: "claude-opus-4-20250514",      name: "Claude Opus 4",           context: "200K" },
       { id: "claude-sonnet-4-20250514",    name: "Claude Sonnet 4",         context: "200K" },
+      // Claude 3.7
+      { id: "claude-3-7-sonnet-20250219",  name: "Claude 3.7 Sonnet",       context: "200K" },
+      { id: "claude-3-7-sonnet-latest",    name: "Claude 3.7 Sonnet Latest", context: "200K" },
       // Claude 3.5
-      { id: "claude-3-5-sonnet-20241022",  name: "Claude 3.5 Sonnet",       context: "200K" },
+      { id: "claude-3-5-sonnet-20240620",  name: "Claude 3.5 Sonnet (Jun)", context: "200K" },
+      { id: "claude-3-5-sonnet-20241022",  name: "Claude 3.5 Sonnet (Oct)", context: "200K" },
       { id: "claude-3-5-haiku-20241022",   name: "Claude 3.5 Haiku",        context: "200K" },
+      { id: "claude-3-5-haiku-latest",     name: "Claude 3.5 Haiku Latest", context: "200K" },
       // Claude 3
-      { id: "claude-3-opus-20240229",      name: "Claude 3 Opus",           context: "200K" },
-      { id: "claude-3-sonnet-20240229",    name: "Claude 3 Sonnet",         context: "200K" },
       { id: "claude-3-haiku-20240307",     name: "Claude 3 Haiku",          context: "200K" },
     ],
   },
