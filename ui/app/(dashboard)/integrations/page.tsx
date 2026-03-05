@@ -28,6 +28,7 @@ interface AllStatus {
   google?: IntegrationStatus
   notion?: IntegrationStatus
   github?: IntegrationStatus
+  tavily?: IntegrationStatus
 }
 
 // ── Integration definitions ───────────────────────────────────────────────────
@@ -69,6 +70,19 @@ const INTEGRATIONS = [
     keyPlaceholder: "ghp_xxxxxxxxxxxxxxxxxxxx",
     keyHint: "GitHub 설정 → Developer settings → Personal access tokens에서 생성할 수 있습니다.",
   },
+  {
+    id: "tavily" as const,
+    name: "Tavily",
+    logo: "🔍",
+    color: "bg-purple-50 dark:bg-purple-950",
+    border: "border-purple-200 dark:border-purple-800",
+    description: "실시간 웹 검색 기능을 Jiki에 연결합니다. 최신 뉴스, 사실 확인, 실시간 데이터 검색이 가능해집니다.",
+    capabilities: ["실시간 웹 검색", "최신 뉴스 조회", "사실 확인", "웹 페이지 내용 추출"],
+    authType: "apikey" as const,
+    keyLabel: "Tavily API Key",
+    keyPlaceholder: "tvly-xxxxxxxxxxxxxxxxxxxxxxxx",
+    keyHint: "app.tavily.com에서 API 키를 발급받을 수 있습니다.",
+  },
 ]
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -81,7 +95,7 @@ function IntegrationsPageInner() {
 
   // API key dialog state
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [dialogProvider, setDialogProvider] = useState<"notion" | "github" | null>(null)
+  const [dialogProvider, setDialogProvider] = useState<"notion" | "github" | "tavily" | null>(null)
   const [apiKeyInput, setApiKeyInput] = useState("")
   const [apiKeyError, setApiKeyError] = useState("")
 
@@ -141,7 +155,7 @@ function IntegrationsPageInner() {
     }
   }
 
-  const openApiKeyDialog = (provider: "notion" | "github") => {
+  const openApiKeyDialog = (provider: "notion" | "github" | "tavily") => {
     setDialogProvider(provider)
     setApiKeyInput("")
     setApiKeyError("")
@@ -161,7 +175,7 @@ function IntegrationsPageInner() {
       })
       if (res.ok) {
         setStatus((s) => ({ ...s, [dialogProvider]: { connected: true } }))
-        showToast(`${dialogProvider === "notion" ? "Notion" : "GitHub"} 연동이 완료됐어요!`)
+        showToast(`${dialogProvider === "notion" ? "Notion" : dialogProvider === "github" ? "GitHub" : "Tavily"} 연동이 완료됐어요!`)
       } else {
         showToast("저장에 실패했어요.", "error")
       }
@@ -170,13 +184,13 @@ function IntegrationsPageInner() {
     }
   }
 
-  const disconnect = async (provider: "notion" | "github") => {
+  const disconnect = async (provider: "notion" | "github" | "tavily") => {
     setBusy(provider)
     try {
       const res = await fetch(`/api/integrations/${provider}`, { method: "DELETE" })
       if (res.ok) {
         setStatus((s) => ({ ...s, [provider]: { connected: false } }))
-        showToast(`${provider === "notion" ? "Notion" : "GitHub"} 연동이 해제됐어요.`)
+        showToast(`${provider === "notion" ? "Notion" : provider === "github" ? "GitHub" : "Tavily"} 연동이 해제됐어요.`)
       } else {
         showToast("해제에 실패했어요.", "error")
       }
@@ -190,7 +204,7 @@ function IntegrationsPageInner() {
   const dialogIntegration = INTEGRATIONS.find((i) => i.id === dialogProvider)
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold">연동</h1>
@@ -214,14 +228,14 @@ function IntegrationsPageInner() {
       )}
 
       {/* Integration cards */}
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {INTEGRATIONS.map((integration) => {
           const st = status[integration.id]
           const isConnected = st?.connected ?? false
           const isBusy = busy === integration.id
 
           return (
-            <Card key={integration.id} className={`border ${integration.border} ${integration.color}`}>
+            <Card key={integration.id} className={`shadow-none border ${integration.border} ${integration.color}`}>
               <CardContent className="p-5">
                 <div className="flex items-start gap-4">
                   {/* Logo */}
@@ -265,7 +279,7 @@ function IntegrationsPageInner() {
                         onClick={() =>
                           integration.id === "google"
                             ? disconnectGoogle()
-                            : disconnect(integration.id as "notion" | "github")
+                            : disconnect(integration.id as "notion" | "github" | "tavily")
                         }
                       >
                         {isBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Unlink className="size-3.5" />}
@@ -279,7 +293,7 @@ function IntegrationsPageInner() {
                         onClick={() =>
                           integration.id === "google"
                             ? connectGoogle()
-                            : openApiKeyDialog(integration.id as "notion" | "github")
+                            : openApiKeyDialog(integration.id as "notion" | "github" | "tavily")
                         }
                       >
                         {isBusy ? (

@@ -27,6 +27,9 @@ import {
   Bot,
   BrainCircuit,
   UserCircle,
+  Cog,
+  Timer,
+  ScrollText,
 } from "lucide-react"
 import {
   Sidebar,
@@ -80,9 +83,12 @@ const toolsNav = [
 
 const settingsNav = [
   { title: "설정", icon: Settings, href: "/settings" },
-  { title: "모델", icon: BrainCircuit, href: "/settings/models" },
-  { title: "페르소나", icon: UserCircle, href: "/settings/personas" },
-  { title: "연동", icon: Link2, href: "/settings/integrations" },
+  { title: "스킬", icon: Cog, href: "/skills" },
+  { title: "Cron Jobs", icon: Timer, href: "/cron" },
+  { title: "로그", icon: ScrollText, href: "/logs" },
+  { title: "모델", icon: BrainCircuit, href: "/models" },
+  { title: "페르소나", icon: UserCircle, href: "/personas" },
+  { title: "연동", icon: Link2, href: "/integrations" },
 ]
 
 export function AppSidebar() {

@@ -63,7 +63,7 @@ async def get_monthly_total(
         async with conn.cursor(row_factory=dict_row) as cur:
             await cur.execute(
                 """
-                SELECT COALESCE(SUM(amount), 0) AS total
+                SELECT COALESCE(SUM(ABS(amount)), 0) AS total
                 FROM finances
                 WHERE user_id = %s
                   AND category = %s
@@ -96,7 +96,7 @@ async def get_monthly_summary(
         async with conn.cursor(row_factory=dict_row) as cur:
             await cur.execute(
                 """
-                SELECT category, COALESCE(SUM(amount), 0) AS total
+                SELECT category, COALESCE(SUM(ABS(amount)), 0) AS total
                 FROM finances
                 WHERE user_id = %s
                   AND created_at >= %s

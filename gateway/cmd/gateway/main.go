@@ -16,6 +16,7 @@ import (
 	"github.com/jikime/jiki/gateway/internal/auth"
 	"github.com/jikime/jiki/gateway/internal/handler"
 	"github.com/jikime/jiki/gateway/internal/identity"
+	"github.com/jikime/jiki/gateway/internal/logbuf"
 	"github.com/jikime/jiki/gateway/internal/middleware"
 	"github.com/jikime/jiki/gateway/internal/scheduler"
 	"github.com/jikime/jiki/gateway/internal/skill"
@@ -94,8 +95,11 @@ func loadConfig(path string) (*Config, error) {
 	return &cfg, nil
 }
 
+// logBuf is the global in-memory log buffer shared across the process.
+var logBuf = logbuf.New()
+
 func setupLogger(cfg *Config) {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	zerolog.TimeFieldFormat = time.RFC3339
 
 	level, err := zerolog.ParseLevel(cfg.Log.Level)
 	if err != nil {
@@ -104,7 +108,10 @@ func setupLogger(cfg *Config) {
 	zerolog.SetGlobalLevel(level)
 
 	if cfg.Log.Format != "json" {
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+		console := zerolog.ConsoleWriter{Out: os.Stderr}
+		log.Logger = log.Output(zerolog.MultiLevelWriter(console, logBuf))
+	} else {
+		log.Logger = log.Output(zerolog.MultiLevelWriter(os.Stderr, logBuf))
 	}
 }
 
@@ -465,6 +472,50 @@ func main() {
 		api.DELETE("/integrations/notion", integrationHandler.NotionDisconnect)
 		api.PUT("/integrations/github", integrationHandler.GitHubConnect)
 		api.DELETE("/integrations/github", integrationHandler.GitHubDisconnect)
+		api.PUT("/integrations/tavily", integrationHandler.TavilyConnect)
+		api.DELETE("/integrations/tavily", integrationHandler.TavilyDisconnect)
+
+		// Skill management endpoints.
+		if skillSvc != nil {
+			skillHandler := handler.NewSkillHandler(skillSvc)
+			api.GET("/skills", skillHandler.List)
+			api.POST("/skills/:id/toggle", skillHandler.Toggle)
+		}
+
+		// Log streaming endpoints (no auth — accessible from admin UI).
+		logsHandler := handler.NewLogsHandler(logBuf)
+		api.GET("/logs", logsHandler.List)
+		api.GET("/logs/stream", logsHandler.Stream)
+		api.GET("/logs/agent", logsHandler.AgentLogsProxy)
+
+		// Budget management endpoints.
+		budgetHandler := handler.NewBudgetHandler(db)
+		api.GET("/budget", budgetHandler.GetBudget)
+		api.PUT("/budget", budgetHandler.UpdateBudget)
+
+		// Finance / ledger endpoints.
+		financeHandler := handler.NewFinanceHandler(db)
+		api.GET("/finance/summary", financeHandler.GetSummary)
+		api.GET("/finance/transactions", financeHandler.ListTransactions)
+		api.POST("/finance/transactions", financeHandler.CreateTransaction)
+		api.PUT("/finance/transactions/:id", financeHandler.UpdateTransaction)
+		api.DELETE("/finance/transactions/:id", financeHandler.DeleteTransaction)
+
+		// Statistics & insights endpoints.
+		statsHandler := handler.NewStatisticsHandler(db)
+		api.GET("/statistics", statsHandler.GetStatistics)
+		api.GET("/statistics/insights", statsHandler.GetInsights)
+
+		// Cron / user schedule endpoints.
+		if db != nil {
+			cronHandler := handler.NewCronHandler(db)
+			api.GET("/cron/system", cronHandler.ListSystemJobs)
+			api.GET("/cron/schedules", cronHandler.ListUserSchedules)
+			api.POST("/cron/schedules", cronHandler.CreateUserSchedule)
+			api.PUT("/cron/schedules/:id", cronHandler.UpdateUserSchedule)
+			api.DELETE("/cron/schedules/:id", cronHandler.DeleteUserSchedule)
+			api.POST("/cron/schedules/:id/toggle", cronHandler.ToggleUserSchedule)
+		}
 
 		// Channel management endpoints (per-user, uses BotManager).
 		channelHandler := handler.NewChannelHandler(db, botManager)

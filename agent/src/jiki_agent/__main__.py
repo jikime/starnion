@@ -8,18 +8,22 @@ from jiki_agent.config import settings
 from jiki_agent.db.pool import close_pool, get_pool, init_pool
 from jiki_agent.graph.agent import close_checkpointer, create_agent
 from jiki_agent.grpc.server import serve
+from jiki_agent.log_buffer import install as install_log_buffer, start_http_server
 from jiki_agent.skills.registry import register_skills
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
+# Install in-memory log buffer after basicConfig so both the console StreamHandler
+# (added by basicConfig) and the buffer handler are active.
+install_log_buffer(level=logging.INFO)
 
 logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
-    """Initialize resources and start the gRPC server."""
+    """Initialize resources and start the gRPC + log-HTTP servers."""
     await init_pool(settings.database_url)
     await register_skills(get_pool())
     agent = await create_agent(settings.database_url)
@@ -37,14 +41,17 @@ async def main() -> None:
         loop.add_signal_handler(sig, _handle_signal)
 
     serve_task = asyncio.create_task(serve(agent, port=settings.grpc_port))
+    # Start the minimal HTTP log server alongside gRPC (port 8082).
+    log_http_task = asyncio.create_task(start_http_server(port=8082))
 
     await stop_event.wait()
 
-    serve_task.cancel()
-    try:
-        await serve_task
-    except asyncio.CancelledError:
-        pass
+    for task in (serve_task, log_http_task):
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
     await close_checkpointer()
     await close_pool()

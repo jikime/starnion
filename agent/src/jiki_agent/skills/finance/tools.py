@@ -16,10 +16,17 @@ class SaveFinanceInput(BaseModel):
     """Input schema for save_finance tool."""
 
     category: str = Field(
-        description="지출 카테고리 (예: 식비, 교통, 쇼핑, 문화, 의료, 수입, 구독, 기타)",
+        description="카테고리 (예: 식비, 교통, 쇼핑, 문화, 의료, 수입, 구독, 기타)",
     )
-    amount: int = Field(description="금액 (원 단위 정수)")
-    description: str = Field(default="", description="지출에 대한 간단한 설명")
+    amount: int = Field(
+        description=(
+            "금액 (원 단위 정수). "
+            "지출(소비)은 반드시 음수로 입력 (예: 식비 12000원 → -12000). "
+            "수입은 양수로 입력 (예: 월급 3000000원 → 3000000). "
+            "사용자가 '썼어', '결제했어', '샀어' 등 소비 표현을 쓰면 무조건 음수."
+        )
+    )
+    description: str = Field(default="", description="내역에 대한 간단한 설명")
 
 
 class GetMonthlyTotalInput(BaseModel):
@@ -34,7 +41,12 @@ class GetMonthlyTotalInput(BaseModel):
 @tool(args_schema=SaveFinanceInput)
 @skill_guard("finance")
 async def save_finance(category: str, amount: int, description: str = "") -> str:
-    """수입이나 지출 내역을 기록합니다. 카테고리, 금액, 설명을 받아 저장합니다."""
+    """수입이나 지출 내역을 기록합니다.
+
+    중요: amount 부호 규칙 —
+    - 지출(식비, 교통, 쇼핑 등 소비)은 반드시 음수 (예: -12000)
+    - 수입(월급, 용돈 등)은 양수 (예: 3000000)
+    """
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요. 다시 시도해 주세요."
@@ -58,7 +70,8 @@ async def save_finance(category: str, amount: int, description: str = "") -> str
         month=month,
     )
 
-    result = f"{category} {amount:,}원 기록했어요. 이번 달 {category} 누적: {monthly_total:,}원"
+    display_amount = abs(amount)
+    result = f"{category} {display_amount:,}원 기록했어요. 이번 달 {category} 누적: {monthly_total:,}원"
 
     # Check budget and warn if approaching/exceeding limit.
     profile = await profile_repo.get_by_uuid_id(pool, uuid_id=user_id)

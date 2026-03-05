@@ -361,7 +361,7 @@ export function ModelsView() {
             const enabled = enabledModels[providerKey] ?? new Set<string>()
 
             return (
-              <Card key={providerKey} className={isConnected ? "border-border" : "border-dashed"}>
+              <Card key={providerKey} className={`shadow-none ${isConnected ? "border-border" : "border-dashed"}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2 text-base">

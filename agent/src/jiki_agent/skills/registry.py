@@ -173,6 +173,17 @@ SKILLS: dict[str, SkillDef] = {
         permission_level=2,  # opt-in (OAuth2 required)
         sort_order=14,
     ),
+    "notion": SkillDef(
+        id="notion",
+        name="노션 연동",
+        emoji="📝",
+        description="노션 페이지 검색, 생성, 읽기, 블록 추가",
+        category="integration",
+        tools=["notion_search", "notion_page_create", "notion_page_read", "notion_block_append"],
+        enabled_by_default=False,
+        permission_level=2,  # opt-in (API key required)
+        sort_order=14,
+    ),
     "websearch": SkillDef(
         id="websearch",
         name="웹 검색",

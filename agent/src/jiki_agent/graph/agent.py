@@ -77,6 +77,12 @@ from jiki_agent.skills.hash.tools import generate_hash
 from jiki_agent.skills.color.tools import convert_color
 from jiki_agent.skills.horoscope.tools import get_horoscope
 from jiki_agent.skills.ip.tools import lookup_ip
+from jiki_agent.skills.notion.tools import (
+    notion_block_append,
+    notion_page_create,
+    notion_page_read,
+    notion_search,
+)
 from jiki_agent.skills.websearch.tools import web_fetch, web_search
 
 logger = logging.getLogger(__name__)
@@ -119,6 +125,10 @@ ALL_TOOLS = [
     google_drive_list,
     google_mail_send,
     google_mail_list,
+    notion_search,
+    notion_page_create,
+    notion_page_read,
+    notion_block_append,
     web_search,
     web_fetch,
     get_weather,

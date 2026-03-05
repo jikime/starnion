@@ -70,7 +70,56 @@ func (h *IntegrationHandler) Status(c echo.Context) error {
 	).Scan(&githubKey)
 	result["github"] = integrationStatus{Connected: err == nil && githubKey != ""}
 
+	// ── Tavily ───────────────────────────────────────────────────────────────
+	var tavilyKey string
+	err = h.db.QueryRowContext(c.Request().Context(),
+		`SELECT api_key FROM integration_keys WHERE user_id = $1 AND provider = 'tavily'`, userID,
+	).Scan(&tavilyKey)
+	result["tavily"] = integrationStatus{Connected: err == nil && tavilyKey != ""}
+
 	return c.JSON(http.StatusOK, result)
+}
+
+// TavilyConnect saves (or updates) a Tavily API key for the user.
+// PUT /api/v1/integrations/tavily  Body: { "user_id": "...", "api_key": "..." }
+func (h *IntegrationHandler) TavilyConnect(c echo.Context) error {
+	var req struct {
+		UserID string `json:"user_id"`
+		APIKey string `json:"api_key"`
+	}
+	if err := c.Bind(&req); err != nil || req.UserID == "" || req.APIKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and api_key required"})
+	}
+
+	_, err := h.db.ExecContext(c.Request().Context(),
+		`INSERT INTO integration_keys (user_id, provider, api_key)
+		 VALUES ($1, 'tavily', $2)
+		 ON CONFLICT (user_id, provider) DO UPDATE SET api_key = EXCLUDED.api_key, updated_at = NOW()`,
+		req.UserID, req.APIKey,
+	)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", req.UserID).Msg("integrations: tavily connect failed")
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "save failed"})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "connected"})
+}
+
+// TavilyDisconnect removes the Tavily API key for the user.
+// DELETE /api/v1/integrations/tavily?user_id=...
+func (h *IntegrationHandler) TavilyDisconnect(c echo.Context) error {
+	userID := c.QueryParam("user_id")
+	if userID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	}
+
+	_, err := h.db.ExecContext(c.Request().Context(),
+		`DELETE FROM integration_keys WHERE user_id = $1 AND provider = 'tavily'`, userID,
+	)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("integrations: tavily disconnect failed")
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "disconnect failed"})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "disconnected"})
 }
 
 // GoogleAuthURL returns the Google OAuth2 authorization URL for web users.

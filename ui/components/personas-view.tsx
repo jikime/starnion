@@ -351,7 +351,7 @@ export function PersonasView() {
       {loading ? (
         <p className="text-sm text-muted-foreground">불러오는 중...</p>
       ) : personas.length === 0 ? (
-        <Card className="border-dashed">
+        <Card className="shadow-none border-dashed">
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
             <p>아직 페르소나가 없어요.</p>
             <p className="mt-1">위 버튼으로 첫 페르소나를 만들어보세요.</p>
@@ -362,7 +362,7 @@ export function PersonasView() {
           {personas.map(p => {
             const provMeta = PROVIDER_META[p.provider]
             return (
-              <Card key={p.id} className={p.isDefault ? "border-primary/50" : ""}>
+              <Card key={p.id} className={`shadow-none ${p.isDefault ? "border-primary/50" : ""}`}>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">

@@ -8,9 +8,39 @@ from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from jiki_agent.config import settings
+from jiki_agent.context import get_current_user
+from jiki_agent.db.pool import get_pool
 from jiki_agent.skills.guard import skill_guard
 
 logger = logging.getLogger(__name__)
+
+
+async def _get_tavily_api_key() -> str:
+    """Return the Tavily API key for the current user.
+
+    Priority:
+    1. User-specific key from integration_keys table
+    2. Global TAVILY_API_KEY from environment
+    """
+    user_id = get_current_user()
+    if user_id:
+        try:
+            from psycopg.rows import dict_row
+
+            pool = get_pool()
+            async with pool.connection() as conn:
+                async with conn.cursor(row_factory=dict_row) as cur:
+                    await cur.execute(
+                        "SELECT api_key FROM integration_keys WHERE user_id = %s AND provider = 'tavily'",
+                        (user_id,),
+                    )
+                    row = await cur.fetchone()
+                    if row and row.get("api_key"):
+                        logger.debug("[Tavily] user=%s | using user-specific key", user_id)
+                        return row["api_key"]
+        except Exception:
+            logger.debug("Failed to fetch user Tavily key, falling back to global", exc_info=True)
+    return settings.tavily_api_key
 
 # Maximum download size for web_fetch (5 MB).
 _MAX_DOWNLOAD_BYTES = 5 * 1024 * 1024
@@ -78,10 +108,11 @@ def _format_search_results(results: list[dict]) -> str:
 @skill_guard("websearch")
 async def web_search(query: str, max_results: int = 5) -> str:
     """인터넷에서 최신 정보를 검색합니다. 실시간 뉴스, 사실 확인, 최신 데이터가 필요할 때 사용합니다."""
-    if not settings.tavily_api_key:
+    api_key = await _get_tavily_api_key()
+    if not api_key:
         return (
             "웹 검색 기능을 사용하려면 Tavily API 키가 필요해요. "
-            "관리자에게 TAVILY_API_KEY 설정을 요청해주세요."
+            "설정 → 연동 메뉴에서 Tavily API 키를 등록해주세요."
         )
 
     max_results = max(1, min(max_results, 10))
@@ -89,7 +120,7 @@ async def web_search(query: str, max_results: int = 5) -> str:
     try:
         from tavily import AsyncTavilyClient  # type: ignore[import-untyped]
 
-        client = AsyncTavilyClient(api_key=settings.tavily_api_key)
+        client = AsyncTavilyClient(api_key=api_key)
         response = await client.search(
             query=query,
             max_results=max_results,
