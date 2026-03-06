@@ -16,6 +16,7 @@ from starpion_agent.db.repositories import document as document_repo
 from starpion_agent.db.repositories import finance as finance_repo
 from starpion_agent.db.repositories import knowledge as knowledge_repo
 from starpion_agent.db.repositories import memo_db as memo_db_repo
+from starpion_agent.db.repositories import user_search_db as user_search_db_repo
 from starpion_agent.embedding.service import embed_text
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,8 @@ async def search(
         doc_vec,
         doc_ft,
         finance_results,
+        search_vec,
+        search_ft,
     ) = await asyncio.gather(
         daily_log_repo.search_similar(
             pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
@@ -133,6 +136,10 @@ async def search(
         ),
         document_repo.search_fulltext_by_user(pool, user_id, query, top_k=top_k),
         finance_repo.get_recent(pool, user_id=user_id, limit=top_k),
+        user_search_db_repo.search_similar(
+            pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
+        ),
+        user_search_db_repo.search_fulltext(pool, user_id, query, top_k=top_k),
     )
 
     # Per-source RRF merge.
@@ -141,6 +148,7 @@ async def search(
     diary_merged = _rrf_merge(diary_vec, diary_ft)
     memo_merged = _rrf_merge(memo_vec, memo_ft)
     doc_merged = _rrf_merge(doc_vec, doc_ft)
+    search_merged = _rrf_merge(search_vec, search_ft)
 
     # Tag sources and normalise content field.
     for r in log_merged:
@@ -167,9 +175,13 @@ async def search(
         desc = f" ({r['description']})" if r.get("description") else ""
         r["content"] = f"{r['category']} {r['amount']:,}원{desc}"
         r["similarity"] = 0.5
+    for r in search_merged:
+        r["source"] = "web_search"
+        r["content"] = f"[웹검색: {r.get('query', '')}] {r.get('result', '')[:200]}"
 
     all_results = (
-        log_merged + kb_merged + diary_merged + memo_merged + doc_merged + finance_results
+        log_merged + kb_merged + diary_merged + memo_merged
+        + doc_merged + finance_results + search_merged
     )
     all_results.sort(key=lambda x: x.get("similarity", 0), reverse=True)
 

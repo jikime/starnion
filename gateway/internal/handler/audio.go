@@ -103,6 +103,84 @@ func (h *AudioHandler) ListAudios(c echo.Context) error {
 	return c.JSON(http.StatusOK, items)
 }
 
+// SaveAudio POST /api/v1/audios
+// Saves audio metadata immediately after a client-side MinIO upload.
+// Returns the new row ID so the caller can later PATCH the transcript.
+func (h *AudioHandler) SaveAudio(c echo.Context) error {
+	var req struct {
+		UserID   string `json:"user_id"`
+		URL      string `json:"url"`
+		Name     string `json:"name"`
+		Mime     string `json:"mime"`
+		Size     int64  `json:"size"`
+		Duration int    `json:"duration"`
+		Source   string `json:"source"`
+		Type     string `json:"type"`
+		Prompt   string `json:"prompt"`
+	}
+	if err := c.Bind(&req); err != nil || req.UserID == "" || req.URL == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and url are required"})
+	}
+	if !strings.HasPrefix(req.Mime, "audio/") {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "mime must be audio/*"})
+	}
+	if req.Source == "" {
+		req.Source = "web"
+	}
+	if req.Type == "" {
+		req.Type = "uploaded"
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
+	defer cancel()
+
+	var id int64
+	err := h.db.QueryRowContext(ctx, `
+		INSERT INTO user_audios (user_id, url, name, mime, size, duration, source, type, prompt)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING id
+	`, req.UserID, req.URL, req.Name, req.Mime, req.Size, req.Duration, req.Source, req.Type, req.Prompt).Scan(&id)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", req.UserID).Msg("save audio failed")
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "save failed"})
+	}
+	return c.JSON(http.StatusCreated, map[string]any{"id": id})
+}
+
+// UpdateTranscript PATCH /api/v1/audios/:id/transcript?user_id=
+// Stores the STT result for a previously saved audio row.
+func (h *AudioHandler) UpdateTranscript(c echo.Context) error {
+	userID := c.QueryParam("user_id")
+	if userID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	}
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+
+	var body struct {
+		Transcript string `json:"transcript"`
+	}
+	if err := c.Bind(&body); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid body"})
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
+	defer cancel()
+
+	res, err := h.db.ExecContext(ctx,
+		`UPDATE user_audios SET transcript = $1 WHERE id = $2 AND user_id = $3`,
+		body.Transcript, id, userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "update failed"})
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "not found"})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "updated"})
+}
+
 // DeleteAudio DELETE /api/v1/audios/:id?user_id=
 func (h *AudioHandler) DeleteAudio(c echo.Context) error {
 	userID := c.QueryParam("user_id")

@@ -21,7 +21,6 @@ import {
   Image,
   Music,
   Search,
-  Cloud,
   Wrench,
   Settings,
   Link2,
@@ -76,7 +75,6 @@ const mediaNav = [
 
 const toolsNav = [
   { title: "웹검색", icon: Search, href: "/search" },
-  { title: "날씨", icon: Cloud, href: "/weather" },
   { title: "유틸리티", icon: Wrench, href: "/utilities" },
   { title: "스킬", icon: Cog, href: "/skills" },
 ]

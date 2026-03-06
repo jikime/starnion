@@ -8,7 +8,7 @@ from starpion_agent.config import settings
 from starpion_agent.db.pool import close_pool, get_pool, init_pool
 from starpion_agent.graph.agent import close_checkpointer, create_agent
 from starpion_agent.grpc.server import serve
-from starpion_agent.log_buffer import install as install_log_buffer, set_index_callback, start_http_server
+from starpion_agent.log_buffer import install as install_log_buffer, set_embed_search_callback, set_index_callback, start_http_server
 from starpion_agent.skills.registry import register_skills
 
 logging.basicConfig(
@@ -77,6 +77,39 @@ async def _index_document(
         logger.exception("index_document: failed for doc_id=%d file=%s", doc_id, file_name)
 
 
+async def _embed_search(user_id: str, search_id: int) -> None:
+    """Embed a saved web search result and store the vector in user_searches.
+
+    Called as a background task from the POST /embed-search HTTP endpoint.
+    """
+    from starpion_agent.db.repositories import user_search_db
+    from starpion_agent.embedding.service import embed_text
+
+    try:
+        pool = get_pool()
+        async with pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "SELECT query, result FROM user_searches WHERE id = %s AND user_id = %s",
+                    (search_id, user_id),
+                )
+                row = await cur.fetchone()
+
+        if not row:
+            logger.warning("embed_search: search_id=%d not found for user=%s", search_id, user_id)
+            return
+
+        query, result = row[0], row[1]
+        text_to_embed = f"{query}\n{result[:500]}"
+        embedding = await embed_text(text_to_embed)
+
+        await user_search_db.update_embedding(pool, user_id, search_id, embedding)
+        logger.info("embed_search: embedded search_id=%d for user=%s", search_id, user_id)
+
+    except Exception:
+        logger.exception("embed_search: failed for search_id=%d user=%s", search_id, user_id)
+
+
 async def main() -> None:
     """Initialize resources and start the gRPC + log-HTTP servers."""
     await init_pool(settings.database_url)
@@ -85,6 +118,8 @@ async def main() -> None:
 
     # Register the document indexing callback so POST /index-document works.
     set_index_callback(_index_document)
+    # Register the search embedding callback so POST /embed-search works.
+    set_embed_search_callback(_embed_search)
 
     logger.info("Agent initialized, starting gRPC server on port %s", settings.grpc_port)
 

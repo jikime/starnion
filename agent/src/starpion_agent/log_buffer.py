@@ -83,11 +83,21 @@ _handler = LogBufferHandler()
 # async def callback(user_id, doc_id, file_url, file_name) -> None
 _index_callback: Callable[..., Coroutine[Any, Any, None]] | None = None
 
+# Optional callback for async search embedding:
+# async def callback(user_id, search_id) -> None
+_embed_search_callback: Callable[..., Coroutine[Any, Any, None]] | None = None
+
 
 def set_index_callback(cb: Callable[..., Coroutine[Any, Any, None]]) -> None:
     """Register the async function called by POST /index-document."""
     global _index_callback
     _index_callback = cb
+
+
+def set_embed_search_callback(cb: Callable[..., Coroutine[Any, Any, None]]) -> None:
+    """Register the async function called by POST /embed-search."""
+    global _embed_search_callback
+    _embed_search_callback = cb
 
 
 def get_handler() -> LogBufferHandler:
@@ -126,8 +136,26 @@ async def _handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) ->
         else:
             qs = ""
 
-        # Handle POST /index-document — fire-and-forget document indexing.
+        # Handle POST requests — fire-and-forget background tasks.
         if method == "POST":
+            if path == "/embed-search":
+                header_end = raw.find(b"\r\n\r\n")
+                body_bytes = raw[header_end + 4:] if header_end != -1 else b""
+                try:
+                    body = json.loads(body_bytes.decode())
+                    user_id = body.get("user_id", "")
+                    search_id = int(body.get("search_id", 0))
+                except Exception:
+                    _write_response(writer, 400, b"Bad Request")
+                    return
+
+                if _embed_search_callback and user_id and search_id:
+                    asyncio.create_task(_embed_search_callback(user_id, search_id))
+                    _write_response(writer, 202, b'{"status":"queued"}', content_type="application/json")
+                else:
+                    _write_response(writer, 503, b'{"error":"embedder not ready"}', content_type="application/json")
+                return
+
             if path == "/index-document":
                 header_end = raw.find(b"\r\n\r\n")
                 body_bytes = raw[header_end + 4:] if header_end != -1 else b""

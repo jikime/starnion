@@ -593,9 +593,17 @@ func main() {
 		api.GET("/images", imageHandler.ListImages)
 		api.DELETE("/images/:id", imageHandler.DeleteImage)
 
+		// Search history endpoints.
+		searchHandler := handler.NewSearchHandler(db, agentHTTPURL)
+		api.GET("/searches", searchHandler.ListSearches)
+		api.POST("/searches", searchHandler.SaveSearch)
+		api.DELETE("/searches/:id", searchHandler.DeleteSearch)
+
 		// Audio gallery endpoints.
 		audioHandler := handler.NewAudioHandler(db)
 		api.GET("/audios", audioHandler.ListAudios)
+		api.POST("/audios", audioHandler.SaveAudio)
+		api.PATCH("/audios/:id/transcript", audioHandler.UpdateTranscript)
 		api.DELETE("/audios/:id", audioHandler.DeleteAudio)
 	}
 

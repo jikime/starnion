@@ -15,12 +15,11 @@ export async function GET(req: NextRequest) {
     if (k !== "user_id") qs.set(k, v)
   }
 
-  const res = await fetch(`${API_URL}/api/v1/audios?${qs}`, { cache: "no-store" })
+  const res = await fetch(`${API_URL}/api/v1/searches?${qs}`, { cache: "no-store" })
   const data = await res.json().catch(() => [])
   return NextResponse.json(data, { status: res.ok ? 200 : res.status })
 }
 
-// Save audio metadata right after a client-side MinIO upload.
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) {
@@ -32,7 +31,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid body" }, { status: 400 })
   }
 
-  const res = await fetch(`${API_URL}/api/v1/audios`, {
+  const res = await fetch(`${API_URL}/api/v1/searches`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...body, user_id: session.user.id }),

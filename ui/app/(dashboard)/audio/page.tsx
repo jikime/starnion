@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Download, FileAudio, Mic, MicOff, RefreshCw, Square, Trash2, Upload } from "lucide-react"
+import { AudioRecorder } from "@/components/chat/audio-recorder"
+import { Download, FileAudio, Mic, RefreshCw, Square, Trash2, Upload } from "lucide-react"
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -18,8 +19,8 @@ interface AudioItem {
   mime: string
   size: number
   duration: number
-  source: string    // 'web' | 'telegram' | 'webchat'
-  type: string      // 'uploaded' | 'recorded' | 'generated'
+  source: string
+  type: string
   transcript: string
   prompt: string
   size_label: string
@@ -27,58 +28,109 @@ interface AudioItem {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// SSE helper – reads the chat stream and extracts text / file events
+// Helpers
 // ────────────────────────────────────────────────────────────────────────────
 
-async function callAudioStream(
-  formData: FormData,
-  onText: (delta: string) => void,
-  onFile: (url: string, mime: string, name: string) => void,
-  onDone: () => void,
-  onError: (msg: string) => void
-): Promise<void> {
-  const res = await fetch("/api/audios/action", { method: "POST", body: formData }).catch(() => null)
-  if (!res || !res.ok || !res.body) {
-    onError("요청에 실패했어요. 다시 시도해 주세요.")
-    onDone()
-    return
-  }
+function fmtDuration(s: number): string {
+  if (!s) return ""
+  const m = Math.floor(s / 60)
+  const sec = s % 60
+  return `${m}:${String(sec).padStart(2, "0")}`
+}
+
+/** Upload a Blob to MinIO and return {url, name, mime, size}. */
+async function uploadBlob(blob: Blob, mimeType: string) {
+  const ext = mimeType.split("/")[1]?.split(";")[0] ?? "webm"
+  const name = `voice-${Date.now()}.${ext}`
+  const file = new File([blob], name, { type: mimeType })
+  const fd = new FormData()
+  fd.append("file", file)
+  const res = await fetch("/api/upload", { method: "POST", body: fd })
+  if (!res.ok) throw new Error("upload failed")
+  const data = await res.json()
+  return { url: data.url as string, name: data.name as string, mime: mimeType, size: blob.size }
+}
+
+/** Upload a File to MinIO and return {url, name, mime, size}. */
+async function uploadFile(file: File) {
+  const fd = new FormData()
+  fd.append("file", file)
+  const res = await fetch("/api/upload", { method: "POST", body: fd })
+  if (!res.ok) throw new Error("upload failed")
+  const data = await res.json()
+  return { url: data.url as string, name: data.name as string, mime: file.type, size: file.size }
+}
+
+/** Save audio metadata to DB. Returns the new row id. */
+async function saveAudioMeta(params: {
+  url: string; name: string; mime: string; size: number
+  type: "recorded" | "uploaded" | "generated"; duration?: number
+}): Promise<number> {
+  const res = await fetch("/api/audios", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source: "web", duration: 0, ...params }),
+  })
+  if (!res.ok) throw new Error("save failed")
+  const data = await res.json()
+  return data.id as number
+}
+
+/** Patch transcript on an existing audio row. */
+async function patchTranscript(id: number, transcript: string) {
+  await fetch(`/api/audios/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ transcript }),
+  })
+}
+
+/**
+ * Stream STT from the action endpoint.
+ * Calls onText with each delta; returns the full transcript string.
+ */
+async function streamTranscript(
+  fileUrl: string, fileName: string, fileMime: string,
+  onText: (delta: string) => void
+): Promise<string> {
+  const res = await fetch("/api/audios/action", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "transcribe", file_url: fileUrl, file_name: fileName, file_mime: fileMime }),
+  })
+  if (!res.ok || !res.body) throw new Error("stream failed")
 
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buf = ""
+  let full = ""
 
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
     buf += decoder.decode(value, { stream: true })
-
     const lines = buf.split("\n")
     buf = lines.pop() ?? ""
-
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue
       const raw = line.slice(6).trim()
-      if (raw === "[DONE]") { onDone(); return }
+      if (raw === "[DONE]") return full
       try {
         const chunk = JSON.parse(raw)
         if (chunk.type === "text-delta" && chunk.delta) {
+          full += chunk.delta as string
           onText(chunk.delta as string)
-        } else if (chunk.type === "file" && chunk.url) {
-          onFile(chunk.url as string, chunk.mediaType as string, chunk.name as string)
         } else if (chunk.type === "error") {
-          onError(chunk.errorText ?? "오류가 발생했어요.")
+          throw new Error(chunk.errorText ?? "agent error")
         }
-      } catch {
-        // ignore non-JSON lines
-      }
+      } catch { /* skip malformed */ }
     }
   }
-  onDone()
+  return full
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Badge helpers
+// Badges
 // ────────────────────────────────────────────────────────────────────────────
 
 function SourceBadge({ source }: { source: string }) {
@@ -101,133 +153,110 @@ function TypeBadge({ type }: { type: string }) {
   return <Badge variant="outline" className={`text-xs ${className}`}>{label}</Badge>
 }
 
-function fmtDuration(s: number): string {
-  if (!s) return ""
-  const m = Math.floor(s / 60)
-  const sec = s % 60
-  return `${m}:${String(sec).padStart(2, "0")}`
-}
-
 // ────────────────────────────────────────────────────────────────────────────
-// RecordTab
+// RecordTab  –  uses the WaveSurfer AudioRecorder from webchat
 // ────────────────────────────────────────────────────────────────────────────
 
 function RecordTab({ onSaved }: { onSaved: () => void }) {
-  const [recording, setRecording] = useState(false)
-  const [seconds, setSeconds] = useState(0)
-  const [processing, setProcessing] = useState(false)
+  const [showRecorder, setShowRecorder] = useState(false)
+  const [status, setStatus] = useState<"idle" | "uploading" | "transcribing" | "done" | "error">("idle")
   const [transcript, setTranscript] = useState("")
   const [error, setError] = useState("")
 
-  const mediaRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
+  const reset = () => {
+    setShowRecorder(false)
+    setStatus("idle")
+    setTranscript("")
+    setError("")
+  }
 
-  const startRecording = useCallback(async () => {
+  const handleAttach = useCallback(async (blob: Blob, mimeType: string) => {
+    setShowRecorder(false)
     setError("")
     setTranscript("")
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : "audio/webm"
-      const mr = new MediaRecorder(stream, { mimeType })
-      chunksRef.current = []
-      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
-      mr.start(250)
-      mediaRef.current = mr
-      setRecording(true)
-      setSeconds(0)
-      timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000)
-    } catch {
-      setError("마이크 접근 권한이 필요합니다.")
+      // 1. Upload to MinIO
+      setStatus("uploading")
+      const { url, name, mime, size } = await uploadBlob(blob, mimeType)
+
+      // 2. Save metadata to DB as 'recorded'
+      const audioId = await saveAudioMeta({ url, name, mime, size, type: "recorded" })
+
+      // 3. Stream STT
+      setStatus("transcribing")
+      let full = ""
+      full = await streamTranscript(url, name, mime, (delta) => {
+        setTranscript((t) => t + delta)
+      })
+
+      // 4. Patch transcript
+      if (full) await patchTranscript(audioId, full)
+
+      setStatus("done")
+      onSaved()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "오류가 발생했어요.")
+      setStatus("error")
     }
-  }, [])
-
-  const stopRecording = useCallback(() => {
-    if (!mediaRef.current) return
-    mediaRef.current.onstop = async () => {
-      const blob = new Blob(chunksRef.current, { type: mediaRef.current?.mimeType ?? "audio/webm" })
-      streamRef.current?.getTracks().forEach((t) => t.stop())
-      streamRef.current = null
-
-      setProcessing(true)
-      setTranscript("")
-      const file = new File([blob], "recording.webm", { type: blob.type })
-      const fd = new FormData()
-      fd.append("action", "transcribe")
-      fd.append("message", "")
-      fd.append("file", file)
-
-      let text = ""
-      await callAudioStream(
-        fd,
-        (delta) => { text += delta; setTranscript(text) },
-        () => {},
-        () => { setProcessing(false); onSaved() },
-        (msg) => { setError(msg); setProcessing(false) }
-      )
-    }
-    mediaRef.current.stop()
-    mediaRef.current = null
-    setRecording(false)
-    if (timerRef.current) clearInterval(timerRef.current)
   }, [onSaved])
 
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
+  const handleCancel = useCallback(() => {
+    setShowRecorder(false)
+  }, [])
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>음성 녹음</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col items-center py-10 gap-6">
-        <div className={`size-32 rounded-full flex items-center justify-center transition-colors ${
-          recording ? "bg-red-100 dark:bg-red-900/30 animate-pulse" : "bg-primary/10"
-        }`}>
-          {recording
-            ? <MicOff className="size-14 text-red-500" />
-            : <Mic className="size-14 text-primary" />
-          }
-        </div>
+      <CardContent className="space-y-6 py-6">
+        {/* Recorder widget */}
+        {showRecorder ? (
+          <AudioRecorder onAttach={handleAttach} onCancel={handleCancel} />
+        ) : (
+          <div className="flex flex-col items-center gap-4">
+            {status === "idle" && (
+              <>
+                <div className="size-24 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Mic className="size-12 text-primary" />
+                </div>
+                <p className="text-sm text-muted-foreground">마이크 버튼을 눌러 녹음을 시작하세요</p>
+                <Button size="lg" className="gap-2" onClick={() => setShowRecorder(true)}>
+                  <Mic className="size-5" />
+                  녹음 시작
+                </Button>
+              </>
+            )}
 
-        {recording && (
-          <p className="text-2xl font-mono tabular-nums text-red-500">
-            {fmtDuration(seconds)}
-          </p>
+            {(status === "uploading" || status === "transcribing") && (
+              <div className="flex flex-col items-center gap-3">
+                <RefreshCw className="size-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">
+                  {status === "uploading" ? "업로드 중..." : "텍스트 변환 중..."}
+                </p>
+              </div>
+            )}
+
+            {status === "done" && (
+              <Button variant="outline" size="sm" className="gap-2" onClick={reset}>
+                <Mic className="size-4" />
+                다시 녹음
+              </Button>
+            )}
+
+            {status === "error" && (
+              <div className="flex flex-col items-center gap-3">
+                <p className="text-sm text-destructive">{error}</p>
+                <Button variant="outline" size="sm" onClick={reset}>다시 시도</Button>
+              </div>
+            )}
+          </div>
         )}
 
-        {!recording && !processing && (
-          <p className="text-sm text-muted-foreground">녹음 버튼을 눌러 시작하세요</p>
-        )}
-
-        <div className="flex gap-3">
-          {!recording && !processing && (
-            <Button size="lg" onClick={startRecording} className="gap-2">
-              <Mic className="size-5" />
-              녹음 시작
-            </Button>
-          )}
-          {recording && (
-            <Button size="lg" variant="destructive" onClick={stopRecording} className="gap-2">
-              <Square className="size-5" />
-              녹음 중지 및 변환
-            </Button>
-          )}
-          {processing && (
-            <Button size="lg" disabled className="gap-2">
-              <RefreshCw className="size-4 animate-spin" />
-              변환 중...
-            </Button>
-          )}
-        </div>
-
-        {error && <p className="text-sm text-destructive">{error}</p>}
-
+        {/* Live transcript */}
         {transcript && (
-          <div className="w-full rounded-lg border border-border bg-muted/30 p-4">
+          <div className="rounded-lg border border-border bg-muted/30 p-4">
             <p className="text-xs text-muted-foreground mb-1">변환 결과</p>
             <p className="text-sm whitespace-pre-wrap">{transcript}</p>
           </div>
@@ -243,7 +272,7 @@ function RecordTab({ onSaved }: { onSaved: () => void }) {
 
 function TranscribeTab({ onSaved }: { onSaved: () => void }) {
   const [file, setFile] = useState<File | null>(null)
-  const [processing, setProcessing] = useState(false)
+  const [status, setStatus] = useState<"idle" | "uploading" | "transcribing" | "done" | "error">("idle")
   const [transcript, setTranscript] = useState("")
   const [error, setError] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
@@ -252,6 +281,7 @@ function TranscribeTab({ onSaved }: { onSaved: () => void }) {
     setFile(f)
     setTranscript("")
     setError("")
+    setStatus("idle")
   }
 
   const handleDrop = (e: React.DragEvent) => {
@@ -262,24 +292,36 @@ function TranscribeTab({ onSaved }: { onSaved: () => void }) {
 
   const handleTranscribe = async () => {
     if (!file) return
-    setProcessing(true)
-    setTranscript("")
     setError("")
+    setTranscript("")
 
-    const fd = new FormData()
-    fd.append("action", "transcribe")
-    fd.append("message", "")
-    fd.append("file", file)
+    try {
+      // 1. Upload
+      setStatus("uploading")
+      const { url, name, mime, size } = await uploadFile(file)
 
-    let text = ""
-    await callAudioStream(
-      fd,
-      (delta) => { text += delta; setTranscript(text) },
-      () => {},
-      () => { setProcessing(false); onSaved() },
-      (msg) => { setError(msg); setProcessing(false) }
-    )
+      // 2. Save metadata
+      const audioId = await saveAudioMeta({ url, name, mime, size, type: "uploaded" })
+
+      // 3. Stream STT
+      setStatus("transcribing")
+      let full = ""
+      full = await streamTranscript(url, name, mime, (delta) => {
+        setTranscript((t) => t + delta)
+      })
+
+      // 4. Patch transcript
+      if (full) await patchTranscript(audioId, full)
+
+      setStatus("done")
+      onSaved()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "오류가 발생했어요.")
+      setStatus("error")
+    }
   }
+
+  const busy = status === "uploading" || status === "transcribing"
 
   return (
     <Card>
@@ -291,7 +333,7 @@ function TranscribeTab({ onSaved }: { onSaved: () => void }) {
           className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}
+          onClick={() => !busy && inputRef.current?.click()}
         >
           <input
             ref={inputRef}
@@ -311,13 +353,9 @@ function TranscribeTab({ onSaved }: { onSaved: () => void }) {
           )}
         </div>
 
-        <Button
-          className="w-full gap-2"
-          disabled={!file || processing}
-          onClick={handleTranscribe}
-        >
-          {processing ? <RefreshCw className="size-4 animate-spin" /> : <FileAudio className="size-4" />}
-          {processing ? "변환 중..." : "텍스트로 변환"}
+        <Button className="w-full gap-2" disabled={!file || busy} onClick={handleTranscribe}>
+          {busy ? <RefreshCw className="size-4 animate-spin" /> : <FileAudio className="size-4" />}
+          {status === "uploading" ? "업로드 중..." : status === "transcribing" ? "변환 중..." : "텍스트로 변환"}
         </Button>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -428,7 +466,7 @@ function FileListTab({ refreshKey }: { refreshKey: number }) {
                     >
                       {playingId === item.id
                         ? <Square className="size-4 text-primary" />
-                        : <span className="text-primary text-xs">▶</span>
+                        : <span className="text-primary text-xs font-bold">▶</span>
                       }
                     </Button>
                     <a href={item.url} download={item.name} target="_blank" rel="noreferrer">

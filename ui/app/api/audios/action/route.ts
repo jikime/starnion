@@ -1,14 +1,16 @@
 /**
  * POST /api/audios/action
  *
- * Proxies audio STT (transcribe) and TTS (generate) requests to the backend SSE stream.
- * For STT: uploads the audio file to MinIO first, then asks the agent to transcribe it.
- * For TTS: sends a text prompt to the agent which calls the TTS tool.
+ * Proxies audio STT / TTS requests to the backend SSE stream.
+ * The caller is responsible for uploading the file and saving
+ * the metadata BEFORE calling this route.
  *
- * Body (multipart):
- *   action  : "transcribe" | "generate"
- *   message : string  (for generate: text to speak; for transcribe: optional extra instruction)
- *   file    : File?   (for transcribe: the audio file to transcribe)
+ * Body (JSON):
+ *   action    : "transcribe" | "generate"
+ *   file_url  : string   (MinIO URL; required for transcribe)
+ *   file_name : string
+ *   file_mime : string
+ *   message   : string   (text for TTS; optional extra instruction for STT)
  */
 import { auth } from "@/auth"
 import { NextRequest, NextResponse } from "next/server"
@@ -21,46 +23,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
   }
 
-  const formData = await req.formData().catch(() => null)
-  if (!formData) {
+  const body = await req.json().catch(() => null)
+  if (!body) {
     return NextResponse.json({ error: "invalid request" }, { status: 400 })
   }
 
-  const action = (formData.get("action") as string) ?? "transcribe"
-  const message = (formData.get("message") as string) ?? ""
-  const file = formData.get("file") as File | null
-
-  let fileUrl = ""
-  let fileName = ""
-
-  // For transcription, upload the audio file to MinIO first.
-  if (action === "transcribe" && file) {
-    const uploadForm = new FormData()
-    uploadForm.append("file", file)
-    const uploadRes = await fetch(`${API_URL}/api/v1/upload`, {
-      method: "POST",
-      body: uploadForm,
-    }).catch(() => null)
-
-    if (!uploadRes || !uploadRes.ok) {
-      return NextResponse.json({ error: "file upload failed" }, { status: 502 })
-    }
-
-    const uploadData = await uploadRes.json().catch(() => null)
-    if (!uploadData?.url) {
-      return NextResponse.json({ error: "invalid upload response" }, { status: 502 })
-    }
-
-    fileUrl = uploadData.url as string
-    fileName = uploadData.name as string
+  const { action = "transcribe", file_url, file_name, file_mime, message = "" } = body as {
+    action?: string
+    file_url?: string
+    file_name?: string
+    file_mime?: string
+    message?: string
   }
 
-  // Build the agent message.
   let agentMessage: string
   if (action === "transcribe") {
     agentMessage = message ? `이 음성을 텍스트로 변환해줘: ${message}` : "이 음성을 텍스트로 변환해줘"
   } else {
-    // generate (TTS)
     agentMessage = message ? `다음 텍스트를 음성으로 변환해줘: ${message}` : message
   }
 
@@ -69,8 +48,8 @@ export async function POST(req: NextRequest) {
     message: agentMessage,
   }
 
-  if (fileUrl) {
-    payload.files = [{ url: fileUrl, name: fileName, mime: file?.type ?? "audio/webm" }]
+  if (file_url) {
+    payload.files = [{ url: file_url, name: file_name ?? "audio.webm", mime: file_mime ?? "audio/webm" }]
   }
 
   const upstream = await fetch(`${API_URL}/api/v1/chat/stream`, {
