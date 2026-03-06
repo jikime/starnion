@@ -23,7 +23,7 @@ from starpion_agent.db.repositories import provider as provider_repo
 from starpion_agent.persona import DEFAULT_PERSONA, build_system_prompt
 from starpion_agent.skills.audio.tools import generate_audio, transcribe_audio
 from starpion_agent.skills.budget.tools import get_budget_status, set_budget
-from starpion_agent.skills.diary.tools import save_daily_log
+from starpion_agent.skills.diary.tools import save_daily_log, save_diary_entry
 from starpion_agent.skills.documents.tools import generate_document, parse_document
 from starpion_agent.skills.finance.tools import get_monthly_total, save_finance
 from starpion_agent.skills.goals.tools import get_goals, set_goal, update_goal_status
@@ -96,6 +96,7 @@ ALL_TOOLS = [
     get_monthly_total,
     retrieve_memory,
     save_daily_log,
+    save_diary_entry,
     set_budget,
     get_budget_status,
     analyze_image,

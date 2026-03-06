@@ -290,6 +290,72 @@ func getUsersWithGoals(ctx context.Context, db *sql.DB) ([]activeUser, error) {
 	return scanActiveUsers(rows)
 }
 
+// ddayNotification holds all D-Day items to notify for a single user.
+type ddayNotification struct {
+	userID string
+	chatID int64
+	items  []ddayNotifItem
+}
+
+type ddayNotifItem struct {
+	title    string
+	icon     string
+	daysDiff int // 0 = today, 1 = tomorrow, etc.
+}
+
+// getDdayUsersForNotification returns users who have D-Days falling on
+// alert thresholds (D-30, D-7, D-3, D-1, D-Day) for today.
+func getDdayUsersForNotification(ctx context.Context, db *sql.DB) ([]ddayNotification, error) {
+	rows, err := db.QueryContext(ctx, `
+		SELECT d.user_id, pi.platform_id, d.title, d.icon,
+		       (d.target_date - CURRENT_DATE) AS days_diff
+		FROM ddays d
+		JOIN platform_identities pi ON pi.user_id = d.user_id AND pi.platform = 'telegram'
+		WHERE (d.target_date - CURRENT_DATE) IN (30, 7, 3, 1, 0)
+		ORDER BY d.user_id, days_diff ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("query dday notifications: %w", err)
+	}
+	defer rows.Close()
+
+	userMap := make(map[string]*ddayNotification)
+	var userOrder []string
+
+	for rows.Next() {
+		var userID, platformID, title, icon string
+		var daysDiff int
+		if err := rows.Scan(&userID, &platformID, &title, &icon, &daysDiff); err != nil {
+			continue
+		}
+
+		if _, ok := userMap[userID]; !ok {
+			chatID, err := strconv.ParseInt(platformID, 10, 64)
+			if err != nil {
+				log.Warn().Str("user_id", userID).Str("platform_id", platformID).Msg("invalid telegram platform_id in dday query")
+				continue
+			}
+			userMap[userID] = &ddayNotification{userID: userID, chatID: chatID}
+			userOrder = append(userOrder, userID)
+		}
+
+		userMap[userID].items = append(userMap[userID].items, ddayNotifItem{
+			title:    title,
+			icon:     icon,
+			daysDiff: daysDiff,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	result := make([]ddayNotification, 0, len(userOrder))
+	for _, uid := range userOrder {
+		result = append(result, *userMap[uid])
+	}
+	return result, nil
+}
+
 // scanActiveUsers scans rows returning (user_id UUID, platform_id Telegram ID) into activeUser slices.
 func scanActiveUsers(rows *sql.Rows) ([]activeUser, error) {
 	var users []activeUser

@@ -559,6 +559,34 @@ func main() {
 		api.DELETE("/goals/:id", goalsHandler.DeleteGoal)
 		api.POST("/goals/:id/checkin", goalsHandler.AddCheckin)
 		api.DELETE("/goals/:id/checkin", goalsHandler.RemoveCheckin)
+
+		// Memo endpoints.
+		memoHandler := handler.NewMemoHandler(db)
+		api.GET("/memos", memoHandler.ListMemos)
+		api.POST("/memos", memoHandler.CreateMemo)
+		api.PUT("/memos/:id", memoHandler.UpdateMemo)
+		api.DELETE("/memos/:id", memoHandler.DeleteMemo)
+
+		// D-Day endpoints.
+		ddayHandler := handler.NewDdayHandler(db)
+		api.GET("/ddays", ddayHandler.ListDdays)
+		api.POST("/ddays", ddayHandler.CreateDday)
+		api.PUT("/ddays/:id", ddayHandler.UpdateDday)
+		api.DELETE("/ddays/:id", ddayHandler.DeleteDday)
+
+		// Report endpoints.
+		reportHandler := handler.NewReportHandler(db, grpcConn)
+		api.GET("/reports", reportHandler.ListReports)
+		api.GET("/reports/:id", reportHandler.GetReport)
+		api.POST("/reports/generate", reportHandler.GenerateReport)
+
+		// Document endpoints.
+		// The agent's log HTTP server (port 8082) also handles POST /index-document.
+		agentHTTPURL := fmt.Sprintf("http://%s:8082", cfg.GRPC.AgentService.Host)
+		documentHandler := handler.NewDocumentHandler(db, minioStore, agentHTTPURL)
+		api.GET("/documents", documentHandler.ListDocuments)
+		api.POST("/documents", documentHandler.UploadDocument)
+		api.DELETE("/documents/:id", documentHandler.DeleteDocument)
 	}
 
 	// Manual report trigger for testing proactive notifications.

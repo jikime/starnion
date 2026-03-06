@@ -1,12 +1,10 @@
 """D-day tracking tools.
 
 Allows users to set, list, and delete D-day entries.
-D-days are stored in the knowledge_base table with a "dday:" key prefix.
+D-days are stored in the dedicated ddays table.
 """
 
-import json
 import logging
-import uuid
 from datetime import date, datetime
 
 from langchain_core.tools import tool
@@ -14,12 +12,11 @@ from pydantic import BaseModel, Field
 
 from starpion_agent.context import get_current_user
 from starpion_agent.db.pool import get_pool
-from starpion_agent.db.repositories import knowledge as knowledge_repo
+from starpion_agent.db.repositories import dday_db as dday_db_repo
 from starpion_agent.skills.guard import skill_guard
 
 logger = logging.getLogger(__name__)
 
-DDAY_KEY_PREFIX = "dday:"
 MAX_ACTIVE_DDAYS = 30
 
 
@@ -29,6 +26,8 @@ class SetDdayInput(BaseModel):
     title: str = Field(description="디데이 이름 (예: 생일, 결혼기념일)")
     target_date: str = Field(description="목표 날짜 (YYYY-MM-DD 형식)")
     recurring: bool = Field(default=False, description="매년 반복 여부")
+    icon: str = Field(default="📅", description="아이콘 이모지 (예: 🎂, 💍, ✈️)")
+    description: str = Field(default="", description="메모 (선택)")
 
 
 class ListDdaysInput(BaseModel):
@@ -43,15 +42,7 @@ class ListDdaysInput(BaseModel):
 class DeleteDdayInput(BaseModel):
     """Input schema for delete_dday tool."""
 
-    dday_id: str = Field(description="삭제할 디데이 ID")
-
-
-def _parse_json(value: str) -> dict:
-    """Safely parse a JSON string."""
-    try:
-        return json.loads(value)
-    except (json.JSONDecodeError, TypeError):
-        return {}
+    dday_id: int = Field(description="삭제할 디데이 ID (숫자)")
 
 
 def _calc_dday(target: date) -> str:
@@ -70,6 +61,8 @@ async def set_dday(
     title: str,
     target_date: str,
     recurring: bool = False,
+    icon: str = "📅",
+    description: str = "",
 ) -> str:
     """디데이를 설정합니다. 중요한 날짜까지 남은 일수를 추적합니다."""
     user_id = get_current_user()
@@ -79,7 +72,6 @@ async def set_dday(
     if not title or not title.strip():
         return "디데이 이름을 입력해 주세요."
 
-    # Parse target_date.
     try:
         target_dt = datetime.strptime(target_date.strip(), "%Y-%m-%d").date()
     except ValueError:
@@ -88,29 +80,21 @@ async def set_dday(
     pool = get_pool()
 
     # Check active dday count.
-    existing = await knowledge_repo.get_by_key_prefix(pool, user_id, DDAY_KEY_PREFIX)
+    existing = await dday_db_repo.list_ddays(pool, user_id)
     if len(existing) >= MAX_ACTIVE_DDAYS:
         return (
             f"디데이는 최대 {MAX_ACTIVE_DDAYS}개까지 설정할 수 있어요. "
             "기존 디데이를 삭제한 후 다시 시도해 주세요."
         )
 
-    dday_id = uuid.uuid4().hex[:8]
-    now = datetime.now()
-
-    dday_data = {
-        "title": title.strip(),
-        "target_date": target_date.strip(),
-        "recurring": recurring,
-        "created_at": now.isoformat(timespec="seconds"),
-    }
-
-    await knowledge_repo.upsert(
+    dday = await dday_db_repo.create(
         pool,
         user_id=user_id,
-        key=f"{DDAY_KEY_PREFIX}{dday_id}",
-        value=json.dumps(dday_data, ensure_ascii=False),
-        source="user_chat",
+        title=title.strip(),
+        target_date=target_dt,
+        icon=icon or "📅",
+        description=description,
+        recurring=recurring,
     )
 
     dday_str = _calc_dday(target_dt)
@@ -118,7 +102,7 @@ async def set_dday(
 
     lines = [
         f"디데이를 설정했어요! '{title.strip()}'{recurring_label}",
-        f"디데이 ID: {dday_id}",
+        f"디데이 ID: {dday['id']}",
         f"날짜: {target_date.strip()}",
         f"남은 일수: {dday_str}",
     ]
@@ -134,64 +118,52 @@ async def list_ddays(include_past: bool = False) -> str:
         return "사용자 정보를 확인할 수 없어요."
 
     pool = get_pool()
-    entries = await knowledge_repo.get_by_key_prefix(pool, user_id, DDAY_KEY_PREFIX)
+    all_ddays = await dday_db_repo.list_ddays(pool, user_id)
 
-    if not entries:
+    if not all_ddays:
         return "등록된 디데이가 없어요. 디데이를 설정해 보세요!"
 
     items: list[tuple[date, str]] = []
-    for entry in entries:
-        data = _parse_json(entry["value"])
-        if not data:
-            continue
+    for dday in all_ddays:
+        target_dt = dday["target_date"]
+        if isinstance(target_dt, str):
+            target_dt = datetime.strptime(target_dt, "%Y-%m-%d").date()
 
-        try:
-            target_dt = datetime.strptime(data["target_date"], "%Y-%m-%d").date()
-        except (ValueError, KeyError):
-            continue
-
-        # Filter past D-days.
+        # Filter past D-days (keep recurring ones even if past).
         if not include_past and target_dt < date.today():
-            # Keep recurring D-days even if past.
-            if not data.get("recurring"):
+            if not dday.get("recurring"):
                 continue
 
-        dday_id = entry["key"].replace(DDAY_KEY_PREFIX, "")
-        title = data.get("title", "")
         dday_str = _calc_dday(target_dt)
-        recurring_label = " 🔄" if data.get("recurring") else ""
+        recurring_label = " 🔄" if dday.get("recurring") else ""
+        icon = dday.get("icon", "📆")
 
-        line = f"📆 {title}{recurring_label} — {dday_str} (ID: {dday_id})"
-        line += f"\n  날짜: {data['target_date']}"
+        line = f"{icon} {dday['title']}{recurring_label} — {dday_str} (ID: {dday['id']})"
+        line += f"\n  날짜: {target_dt}"
+        if dday.get("description"):
+            line += f"\n  {dday['description']}"
+
         items.append((target_dt, line))
 
     if not items:
         return "활성 디데이가 없어요."
 
-    # Sort by target date.
     items.sort(key=lambda x: x[0])
-
     return "\n\n".join(line for _, line in items)
 
 
 @tool(args_schema=DeleteDdayInput)
 @skill_guard("dday")
-async def delete_dday(dday_id: str) -> str:
+async def delete_dday(dday_id: int) -> str:
     """디데이를 삭제합니다."""
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요."
 
     pool = get_pool()
-    key = f"{DDAY_KEY_PREFIX}{dday_id}"
-    entry = await knowledge_repo.get_by_key(pool, user_id, key)
+    deleted = await dday_db_repo.delete(pool, user_id, dday_id)
 
-    if not entry:
+    if not deleted:
         return f"디데이 ID '{dday_id}'를 찾을 수 없어요."
 
-    data = _parse_json(entry["value"])
-    title = data.get("title", dday_id) if data else dday_id
-
-    await knowledge_repo.delete_by_key(pool, user_id, key)
-
-    return f"'{title}' 디데이를 삭제했어요."
+    return f"디데이(ID: {dday_id})를 삭제했어요."

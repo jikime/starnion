@@ -235,7 +235,7 @@ function IntegrationsPageInner() {
           const isBusy = busy === integration.id
 
           return (
-            <Card key={integration.id} className={`shadow-none border ${integration.border} ${integration.color}`}>
+            <Card key={integration.id} className={`border ${integration.border} ${integration.color}`}>
               <CardContent className="p-5">
                 <div className="flex items-start gap-4">
                   {/* Logo */}

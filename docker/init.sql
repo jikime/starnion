@@ -117,9 +117,13 @@ CREATE TABLE IF NOT EXISTS user_documents (
     title       TEXT        NOT NULL,
     file_type   TEXT        NOT NULL,
     file_url    TEXT        NOT NULL,
+    object_key  TEXT        NOT NULL DEFAULT '',
+    size        BIGINT      NOT NULL DEFAULT 0,
+    indexed     BOOLEAN     NOT NULL DEFAULT FALSE,
     uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_user_documents_user_id ON user_documents(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_documents_user_id    ON user_documents(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_documents_uploaded_at ON user_documents(uploaded_at DESC);
 
 CREATE TABLE IF NOT EXISTS document_sections (
     id          BIGSERIAL NOT NULL PRIMARY KEY,
@@ -133,6 +137,22 @@ CREATE INDEX IF NOT EXISTS idx_document_sections_embedding ON document_sections
     USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 CREATE INDEX IF NOT EXISTS idx_document_sections_content_tsv
     ON document_sections USING gin(content_tsv);
+
+-- =============================================================
+-- REPORTS
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS reports (
+    id          BIGSERIAL   NOT NULL PRIMARY KEY,
+    user_id     TEXT        NOT NULL,
+    report_type TEXT        NOT NULL,
+    title       TEXT        NOT NULL DEFAULT '',
+    content     TEXT        NOT NULL DEFAULT '',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_reports_user_id    ON reports(user_id);
+CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reports_type       ON reports(report_type);
 
 -- =============================================================
 -- KNOWLEDGE BASE  (goals / schedules / reminders / dday / memo / RAG)
@@ -270,6 +290,32 @@ CREATE TRIGGER trg_document_sections_tsv
     BEFORE INSERT OR UPDATE OF content ON document_sections
     FOR EACH ROW EXECUTE FUNCTION document_sections_tsv_trigger();
 
+CREATE OR REPLACE FUNCTION diary_entries_tsv_trigger() RETURNS trigger AS $$
+BEGIN
+    NEW.content_tsv := to_tsvector('simple',
+        COALESCE(NEW.title, '') || ' ' || COALESCE(NEW.content, ''));
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION memos_tsv_trigger() RETURNS trigger AS $$
+BEGIN
+    NEW.content_tsv := to_tsvector('simple',
+        COALESCE(NEW.title, '') || ' ' || COALESCE(NEW.content, ''));
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_diary_entries_tsv ON diary_entries;
+CREATE TRIGGER trg_diary_entries_tsv
+    BEFORE INSERT OR UPDATE OF title, content ON diary_entries
+    FOR EACH ROW EXECUTE FUNCTION diary_entries_tsv_trigger();
+
+DROP TRIGGER IF EXISTS trg_memos_tsv ON memos;
+CREATE TRIGGER trg_memos_tsv
+    BEFORE INSERT OR UPDATE OF title, content ON memos
+    FOR EACH ROW EXECUTE FUNCTION memos_tsv_trigger();
+
 -- =============================================================
 -- CHANNEL SETTINGS (migrations 013–015)
 -- =============================================================
@@ -357,3 +403,99 @@ CREATE TABLE IF NOT EXISTS user_personas (
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_user_personas_user_id ON user_personas(user_id);
+
+-- =============================================================
+-- LIFE - DIARY
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS diary_entries (
+    id          SERIAL      PRIMARY KEY,
+    user_id     TEXT        NOT NULL,
+    title       TEXT        NOT NULL DEFAULT '',
+    content     TEXT        NOT NULL,
+    mood        TEXT        NOT NULL DEFAULT '보통',
+    tags        TEXT[]      NOT NULL DEFAULT '{}',
+    entry_date  DATE        NOT NULL DEFAULT CURRENT_DATE,
+    embedding   vector(768),
+    content_tsv tsvector,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_diary_entries_user_date ON diary_entries(user_id, entry_date DESC);
+CREATE INDEX IF NOT EXISTS idx_diary_entries_embedding ON diary_entries
+    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+CREATE INDEX IF NOT EXISTS idx_diary_entries_content_tsv ON diary_entries USING gin(content_tsv);
+
+-- =============================================================
+-- LIFE - GOALS
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS goals (
+    id             BIGSERIAL   PRIMARY KEY,
+    user_id        TEXT        NOT NULL,
+    title          TEXT        NOT NULL,
+    icon           TEXT        NOT NULL DEFAULT '🎯',
+    category       TEXT        NOT NULL DEFAULT 'general',
+    target_value   NUMERIC     NOT NULL DEFAULT 0,
+    current_value  NUMERIC     NOT NULL DEFAULT 0,
+    unit           TEXT        NOT NULL DEFAULT '',
+    start_date     DATE        NOT NULL DEFAULT CURRENT_DATE,
+    end_date       DATE,
+    status         TEXT        NOT NULL DEFAULT 'in_progress'
+                               CHECK (status IN ('in_progress','completed','abandoned')),
+    description    TEXT,
+    metadata       JSONB       NOT NULL DEFAULT '{}',
+    completed_date DATE,
+    abandoned_date DATE,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_goals_user_status  ON goals(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_goals_user_created ON goals(user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS goal_checkins (
+    id         BIGSERIAL   PRIMARY KEY,
+    goal_id    BIGINT      NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+    user_id    TEXT        NOT NULL,
+    check_date DATE        NOT NULL DEFAULT CURRENT_DATE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(goal_id, check_date)
+);
+CREATE INDEX IF NOT EXISTS idx_goal_checkins_goal ON goal_checkins(goal_id);
+
+-- =============================================================
+-- LIFE - MEMOS
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS memos (
+    id          BIGSERIAL   PRIMARY KEY,
+    user_id     TEXT        NOT NULL,
+    title       TEXT        NOT NULL DEFAULT '',
+    content     TEXT        NOT NULL DEFAULT '',
+    tag         TEXT        NOT NULL DEFAULT '개인',
+    embedding   vector(768),
+    content_tsv tsvector,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_memos_user_id ON memos(user_id);
+CREATE INDEX IF NOT EXISTS idx_memos_embedding ON memos
+    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+CREATE INDEX IF NOT EXISTS idx_memos_content_tsv ON memos USING gin(content_tsv);
+
+-- =============================================================
+-- LIFE - D-DAY
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS ddays (
+    id          BIGSERIAL   PRIMARY KEY,
+    user_id     TEXT        NOT NULL,
+    title       TEXT        NOT NULL,
+    target_date DATE        NOT NULL,
+    icon        TEXT        NOT NULL DEFAULT '📅',
+    description TEXT        NOT NULL DEFAULT '',
+    recurring   BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ddays_user_id ON ddays(user_id);

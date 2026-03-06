@@ -516,6 +516,59 @@ func formatNumber(n int) string {
 	return result.String()
 }
 
+// --- D-Day Notification Rule ---
+
+// runDdayNotificationRule checks for D-Days at alert thresholds (D-30, D-7, D-3, D-1, D-Day)
+// and sends a grouped Telegram message to each affected user.
+// Runs daily at 08:00 KST.
+func (s *Scheduler) runDdayNotificationRule() {
+	if s.db == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	notifications, err := getDdayUsersForNotification(ctx, s.db)
+	if err != nil {
+		log.Error().Err(err).Msg("dday notification: failed to query")
+		return
+	}
+
+	if len(notifications) == 0 {
+		log.Debug().Msg("dday notification: no D-Days to notify today")
+		return
+	}
+
+	log.Info().Int("users", len(notifications)).Msg("sending D-Day notifications")
+
+	for _, n := range notifications {
+		if s.skillService != nil && !s.skillService.IsEnabled(n.userID, "dday") {
+			continue
+		}
+
+		var lines []string
+		for _, item := range n.items {
+			var label string
+			switch item.daysDiff {
+			case 0:
+				label = "D-Day! 🎉 (오늘!)"
+			case 1:
+				label = "D-1 (내일!)"
+			default:
+				label = fmt.Sprintf("D-%d (%d일 후)", item.daysDiff, item.daysDiff)
+			}
+			lines = append(lines, fmt.Sprintf("%s %s — %s", item.icon, item.title, label))
+		}
+
+		message := "📅 디데이 알림\n\n" + strings.Join(lines, "\n")
+		prefs := s.loadPreferences(n.userID)
+		if err := s.sendTemplateNotification(n.userID, n.chatID, prefs, message); err != nil {
+			log.Error().Err(err).Str("user_id", n.userID).Msg("dday notification: send failed")
+		}
+	}
+}
+
 // --- Conversation Analysis Rule ---
 
 // runConversationAnalysisRule detects idle users and triggers background

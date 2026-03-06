@@ -54,7 +54,7 @@ SKILLS: dict[str, SkillDef] = {
         emoji="📔",
         description="일상 기록, 감정 분석, 대화 분석",
         category="lifestyle",
-        tools=["save_daily_log"],
+        tools=["save_daily_log", "save_diary_entry"],
         reports=["conversation_analysis"],
         sort_order=3,
     ),

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -46,10 +46,10 @@ interface UserSchedule {
   id: string
   kb_row_id: number
   title: string
-  type: string        // one_time | recurring
+  type: string
   report_type: string
   schedule: ScheduleTime
-  status: string      // active | paused | completed
+  status: string
   message: string
   last_sent: string
   created_at: string
@@ -92,28 +92,27 @@ const DOW_OPTIONS = [
 
 function cronHuman(expr: string): string {
   const m: Record<string, string> = {
-    "0 9 * * 1":        "매주 월 09:00",
-    "0 * * * *":        "매시간",
-    "0 21 * * *":       "매일 21:00",
-    "0 20 * * *":       "매일 20:00",
-    "0 21 28-31 * *":   "월말 21:00",
-    "0 6 * * *":        "매일 06:00",
-    "0 */3 * * *":      "3시간마다",
-    "0 14 * * *":       "매일 14:00",
-    "*/10 * * * *":     "10분마다",
-    "0 7 * * *":        "매일 07:00",
-    "0 12 * * 3":       "매주 수 12:00",
-    "*/15 * * * *":     "15분마다",
-    "0 5 * * 1":        "매주 월 05:00",
+    "0 9 * * 1":      "매주 월 09:00",
+    "0 * * * *":      "매시간",
+    "0 21 * * *":     "매일 21:00",
+    "0 20 * * *":     "매일 20:00",
+    "0 21 28-31 * *": "월말 21:00",
+    "0 6 * * *":      "매일 06:00",
+    "0 */3 * * *":    "3시간마다",
+    "0 14 * * *":     "매일 14:00",
+    "*/10 * * * *":   "10분마다",
+    "0 7 * * *":      "매일 07:00",
+    "0 8 * * *":      "매일 08:00",
+    "0 12 * * 3":     "매주 수 12:00",
+    "*/15 * * * *":   "15분마다",
+    "0 5 * * 1":      "매주 월 05:00",
   }
   return m[expr] ?? expr
 }
 
 function scheduleDisplay(s: ScheduleTime, type: string): string {
   const time = `${String(s.hour).padStart(2, "0")}:${String(s.minute).padStart(2, "0")}`
-  if (type === "one_time") {
-    return s.date ? `${s.date} ${time}` : time
-  }
+  if (type === "one_time") return s.date ? `${s.date} ${time}` : time
   if (s.day_of_week) {
     const dow = DOW_OPTIONS.find((d) => d.value === s.day_of_week)?.label ?? s.day_of_week
     return `매주 ${dow} ${time}`
@@ -128,35 +127,26 @@ function statusBadge(status: string) {
   return <Badge variant="outline">{status}</Badge>
 }
 
-// ── Empty form state ───────────────────────────────────────────────────────────
-
-const emptyForm = () => ({
-  title:       "",
-  type:        "recurring",
-  report_type: "custom_reminder",
-  message:     "",
-  hour:        9,
-  minute:      0,
-  day_of_week: "",
-  date:        "",
+const emptyCronForm = () => ({
+  title: "", type: "recurring", report_type: "custom_reminder",
+  message: "", hour: 9, minute: 0, day_of_week: "", date: "",
 })
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function CronPage() {
-  const [systemJobs, setSystemJobs]     = useState<SystemJob[]>([])
-  const [schedules, setSchedules]       = useState<UserSchedule[]>([])
-  const [loadingSystem, setLoadingSystem] = useState(true)
-  const [loadingUser, setLoadingUser]   = useState(true)
-  const [dialogOpen, setDialogOpen]     = useState(false)
-  const [editTarget, setEditTarget]     = useState<UserSchedule | null>(null)
-  const [saving, setSaving]             = useState(false)
-  const [togglingId, setTogglingId]     = useState<string | null>(null)
-  const [deletingId, setDeletingId]     = useState<string | null>(null)
-  const [form, setForm] = useState(emptyForm())
+  const [systemJobs, setSystemJobs]         = useState<SystemJob[]>([])
+  const [schedules, setSchedules]           = useState<UserSchedule[]>([])
+  const [loadingSystem, setLoadingSystem]   = useState(true)
+  const [loadingUser, setLoadingUser]       = useState(true)
+  const [cronDialogOpen, setCronDialogOpen] = useState(false)
+  const [cronEditTarget, setCronEditTarget] = useState<UserSchedule | null>(null)
+  const [cronSaving, setCronSaving]         = useState(false)
+  const [togglingId, setTogglingId]         = useState<string | null>(null)
+  const [cronDeletingId, setCronDeletingId] = useState<string | null>(null)
+  const [cronForm, setCronForm]             = useState(emptyCronForm())
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
-
+  // ── Fetch: system jobs ───────────────────────────────────────────────────────
   useEffect(() => {
     fetch("/api/cron/system")
       .then((r) => r.json())
@@ -165,81 +155,63 @@ export default function CronPage() {
       .finally(() => setLoadingSystem(false))
   }, [])
 
-  const fetchSchedules = () => {
+  // ── Fetch: user schedules ───────────────────────────────────────────────────
+  const fetchSchedules = useCallback(() => {
     setLoadingUser(true)
     fetch("/api/cron/schedules")
       .then((r) => r.json())
       .then((d) => setSchedules(Array.isArray(d) ? d : []))
       .catch(() => {})
       .finally(() => setLoadingUser(false))
+  }, [])
+
+  useEffect(() => { fetchSchedules() }, [fetchSchedules])
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+  const openCronCreate = () => {
+    setCronEditTarget(null)
+    setCronForm(emptyCronForm())
+    setCronDialogOpen(true)
   }
 
-  useEffect(() => { fetchSchedules() }, [])
-
-  // ── Dialog helpers ─────────────────────────────────────────────────────────
-
-  const openCreate = () => {
-    setEditTarget(null)
-    setForm(emptyForm())
-    setDialogOpen(true)
-  }
-
-  const openEdit = (s: UserSchedule) => {
-    setEditTarget(s)
-    setForm({
-      title:       s.title,
-      type:        s.type,
-      report_type: s.report_type,
-      message:     s.message,
-      hour:        s.schedule.hour,
-      minute:      s.schedule.minute,
-      day_of_week: s.schedule.day_of_week ?? "",
-      date:        s.schedule.date ?? "",
+  const openCronEdit = (s: UserSchedule) => {
+    setCronEditTarget(s)
+    setCronForm({
+      title: s.title, type: s.type, report_type: s.report_type,
+      message: s.message, hour: s.schedule.hour, minute: s.schedule.minute,
+      day_of_week: s.schedule.day_of_week ?? "", date: s.schedule.date ?? "",
     })
-    setDialogOpen(true)
+    setCronDialogOpen(true)
   }
 
-  // ── Save (create / update) ─────────────────────────────────────────────────
-
-  const handleSave = async () => {
-    if (!form.title.trim()) return
-    setSaving(true)
+  const handleCronSave = async () => {
+    if (!cronForm.title.trim()) return
+    setCronSaving(true)
     try {
       const body = {
-        title:       form.title,
-        type:        form.type,
-        report_type: form.report_type,
-        message:     form.message,
+        title: cronForm.title, type: cronForm.type, report_type: cronForm.report_type,
+        message: cronForm.message,
         schedule: {
-          hour:        form.hour,
-          minute:      form.minute,
-          day_of_week: form.type === "recurring" ? (form.day_of_week || undefined) : undefined,
-          date:        form.type === "one_time"  ? (form.date || undefined)        : undefined,
+          hour: cronForm.hour, minute: cronForm.minute,
+          day_of_week: cronForm.type === "recurring" ? (cronForm.day_of_week || undefined) : undefined,
+          date: cronForm.type === "one_time" ? (cronForm.date || undefined) : undefined,
         },
       }
-
-      if (editTarget) {
-        await fetch(`/api/cron/schedules/${editTarget.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+      if (cronEditTarget) {
+        await fetch(`/api/cron/schedules/${cronEditTarget.id}`, {
+          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
         })
       } else {
         await fetch("/api/cron/schedules", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
         })
       }
-
-      setDialogOpen(false)
+      setCronDialogOpen(false)
       fetchSchedules()
     } finally {
-      setSaving(false)
+      setCronSaving(false)
     }
   }
-
-  // ── Toggle ─────────────────────────────────────────────────────────────────
 
   const handleToggle = async (id: string) => {
     setTogglingId(id)
@@ -254,26 +226,24 @@ export default function CronPage() {
     }
   }
 
-  // ── Delete ─────────────────────────────────────────────────────────────────
-
-  const handleDelete = async (id: string) => {
+  const handleCronDelete = async (id: string) => {
     if (!confirm("이 일정을 삭제하시겠습니까?")) return
-    setDeletingId(id)
+    setCronDeletingId(id)
     try {
       await fetch(`/api/cron/schedules/${id}`, { method: "DELETE" })
       setSchedules((prev) => prev.filter((s) => s.id !== id))
     } finally {
-      setDeletingId(null)
+      setCronDeletingId(null)
     }
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Cron Jobs</h1>
-        <p className="text-muted-foreground">시스템 자동화 작업 및 사용자 일정을 관리합니다</p>
+        <h1 className="text-2xl font-semibold">알림 센터</h1>
+        <p className="text-muted-foreground">시스템 자동화 스케줄과 내 알림 일정을 관리합니다</p>
       </div>
 
       <Tabs defaultValue="system" className="space-y-6">
@@ -284,10 +254,8 @@ export default function CronPage() {
 
         {/* ── System Jobs ──────────────────────────────────────────────────── */}
         <TabsContent value="system">
-          <Card className="shadow-none">
-            <CardHeader>
-              <CardTitle>시스템 Cron Jobs</CardTitle>
-            </CardHeader>
+          <Card>
+            <CardHeader><CardTitle>시스템 Cron Jobs</CardTitle></CardHeader>
             <CardContent>
               {loadingSystem ? (
                 <div className="flex justify-center py-12">
@@ -296,10 +264,7 @@ export default function CronPage() {
               ) : (
                 <div className="space-y-2">
                   {systemJobs.map((job) => (
-                    <div
-                      key={job.id}
-                      className="flex items-center gap-4 rounded-lg border border-border p-3"
-                    >
+                    <div key={job.id} className="flex items-center gap-4 rounded-lg border border-border p-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium">{job.name}</span>
@@ -309,12 +274,8 @@ export default function CronPage() {
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">{job.description}</p>
                       </div>
-                      <code className="text-xs bg-muted px-2 py-1 rounded shrink-0 hidden sm:block">
-                        {job.schedule}
-                      </code>
-                      <span className="text-xs text-muted-foreground shrink-0 hidden md:block">
-                        {cronHuman(job.schedule)}
-                      </span>
+                      <code className="text-xs bg-muted px-2 py-1 rounded shrink-0 hidden sm:block">{job.schedule}</code>
+                      <span className="text-xs text-muted-foreground shrink-0 hidden md:block">{cronHuman(job.schedule)}</span>
                       <Badge variant={job.enabled ? "default" : "secondary"} className="shrink-0">
                         {job.enabled ? "활성" : "비활성"}
                       </Badge>
@@ -328,12 +289,11 @@ export default function CronPage() {
 
         {/* ── User Schedules ───────────────────────────────────────────────── */}
         <TabsContent value="user">
-          <Card className="shadow-none">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>내 일정</CardTitle>
-              <Button size="sm" onClick={openCreate} className="gap-1">
-                <Plus className="size-4" />
-                일정 추가
+              <Button size="sm" onClick={openCronCreate} className="gap-1">
+                <Plus className="size-4" />일정 추가
               </Button>
             </CardHeader>
             <CardContent>
@@ -348,10 +308,7 @@ export default function CronPage() {
               ) : (
                 <div className="space-y-2">
                   {schedules.map((s) => (
-                    <div
-                      key={s.id}
-                      className="flex items-center gap-3 rounded-lg border border-border p-3"
-                    >
+                    <div key={s.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium">{s.title}</span>
@@ -365,41 +322,23 @@ export default function CronPage() {
                           {s.last_sent && <span>마지막 전송: {s.last_sent}</span>}
                         </div>
                       </div>
-
-                      {/* Toggle */}
                       {s.status !== "completed" && (
                         togglingId === s.id ? (
                           <Loader2 className="size-4 animate-spin text-muted-foreground shrink-0" />
                         ) : (
-                          <Switch
-                            checked={s.status === "active"}
-                            onCheckedChange={() => handleToggle(s.id)}
-                          />
+                          <Switch checked={s.status === "active"} onCheckedChange={() => handleToggle(s.id)} />
                         )
                       )}
-
-                      {/* Edit */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8 shrink-0"
-                        onClick={() => openEdit(s)}
-                      >
+                      <Button variant="ghost" size="icon" className="size-8 shrink-0" onClick={() => openCronEdit(s)}>
                         <Pencil className="size-3.5" />
                       </Button>
-
-                      {/* Delete */}
                       <Button
-                        variant="ghost"
-                        size="icon"
+                        variant="ghost" size="icon"
                         className="size-8 shrink-0 text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(s.id)}
-                        disabled={deletingId === s.id}
+                        onClick={() => handleCronDelete(s.id)}
+                        disabled={cronDeletingId === s.id}
                       >
-                        {deletingId === s.id
-                          ? <Loader2 className="size-3.5 animate-spin" />
-                          : <Trash2 className="size-3.5" />
-                        }
+                        {cronDeletingId === s.id ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
                       </Button>
                     </div>
                   ))}
@@ -410,130 +349,74 @@ export default function CronPage() {
         </TabsContent>
       </Tabs>
 
-      {/* ── Create / Edit Dialog ─────────────────────────────────────────────── */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {/* ── Cron Dialog ──────────────────────────────────────────────────────── */}
+      <Dialog open={cronDialogOpen} onOpenChange={setCronDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editTarget ? "일정 수정" : "일정 추가"}</DialogTitle>
+            <DialogTitle>{cronEditTarget ? "일정 수정" : "일정 추가"}</DialogTitle>
           </DialogHeader>
-
           <div className="space-y-4 py-2">
-            {/* Title */}
             <div className="space-y-1.5">
               <Label>제목</Label>
-              <Input
-                placeholder="일정 이름"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-              />
+              <Input placeholder="일정 이름" value={cronForm.title} onChange={(e) => setCronForm({ ...cronForm, title: e.target.value })} />
             </div>
-
-            {/* Type */}
             <div className="space-y-1.5">
               <Label>유형</Label>
-              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={cronForm.type} onValueChange={(v) => setCronForm({ ...cronForm, type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="recurring">반복</SelectItem>
                   <SelectItem value="one_time">1회</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Report type */}
             <div className="space-y-1.5">
               <Label>알림 유형</Label>
-              <Select value={form.report_type} onValueChange={(v) => setForm({ ...form, report_type: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={cronForm.report_type} onValueChange={(v) => setCronForm({ ...cronForm, report_type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {REPORT_TYPES.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                  ))}
+                  {REPORT_TYPES.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Custom message */}
-            {form.report_type === "custom_reminder" && (
+            {cronForm.report_type === "custom_reminder" && (
               <div className="space-y-1.5">
                 <Label>메시지</Label>
-                <Input
-                  placeholder="전송할 메시지"
-                  value={form.message}
-                  onChange={(e) => setForm({ ...form, message: e.target.value })}
-                />
+                <Input placeholder="전송할 메시지" value={cronForm.message} onChange={(e) => setCronForm({ ...cronForm, message: e.target.value })} />
               </div>
             )}
-
-            {/* Time */}
             <div className="space-y-1.5">
               <Label>시간</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min={0}
-                  max={23}
-                  value={form.hour}
-                  onChange={(e) => setForm({ ...form, hour: Number(e.target.value) })}
-                  className="w-20"
-                  placeholder="시"
-                />
-                <span className="self-center text-muted-foreground">:</span>
-                <Input
-                  type="number"
-                  min={0}
-                  max={59}
-                  value={form.minute}
-                  onChange={(e) => setForm({ ...form, minute: Number(e.target.value) })}
-                  className="w-20"
-                  placeholder="분"
-                />
+              <div className="flex gap-2 items-center">
+                <Input type="number" min={0} max={23} value={cronForm.hour} onChange={(e) => setCronForm({ ...cronForm, hour: Number(e.target.value) })} className="w-20" placeholder="시" />
+                <span className="text-muted-foreground">:</span>
+                <Input type="number" min={0} max={59} value={cronForm.minute} onChange={(e) => setCronForm({ ...cronForm, minute: Number(e.target.value) })} className="w-20" placeholder="분" />
               </div>
             </div>
-
-            {/* Day of week (recurring) */}
-            {form.type === "recurring" && (
+            {cronForm.type === "recurring" && (
               <div className="space-y-1.5">
                 <Label>요일 (비워두면 매일)</Label>
-                <Select
-                  value={form.day_of_week}
-                  onValueChange={(v) => setForm({ ...form, day_of_week: v === "daily" ? "" : v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="매일" />
-                  </SelectTrigger>
+                <Select value={cronForm.day_of_week} onValueChange={(v) => setCronForm({ ...cronForm, day_of_week: v === "daily" ? "" : v })}>
+                  <SelectTrigger><SelectValue placeholder="매일" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="daily">매일</SelectItem>
-                    {DOW_OPTIONS.map((d) => (
-                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                    ))}
+                    {DOW_OPTIONS.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             )}
-
-            {/* Date (one_time) */}
-            {form.type === "one_time" && (
+            {cronForm.type === "one_time" && (
               <div className="space-y-1.5">
                 <Label>날짜</Label>
-                <Input
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                />
+                <Input type="date" value={cronForm.date} onChange={(e) => setCronForm({ ...cronForm, date: e.target.value })} />
               </div>
             )}
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>취소</Button>
-            <Button onClick={handleSave} disabled={saving || !form.title.trim()}>
-              {saving && <Loader2 className="size-4 animate-spin mr-2" />}
-              {editTarget ? "수정" : "추가"}
+            <Button variant="outline" onClick={() => setCronDialogOpen(false)}>취소</Button>
+            <Button onClick={handleCronSave} disabled={cronSaving || !cronForm.title.trim()}>
+              {cronSaving && <Loader2 className="size-4 animate-spin mr-2" />}
+              {cronEditTarget ? "수정" : "추가"}
             </Button>
           </DialogFooter>
         </DialogContent>

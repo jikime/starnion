@@ -4,12 +4,11 @@ Provides chat tools for users to create, view, and manage goals, plus
 report functions for periodic goal evaluation and status notifications.
 """
 
-import json
 import logging
 import re
-import uuid
+import json
 from calendar import monthrange
-from datetime import datetime
+from datetime import date, datetime
 
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
@@ -20,18 +19,17 @@ from starpion_agent.config import settings
 from starpion_agent.context import get_current_user
 from starpion_agent.db.pool import get_pool
 from starpion_agent.db.repositories import finance as finance_repo
-from starpion_agent.db.repositories import knowledge as knowledge_repo
+from starpion_agent.db.repositories import goal_db as goal_db_repo
 from starpion_agent.db.repositories import profile as profile_repo
 from starpion_agent.persona import DEFAULT_PERSONA, get_tone_instruction
 from starpion_agent.skills.guard import skill_guard
 
 logger = logging.getLogger(__name__)
 
-GOAL_KEY_PREFIX = "goal:"
 MAX_ACTIVE_GOALS = 5
 
 
-# --- Chat Tools (registered in LangGraph agent) ---
+# --- Chat Tools ---
 
 
 class SetGoalInput(BaseModel):
@@ -69,8 +67,8 @@ class GetGoalsInput(BaseModel):
 class UpdateGoalStatusInput(BaseModel):
     """Input schema for update_goal_status tool."""
 
-    goal_id: str = Field(
-        description="목표 ID (예: a1b2c3d4)",
+    goal_id: int = Field(
+        description="목표 ID (숫자)",
     )
     new_status: str = Field(
         description="새 상태: completed(달성) 또는 cancelled(취소)",
@@ -94,17 +92,12 @@ async def set_goal(
     pool = get_pool()
 
     # Check active goal limit.
-    existing = await knowledge_repo.get_by_key_prefix(pool, user_id, GOAL_KEY_PREFIX)
-    active_count = sum(
-        1
-        for e in existing
-        if _parse_goal_json(e["value"]).get("status") == "active"
-    )
-    if active_count >= MAX_ACTIVE_GOALS:
-        return f"활성 목표는 최대 {MAX_ACTIVE_GOALS}개까지 설정할 수 있어요. 기존 목표를 완료하거나 취소한 후 다시 시도해 주세요."
-
-    # Generate goal ID.
-    goal_id = uuid.uuid4().hex[:8]
+    active_goals = await goal_db_repo.list_goals(pool, user_id, status="in_progress")
+    if len(active_goals) >= MAX_ACTIVE_GOALS:
+        return (
+            f"활성 목표는 최대 {MAX_ACTIVE_GOALS}개까지 설정할 수 있어요. "
+            "기존 목표를 완료하거나 취소한 후 다시 시도해 주세요."
+        )
 
     # Default deadline to end of current month.
     now = datetime.now()
@@ -112,31 +105,28 @@ async def set_goal(
         last_day = monthrange(now.year, now.month)[1]
         deadline = now.replace(day=last_day).strftime("%Y-%m-%d")
 
-    goal_data = {
-        "title": title,
-        "type": goal_type,
-        "target": {
-            "category": category,
-            "amount": target_amount,
-            "period": "monthly",
-        },
-        "status": "active",
-        "created_at": now.isoformat(timespec="seconds"),
-        "deadline": f"{deadline}T23:59:59",
-        "last_evaluation": None,
-    }
+    try:
+        end_date = datetime.strptime(deadline, "%Y-%m-%d").date()
+    except ValueError:
+        return "날짜 형식이 올바르지 않아요. YYYY-MM-DD 형식으로 입력해 주세요."
 
-    await knowledge_repo.upsert(
+    # Use goal_type as category when no category provided.
+    cat = category.strip() if category.strip() else goal_type
+    unit = "원" if target_amount > 0 else ""
+
+    goal = await goal_db_repo.create(
         pool,
         user_id=user_id,
-        key=f"{GOAL_KEY_PREFIX}{goal_id}",
-        value=json.dumps(goal_data, ensure_ascii=False),
-        source="user_chat",
+        title=title,
+        category=cat,
+        target_value=float(target_amount),
+        unit=unit,
+        end_date=end_date,
     )
 
     lines = [
         f"목표를 설정했어요! '{title}'",
-        f"목표 ID: {goal_id}",
+        f"목표 ID: {goal['id']}",
         f"마감일: {deadline}",
         "",
         "매일 진행 상황을 체크하고, 매주 수요일에 진행률 리포트를 보내드릴게요.",
@@ -153,35 +143,36 @@ async def get_goals(include_completed: bool = False) -> str:
         return "사용자 정보를 확인할 수 없어요."
 
     pool = get_pool()
-    entries = await knowledge_repo.get_by_key_prefix(pool, user_id, GOAL_KEY_PREFIX)
 
-    if not entries:
+    if include_completed:
+        goals = await goal_db_repo.list_goals(pool, user_id)
+    else:
+        goals = await goal_db_repo.list_goals(pool, user_id, status="in_progress")
+
+    if not goals:
         return "설정된 목표가 없어요. 목표를 설정해 보세요!"
 
     lines = []
-    for entry in entries:
-        goal = _parse_goal_json(entry["value"])
-        if not goal:
-            continue
+    for goal in goals:
         status = goal.get("status", "unknown")
-        if not include_completed and status != "active":
-            continue
+        status_label = {
+            "in_progress": "진행중",
+            "completed": "달성",
+            "abandoned": "취소",
+        }.get(status, status)
 
-        goal_id = entry["key"].replace(GOAL_KEY_PREFIX, "")
-        title = goal.get("title", "")
-        deadline = goal.get("deadline", "")[:10]
+        line = f"[{status_label}] {goal['title']} (ID: {goal['id']})"
 
-        status_label = {"active": "진행중", "completed": "달성", "cancelled": "취소", "expired": "만료"}.get(status, status)
-        line = f"[{status_label}] {title} (ID: {goal_id})"
+        target_value = goal.get("target_value", 0)
+        if target_value:
+            line += f"\n  목표: {int(target_value):,}{goal.get('unit', '')}"
+        if goal.get("category") and goal["category"] != "general":
+            line += f" ({goal['category']})"
+        if goal.get("end_date"):
+            line += f"\n  마감일: {goal['end_date']}"
 
-        target = goal.get("target", {})
-        if target.get("amount"):
-            line += f"\n  목표: {target['amount']:,}원"
-        if target.get("category"):
-            line += f" ({target['category']})"
-        line += f"\n  마감일: {deadline}"
-
-        last_eval = goal.get("last_evaluation")
+        metadata = goal.get("metadata") or {}
+        last_eval = metadata.get("last_evaluation")
         if last_eval:
             verdict_label = {
                 "on_track": "순조로움",
@@ -204,7 +195,7 @@ async def get_goals(include_completed: bool = False) -> str:
 
 @tool(args_schema=UpdateGoalStatusInput)
 @skill_guard("goals")
-async def update_goal_status(goal_id: str, new_status: str) -> str:
+async def update_goal_status(goal_id: int, new_status: str) -> str:
     """목표를 완료(completed) 또는 취소(cancelled) 처리합니다."""
     user_id = get_current_user()
     if not user_id:
@@ -213,78 +204,50 @@ async def update_goal_status(goal_id: str, new_status: str) -> str:
     if new_status not in ("completed", "cancelled"):
         return "상태는 completed(달성) 또는 cancelled(취소)만 가능해요."
 
+    # Map to DB status: 'cancelled' → 'abandoned'
+    db_status = "abandoned" if new_status == "cancelled" else "completed"
+
     pool = get_pool()
-    key = f"{GOAL_KEY_PREFIX}{goal_id}"
-    entry = await knowledge_repo.get_by_key(pool, user_id, key)
+    result = await goal_db_repo.update_status(pool, user_id, goal_id, db_status)
 
-    if not entry:
-        return f"목표 ID '{goal_id}'를 찾을 수 없어요."
-
-    goal = _parse_goal_json(entry["value"])
-    if not goal:
-        return "목표 데이터를 읽을 수 없어요."
-
-    if goal.get("status") != "active":
-        return f"이 목표는 이미 '{goal.get('status')}' 상태예요."
-
-    goal["status"] = new_status
-
-    await knowledge_repo.delete_by_key(pool, user_id, key)
-    await knowledge_repo.upsert(
-        pool,
-        user_id=user_id,
-        key=key,
-        value=json.dumps(goal, ensure_ascii=False),
-        source="user_chat",
-    )
+    if not result:
+        return f"목표 ID '{goal_id}'를 찾을 수 없거나 이미 완료/취소됐어요."
 
     status_label = "달성" if new_status == "completed" else "취소"
-    return f"'{goal.get('title', '')}' 목표를 {status_label} 처리했어요."
+    return f"'{result['title']}' 목표를 {status_label} 처리했어요."
 
 
 # --- Report Functions (called via gRPC, NOT @tool) ---
 
 
 async def evaluate_goals(user_id: str) -> str:
-    """Evaluate progress on all active goals and update last_evaluation."""
+    """Evaluate progress on all active goals and cache evaluation in metadata."""
     pool = get_pool()
-    entries = await knowledge_repo.get_by_key_prefix(pool, user_id, GOAL_KEY_PREFIX)
-
-    active_goals = []
-    for entry in entries:
-        goal = _parse_goal_json(entry["value"])
-        if goal and goal.get("status") == "active":
-            active_goals.append((entry["key"], goal))
+    active_goals = await goal_db_repo.list_goals(pool, user_id, status="in_progress")
 
     if not active_goals:
         return "활성 목표 없음"
 
-    # Check for expired goals.
+    # Check for expired goals (end_date passed).
     now = datetime.now()
-    for key, goal in active_goals:
-        deadline_str = goal.get("deadline", "")
-        if deadline_str:
-            try:
-                deadline_dt = datetime.fromisoformat(deadline_str)
-                if now > deadline_dt:
-                    goal["status"] = "expired"
-                    await knowledge_repo.delete_by_key(pool, user_id, key)
-                    await knowledge_repo.upsert(
-                        pool,
-                        user_id=user_id,
-                        key=key,
-                        value=json.dumps(goal, ensure_ascii=False),
-                        source="goal_evaluator",
-                    )
-            except ValueError:
-                pass
+    still_active = []
+    for goal in active_goals:
+        end_date = goal.get("end_date")
+        if end_date:
+            if isinstance(end_date, date):
+                end_dt = datetime.combine(end_date, datetime.max.time())
+            else:
+                end_dt = datetime.fromisoformat(str(end_date))
+            if now > end_dt:
+                await goal_db_repo.update_status(pool, user_id, goal["id"], "abandoned")
+                continue
+        still_active.append(goal)
 
-    # Filter to still-active goals after expiry check.
-    active_goals = [(k, g) for k, g in active_goals if g.get("status") == "active"]
+    active_goals = still_active
     if not active_goals:
         return "모든 목표 만료 처리됨"
 
-    # Gather spending data for evaluation.
+    # Gather spending data.
     month = now.strftime("%Y-%m")
     monthly = await finance_repo.get_monthly_summary(pool, user_id=user_id, month=month)
     daily_totals = await finance_repo.get_daily_totals(pool, user_id, days=30)
@@ -295,10 +258,8 @@ async def evaluate_goals(user_id: str) -> str:
         preferences = profile.get("preferences", {}) or {}
         budget = preferences.get("budget", {})
 
-    # Build data summary for LLM.
     data_summary = _build_evaluation_data(active_goals, monthly, daily_totals, budget, now)
 
-    # Call LLM for structured evaluation.
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
         google_api_key=settings.gemini_api_key,
@@ -307,7 +268,6 @@ async def evaluate_goals(user_id: str) -> str:
     prompt = _build_evaluation_prompt(data_summary)
     response = await llm.ainvoke([HumanMessage(content=prompt)])
 
-    # Parse and apply evaluations.
     evaluations = _extract_json(response.content)
     if not evaluations or "evaluations" not in evaluations:
         logger.warning("Failed to parse goal evaluation for user %s", user_id)
@@ -315,28 +275,19 @@ async def evaluate_goals(user_id: str) -> str:
 
     verdict_counts: dict[str, int] = {}
     for eval_item in evaluations["evaluations"]:
-        eval_goal_id = eval_item.get("goal_id", "")
-        target_key = f"{GOAL_KEY_PREFIX}{eval_goal_id}"
-
-        for key, goal in active_goals:
-            if key != target_key:
+        eval_goal_id = eval_item.get("goal_id")
+        for goal in active_goals:
+            if str(goal["id"]) != str(eval_goal_id):
                 continue
 
-            goal["last_evaluation"] = {
+            metadata = dict(goal.get("metadata") or {})
+            metadata["last_evaluation"] = {
                 "date": now.strftime("%Y-%m-%d"),
                 "progress_pct": eval_item.get("progress_pct", 0),
                 "summary": eval_item.get("summary", ""),
                 "verdict": eval_item.get("verdict", "on_track"),
             }
-
-            await knowledge_repo.delete_by_key(pool, user_id, key)
-            await knowledge_repo.upsert(
-                pool,
-                user_id=user_id,
-                key=key,
-                value=json.dumps(goal, ensure_ascii=False),
-                source="goal_evaluator",
-            )
+            await goal_db_repo.update_evaluation(pool, user_id, goal["id"], metadata)
 
             verdict = eval_item.get("verdict", "on_track")
             verdict_counts[verdict] = verdict_counts.get(verdict, 0) + 1
@@ -349,18 +300,11 @@ async def evaluate_goals(user_id: str) -> str:
 async def generate_goal_status(user_id: str) -> str:
     """Generate a weekly goal progress notification."""
     pool = get_pool()
-    entries = await knowledge_repo.get_by_key_prefix(pool, user_id, GOAL_KEY_PREFIX)
-
-    active_goals = []
-    for entry in entries:
-        goal = _parse_goal_json(entry["value"])
-        if goal and goal.get("status") == "active":
-            active_goals.append((entry["key"], goal))
+    active_goals = await goal_db_repo.list_goals(pool, user_id, status="in_progress")
 
     if not active_goals:
         return ""
 
-    # Current spending context.
     now = datetime.now()
     month = now.strftime("%Y-%m")
     monthly = await finance_repo.get_monthly_summary(pool, user_id=user_id, month=month)
@@ -373,7 +317,6 @@ async def generate_goal_status(user_id: str) -> str:
         budget = preferences.get("budget", {})
         persona_id = preferences.get("persona", DEFAULT_PERSONA)
 
-    # Build prompt and generate status notification.
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
         google_api_key=settings.gemini_api_key,
@@ -387,16 +330,8 @@ async def generate_goal_status(user_id: str) -> str:
 # --- Private helpers ---
 
 
-def _parse_goal_json(value: str) -> dict:
-    """Safely parse a goal JSON string."""
-    try:
-        return json.loads(value)
-    except (json.JSONDecodeError, TypeError):
-        return {}
-
-
 def _build_evaluation_data(
-    goals: list[tuple[str, dict]],
+    goals: list[dict],
     monthly: list[dict],
     daily_totals: list[dict],
     budget: dict,
@@ -406,17 +341,14 @@ def _build_evaluation_data(
     lines: list[str] = []
 
     lines.append("[활성 목표]")
-    for key, goal in goals:
-        goal_id = key.replace(GOAL_KEY_PREFIX, "")
-        target = goal.get("target", {})
-        lines.append(f"  ID: {goal_id}")
+    for goal in goals:
+        lines.append(f"  ID: {goal['id']}")
         lines.append(f"  제목: {goal.get('title', '')}")
-        lines.append(f"  유형: {goal.get('type', '')}")
-        if target.get("category"):
-            lines.append(f"  카테고리: {target['category']}")
-        if target.get("amount"):
-            lines.append(f"  목표 금액: {target['amount']:,}원")
-        lines.append(f"  마감일: {goal.get('deadline', '')[:10]}")
+        lines.append(f"  유형: {goal.get('category', '')}")
+        if goal.get("target_value"):
+            lines.append(f"  목표 금액: {int(goal['target_value']):,}{goal.get('unit', '')}")
+        if goal.get("end_date"):
+            lines.append(f"  마감일: {goal['end_date']}")
         lines.append("")
 
     lines.append("[이번 달 카테고리별 지출]")
@@ -456,7 +388,7 @@ def _build_evaluation_prompt(data_summary: str) -> str:
         "{\n"
         '  "evaluations": [\n'
         "    {\n"
-        '      "goal_id": "목표 ID",\n'
+        '      "goal_id": "목표 ID (숫자)",\n'
         '      "progress_pct": 45,\n'
         '      "verdict": "on_track | warning | critical | achieved",\n'
         '      "summary": "한국어 요약 (1-2문장)"\n'
@@ -478,7 +410,7 @@ def _build_evaluation_prompt(data_summary: str) -> str:
 
 
 def _build_status_prompt(
-    goals: list[tuple[str, dict]],
+    goals: list[dict],
     monthly: list[dict],
     budget: dict,
     now: datetime,
@@ -488,16 +420,16 @@ def _build_status_prompt(
     lines: list[str] = []
 
     lines.append("[목표 진행 상황]")
-    for key, goal in goals:
-        goal_id = key.replace(GOAL_KEY_PREFIX, "")
+    for goal in goals:
         title = goal.get("title", "")
-        target = goal.get("target", {})
-        last_eval = goal.get("last_evaluation")
+        metadata = goal.get("metadata") or {}
+        last_eval = metadata.get("last_evaluation")
 
-        lines.append(f"  {title} (ID: {goal_id})")
-        if target.get("amount"):
-            lines.append(f"    목표: {target['amount']:,}원 ({target.get('category', '')})")
-        lines.append(f"    마감일: {goal.get('deadline', '')[:10]}")
+        lines.append(f"  {title} (ID: {goal['id']})")
+        if goal.get("target_value"):
+            lines.append(f"    목표: {int(goal['target_value']):,}{goal.get('unit', '')} ({goal.get('category', '')})")
+        if goal.get("end_date"):
+            lines.append(f"    마감일: {goal['end_date']}")
         if last_eval:
             lines.append(f"    진행률: {last_eval.get('progress_pct', 0)}%")
             lines.append(f"    판정: {last_eval.get('verdict', '')}")
@@ -524,7 +456,6 @@ def _build_status_prompt(
     lines.append(f"\n[현재] {now.strftime('%Y-%m-%d %A')}, 이번 달 남은 일수: {days_left}일")
 
     data_summary = "\n".join(lines)
-
     tone = get_tone_instruction(persona_id)
 
     return (

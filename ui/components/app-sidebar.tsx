@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import NextImage from "next/image"
 import {
   LayoutDashboard,
   MessageCircle,
@@ -13,6 +14,7 @@ import {
   Target,
   StickyNote,
   Clock,
+  Bell,
   FileBarChart,
   BarChart3,
   FileText,
@@ -23,12 +25,11 @@ import {
   Wrench,
   Settings,
   Link2,
-  Bot,
   BrainCircuit,
   UserCircle,
   Cog,
-  Timer,
   ScrollText,
+  Activity,
 } from "lucide-react"
 import {
   Sidebar,
@@ -58,9 +59,8 @@ const financeNav = [
 const lifeNav = [
   { title: "일기", icon: BookOpen, href: "/diary" },
   { title: "목표 관리", icon: Target, href: "/goals" },
-  { title: "스케쥴 예약", icon: Timer, href: "/cron" },
-  { title: "메모", icon: StickyNote, href: "/memo" },
   { title: "디데이", icon: Clock, href: "/dday" },
+  { title: "메모", icon: StickyNote, href: "/memo" },
 ]
 
 const reportsNav = [
@@ -78,12 +78,17 @@ const toolsNav = [
   { title: "웹검색", icon: Search, href: "/search" },
   { title: "날씨", icon: Cloud, href: "/weather" },
   { title: "유틸리티", icon: Wrench, href: "/utilities" },
+  { title: "스킬", icon: Cog, href: "/skills" },
+]
+
+const monitoringNav = [
+  { title: "로그", icon: ScrollText, href: "/logs" },
+  { title: "사용량", icon: Activity, href: "/usage" },
 ]
 
 const settingsNav = [
   { title: "설정", icon: Settings, href: "/settings" },
-  { title: "스킬", icon: Cog, href: "/skills" },
-  { title: "로그", icon: ScrollText, href: "/logs" },
+  { title: "알림 센터", icon: Bell, href: "/cron" },
   { title: "모델", icon: BrainCircuit, href: "/models" },
   { title: "페르소나", icon: UserCircle, href: "/personas" },
   { title: "연동", icon: Link2, href: "/integrations" },
@@ -126,9 +131,14 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border h-14">
         <Link href="/" className="flex items-center gap-2 px-4 py-1">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Bot className="size-5" />
-          </div>
+          <NextImage
+            src="/brand_logo.webp"
+            alt="StarPion"
+            width={36}
+            height={36}
+            className="rounded-md object-contain"
+            priority
+          />
           <span className="text-lg font-semibold">StarPion</span>
         </Link>
       </SidebarHeader>
@@ -139,6 +149,7 @@ export function AppSidebar() {
         <NavGroup label="REPORTS" items={reportsNav} />
         <NavGroup label="MEDIA" items={mediaNav} />
         <NavGroup label="TOOLS" items={toolsNav} />
+        <NavGroup label="MONITORING" items={monitoringNav} />
         <NavGroup label="SETTINGS" items={settingsNav} />
       </SidebarContent>
       <SidebarRail />

@@ -87,7 +87,7 @@ export default function SkillsPage() {
         )}
       </div>
 
-      <Card className="shadow-none">
+      <Card>
         <CardContent className="pt-6 space-y-8">
           {loading ? (
             <div className="flex items-center justify-center py-16">

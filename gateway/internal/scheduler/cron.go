@@ -80,6 +80,7 @@ func (s *Scheduler) Start() {
 		// Level 3: Autonomous Agent
 		{"0 7 * * *", "goal_evaluation", s.runGoalEvaluationRule},
 		{"0 12 * * 3", "goal_status", s.runGoalStatusRule},
+		{"0 8 * * *", "dday_notification", s.runDdayNotificationRule},
 
 		// Level 4: User-Created Schedules
 		{"*/15 * * * *", "user_schedules", s.runUserSchedulesRule},
@@ -168,6 +169,9 @@ func (s *Scheduler) GenerateAndSendType(userID string, chatID int64, reportType 
 		return nil
 	}
 
+	// Persist the report to DB regardless of Telegram delivery.
+	s.saveReport(userID, reportType, resp.Content)
+
 	if err := s.telegram.SendMessage(chatID, resp.Content); err != nil {
 		log.Error().Err(err).Str("user_id", userID).Str("type", reportType).Msg("failed to send report via telegram")
 		return fmt.Errorf("send %s report: %w", reportType, err)
@@ -175,6 +179,44 @@ func (s *Scheduler) GenerateAndSendType(userID string, chatID int64, reportType 
 
 	log.Info().Str("user_id", userID).Str("type", reportType).Msg("report sent")
 	return nil
+}
+
+// saveReport persists a generated report to the reports table.
+func (s *Scheduler) saveReport(userID, reportType, content string) {
+	if s.db == nil {
+		return
+	}
+	title := buildReportTitle(reportType, s.loc)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := s.db.ExecContext(ctx, `
+		INSERT INTO reports (user_id, report_type, title, content)
+		VALUES ($1, $2, $3, $4)
+	`, userID, reportType, title, content); err != nil {
+		log.Error().Err(err).Str("user_id", userID).Str("type", reportType).Msg("failed to save report")
+	}
+}
+
+// buildReportTitle generates a localized Korean title for a report.
+func buildReportTitle(reportType string, loc *time.Location) string {
+	now := time.Now().In(loc)
+	switch reportType {
+	case "daily":
+		return fmt.Sprintf("%d년 %s %s 일간 요약", now.Year(), now.Format("01월"), now.Format("02일"))
+	case "weekly":
+		_, week := now.ISOWeek()
+		return fmt.Sprintf("%d년 %s %d주차 주간 리포트", now.Year(), now.Format("01월"), week)
+	case "monthly":
+		return fmt.Sprintf("%d년 %s 월간 리포트", now.Year(), now.Format("01월"))
+	case "anomaly":
+		return now.Format("2006-01-02") + " 소비 이상 감지"
+	case "pattern":
+		return now.Format("2006-01-02") + " 패턴 인사이트"
+	case "goal":
+		return now.Format("2006-01-02") + " 목표 달성 현황"
+	default:
+		return now.Format("2006-01-02") + " " + reportType
+	}
 }
 
 // activeUser represents a user eligible for proactive notifications.

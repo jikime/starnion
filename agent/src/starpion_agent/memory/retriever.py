@@ -1,8 +1,8 @@
 """Hybrid memory retriever: Vector + Full-Text Search with RRF merge.
 
-Searches across 4 sources (daily_logs, knowledge_base, document_sections,
-finances) using both vector similarity and full-text search, then merges
-results via Reciprocal Rank Fusion (RRF).
+Searches across 6 sources (daily_logs, knowledge_base, diary_entries,
+memos, document_sections, finances) using both vector similarity and
+full-text search, then merges results via Reciprocal Rank Fusion (RRF).
 """
 
 import asyncio
@@ -11,9 +11,11 @@ from typing import Any
 
 from starpion_agent.db.pool import get_pool
 from starpion_agent.db.repositories import daily_log as daily_log_repo
+from starpion_agent.db.repositories import diary_entry as diary_entry_repo
 from starpion_agent.db.repositories import document as document_repo
 from starpion_agent.db.repositories import finance as finance_repo
 from starpion_agent.db.repositories import knowledge as knowledge_repo
+from starpion_agent.db.repositories import memo_db as memo_db_repo
 from starpion_agent.embedding.service import embed_text
 
 logger = logging.getLogger(__name__)
@@ -80,7 +82,7 @@ async def search(
 ) -> list[dict[str, Any]]:
     """Search across all memory layers using hybrid vector + full-text search.
 
-    Runs 7 queries in parallel (3 vector + 3 full-text + 1 finance),
+    Runs 11 queries in parallel (5 vector + 5 full-text + 1 finance),
     merges per-source results via RRF, tags sources, and returns the
     top_k results.
 
@@ -102,6 +104,10 @@ async def search(
         log_ft,
         kb_vec,
         kb_ft,
+        diary_vec,
+        diary_ft,
+        memo_vec,
+        memo_ft,
         doc_vec,
         doc_ft,
         finance_results,
@@ -114,6 +120,14 @@ async def search(
             pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
         ),
         knowledge_repo.search_fulltext(pool, user_id, query, top_k=top_k),
+        diary_entry_repo.search_similar(
+            pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
+        ),
+        diary_entry_repo.search_fulltext(pool, user_id, query, top_k=top_k),
+        memo_db_repo.search_similar(
+            pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
+        ),
+        memo_db_repo.search_fulltext(pool, user_id, query, top_k=top_k),
         document_repo.search_by_user(
             pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
         ),
@@ -124,13 +138,28 @@ async def search(
     # Per-source RRF merge.
     log_merged = _rrf_merge(log_vec, log_ft)
     kb_merged = _rrf_merge(kb_vec, kb_ft)
+    diary_merged = _rrf_merge(diary_vec, diary_ft)
+    memo_merged = _rrf_merge(memo_vec, memo_ft)
     doc_merged = _rrf_merge(doc_vec, doc_ft)
 
-    # Tag sources.
+    # Tag sources and normalise content field.
     for r in log_merged:
         r["source"] = "daily_log"
     for r in kb_merged:
         r["source"] = "knowledge"
+    for r in diary_merged:
+        r["source"] = "diary"
+        # Prepend mood/date context for better LLM grounding.
+        mood = r.get("mood", "")
+        entry_date = r.get("entry_date", "")
+        prefix = f"[일기 {entry_date}" + (f", 기분: {mood}" if mood else "") + "] "
+        r.setdefault("content", "")
+        r["content"] = prefix + r["content"]
+    for r in memo_merged:
+        r["source"] = "memo"
+        title = r.get("title", "")
+        if title:
+            r["content"] = f"[메모: {title}] " + r.get("content", "")
     for r in doc_merged:
         r["source"] = "document"
     for r in finance_results:
@@ -139,7 +168,9 @@ async def search(
         r["content"] = f"{r['category']} {r['amount']:,}원{desc}"
         r["similarity"] = 0.5
 
-    all_results = log_merged + kb_merged + doc_merged + finance_results
+    all_results = (
+        log_merged + kb_merged + diary_merged + memo_merged + doc_merged + finance_results
+    )
     all_results.sort(key=lambda x: x.get("similarity", 0), reverse=True)
 
     return all_results[:top_k]

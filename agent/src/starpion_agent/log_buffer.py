@@ -4,8 +4,8 @@ import asyncio
 import collections
 import json
 import logging
-import time
 from datetime import datetime, timezone
+from typing import Any, Callable, Coroutine
 
 
 MAX_ENTRIES = 2000
@@ -79,6 +79,16 @@ class LogBufferHandler(logging.Handler):
 # Singleton handler — install once at startup.
 _handler = LogBufferHandler()
 
+# Optional callback for async document indexing:
+# async def callback(user_id, doc_id, file_url, file_name) -> None
+_index_callback: Callable[..., Coroutine[Any, Any, None]] | None = None
+
+
+def set_index_callback(cb: Callable[..., Coroutine[Any, Any, None]]) -> None:
+    """Register the async function called by POST /index-document."""
+    global _index_callback
+    _index_callback = cb
+
 
 def get_handler() -> LogBufferHandler:
     return _handler
@@ -101,7 +111,7 @@ def install(level: int = logging.DEBUG) -> LogBufferHandler:
 
 async def _handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
     try:
-        raw = await asyncio.wait_for(reader.read(4096), timeout=5)
+        raw = await asyncio.wait_for(reader.read(8192), timeout=5)
         if not raw:
             return
         request_line = raw.split(b"\r\n")[0].decode()
@@ -110,15 +120,39 @@ async def _handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) ->
             return
         method, path = parts[0], parts[1]
 
-        if method != "GET":
-            _write_response(writer, 405, b"Method Not Allowed")
-            return
-
         # Parse path and query string.
         if "?" in path:
             path, qs = path.split("?", 1)
         else:
             qs = ""
+
+        # Handle POST /index-document — fire-and-forget document indexing.
+        if method == "POST":
+            if path == "/index-document":
+                header_end = raw.find(b"\r\n\r\n")
+                body_bytes = raw[header_end + 4:] if header_end != -1 else b""
+                try:
+                    body = json.loads(body_bytes.decode())
+                    user_id = body.get("user_id", "")
+                    doc_id = int(body.get("doc_id", 0))
+                    file_url = body.get("file_url", "")
+                    file_name = body.get("file_name", "")
+                except Exception:
+                    _write_response(writer, 400, b"Bad Request")
+                    return
+
+                if _index_callback and user_id and doc_id and file_url:
+                    asyncio.create_task(_index_callback(user_id, doc_id, file_url, file_name))
+                    _write_response(writer, 202, b'{"status":"queued"}', content_type="application/json")
+                else:
+                    _write_response(writer, 503, b'{"error":"indexer not ready"}', content_type="application/json")
+            else:
+                _write_response(writer, 405, b"Method Not Allowed")
+            return
+
+        if method != "GET":
+            _write_response(writer, 405, b"Method Not Allowed")
+            return
 
         params: dict[str, str] = {}
         for kv in qs.split("&"):

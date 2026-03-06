@@ -31,7 +31,7 @@ export default function SettingsPage() {
 
         {/* ── Notifications ───────────────────────────────────────────────── */}
         <TabsContent value="notifications">
-          <Card className="shadow-none">
+          <Card>
             <CardHeader>
               <CardTitle>알림 설정</CardTitle>
             </CardHeader>
@@ -99,7 +99,7 @@ export default function SettingsPage() {
         {/* ── Account ─────────────────────────────────────────────────────── */}
         <TabsContent value="account">
           <div className="space-y-6">
-            <Card className="shadow-none">
+            <Card>
               <CardHeader>
                 <CardTitle>계정 설정</CardTitle>
               </CardHeader>
