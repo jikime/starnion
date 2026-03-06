@@ -8,11 +8,11 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <SidebarProvider>
+    <SidebarProvider className="h-screen overflow-hidden">
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="flex flex-col overflow-hidden">
         <AppHeader />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-y-auto scrollbar-hide">
           {children}
         </main>
       </SidebarInset>

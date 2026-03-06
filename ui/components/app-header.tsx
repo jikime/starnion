@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Search, ExternalLink } from "lucide-react"
+import { Bell, Search } from "lucide-react"
 import { signOut, useSession } from "next-auth/react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -31,7 +31,7 @@ export function AppHeader() {
     .toUpperCase()
 
   return (
-    <header className="flex h-14 items-center gap-4 border-b border-border bg-background px-4 lg:px-6">
+    <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-4 border-b border-border bg-background px-4 lg:px-6">
       <SidebarTrigger className="-ml-2" />
 
       <div className="relative flex-1 max-w-md">
@@ -114,13 +114,6 @@ export function AppHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Telegram shortcut */}
-        <Button variant="outline" size="sm" className="hidden md:flex gap-2 ml-1" asChild>
-          <a href="https://t.me/jiki_bot" target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="size-4" />
-            Telegram
-          </a>
-        </Button>
       </div>
     </header>
   )

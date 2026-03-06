@@ -135,3 +135,20 @@
     @apply bg-background text-foreground;
   }
 }
+
+@utility scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Hide sidebar scroll */
+[data-sidebar="content"] {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+[data-sidebar="content"]::-webkit-scrollbar {
+  display: none;
+}

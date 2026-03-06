@@ -11,7 +11,6 @@ import {
   TrendingUp,
   BookOpen,
   Target,
-  Calendar,
   StickyNote,
   Clock,
   FileBarChart,
@@ -59,7 +58,7 @@ const financeNav = [
 const lifeNav = [
   { title: "일기", icon: BookOpen, href: "/diary" },
   { title: "목표 관리", icon: Target, href: "/goals" },
-  { title: "일정/알림", icon: Calendar, href: "/schedule" },
+  { title: "스케쥴 예약", icon: Timer, href: "/cron" },
   { title: "메모", icon: StickyNote, href: "/memo" },
   { title: "디데이", icon: Clock, href: "/dday" },
 ]
@@ -84,7 +83,6 @@ const toolsNav = [
 const settingsNav = [
   { title: "설정", icon: Settings, href: "/settings" },
   { title: "스킬", icon: Cog, href: "/skills" },
-  { title: "Cron Jobs", icon: Timer, href: "/cron" },
   { title: "로그", icon: ScrollText, href: "/logs" },
   { title: "모델", icon: BrainCircuit, href: "/models" },
   { title: "페르소나", icon: UserCircle, href: "/personas" },
@@ -131,7 +129,7 @@ export function AppSidebar() {
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Bot className="size-5" />
           </div>
-          <span className="text-lg font-semibold">JIKI</span>
+          <span className="text-lg font-semibold">StarPion</span>
         </Link>
       </SidebarHeader>
       <SidebarContent>

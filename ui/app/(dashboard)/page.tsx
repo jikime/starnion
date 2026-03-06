@@ -1,7 +1,6 @@
 import { DashboardStats } from "@/components/dashboard/stats-cards"
 import { CategoryChart } from "@/components/dashboard/category-chart"
 import { RecentAlerts } from "@/components/dashboard/recent-alerts"
-import { TodaySchedule } from "@/components/dashboard/today-schedule"
 import { GoalsProgress } from "@/components/dashboard/goals-progress"
 
 export default function DashboardPage() {
@@ -17,7 +16,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">
-            안녕하세요! JIKI
+            안녕하세요! StarPion
           </h1>
           <p className="text-muted-foreground">{today}</p>
         </div>
@@ -30,7 +29,6 @@ export default function DashboardPage() {
         <RecentAlerts />
       </div>
 
-      <TodaySchedule />
       <GoalsProgress />
     </div>
   )
