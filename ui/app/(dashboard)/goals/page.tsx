@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useTranslations } from "next-intl"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -92,7 +93,7 @@ async function fetchGoals(): Promise<Goal[]> {
   const res = await fetch("/api/goals", { cache: "no-store" })
   if (!res.ok) return []
   const data = await res.json()
-  return data.goals ?? []
+  return (data.goals ?? []).map((g: Goal) => ({ ...g, checkins: g.checkins ?? [] }))
 }
 
 async function createGoal(form: GoalForm): Promise<boolean> {
@@ -154,6 +155,8 @@ function GoalFormDialog({
   initial?: GoalForm
   onSubmit: (form: GoalForm) => Promise<void>
 }) {
+  const t = useTranslations("goals")
+  const tc = useTranslations("common")
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<GoalForm>(initial ?? EMPTY_FORM)
   const [saving, setSaving] = useState(false)
@@ -182,7 +185,7 @@ function GoalFormDialog({
         <div className="space-y-4 py-2">
           {/* icon picker */}
           <div className="space-y-2">
-            <Label>아이콘</Label>
+            <Label>{t("iconLabel")}</Label>
             <div className="flex flex-wrap gap-2">
               {ICON_OPTIONS.map((icon) => (
                 <button
@@ -201,10 +204,10 @@ function GoalFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="title">목표 제목 *</Label>
+            <Label htmlFor="title">{t("goalTitleLabel")}</Label>
             <Input
               id="title"
-              placeholder="여행 자금 모으기"
+              placeholder={t("goalTitlePlaceholder")}
               value={form.title}
               onChange={(e) => set("title", e.target.value)}
             />
@@ -212,7 +215,7 @@ function GoalFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="target">목표값</Label>
+              <Label htmlFor="target">{t("targetValue")}</Label>
               <Input
                 id="target"
                 type="number"
@@ -222,10 +225,10 @@ function GoalFormDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>단위</Label>
+              <Label>{t("unit")}</Label>
               <Select value={form.unit} onValueChange={(v) => set("unit", v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="선택" />
+                  <SelectValue placeholder={t("unitPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {UNIT_OPTIONS.map((u) => (
@@ -238,7 +241,7 @@ function GoalFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="startDate">시작일</Label>
+              <Label htmlFor="startDate">{t("startDate")}</Label>
               <Input
                 id="startDate"
                 type="date"
@@ -247,7 +250,7 @@ function GoalFormDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="endDate">종료일</Label>
+              <Label htmlFor="endDate">{t("endDate")}</Label>
               <Input
                 id="endDate"
                 type="date"
@@ -258,20 +261,20 @@ function GoalFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">설명 (선택)</Label>
+            <Label htmlFor="description">{t("descriptionLabel")}</Label>
             <Textarea
               id="description"
-              placeholder="목표에 대한 설명..."
+              placeholder={t("descriptionPlaceholder")}
               value={form.description}
               onChange={(e) => set("description", e.target.value)}
             />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setOpen(false)}>취소</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>{tc("cancel")}</Button>
             <Button onClick={handleSubmit} disabled={saving || !form.title.trim()}>
               {saving && <Loader2 className="size-4 mr-1 animate-spin" />}
-              저장
+              {tc("save")}
             </Button>
           </div>
         </div>
@@ -287,6 +290,8 @@ function EditProgressDialog({
   goal: Goal
   onSave: (currentValue: number) => Promise<void>
 }) {
+  const t = useTranslations("goals")
+  const tc = useTranslations("common")
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState(String(goal.current_value))
   const [saving, setSaving] = useState(false)
@@ -303,16 +308,16 @@ function EditProgressDialog({
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1">
           <Edit className="size-3" />
-          편집
+          {t("editButton")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-xs">
         <DialogHeader>
-          <DialogTitle>진행 현황 업데이트</DialogTitle>
+          <DialogTitle>{t("updateProgress")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>현재값 ({goal.unit})</Label>
+            <Label>{t("currentValue", { unit: goal.unit })}</Label>
             <Input
               type="number"
               value={value}
@@ -320,14 +325,14 @@ function EditProgressDialog({
               autoFocus
             />
             <p className="text-xs text-muted-foreground">
-              목표: {formatValue(goal.target_value, goal.unit)}
+              {t("targetLabel")} {formatValue(goal.target_value, goal.unit)}
             </p>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setOpen(false)}>취소</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>{tc("cancel")}</Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="size-4 mr-1 animate-spin" />}
-              저장
+              {tc("save")}
             </Button>
           </div>
         </div>
@@ -339,6 +344,9 @@ function EditProgressDialog({
 // ── main component ─────────────────────────────────────────────────────────────
 
 export default function GoalsPage() {
+  const t = useTranslations("goals")
+  const tc = useTranslations("common")
+
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
   const [mutating, setMutating] = useState<number | null>(null)
@@ -391,13 +399,6 @@ export default function GoalsPage() {
     setMutating(null)
   }
 
-  const handleAbandon = async (id: number) => {
-    setMutating(id)
-    await updateGoal(id, { status: "abandoned" })
-    await load()
-    setMutating(null)
-  }
-
   const handleRestart = async (id: number) => {
     setMutating(id)
     await updateGoal(id, { status: "in_progress" })
@@ -406,7 +407,7 @@ export default function GoalsPage() {
   }
 
   const handleDelete = async (id: number) => {
-    if (!confirm("목표를 삭제하시겠습니까?")) return
+    if (!confirm(t("deleteConfirm"))) return
     setMutating(id)
     await deleteGoal(id)
     await load()
@@ -443,32 +444,32 @@ export default function GoalsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">목표 관리</h1>
-          <p className="text-muted-foreground">목표를 설정하고 진행 상황을 추적하세요</p>
+          <h1 className="text-2xl font-semibold">{t("title")}</h1>
+          <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <GoalFormDialog
           trigger={
             <Button className="gap-2">
               <Plus className="size-4" />
-              목표 추가
+              {t("addGoal")}
             </Button>
           }
-          title="새 목표 추가"
+          title={t("newGoalTitle")}
           onSubmit={handleCreate}
         />
       </div>
 
       <Tabs defaultValue="inProgress" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="inProgress">진행중 ({inProgress.length})</TabsTrigger>
-          <TabsTrigger value="completed">완료 ({completed.length})</TabsTrigger>
-          <TabsTrigger value="abandoned">포기 ({abandoned.length})</TabsTrigger>
+          <TabsTrigger value="inProgress">{t("inProgress", { count: inProgress.length })}</TabsTrigger>
+          <TabsTrigger value="completed">{t("completed", { count: completed.length })}</TabsTrigger>
+          <TabsTrigger value="abandoned">{t("abandoned", { count: abandoned.length })}</TabsTrigger>
         </TabsList>
 
         {/* ── In Progress ── */}
         <TabsContent value="inProgress" className="space-y-4">
           {inProgress.length === 0 && (
-            <p className="text-center text-muted-foreground py-12">진행중인 목표가 없어요. 새 목표를 추가해보세요!</p>
+            <p className="text-center text-muted-foreground py-12">{t("emptyInProgress")}</p>
           )}
           {inProgress.map((goal) => {
             const isMutating = mutating === goal.id
@@ -485,7 +486,7 @@ export default function GoalsPage() {
                         <h3 className="font-semibold">{goal.title}</h3>
                         <p className="text-sm text-muted-foreground">
                           {goal.start_date} ~ {goal.end_date ?? "–"}
-                          {goal.days_remaining != null && ` | 남은 기간: ${goal.days_remaining}일`}
+                          {goal.days_remaining != null && ` | ${t("daysRemaining", { days: goal.days_remaining })}`}
                         </p>
                       </div>
                     </div>
@@ -495,10 +496,10 @@ export default function GoalsPage() {
                         trigger={
                           <Button variant="outline" size="sm" className="gap-1">
                             <Edit className="size-3" />
-                            편집
+                            {t("editButton")}
                           </Button>
                         }
-                        title="목표 편집"
+                        title={t("editGoalTitle")}
                         initial={{
                           title: goal.title,
                           icon: goal.icon,
@@ -519,7 +520,7 @@ export default function GoalsPage() {
                         onClick={() => handleComplete(goal.id)}
                       >
                         {isMutating ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
-                        달성
+                        {t("achieveButton")}
                       </Button>
                       {/* Delete */}
                       <Button
@@ -537,7 +538,7 @@ export default function GoalsPage() {
                   {/* Progress bar */}
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center justify-between text-sm">
-                      <span>진행률</span>
+                      <span>{t("progressRate")}</span>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{Math.round(goal.progress)}%</span>
                         {!isHabit && (
@@ -561,7 +562,7 @@ export default function GoalsPage() {
                   {goal.streak > 0 && (
                     <div className="flex items-center gap-2 mb-4">
                       <Flame className="size-4 text-destructive" />
-                      <span className="text-sm font-medium">연속 {goal.streak}일 달성!</span>
+                      <span className="text-sm font-medium">{t("streak", { days: goal.streak })}</span>
                     </div>
                   )}
 
@@ -569,7 +570,7 @@ export default function GoalsPage() {
                   {isHabit && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">최근 30일 체크인</p>
+                        <p className="text-sm text-muted-foreground">{t("checkin30Days")}</p>
                         <Button
                           size="sm"
                           variant={checkedToday ? "secondary" : "default"}
@@ -581,7 +582,7 @@ export default function GoalsPage() {
                             ? <Loader2 className="size-3 animate-spin" />
                             : <Check className="size-3" />
                           }
-                          {checkedToday ? "오늘 완료" : "오늘 체크"}
+                          {checkedToday ? t("checkedToday") : t("checkToday")}
                         </Button>
                       </div>
                       <div className="flex flex-wrap gap-1">
@@ -619,7 +620,7 @@ export default function GoalsPage() {
         {/* ── Completed ── */}
         <TabsContent value="completed" className="space-y-4">
           {completed.length === 0 && (
-            <p className="text-center text-muted-foreground py-12">완료된 목표가 없어요.</p>
+            <p className="text-center text-muted-foreground py-12">{t("emptyCompleted")}</p>
           )}
           {completed.map((goal) => (
             <Card key={goal.id}>
@@ -630,12 +631,12 @@ export default function GoalsPage() {
                     <div>
                       <h3 className="font-semibold">{goal.title}</h3>
                       <p className="text-sm text-muted-foreground">
-                        완료일: {goal.completed_date ?? "-"}
+                        {t("completedDate")} {goal.completed_date ?? "-"}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge className="bg-green-500 text-white">완료</Badge>
+                    <Badge className="bg-green-500 text-white">{t("completedBadge")}</Badge>
                     <Button
                       size="sm"
                       variant="ghost"
@@ -654,7 +655,7 @@ export default function GoalsPage() {
         {/* ── Abandoned ── */}
         <TabsContent value="abandoned" className="space-y-4">
           {abandoned.length === 0 && (
-            <p className="text-center text-muted-foreground py-12">포기한 목표가 없어요.</p>
+            <p className="text-center text-muted-foreground py-12">{t("emptyAbandoned")}</p>
           )}
           {abandoned.map((goal) => {
             const isMutating = mutating === goal.id
@@ -667,7 +668,7 @@ export default function GoalsPage() {
                       <div>
                         <h3 className="font-semibold text-muted-foreground">{goal.title}</h3>
                         <p className="text-sm text-muted-foreground">
-                          포기일: {goal.abandoned_date ?? "-"} | 달성률: {Math.round(goal.progress)}%
+                          {t("abandonedDate")} {goal.abandoned_date ?? "-"} | {t("achievementRate")} {Math.round(goal.progress)}%
                         </p>
                       </div>
                     </div>
@@ -683,7 +684,7 @@ export default function GoalsPage() {
                           ? <Loader2 className="size-3 animate-spin" />
                           : <RotateCcw className="size-3" />
                         }
-                        다시 시작
+                        {t("restartButton")}
                       </Button>
                       <Button
                         size="sm"

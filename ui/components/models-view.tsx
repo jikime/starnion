@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useTranslations } from "next-intl"
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card"
@@ -174,6 +175,7 @@ interface ProviderState {
 // ── Main component ──────────────────────────────────────────────────────────
 
 export function ModelsView() {
+  const t = useTranslations("models")
   const [savedProviders, setSavedProviders] = useState<ProviderState[]>([])
   const [providerLoading, setProviderLoading] = useState(true)
 
@@ -248,12 +250,12 @@ export function ModelsView() {
     const providerName = PROVIDER_META[provider]?.name ?? provider
 
     if (provider === "custom" && !baseUrl.trim()) {
-      showToast("Base URL을 입력해주세요.", false)
+      showToast(t("toast.baseUrlRequired"), false)
       return
     }
 
     if (provider !== "custom" && !newApiKey && !saved?.hasKey) {
-      showToast("API 키를 입력해주세요.", false)
+      showToast(t("toast.apiKeyRequired"), false)
       return
     }
 
@@ -262,16 +264,16 @@ export function ModelsView() {
       : [...(enabledModels[provider] ?? [])]
 
     if (provider !== "custom" && models.length === 0) {
-      showToast("사용할 모델을 하나 이상 선택해주세요.", false)
+      showToast(t("toast.modelRequired"), false)
       return
     }
 
     setSavingProvider(provider)
     try {
       if (newApiKey && provider !== "custom") {
-        showToast(`${providerName} API 키 확인 중...`, true)
+        showToast(t("toast.validating", { name: providerName }), true)
         let isValid = false
-        let validationError = "API 키가 유효하지 않아요."
+        let validationError = t("toast.invalidApiKey")
         try {
           const vRes = await fetch("/api/settings/providers/validate", {
             method: "POST",
@@ -284,7 +286,7 @@ export function ModelsView() {
             validationError = (vData as { error: string }).error
           }
         } catch {
-          validationError = "네트워크 오류로 API 키를 확인할 수 없어요."
+          validationError = t("toast.networkError")
         }
 
         if (!isValid) {
@@ -305,12 +307,12 @@ export function ModelsView() {
         body: JSON.stringify(body),
       })
       if (res.ok) {
-        showToast(`${providerName} 저장됐어요.`)
+        showToast(t("toast.saved", { name: providerName }))
         setApiKeys(prev => ({ ...prev, [provider]: "" }))
         fetchProviders()
       } else {
         const data = await res.json().catch(() => ({}))
-        showToast((data as { error?: string }).error ?? "저장에 실패했어요.", false)
+        showToast((data as { error?: string }).error ?? t("toast.saveFailed"), false)
       }
     } finally {
       setSavingProvider(null)
@@ -320,7 +322,7 @@ export function ModelsView() {
   const removeProvider = async (provider: string) => {
     const res = await fetch(`/api/settings/providers/${provider}`, { method: "DELETE" })
     if (res.ok) {
-      showToast(`${PROVIDER_META[provider]?.name ?? provider} 제거됐어요.`)
+      showToast(t("toast.removed", { name: PROVIDER_META[provider]?.name ?? provider }))
       fetchProviders()
     }
   }
@@ -338,14 +340,14 @@ export function ModelsView() {
       )}
 
       <div>
-        <h1 className="text-2xl font-bold">모델</h1>
+        <h1 className="text-2xl font-bold">{t("title")}</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          LLM 프로바이더 API 키를 설정하고 사용할 모델을 선택하세요.
+          {t("subtitle")}
         </p>
       </div>
 
       {providerLoading ? (
-        <p className="text-sm text-muted-foreground">불러오는 중...</p>
+        <p className="text-sm text-muted-foreground">{t("loading")}</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {PROVIDER_ORDER.map(providerKey => {
@@ -370,14 +372,14 @@ export function ModelsView() {
                     </CardTitle>
                     <div className="flex items-center gap-2">
                       {isConnected
-                        ? <Badge className="bg-green-500 text-white text-xs">연결됨</Badge>
-                        : <Badge variant="outline" className="text-xs">미연결</Badge>}
+                        ? <Badge className="bg-green-500 text-white text-xs">{t("connected")}</Badge>
+                        : <Badge variant="outline" className="text-xs">{t("notConnected")}</Badge>}
                       {isConnected && (
                         <Button
                           variant="ghost" size="icon"
                           className="h-6 w-6 text-muted-foreground hover:text-destructive"
                           onClick={() => removeProvider(providerKey)}
-                          title="제거"
+                          title={t("remove")}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -397,7 +399,7 @@ export function ModelsView() {
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs">
-                          API 키{" "}
+                          {t("apiKey.label")}{" "}
                           {meta.keyUrl && (
                             <a
                               href={meta.keyUrl}
@@ -406,7 +408,7 @@ export function ModelsView() {
                               className="inline-flex items-center gap-0.5 text-primary hover:underline"
                             >
                               <ExternalLink className="h-3 w-3" />
-                              발급
+                              {t("apiKey.issue")}
                             </a>
                           )}
                         </Label>
@@ -414,7 +416,7 @@ export function ModelsView() {
                       <div className="flex gap-1.5">
                         <Input
                           type={showKey ? "text" : "password"}
-                          placeholder={isConnected ? "새 키로 교체하려면 입력" : meta.keyHint}
+                          placeholder={isConnected ? t("apiKey.replacePlaceholder") : meta.keyHint}
                           value={keyVal}
                           onChange={e => setApiKeys(prev => ({ ...prev, [providerKey]: e.target.value }))}
                           className="flex-1 font-mono text-xs h-8"
@@ -446,7 +448,7 @@ export function ModelsView() {
                   {/* Models — checkbox list */}
                   {meta.models.length > 0 && (
                     <div className="space-y-1.5">
-                      <Label className="text-xs">사용할 모델</Label>
+                      <Label className="text-xs">{t("enabledModels")}</Label>
                       <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                         {meta.models.map(m => (
                           <div key={m.id} className="flex items-center gap-2">
@@ -471,10 +473,10 @@ export function ModelsView() {
                   {/* Custom endpoint: user-defined models */}
                   {providerKey === "custom" && (
                     <div className="space-y-1.5">
-                      <Label className="text-xs">모델 목록</Label>
+                      <Label className="text-xs">{t("customModels")}</Label>
                       <div className="flex gap-1.5">
                         <Input
-                          placeholder="model-name 입력 후 추가"
+                          placeholder={t("customModelPlaceholder")}
                           value={customModelInput}
                           onChange={e => setCustomModelInput(e.target.value)}
                           onKeyDown={e => {
@@ -519,8 +521,8 @@ export function ModelsView() {
                     onClick={() => saveProvider(providerKey)}
                   >
                     {isSaving ? (
-                      <><RefreshCw className="h-3.5 w-3.5 mr-1 animate-spin" />저장중...</>
-                    ) : isConnected ? "업데이트" : "연결"}
+                      <><RefreshCw className="h-3.5 w-3.5 mr-1 animate-spin" />{t("saving")}</>
+                    ) : isConnected ? t("update") : t("connect")}
                   </Button>
                 </CardContent>
               </Card>

@@ -1,5 +1,6 @@
 """Image analysis, generation, and editing tools."""
 
+import logging
 from io import BytesIO
 
 from langchain_core.messages import HumanMessage
@@ -8,9 +9,14 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 from starpion_agent.config import settings
+from starpion_agent.context import get_current_user
+from starpion_agent.db.pool import get_pool
+from starpion_agent.db.repositories import image_db as image_db_repo
 from starpion_agent.document.parser import fetch_file
 from starpion_agent.skills.file_context import add_pending_file
 from starpion_agent.skills.guard import skill_guard
+
+logger = logging.getLogger(__name__)
 
 # Dedicated model for image generation/editing (supports response_modalities=["IMAGE"]).
 # Kept separate from settings.gemini_model which may be a chat-only model.
@@ -62,6 +68,8 @@ async def analyze_image(
     file_url: str, user_query: str = "이 이미지를 분석해주세요.",
 ) -> str:
     """이미지를 분석합니다. 영수증, 사진, 스크린샷 등을 인식하고 내용을 설명합니다."""
+    user_id = get_current_user()
+
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
         google_api_key=settings.gemini_api_key,
@@ -75,7 +83,29 @@ async def analyze_image(
     )
 
     response = await llm.ainvoke([message])
-    return response.content
+    analysis_text = response.content if isinstance(response.content, str) else str(response.content)
+
+    # Save analyzed image to gallery so it appears in the web UI.
+    if user_id:
+        try:
+            pool = get_pool()
+            # Derive file name from URL path.
+            name = file_url.rstrip("/").split("/")[-1] or "image.png"
+            await image_db_repo.create(
+                pool,
+                user_id=user_id,
+                url=file_url,
+                name=name,
+                source="telegram" if "api.telegram.org" in file_url else "web",
+                img_type="analyzed",
+                prompt=user_query,
+                analysis=analysis_text,
+            )
+            logger.info("analyze_image: saved to gallery for user %s", user_id)
+        except Exception as e:
+            logger.warning("analyze_image: gallery save failed for user %s: %s", user_id, e)
+
+    return analysis_text
 
 
 @tool(args_schema=GenerateImageInput)

@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { ChatSidebar, type Conversation } from "@/components/chat/chat-sidebar"
 import { ChatMessages } from "@/components/chat/chat-messages"
 import { ChatInput, type AttachedFile } from "@/components/chat/chat-input"
@@ -10,15 +11,15 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { PanelLeftClose, PanelLeft, WifiOff, Loader2 } from "lucide-react"
 
-const PERSONAS = [
-  { id: "assistant", name: "기본 비서" },
-  { id: "finance",   name: "금융 전문가" },
-  { id: "buddy",     name: "친한 친구" },
-  { id: "coach",     name: "재정 코치" },
-  { id: "analyst",   name: "데이터 분석가" },
-]
-
 function ChatPageInner() {
+  const t = useTranslations("chat")
+  const PERSONAS = [
+    { id: "assistant", name: t("personas.assistant") },
+    { id: "finance",   name: t("personas.finance") },
+    { id: "buddy",     name: t("personas.buddy") },
+    { id: "coach",     name: t("personas.coach") },
+    { id: "analyst",   name: t("personas.analyst") },
+  ]
   const router = useRouter()
   const searchParams = useSearchParams()
   const urlId = searchParams.get("id")
@@ -125,7 +126,7 @@ function ChatPageInner() {
                 <PanelLeft className="size-5" />
               )}
             </Button>
-            <h1 className="text-lg font-semibold">웹챗</h1>
+            <h1 className="text-lg font-semibold">{t("title")}</h1>
             {isStreaming && (
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
             )}
@@ -137,7 +138,7 @@ function ChatPageInner() {
           {connState === "error" && (
             <Badge variant="secondary" className="gap-1">
               <WifiOff className="size-3" />
-              오류
+              {t("errorBadge")}
             </Badge>
           )}
         </div>
@@ -154,9 +155,9 @@ function ChatPageInner() {
           disabled={!isConnected || isStreaming || activeThreadId === null || isReadonly}
           placeholder={
             isReadonly
-              ? "읽기 전용 대화입니다"
+              ? t("readonlyPlaceholder")
               : activeThreadId === null
-              ? "새 대화를 시작하거나 왼쪽에서 대화를 선택하세요"
+              ? t("newConvPlaceholder")
               : undefined
           }
           persona={persona}

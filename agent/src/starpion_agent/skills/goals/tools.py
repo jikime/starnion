@@ -8,7 +8,7 @@ import logging
 import re
 import json
 from calendar import monthrange
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
@@ -36,22 +36,29 @@ class SetGoalInput(BaseModel):
     """Input schema for set_goal tool."""
 
     title: str = Field(
-        description="목표 설명 (예: '이번 달 식비 30만원 이내로 관리해줘')",
+        description="목표 설명 (예: '이번 달 식비 30만원 이내로', '프로젝트 마무리하기', '매일 운동하기')",
     )
     goal_type: str = Field(
-        description="목표 유형: budget_limit(지출 제한), savings(저축), habit(습관)",
+        description=(
+            "목표 유형: "
+            "budget_limit(지출 제한), "
+            "savings(저축), "
+            "habit(습관/반복), "
+            "task(할 일 완료/프로젝트), "
+            "general(기타 일반 목표)"
+        ),
     )
     category: str = Field(
         default="",
-        description="관련 카테고리 (예: 식비, 교통). 없으면 빈 문자열",
+        description="관련 카테고리 (예: 식비, 업무, 운동, 건강). 없으면 빈 문자열",
     )
     target_amount: int = Field(
         default=0,
-        description="목표 금액 (원 단위). 없으면 0",
+        description="목표 금액 (원 단위). 금액 목표가 없으면 0",
     )
     deadline: str = Field(
         default="",
-        description="마감일 (YYYY-MM-DD). 빈 문자열이면 이번 달 말일",
+        description="마감일 (YYYY-MM-DD). 빈 문자열이면 task/general은 1주일 후, 재정 목표는 이번 달 말일",
     )
 
 
@@ -75,6 +82,17 @@ class UpdateGoalStatusInput(BaseModel):
     )
 
 
+class UpdateGoalProgressInput(BaseModel):
+    """Input schema for update_goal_progress tool."""
+
+    goal_id: int = Field(
+        description="목표 ID (숫자)",
+    )
+    progress_pct: float = Field(
+        description="진행률 (0~100 사이 숫자). 예: 50% 완료 → 50, 100% 달성 → 100",
+    )
+
+
 @tool(args_schema=SetGoalInput)
 @skill_guard("goals")
 async def set_goal(
@@ -84,7 +102,7 @@ async def set_goal(
     target_amount: int = 0,
     deadline: str = "",
 ) -> str:
-    """재정 목표를 설정합니다. 목표를 설정하면 매일 진행 상황을 평가하고, 매주 수요일에 진행률 리포트를 보내드립니다."""
+    """목표를 설정합니다. 재정 목표(지출 제한, 저축)뿐 아니라 할 일, 프로젝트 완료, 습관 형성 등 모든 종류의 목표를 저장합니다."""
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요."
@@ -99,11 +117,14 @@ async def set_goal(
             "기존 목표를 완료하거나 취소한 후 다시 시도해 주세요."
         )
 
-    # Default deadline to end of current month.
+    # Default deadline: financial goals → end of month, others → 1 week later.
     now = datetime.now()
     if not deadline:
-        last_day = monthrange(now.year, now.month)[1]
-        deadline = now.replace(day=last_day).strftime("%Y-%m-%d")
+        if goal_type in ("budget_limit", "savings"):
+            last_day = monthrange(now.year, now.month)[1]
+            deadline = now.replace(day=last_day).strftime("%Y-%m-%d")
+        else:
+            deadline = (now + timedelta(weeks=1)).strftime("%Y-%m-%d")
 
     try:
         end_date = datetime.strptime(deadline, "%Y-%m-%d").date()
@@ -215,6 +236,26 @@ async def update_goal_status(goal_id: int, new_status: str) -> str:
 
     status_label = "달성" if new_status == "completed" else "취소"
     return f"'{result['title']}' 목표를 {status_label} 처리했어요."
+
+
+@tool(args_schema=UpdateGoalProgressInput)
+@skill_guard("goals")
+async def update_goal_progress(goal_id: int, progress_pct: float) -> str:
+    """목표의 진행률(%)을 업데이트합니다. 0~100 사이 숫자를 넘기면 됩니다."""
+    user_id = get_current_user()
+    if not user_id:
+        return "사용자 정보를 확인할 수 없어요."
+
+    pct = max(0.0, min(progress_pct, 100.0))
+
+    pool = get_pool()
+    result = await goal_db_repo.update_progress(pool, user_id, goal_id, pct)
+
+    if not result:
+        return f"목표 ID '{goal_id}'를 찾을 수 없거나 이미 완료/취소됐어요."
+
+    title = result["title"]
+    return f"'{title}' 목표 진행률을 {pct:.0f}%로 업데이트했어요!"
 
 
 # --- Report Functions (called via gRPC, NOT @tool) ---

@@ -102,7 +102,7 @@ def generate_pptx(title: str, content: str) -> bytes:
     title_layout = prs.slide_layouts[0]
     slide = prs.slides.add_slide(title_layout)
     slide.shapes.title.text = title
-    if slide.placeholders[1]:
+    if 1 in slide.placeholders:
         slide.placeholders[1].text = ""
 
     # Content slides from paragraphs.
@@ -113,6 +113,8 @@ def generate_pptx(title: str, content: str) -> bytes:
         content_layout = prs.slide_layouts[1]
         slide = prs.slides.add_slide(content_layout)
         slide.shapes.title.text = title
+        if 1 not in slide.placeholders:
+            continue
         body = slide.placeholders[1]
         tf = body.text_frame
         tf.clear()

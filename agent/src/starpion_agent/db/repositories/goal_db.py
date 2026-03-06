@@ -84,6 +84,39 @@ async def update_status(
             return dict(row) if row else None
 
 
+async def update_progress(
+    pool: AsyncConnectionPool[Any],
+    user_id: str,
+    goal_id: int,
+    progress_pct: float,
+) -> dict[str, Any] | None:
+    """Update the progress of a goal by percentage (0-100).
+
+    Always stores progress_pct as current_value and ensures target_value=100,
+    so the UI progress bar renders correctly for all goal types.
+
+    Returns:
+        Updated row with id, title, current_value, target_value, status,
+        or None if not found.
+    """
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                """
+                UPDATE goals
+                SET current_value = %s,
+                    target_value = 100,
+                    updated_at = NOW()
+                WHERE id = %s AND user_id = %s AND status = 'in_progress'
+                RETURNING id, title, current_value, target_value, unit, status
+                """,
+                (progress_pct, goal_id, user_id),
+            )
+            row = await cur.fetchone()
+            await conn.commit()
+            return dict(row) if row else None
+
+
 async def update_evaluation(
     pool: AsyncConnectionPool[Any],
     user_id: str,

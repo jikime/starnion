@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useState, Suspense, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -31,63 +32,62 @@ interface AllStatus {
   tavily?: IntegrationStatus
 }
 
-// ── Integration definitions ───────────────────────────────────────────────────
-
-const INTEGRATIONS = [
-  {
-    id: "google" as const,
-    name: "Google Workspace",
-    logo: "🔵",
-    color: "bg-blue-50 dark:bg-blue-950",
-    border: "border-blue-200 dark:border-blue-800",
-    description: "캘린더, Gmail, Drive, Docs, Tasks를 Jiki에서 직접 제어합니다.",
-    capabilities: ["Google Calendar 조회/생성", "Gmail 읽기/발송", "Google Drive 파일 업로드", "Google Docs 생성/편집", "Google Tasks 관리"],
-    authType: "oauth" as const,
-  },
-  {
-    id: "notion" as const,
-    name: "Notion",
-    logo: "◼",
-    color: "bg-gray-50 dark:bg-gray-900",
-    border: "border-gray-200 dark:border-gray-700",
-    description: "Notion 워크스페이스의 페이지, 데이터베이스를 조회하고 생성합니다.",
-    capabilities: ["페이지 읽기/생성", "데이터베이스 조회", "블록 추가/수정"],
-    authType: "apikey" as const,
-    keyLabel: "Internal Integration Token",
-    keyPlaceholder: "secret_xxxxxxxxxxxxxxxxxxxxxxxx",
-    keyHint: "Notion 설정 → 연동 → 새 API 통합에서 생성할 수 있습니다.",
-  },
-  {
-    id: "github" as const,
-    name: "GitHub",
-    logo: "🐙",
-    color: "bg-slate-50 dark:bg-slate-900",
-    border: "border-slate-200 dark:border-slate-700",
-    description: "레포지토리, 이슈, PR을 Jiki에서 조회하고 관리합니다.",
-    capabilities: ["레포지토리 조회", "이슈 읽기/생성", "PR 조회", "코드 검색"],
-    authType: "apikey" as const,
-    keyLabel: "Personal Access Token (PAT)",
-    keyPlaceholder: "ghp_xxxxxxxxxxxxxxxxxxxx",
-    keyHint: "GitHub 설정 → Developer settings → Personal access tokens에서 생성할 수 있습니다.",
-  },
-  {
-    id: "tavily" as const,
-    name: "Tavily",
-    logo: "🔍",
-    color: "bg-purple-50 dark:bg-purple-950",
-    border: "border-purple-200 dark:border-purple-800",
-    description: "실시간 웹 검색 기능을 Jiki에 연결합니다. 최신 뉴스, 사실 확인, 실시간 데이터 검색이 가능해집니다.",
-    capabilities: ["실시간 웹 검색", "최신 뉴스 조회", "사실 확인", "웹 페이지 내용 추출"],
-    authType: "apikey" as const,
-    keyLabel: "Tavily API Key",
-    keyPlaceholder: "tvly-xxxxxxxxxxxxxxxxxxxxxxxx",
-    keyHint: "app.tavily.com에서 API 키를 발급받을 수 있습니다.",
-  },
-]
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 function IntegrationsPageInner() {
+  const t = useTranslations("integrations")
+
+  const INTEGRATIONS = useMemo(() => [
+    {
+      id: "google" as const,
+      name: "Google Workspace",
+      logo: "🔵",
+      color: "bg-blue-50 dark:bg-blue-950",
+      border: "border-blue-200 dark:border-blue-800",
+      description: t("google.description"),
+      capabilities: [t("google.cap1"), t("google.cap2"), t("google.cap3"), t("google.cap4"), t("google.cap5")],
+      authType: "oauth" as const,
+    },
+    {
+      id: "notion" as const,
+      name: "Notion",
+      logo: "◼",
+      color: "bg-gray-50 dark:bg-gray-900",
+      border: "border-gray-200 dark:border-gray-700",
+      description: t("notion.description"),
+      capabilities: [t("notion.cap1"), t("notion.cap2"), t("notion.cap3")],
+      authType: "apikey" as const,
+      keyLabel: "Internal Integration Token",
+      keyPlaceholder: "secret_xxxxxxxxxxxxxxxxxxxxxxxx",
+      keyHint: t("notion.keyHint"),
+    },
+    {
+      id: "github" as const,
+      name: "GitHub",
+      logo: "🐙",
+      color: "bg-slate-50 dark:bg-slate-900",
+      border: "border-slate-200 dark:border-slate-700",
+      description: t("github.description"),
+      capabilities: [t("github.cap1"), t("github.cap2"), t("github.cap3"), t("github.cap4")],
+      authType: "apikey" as const,
+      keyLabel: "Personal Access Token (PAT)",
+      keyPlaceholder: "ghp_xxxxxxxxxxxxxxxxxxxx",
+      keyHint: t("github.keyHint"),
+    },
+    {
+      id: "tavily" as const,
+      name: "Tavily",
+      logo: "🔍",
+      color: "bg-purple-50 dark:bg-purple-950",
+      border: "border-purple-200 dark:border-purple-800",
+      description: t("tavily.description"),
+      capabilities: [t("tavily.cap1"), t("tavily.cap2"), t("tavily.cap3"), t("tavily.cap4")],
+      authType: "apikey" as const,
+      keyLabel: "Tavily API Key",
+      keyPlaceholder: "tvly-xxxxxxxxxxxxxxxxxxxxxxxx",
+      keyHint: t("tavily.keyHint"),
+    },
+  ], [t])
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<AllStatus>({})
   const [loading, setLoading] = useState(true)
@@ -123,8 +123,8 @@ function IntegrationsPageInner() {
     // Handle redirect-back from Google OAuth
     const connected = searchParams.get("connected")
     const error = searchParams.get("error")
-    if (connected === "google") showToast("Google 계정 연동이 완료됐어요!")
-    if (error === "google") showToast("Google 연동이 취소됐어요.", "error")
+    if (connected === "google") showToast(t("googleConnected"))
+    if (error === "google") showToast(t("googleCancelled"), "error")
     // Clean URL
     if (connected || error) window.history.replaceState({}, "", "/settings/integrations")
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,7 +136,7 @@ function IntegrationsPageInner() {
     setBusy("google")
     try {
       const res = await fetch("/api/integrations/google/auth-url")
-      if (!res.ok) { showToast("Google OAuth 설정이 되어있지 않아요.", "error"); return }
+      if (!res.ok) { showToast(t("googleOAuthMissing"), "error"); return }
       const { url } = await res.json()
       window.location.href = url
     } finally {
@@ -148,8 +148,8 @@ function IntegrationsPageInner() {
     setBusy("google")
     try {
       const res = await fetch("/api/integrations/google", { method: "DELETE" })
-      if (res.ok) { setStatus((s) => ({ ...s, google: { connected: false } })); showToast("Google 연동이 해제됐어요.") }
-      else showToast("해제에 실패했어요.", "error")
+      if (res.ok) { setStatus((s) => ({ ...s, google: { connected: false } })); showToast(t("googleUnlinked")) }
+      else showToast(t("disconnectFailed"), "error")
     } finally {
       setBusy(null)
     }
@@ -164,7 +164,7 @@ function IntegrationsPageInner() {
 
   const submitApiKey = async () => {
     if (!dialogProvider) return
-    if (!apiKeyInput.trim()) { setApiKeyError("API 키를 입력해주세요."); return }
+    if (!apiKeyInput.trim()) { setApiKeyError(t("apiKeyRequired")); return }
     setBusy(dialogProvider)
     setDialogOpen(false)
     try {
@@ -175,9 +175,10 @@ function IntegrationsPageInner() {
       })
       if (res.ok) {
         setStatus((s) => ({ ...s, [dialogProvider]: { connected: true } }))
-        showToast(`${dialogProvider === "notion" ? "Notion" : dialogProvider === "github" ? "GitHub" : "Tavily"} 연동이 완료됐어요!`)
+        const name = dialogProvider === "notion" ? "Notion" : dialogProvider === "github" ? "GitHub" : "Tavily"
+        showToast(t("providerConnected", { name }))
       } else {
-        showToast("저장에 실패했어요.", "error")
+        showToast(t("saveFailed"), "error")
       }
     } finally {
       setBusy(null)
@@ -190,9 +191,10 @@ function IntegrationsPageInner() {
       const res = await fetch(`/api/integrations/${provider}`, { method: "DELETE" })
       if (res.ok) {
         setStatus((s) => ({ ...s, [provider]: { connected: false } }))
-        showToast(`${provider === "notion" ? "Notion" : provider === "github" ? "GitHub" : "Tavily"} 연동이 해제됐어요.`)
+        const name = provider === "notion" ? "Notion" : provider === "github" ? "GitHub" : "Tavily"
+        showToast(t("providerUnlinked", { name }))
       } else {
-        showToast("해제에 실패했어요.", "error")
+        showToast(t("disconnectFailed"), "error")
       }
     } finally {
       setBusy(null)
@@ -207,9 +209,9 @@ function IntegrationsPageInner() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold">연동</h1>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
         <p className="text-muted-foreground mt-1">
-          외부 서비스를 연결하면 Jiki가 대신 작업을 수행할 수 있어요.
+          {t("subtitle")}
         </p>
       </div>
 
@@ -251,10 +253,10 @@ function IntegrationsPageInner() {
                         <Loader2 className="size-3 animate-spin text-muted-foreground" />
                       ) : isConnected ? (
                         <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-0 text-xs gap-1">
-                          <CheckCircle2 className="size-3" /> 연결됨
+                          <CheckCircle2 className="size-3" /> {t("connected")}
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="text-xs">미연결</Badge>
+                        <Badge variant="secondary" className="text-xs">{t("disconnected")}</Badge>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">{integration.description}</p>
@@ -283,7 +285,7 @@ function IntegrationsPageInner() {
                         }
                       >
                         {isBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Unlink className="size-3.5" />}
-                        해제
+                        {t("disconnect")}
                       </Button>
                     ) : (
                       <Button
@@ -301,7 +303,7 @@ function IntegrationsPageInner() {
                         ) : integration.authType === "oauth" ? (
                           <ExternalLink className="size-3.5" />
                         ) : null}
-                        연결하기
+                        {t("connect")}
                       </Button>
                     )}
                   </div>
@@ -316,7 +318,7 @@ function IntegrationsPageInner() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{dialogIntegration?.name} 연동</DialogTitle>
+            <DialogTitle>{t("dialogTitle", { name: dialogIntegration?.name ?? "" })}</DialogTitle>
             <DialogDescription>
               {dialogIntegration?.keyHint}
             </DialogDescription>
@@ -336,8 +338,8 @@ function IntegrationsPageInner() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setDialogOpen(false)}>취소</Button>
-            <Button onClick={submitApiKey}>저장</Button>
+            <Button variant="ghost" onClick={() => setDialogOpen(false)}>{t("cancel")}</Button>
+            <Button onClick={submitApiKey}>{t("save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

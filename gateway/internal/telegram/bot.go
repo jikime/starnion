@@ -147,19 +147,21 @@ func (b *Bot) Run(ctx context.Context) {
 
 // SendMessage sends a text message to a specific chat.
 // Handles long messages by chunking at paragraph/newline boundaries (Telegram 4096 char limit).
-// Supports Markdown formatting with HTML fallback on parse failure.
+// Markdown in the text is converted to Telegram-compatible HTML before sending.
 func (b *Bot) SendMessage(chatID int64, text string) error {
-	chunks := chunkText(text, 4096)
+	converted := markdownToTelegramHTML(text)
+	chunks := chunkText(converted, 4096)
 
 	for i, chunk := range chunks {
 		msg := tgbotapi.NewMessage(chatID, chunk)
-		msg.ParseMode = "Markdown"
+		msg.ParseMode = "HTML"
 
 		_, err := b.api.Send(msg)
 		if err != nil {
-			// Markdown parse failure → retry as plain text (openclaw pattern).
-			log.Warn().Err(err).Int("chunk", i).Msg("Markdown send failed, retrying as plain text")
+			// HTML parse failure → retry as plain text fallback.
+			log.Warn().Err(err).Int("chunk", i).Msg("HTML send failed, retrying as plain text")
 			msg.ParseMode = ""
+			msg.Text = text // send original unescaped text as plain fallback
 			if _, retryErr := b.api.Send(msg); retryErr != nil {
 				return fmt.Errorf("send chunk %d: %w", i, retryErr)
 			}
@@ -337,6 +339,10 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	// Mirroring runs in a background goroutine so it never delays the agent call.
 	mirrorCh := make(chan storage.FileAttachment, 1)
 
+	// imgIDCh receives the user_images row ID for uploaded photos so that the
+	// stream/unary handler can backfill the analysis column once the LLM responds.
+	var imgIDCh chan int64
+
 	// Handle photo messages.
 	if msg.Photo != nil && len(msg.Photo) > 0 {
 		// Pick the largest photo (last element).
@@ -350,15 +356,25 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 				FileUrl:  fileURL,
 				FileName: "photo.jpg",
 			}
-			go func(u string) {
+			photoCaption := msg.Caption
+			if photoCaption == "" {
+				photoCaption = "이 이미지를 분석해주세요."
+			}
+			imgIDCh = make(chan int64, 1)
+			go func(u, caption string) {
 				mirrorCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
 				if att, err := b.mirrorToStorage(mirrorCtx, "photo.jpg", "image/jpeg", u); err != nil {
 					log.Warn().Err(err).Msg("telegram: mirror photo to storage failed")
+					imgIDCh <- 0 // signal that no record was created
 				} else {
 					mirrorCh <- att
+					// Record uploaded photo to image gallery and send its DB row id
+					// back so the streaming handler can update the analysis column.
+					imgID := b.recordImageID(userID, att.URL, att.Name, att.Mime, att.Size, "uploaded", caption)
+					imgIDCh <- imgID
 				}
-			}(fileURL)
+			}(fileURL, photoCaption)
 			if chatReq.Message == "" {
 				chatReq.Message = msg.Caption
 			}
@@ -488,15 +504,17 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	b.setReaction(chatID, messageID, "👀")
 
 	// 3. Try streaming first, fallback to unary on error.
-	if err := b.handleMessageStream(ctx, chatID, messageID, userID, convID, chatReq); err != nil {
+	if err := b.handleMessageStream(ctx, chatID, messageID, userID, convID, chatReq, imgIDCh); err != nil {
 		log.Warn().Err(err).Str("user_id", userID).Msg("stream failed, falling back to unary")
-		b.handleMessageUnary(ctx, chatID, messageID, userID, convID, chatReq)
+		b.handleMessageUnary(ctx, chatID, messageID, userID, convID, chatReq, imgIDCh)
 	}
 }
 
 // handleMessageStream processes a chat request via server-side streaming.
 // Sends an initial message to Telegram and progressively edits it as tokens arrive.
-func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID int, userID, convID string, req *starpionv1.ChatRequest) error {
+// imgIDCh (may be nil) carries the user_images row id for uploaded photos so
+// that the analysis column can be backfilled once the LLM response is complete.
+func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID int, userID, convID string, req *starpionv1.ChatRequest, imgIDCh chan int64) error {
 	reqCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 
@@ -586,14 +604,15 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 				deleteMsg := tgbotapi.NewDeleteMessage(chatID, statusMsgID)
 				b.api.Request(deleteMsg)
 			}
-			// Final edit with Markdown formatting.
+			// Final edit with HTML formatting (converted from Markdown).
 			if sentMsgID != 0 && accumulated.Len() > lastLen {
-				final := accumulated.String()
+				final := markdownToTelegramHTML(accumulated.String())
 				edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, final)
-				edit.ParseMode = "Markdown"
+				edit.ParseMode = "HTML"
 				if _, editErr := b.api.Send(edit); editErr != nil {
-					// Markdown parse failure → retry as plain text.
+					// HTML parse failure → retry as plain text.
 					edit.ParseMode = ""
+					edit.Text = accumulated.String()
 					b.api.Send(edit)
 				}
 			} else if sentMsgID == 0 && accumulated.Len() > 0 {
@@ -606,6 +625,8 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 			if accumulated.Len() > 0 || len(attachments) > 0 {
 				b.saveMessage(convID, "assistant", accumulated.String(), attachments)
 			}
+			// Backfill analysis column for the uploaded photo (if any).
+			b.backfillImageAnalysis(imgIDCh, accumulated.String())
 			b.setReaction(chatID, messageID, "👍")
 			return nil
 
@@ -640,6 +661,8 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 					b.recordImage(userID, att.URL, att.Name, att.Mime, att.Size, tgImageType(resp.FileName), req.Message)
 				} else if strings.HasPrefix(att.Mime, "audio/") {
 					b.recordAudio(userID, att.URL, att.Name, att.Mime, att.Size, 0, "generated", req.Message, "")
+				} else {
+					b.recordDocument(userID, att.URL, att.Name, att.Mime, att.Size)
 				}
 			}
 
@@ -666,11 +689,12 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 		b.api.Request(deleteMsg)
 	}
 	if sentMsgID != 0 && accumulated.Len() > lastLen {
-		final := accumulated.String()
+		final := markdownToTelegramHTML(accumulated.String())
 		edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, final)
-		edit.ParseMode = "Markdown"
+		edit.ParseMode = "HTML"
 		if _, editErr := b.api.Send(edit); editErr != nil {
 			edit.ParseMode = ""
+			edit.Text = accumulated.String()
 			b.api.Send(edit)
 		}
 	} else if sentMsgID == 0 && accumulated.Len() > 0 {
@@ -680,12 +704,14 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 	if accumulated.Len() > 0 || len(attachments) > 0 {
 		b.saveMessage(convID, "assistant", accumulated.String(), attachments)
 	}
+	// Backfill analysis column for the uploaded photo (if any).
+	b.backfillImageAnalysis(imgIDCh, accumulated.String())
 	b.setReaction(chatID, messageID, "👍")
 	return nil
 }
 
 // handleMessageUnary processes a chat request via unary gRPC call (fallback).
-func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID int, userID, convID string, req *starpionv1.ChatRequest) {
+func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID int, userID, convID string, req *starpionv1.ChatRequest, imgIDCh chan int64) {
 	typingCtx, typingCancel := context.WithCancel(ctx)
 	go b.typingLoop(typingCtx, chatID)
 
@@ -719,6 +745,8 @@ func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID in
 				b.recordImage(userID, att.URL, att.Name, att.Mime, att.Size, tgImageType(resp.FileName), req.Message)
 			} else if strings.HasPrefix(att.Mime, "audio/") {
 				b.recordAudio(userID, att.URL, att.Name, att.Mime, att.Size, 0, "generated", req.Message, "")
+			} else {
+				b.recordDocument(userID, att.URL, att.Name, att.Mime, att.Size)
 			}
 		}
 	}
@@ -733,6 +761,8 @@ func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID in
 	if resp.Content != "" || len(attachments) > 0 {
 		b.saveMessage(convID, "assistant", resp.Content, attachments)
 	}
+	// Backfill analysis column for the uploaded photo (if any).
+	b.backfillImageAnalysis(imgIDCh, resp.Content)
 }
 
 // typingLoop sends "typing" chat action every 4 seconds until ctx is cancelled.
@@ -1278,17 +1308,89 @@ func (b *Bot) handleSkillToggle(ctx context.Context, callback *tgbotapi.Callback
 	log.Info().Str("user_id", userID).Str("skill_id", skillID).Bool("enabled", enabled).Msg("skill toggled")
 }
 
+// recordDocument inserts a user_documents row for a generated document file.
+func (b *Bot) recordDocument(userID, url, name, mime string, size int64) {
+	if b.db == nil {
+		return
+	}
+	// Only record known document MIME types.
+	switch mime {
+	case "application/pdf",
+		"application/msword",
+		"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"application/vnd.ms-excel",
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		"application/vnd.ms-powerpoint",
+		"application/vnd.openxmlformats-officedocument.presentationml.presentation",
+		"text/plain", "text/markdown", "text/csv":
+		// allowed
+	default:
+		return
+	}
+	parts := strings.Split(url, "/")
+	objectKey := ""
+	if len(parts) >= 2 {
+		objectKey = parts[len(parts)-2] + "/" + parts[len(parts)-1]
+	}
+	_, err := b.db.ExecContext(context.Background(), `
+		INSERT INTO user_documents (user_id, title, file_type, file_url, object_key, size)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, userID, name, mime, url, objectKey, size)
+	if err != nil {
+		log.Warn().Err(err).Str("user_id", userID).Str("url", url).Msg("telegram: record document failed")
+	}
+}
+
 // recordImage inserts an image row into user_images (fire-and-forget).
 func (b *Bot) recordImage(userID, url, name, mime string, size int64, imgType, prompt string) {
+	b.recordImageID(userID, url, name, mime, size, imgType, prompt)
+}
+
+// recordImageID inserts a user_images row and returns the new row id (0 on failure).
+func (b *Bot) recordImageID(userID, url, name, mime string, size int64, imgType, prompt string) int64 {
 	if b.db == nil || !strings.HasPrefix(mime, "image/") {
+		return 0
+	}
+	var id int64
+	err := b.db.QueryRowContext(context.Background(), `
+		INSERT INTO user_images (user_id, url, name, mime, size, source, type, prompt)
+		VALUES ($1, $2, $3, $4, $5, 'telegram', $6, $7)
+		RETURNING id
+	`, userID, url, name, mime, size, imgType, prompt).Scan(&id)
+	if err != nil {
+		log.Warn().Err(err).Str("user_id", userID).Msg("telegram: record image failed")
+		return 0
+	}
+	return id
+}
+
+// backfillImageAnalysis reads an image row id from imgIDCh (with a short timeout)
+// and calls updateImageAnalysis if a positive id and non-empty analysis are available.
+// imgIDCh may be nil (non-photo messages) — in that case this is a no-op.
+func (b *Bot) backfillImageAnalysis(imgIDCh chan int64, analysis string) {
+	if imgIDCh == nil || analysis == "" {
+		return
+	}
+	var imgID int64
+	select {
+	case imgID = <-imgIDCh:
+	case <-time.After(5 * time.Second):
+		log.Warn().Msg("telegram: photo id not received in time, analysis not backfilled")
+		return
+	}
+	b.updateImageAnalysis(imgID, analysis)
+}
+
+// updateImageAnalysis sets the analysis text on an existing user_images row and marks it as analyzed.
+func (b *Bot) updateImageAnalysis(id int64, analysis string) {
+	if b.db == nil || id == 0 || analysis == "" {
 		return
 	}
 	_, err := b.db.ExecContext(context.Background(), `
-		INSERT INTO user_images (user_id, url, name, mime, size, source, type, prompt)
-		VALUES ($1, $2, $3, $4, $5, 'telegram', $6, $7)
-	`, userID, url, name, mime, size, imgType, prompt)
+		UPDATE user_images SET analysis = $1, type = 'analyzed' WHERE id = $2
+	`, analysis, id)
 	if err != nil {
-		log.Warn().Err(err).Str("user_id", userID).Msg("telegram: record image failed")
+		log.Warn().Err(err).Int64("id", id).Msg("telegram: update image analysis failed")
 	}
 }
 

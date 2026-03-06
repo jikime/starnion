@@ -16,10 +16,13 @@ class SetBudgetInput(BaseModel):
     """Input schema for set_budget tool."""
 
     category: str = Field(
-        description="예산을 설정할 카테고리 (예: 식비, 교통, 쇼핑, 전체)",
+        description=(
+            "예산을 설정할 카테고리. 예: 식비, 교통, 쇼핑, 문화, 의료, 구독, 기타. "
+            "'전체', '총 지출', '모든 지출', '전체 비용' 등은 '전체'로 통일하세요."
+        ),
     )
     amount: int = Field(
-        description="월 예산 금액 (원 단위 정수)",
+        description="월 예산 금액 (원 단위 정수). 예: '50만원' → 500000, '30만원' → 300000",
     )
 
 
@@ -35,8 +38,10 @@ class GetBudgetStatusInput(BaseModel):
 @tool(args_schema=SetBudgetInput)
 @skill_guard("budget")
 async def set_budget(category: str, amount: int) -> str:
-    """월별 예산을 카테고리별로 설정합니다.
+    """월별 예산을 카테고리별로 설정하거나 변경합니다.
 
+    기존 예산이 있으면 새 금액으로 덮어씁니다(업데이트).
+    '전체' 카테고리는 월 총 지출 한도를 의미합니다.
     예산을 설정하면 지출 기록 시 자동으로 예산 대비 사용률을 알려드립니다.
     """
     user_id = get_current_user()

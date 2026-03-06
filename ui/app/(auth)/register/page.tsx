@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useTranslations } from "next-intl"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -23,26 +24,24 @@ import { Loader2 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"
 
-const schema = z
-  .object({
-    name: z.string().min(1, "이름을 입력해주세요").max(50),
-    email: z.string().email("올바른 이메일 형식이 아닙니다"),
-    password: z
-      .string()
-      .min(8, "비밀번호는 8자 이상이어야 합니다")
-      .max(100),
-    confirmPassword: z.string(),
-  })
-  .refine((d) => d.password === d.confirmPassword, {
-    message: "비밀번호가 일치하지 않습니다",
-    path: ["confirmPassword"],
-  })
-
-type FormData = z.infer<typeof schema>
+type FormData = { name: string; email: string; password: string; confirmPassword: string }
 
 export default function RegisterPage() {
+  const t = useTranslations("auth")
   const router = useRouter()
   const [error, setError] = useState("")
+
+  const schema = useMemo(() => z
+    .object({
+      name: z.string().min(1, t("register.nameRequired")).max(50),
+      email: z.string().email(t("register.emailInvalid")),
+      password: z.string().min(8, t("register.passwordTooShort")).max(100),
+      confirmPassword: z.string(),
+    })
+    .refine((d) => d.password === d.confirmPassword, {
+      message: t("register.passwordMismatch"),
+      path: ["confirmPassword"],
+    }), [t])
 
   const {
     register,
@@ -66,7 +65,7 @@ export default function RegisterPage() {
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      setError(body.error ?? "회원가입에 실패했습니다")
+      setError(body.error ?? t("register.failed"))
       return
     }
 
@@ -90,8 +89,8 @@ export default function RegisterPage() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center space-y-1">
-        <CardTitle className="text-2xl font-bold">회원가입</CardTitle>
-        <CardDescription>JIKI AI 어시스턴트 계정을 만드세요</CardDescription>
+        <CardTitle className="text-2xl font-bold">{t("register.title")}</CardTitle>
+        <CardDescription>{t("register.description")}</CardDescription>
       </CardHeader>
 
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -103,11 +102,11 @@ export default function RegisterPage() {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="name">이름</Label>
+            <Label htmlFor="name">{t("register.nameLabel")}</Label>
             <Input
               id="name"
               type="text"
-              placeholder="홍길동"
+              placeholder={t("register.namePlaceholder")}
               autoComplete="name"
               {...register("name")}
             />
@@ -117,7 +116,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">이메일</Label>
+            <Label htmlFor="email">{t("register.emailLabel")}</Label>
             <Input
               id="email"
               type="email"
@@ -131,11 +130,11 @@ export default function RegisterPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">비밀번호</Label>
+            <Label htmlFor="password">{t("register.passwordLabel")}</Label>
             <Input
               id="password"
               type="password"
-              placeholder="8자 이상"
+              placeholder={t("register.passwordPlaceholder")}
               autoComplete="new-password"
               {...register("password")}
             />
@@ -145,7 +144,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">비밀번호 확인</Label>
+            <Label htmlFor="confirmPassword">{t("register.confirmPasswordLabel")}</Label>
             <Input
               id="confirmPassword"
               type="password"
@@ -164,12 +163,12 @@ export default function RegisterPage() {
         <CardFooter className="flex flex-col gap-3">
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-            가입하기
+            {t("register.submit")}
           </Button>
           <p className="text-sm text-muted-foreground text-center">
-            이미 계정이 있으신가요?{" "}
+            {t("register.hasAccount")}{" "}
             <Link href="/login" className="underline text-primary font-medium">
-              로그인
+              {t("register.login")}
             </Link>
           </p>
         </CardFooter>

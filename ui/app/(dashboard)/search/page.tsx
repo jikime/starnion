@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -36,7 +37,7 @@ async function streamSearch(
     body: JSON.stringify({ query }),
     signal,
   })
-  if (!res.ok || !res.body) throw new Error("검색에 실패했어요.")
+  if (!res.ok || !res.body) throw new Error("streamFailed")
 
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
@@ -113,6 +114,8 @@ function Md({ content }: { content: string }) {
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function SearchPage() {
+  const t = useTranslations("search")
+
   const [query, setQuery] = useState("")
   const [result, setResult] = useState("")
   const [currentQuery, setCurrentQuery] = useState("")
@@ -159,11 +162,21 @@ export default function SearchPage() {
     setStatus("searching")
 
     try {
-      await streamSearch(searchQuery, (delta) => setResult((r) => r + delta), ctrl.signal)
+      const fullResult = await streamSearch(searchQuery, (delta) => setResult((r) => r + delta), ctrl.signal)
       setStatus("done")
+      // Auto-save the AI summary so history always has the full response
+      if (fullResult) {
+        setSaved(true)
+        fetch("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: searchQuery, result: fullResult }),
+        }).then(res => { if (res.ok) loadHistory() }).catch(() => setSaved(false))
+      }
     } catch (e) {
       if ((e as Error).name === "AbortError") return
-      setError(e instanceof Error ? e.message : "오류가 발생했어요.")
+      const msg = e instanceof Error ? e.message : "error"
+      setError(msg === "streamFailed" ? t("streamFailed") : msg)
       setStatus("error")
     }
   }
@@ -205,12 +218,16 @@ export default function SearchPage() {
     setHistory((prev) => prev.filter((h) => h.id !== id))
   }
 
-  // ── Re-search from history ────────────────────────────────────────────────
+  // ── Load cached result from history ───────────────────────────────────────
 
-  const handleReSearch = (q: string) => {
-    setQuery(q)
+  const handleReSearch = (item: SavedSearch) => {
+    setQuery(item.query)
+    setCurrentQuery(item.query)
+    setResult(item.result)
+    setError("")
+    setSaved(true)
+    setStatus("done")
     setShowHistory(false)
-    handleSearch(q)
   }
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────
@@ -219,13 +236,20 @@ export default function SearchPage() {
 
   const searching = status === "searching"
 
+  // Deduplicate history: keep only the most recent entry per unique query
+  // (auto-save from tool + manual save can create duplicates; latest = AI summary)
+  const uniqueHistory = history.reduce<SavedSearch[]>((acc, item) => {
+    if (!acc.some(h => h.query === item.query)) acc.push(item)
+    return acc
+  }, [])
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">웹검색</h1>
-          <p className="text-muted-foreground">AI 에이전트가 웹을 검색하고 요약합니다</p>
+          <h1 className="text-2xl font-semibold">{t("webTitle")}</h1>
+          <p className="text-muted-foreground">{t("webSubtitle")}</p>
         </div>
         <Button
           variant="outline"
@@ -234,9 +258,9 @@ export default function SearchPage() {
           onClick={() => setShowHistory(!showHistory)}
         >
           <Clock className="size-4" />
-          저장된 검색
-          {history.length > 0 && (
-            <Badge variant="secondary" className="text-xs px-1.5">{history.length}</Badge>
+          {t("savedSearches")}
+          {uniqueHistory.length > 0 && (
+            <Badge variant="secondary" className="text-xs px-1.5">{uniqueHistory.length}</Badge>
           )}
         </Button>
       </div>
@@ -252,7 +276,7 @@ export default function SearchPage() {
                   <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     type="search"
-                    placeholder="검색어를 입력하세요..."
+                    placeholder={t("inputPlaceholder")}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     className="pl-9"
@@ -262,12 +286,12 @@ export default function SearchPage() {
                 {searching ? (
                   <Button type="button" variant="destructive" onClick={handleStop} className="gap-2 shrink-0">
                     <X className="size-4" />
-                    중지
+                    {t("stop")}
                   </Button>
                 ) : (
                   <Button type="submit" disabled={!query.trim()} className="gap-2 shrink-0">
                     <Search className="size-4" />
-                    검색
+                    {t("button")}
                   </Button>
                 )}
               </form>
@@ -283,29 +307,34 @@ export default function SearchPage() {
                     {searching && <RefreshCw className="size-4 animate-spin text-primary" />}
                     {currentQuery && (
                       <span className="truncate">
-                        {searching ? "검색 중: " : ""}{currentQuery}
+                        {searching ? t("searchingPrefix") : ""}{currentQuery}
                       </span>
                     )}
                   </CardTitle>
 
-                  {/* Save button — shown only when result is ready */}
+                  {/* Save indicator / manual save button for stopped searches */}
                   {status === "done" && result && (
-                    <Button
-                      variant={saved ? "secondary" : "outline"}
-                      size="sm"
-                      className="gap-1.5 shrink-0"
-                      onClick={handleSave}
-                      disabled={saved || saving}
-                    >
-                      {saving ? (
-                        <RefreshCw className="size-3.5 animate-spin" />
-                      ) : saved ? (
+                    saved ? (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
                         <BookmarkCheck className="size-3.5" />
-                      ) : (
-                        <Bookmark className="size-3.5" />
-                      )}
-                      {saved ? "저장됨" : "저장"}
-                    </Button>
+                        {t("saved")}
+                      </span>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 shrink-0"
+                        onClick={handleSave}
+                        disabled={saving}
+                      >
+                        {saving ? (
+                          <RefreshCw className="size-3.5 animate-spin" />
+                        ) : (
+                          <Bookmark className="size-3.5" />
+                        )}
+                        {t("save")}
+                      </Button>
+                    )
                   )}
                 </div>
               </CardHeader>
@@ -329,9 +358,9 @@ export default function SearchPage() {
           {status === "idle" && (
             <div className="flex flex-col items-center py-16 text-muted-foreground gap-3">
               <Search className="size-12 opacity-20" />
-              <p className="text-sm">검색어를 입력하고 AI 에이전트가 웹을 검색합니다</p>
-              {history.length > 0 && (
-                <p className="text-xs">최근 검색을 다시 실행하려면 오른쪽 패널을 확인하세요</p>
+              <p className="text-sm">{t("webEmptyState")}</p>
+              {uniqueHistory.length > 0 && (
+                <p className="text-xs">{t("historyHint")}</p>
               )}
             </div>
           )}
@@ -343,7 +372,7 @@ export default function SearchPage() {
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm">저장된 검색</CardTitle>
+                  <CardTitle className="text-sm">{t("savedSearches")}</CardTitle>
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowHistory(false)}>
                     <X className="size-3.5" />
                   </Button>
@@ -356,18 +385,18 @@ export default function SearchPage() {
                   </div>
                 ) : history.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-6">
-                    저장된 검색이 없어요
+                    {t("noSavedSearches")}
                   </p>
                 ) : (
                   <div className="space-y-1">
-                    {history.map((item) => (
+                    {uniqueHistory.map((item) => (
                       <div
                         key={item.id}
                         className="group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50 transition-colors"
                       >
                         <button
                           className="flex-1 text-left min-w-0"
-                          onClick={() => handleReSearch(item.query)}
+                          onClick={() => handleReSearch(item)}
                         >
                           <p className="text-sm truncate">{item.query}</p>
                           <p className="text-xs text-muted-foreground">{item.created_at}</p>

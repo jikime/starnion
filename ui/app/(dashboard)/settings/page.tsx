@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslations } from "next-intl"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,22 +11,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Bell, User } from "lucide-react"
 
 export default function SettingsPage() {
+  const t = useTranslations("settings")
+
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">설정</h1>
-        <p className="text-muted-foreground">알림 및 계정 설정</p>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
+        <p className="text-muted-foreground">{t("subtitle")}</p>
       </div>
 
       <Tabs defaultValue="notifications" className="space-y-6">
         <TabsList>
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="size-4" />
-            알림
+            {t("notifications")}
           </TabsTrigger>
           <TabsTrigger value="account" className="gap-2">
             <User className="size-4" />
-            계정
+            {t("account")}
           </TabsTrigger>
         </TabsList>
 
@@ -33,21 +36,21 @@ export default function SettingsPage() {
         <TabsContent value="notifications">
           <Card>
             <CardHeader>
-              <CardTitle>알림 설정</CardTitle>
+              <CardTitle>{t("notifications")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between rounded-lg border border-border p-4">
                   <div>
-                    <p className="font-medium">예산 경고</p>
+                    <p className="font-medium">{t("budgetAlert")}</p>
                     <div className="flex items-center gap-4 mt-2">
                       <div className="flex items-center gap-2">
-                        <Label className="text-sm text-muted-foreground">경고</Label>
+                        <Label className="text-sm text-muted-foreground">{t("warning")}</Label>
                         <Input type="number" defaultValue={70} className="w-16 h-8" />
                         <span className="text-sm text-muted-foreground">%</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Label className="text-sm text-muted-foreground">위험</Label>
+                        <Label className="text-sm text-muted-foreground">{t("danger")}</Label>
                         <Input type="number" defaultValue={90} className="w-16 h-8" />
                         <span className="text-sm text-muted-foreground">%</span>
                       </div>
@@ -58,9 +61,9 @@ export default function SettingsPage() {
 
                 <div className="flex items-center justify-between rounded-lg border border-border p-4">
                   <div>
-                    <p className="font-medium">일간 요약</p>
+                    <p className="font-medium">{t("dailySummary")}</p>
                     <div className="flex items-center gap-2 mt-2">
-                      <Label className="text-sm text-muted-foreground">시간</Label>
+                      <Label className="text-sm text-muted-foreground">{t("time")}</Label>
                       <Input type="time" defaultValue="20:00" className="w-28 h-8" />
                     </div>
                   </div>
@@ -69,10 +72,10 @@ export default function SettingsPage() {
 
                 <div className="flex items-center justify-between rounded-lg border border-border p-4">
                   <div>
-                    <p className="font-medium">비활성 리마인더</p>
+                    <p className="font-medium">{t("inactiveReminder")}</p>
                     <div className="flex items-center gap-2 mt-2">
                       <Input type="number" defaultValue={3} className="w-16 h-8" />
-                      <span className="text-sm text-muted-foreground">일 후</span>
+                      <span className="text-sm text-muted-foreground">{t("daysLater")}</span>
                     </div>
                   </div>
                   <Switch defaultChecked />
@@ -80,7 +83,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-3">
-                <Label>알림 채널</Label>
+                <Label>{t("channels")}</Label>
                 <div className="flex flex-wrap gap-4">
                   <div className="flex items-center gap-2">
                     <Checkbox id="tg" defaultChecked />
@@ -88,7 +91,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Checkbox id="web" defaultChecked />
-                    <Label htmlFor="web" className="font-normal">웹 알림</Label>
+                    <Label htmlFor="web" className="font-normal">{t("webNotification")}</Label>
                   </div>
                 </div>
               </div>
@@ -101,23 +104,23 @@ export default function SettingsPage() {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>계정 설정</CardTitle>
+                <CardTitle>{t("accountSettings")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="name">이름</Label>
+                  <Label htmlFor="name">{t("name")}</Label>
                   <Input id="name" defaultValue="사용자" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">이메일</Label>
+                  <Label htmlFor="email">{t("email")}</Label>
                   <Input id="email" type="email" defaultValue="user@example.com" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="timezone">시간대</Label>
+                  <Label htmlFor="timezone">{t("timezone")}</Label>
                   <Input id="timezone" defaultValue="Asia/Seoul" disabled />
                 </div>
                 <div className="flex justify-end">
-                  <Button>저장</Button>
+                  <Button>{t("save")}</Button>
                 </div>
               </CardContent>
             </Card>

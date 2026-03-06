@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useTranslations } from "next-intl"
 import {
   BarChart,
   Bar,
@@ -70,11 +71,6 @@ const PLATFORM_COLOR: Record<string, string> = {
   webchat: "#6366f1",
 }
 
-function platformLabel(p: string) {
-  if (p === "telegram") return "텔레그램"
-  return "웹챗"
-}
-
 // ─── Mini Sparkline ───────────────────────────────────────────────────────────
 
 function Sparkline({ data, color = "#10b981" }: { data: number[]; color?: string }) {
@@ -101,7 +97,7 @@ function Sparkline({ data, color = "#10b981" }: { data: number[]; color?: string
   )
 }
 
-// ─── Metric Card (image style top row) ───────────────────────────────────────
+// ─── Metric Card ─────────────────────────────────────────────────────────────
 
 function MetricCard({
   label,
@@ -194,11 +190,12 @@ function CountTooltip({ active, payload, label }: {
   payload?: { value: number }[]
   label?: string
 }) {
+  const t = useTranslations("analytics")
   if (!active || !payload?.length) return null
   return (
     <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs">
       <p className="font-medium">{label}</p>
-      <p className="text-muted-foreground">{payload[0].value}건</p>
+      <p className="text-muted-foreground">{t("msgCount", { n: payload[0].value })}</p>
     </div>
   )
 }
@@ -206,6 +203,8 @@ function CountTooltip({ active, payload, label }: {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
+  const t = useTranslations("analytics")
+
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -263,16 +262,16 @@ export default function AnalyticsPage() {
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
           <BarChart3 className="size-6 text-indigo-500" />
-          통계 / 분석
+          {t("title")}
         </h1>
-        <p className="text-sm text-muted-foreground">텔레그램 · 웹챗 대화 데이터 종합 분석</p>
+        <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
       </div>
 
-      {/* ── Top Metric Cards (6개, image 3 상단 스타일) ──────────────────── */}
+      {/* ── Top Metric Cards ──────────────────────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <MetricCard
-          label="전체 누적"
-          sub="총 메시지"
+          label={t("totalMessagesSub")}
+          sub={t("totalMessages")}
           value={s?.total_messages.toLocaleString() ?? 0}
           sparkData={spark7}
           sparkColor="#6366f1"
@@ -280,8 +279,8 @@ export default function AnalyticsPage() {
           iconBg="bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400"
         />
         <MetricCard
-          label="전월 대비"
-          sub="이번달 메시지"
+          label={t("thisMonthSub")}
+          sub={t("thisMonthMessages")}
           value={s?.this_month.toLocaleString() ?? 0}
           trend={s?.mom}
           sparkData={spark7}
@@ -290,8 +289,8 @@ export default function AnalyticsPage() {
           iconBg="bg-violet-50 text-violet-600 dark:bg-violet-950 dark:text-violet-400"
         />
         <MetricCard
-          label="내가 보낸 메시지"
-          sub="사용자 메시지"
+          label={t("userMessagesSub")}
+          sub={t("userMessages")}
           value={s?.user_messages.toLocaleString() ?? 0}
           sparkData={spark7}
           sparkColor="#10b981"
@@ -299,8 +298,8 @@ export default function AnalyticsPage() {
           iconBg="bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400"
         />
         <MetricCard
-          label="AI 응답 수"
-          sub="AI 메시지"
+          label={t("aiMessagesSub")}
+          sub={t("aiMessages")}
           value={s?.ai_messages.toLocaleString() ?? 0}
           sparkData={spark7}
           sparkColor="#f59e0b"
@@ -308,8 +307,8 @@ export default function AnalyticsPage() {
           iconBg="bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400"
         />
         <MetricCard
-          label="전체 대화방"
-          sub="대화 수"
+          label={t("conversationsSub")}
+          sub={t("conversations")}
           value={s?.total_conversations.toLocaleString() ?? 0}
           sparkData={spark7}
           sparkColor="#3b82f6"
@@ -317,8 +316,8 @@ export default function AnalyticsPage() {
           iconBg="bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400"
         />
         <MetricCard
-          label={`일평균 ${s?.avg_per_day ?? 0}건`}
-          sub="텔레그램"
+          label={t("telegramSub", { n: s?.avg_per_day ?? 0 })}
+          sub={t("telegram")}
           value={s?.telegram_messages.toLocaleString() ?? 0}
           sparkData={spark7}
           sparkColor="#2AABEE"
@@ -327,26 +326,25 @@ export default function AnalyticsPage() {
         />
       </div>
 
-      {/* ── Bottom 3 Panels (image 3 하단 3열 스타일) ────────────────────── */}
+      {/* ── Bottom 3 Panels ──────────────────────────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-3">
 
         {/* Left: Weekly trend bar chart */}
         <Panel
-          title="주간 메시지 추이"
-          sub="최근 8주"
+          title={t("weeklyTrend")}
+          sub={t("weeklyTrendSub")}
           icon={BarChart3}
           iconBg="bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400"
         >
           {weekly.length === 0 ? (
             <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-              데이터가 없습니다
+              {t("noData")}
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Big number */}
               <div>
                 <p className="text-3xl font-bold">{(s?.total_messages ?? 0).toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">총 메시지</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t("totalMessagesLabel")}</p>
               </div>
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={weekly} barCategoryGap="25%">
@@ -367,22 +365,23 @@ export default function AnalyticsPage() {
           )}
         </Panel>
 
-        {/* Center: Platform breakdown (Report panel style) */}
+        {/* Center: Platform breakdown */}
         <Panel
-          title="채널 분석"
-          sub="텔레그램 vs 웹챗"
+          title={t("channelAnalysis")}
+          sub={t("channelAnalysisSub")}
           icon={Users}
           iconBg="bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400"
         >
           {platforms.length === 0 ? (
             <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-              데이터가 없습니다
+              {t("noData")}
             </div>
           ) : (
             <div className="space-y-5">
               {platforms.map((p) => {
                 const ratio = pct(p.messages, totalPlatMsg)
                 const color = PLATFORM_COLOR[p.platform] ?? "#6366f1"
+                const label = p.platform === "telegram" ? t("telegram") : t("webchat")
                 return (
                   <div key={p.platform} className="space-y-2">
                     <div className="flex items-center gap-3">
@@ -395,11 +394,11 @@ export default function AnalyticsPage() {
                           : <MessageSquare className="size-4" />}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{platformLabel(p.platform)}</p>
-                        <p className="text-xs text-muted-foreground">{p.conversations}개 대화</p>
+                        <p className="text-sm font-medium">{label}</p>
+                        <p className="text-xs text-muted-foreground">{t("convCount", { n: p.conversations })}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-bold">{p.messages.toLocaleString()}건</p>
+                        <p className="text-sm font-bold">{t("msgCount", { n: p.messages.toLocaleString() })}</p>
                         <p className="text-xs font-medium" style={{ color }}>
                           {ratio}%
                         </p>
@@ -417,7 +416,7 @@ export default function AnalyticsPage() {
 
               {/* User vs AI ratio */}
               <div className="pt-3 border-t border-border/60 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">사용자 vs AI 응답</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("userVsAi")}</p>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-2 bg-muted/40 rounded-full overflow-hidden flex">
                     <div
@@ -433,11 +432,11 @@ export default function AnalyticsPage() {
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <span className="size-2 rounded-full bg-indigo-500 inline-block" />
-                    사용자 {pct(s?.user_messages ?? 0, s?.total_messages ?? 1)}%
+                    {t("userLabel")} {pct(s?.user_messages ?? 0, s?.total_messages ?? 1)}%
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="size-2 rounded-full bg-amber-400 inline-block" />
-                    AI {pct(s?.ai_messages ?? 0, s?.total_messages ?? 1)}%
+                    {t("aiLabel")} {pct(s?.ai_messages ?? 0, s?.total_messages ?? 1)}%
                   </span>
                 </div>
               </div>
@@ -445,39 +444,39 @@ export default function AnalyticsPage() {
           )}
         </Panel>
 
-        {/* Right: Hourly distribution (Total sales style) */}
+        {/* Right: Hourly distribution */}
         <Panel
-          title="시간대별 활동"
-          sub="최근 30일 기준"
+          title={t("hourlyActivity")}
+          sub={t("hourlyActivitySub")}
           icon={Clock}
           iconBg="bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400"
         >
           <div className="space-y-3">
             <div className="flex items-end justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">가장 활발한 시간</p>
+                <p className="text-xs text-muted-foreground">{t("peakHour")}</p>
                 <p className="text-2xl font-bold">
                   {String(peakHour.hour).padStart(2, "0")}:00
                 </p>
               </div>
               <span className="text-xs text-emerald-500 font-medium flex items-center gap-0.5">
                 <ArrowUpRight className="size-3.5" />
-                {peakHour.count}건
+                {t("msgCount", { n: peakHour.count })}
               </span>
             </div>
 
             {/* Platform quick stats */}
             <div className="space-y-1.5">
               {[
-                { label: "웹챗", value: s?.webchat_messages ?? 0, color: "#6366f1" },
-                { label: "텔레그램", value: s?.telegram_messages ?? 0, color: "#2AABEE" },
+                { label: t("webchat"), value: s?.webchat_messages ?? 0, color: "#6366f1" },
+                { label: t("telegram"), value: s?.telegram_messages ?? 0, color: "#2AABEE" },
               ].map((item) => (
                 <div key={item.label} className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-1.5 text-muted-foreground">
                     <span className="size-2 rounded-full" style={{ backgroundColor: item.color }} />
                     {item.label}
                   </span>
-                  <span className="font-medium">{item.value.toLocaleString()}건</span>
+                  <span className="font-medium">{t("msgCount", { n: item.value.toLocaleString() })}</span>
                 </div>
               ))}
             </div>
@@ -514,13 +513,13 @@ export default function AnalyticsPage() {
             <TrendingUp className="size-4" />
           </div>
           <div>
-            <p className="text-sm font-semibold">일별 메시지 추이</p>
-            <p className="text-xs text-muted-foreground">최근 30일</p>
+            <p className="text-sm font-semibold">{t("dailyTrend")}</p>
+            <p className="text-xs text-muted-foreground">{t("dailyTrendSub")}</p>
           </div>
         </div>
         {daily.length === 0 ? (
           <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-            데이터가 없습니다
+            {t("noData")}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={160}>

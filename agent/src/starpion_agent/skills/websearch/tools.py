@@ -1,5 +1,6 @@
 """Web search and URL content extraction tools."""
 
+import asyncio
 import logging
 import re
 
@@ -13,6 +14,9 @@ from starpion_agent.db.pool import get_pool
 from starpion_agent.skills.guard import skill_guard
 
 logger = logging.getLogger(__name__)
+
+# Strong references to fire-and-forget background tasks to prevent GC collection.
+_background_tasks: set[asyncio.Task] = set()
 
 
 async def _get_tavily_api_key() -> str:
@@ -102,6 +106,52 @@ def _format_search_results(results: list[dict]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Persistence helper
+# ---------------------------------------------------------------------------
+async def _persist_search(user_id: str, query: str, result: str) -> None:
+    """Insert search result into user_searches and generate its embedding.
+
+    Runs as a fire-and-forget background task so it does not block the tool response.
+    """
+    print(f"[persist_search] START user={user_id!r} query={query!r}", flush=True)
+    try:
+        from starpion_agent.db.repositories import user_search_db
+        from starpion_agent.embedding.service import embed_text
+
+        pool = get_pool()
+        # 1. Insert the search row.
+        async with pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "INSERT INTO user_searches (user_id, query, result) VALUES (%s, %s, %s) RETURNING id",
+                    (user_id, query, result),
+                )
+                row = await cur.fetchone()
+            await conn.commit()
+
+        if not row:
+            msg = f"[persist_search] INSERT returned no id for user={user_id}"
+            logger.warning(msg)
+            print(msg, flush=True)
+            return
+
+        search_id: int = row[0]
+        print(f"[persist_search] INSERT ok search_id={search_id} user={user_id}", flush=True)
+
+        # 2. Embed query + first 500 chars of result and store vector.
+        text_to_embed = f"{query}\n{result[:500]}"
+        embedding = await embed_text(text_to_embed)
+        await user_search_db.update_embedding(pool, user_id, search_id, embedding)
+
+        logger.info("persist_search: saved search_id=%d for user=%s", search_id, user_id)
+        print(f"[persist_search] DONE search_id={search_id} user={user_id}", flush=True)
+
+    except Exception as exc:
+        logger.warning("persist_search: failed for user=%s query=%r: %s", user_id, query, exc, exc_info=True)
+        print(f"[persist_search] ERROR user={user_id!r}: {exc}", flush=True)
+
+
+# ---------------------------------------------------------------------------
 # Tools
 # ---------------------------------------------------------------------------
 @tool(args_schema=WebSearchInput)
@@ -131,7 +181,21 @@ async def web_search(query: str, max_results: int = 5) -> str:
         return "웹 검색 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."
 
     results = response.get("results", [])
-    return _format_search_results(results)
+    formatted = _format_search_results(results)
+
+    # Persist to user_searches in the background (fire-and-forget).
+    # We keep a strong reference in _background_tasks so the GC cannot
+    # collect the task before it finishes.
+    user_id = get_current_user()
+    print(f"[web_search] query={query!r} user_id={user_id!r} results={len(results)}", flush=True)
+    if not user_id:
+        logger.warning("web_search: user_id empty, skipping persistence")
+    elif results:
+        task = asyncio.create_task(_persist_search(user_id, query, formatted))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+
+    return formatted
 
 
 @tool(args_schema=WebFetchInput)

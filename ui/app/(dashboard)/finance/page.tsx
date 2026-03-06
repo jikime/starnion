@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,7 +18,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Table,
@@ -133,6 +133,22 @@ function StatCard({
 // ── main page ─────────────────────────────────────────────────────────────────
 
 export default function FinancePage() {
+  const t = useTranslations("finance")
+  const tc = useTranslations("common")
+
+  const categoryLabel = (cat: string) => {
+    const map: Record<string, string> = {
+      "식비": t("categories.food"),
+      "교통": t("categories.transport"),
+      "쇼핑": t("categories.shopping"),
+      "구독": t("categories.subscription"),
+      "의료": t("categories.medical"),
+      "문화": t("categories.culture"),
+      "기타": t("categories.other"),
+    }
+    return map[cat] ?? cat
+  }
+
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -286,7 +302,7 @@ export default function FinancePage() {
   }
 
   const handleDelete = async (id: number) => {
-    if (!confirm("삭제하시겠습니까?")) return
+    if (!confirm(tc("delete") + "?")) return
     await fetch(`/api/finance/transactions/${id}`, { method: "DELETE" })
     await Promise.all([fetchSummary(), fetchTx()])
   }
@@ -310,7 +326,7 @@ export default function FinancePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">가계부</h1>
+          <h1 className="text-2xl font-semibold">{t("title")}</h1>
           <p className="text-muted-foreground text-sm">{monthLabel}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -323,7 +339,7 @@ export default function FinancePage() {
           </Button>
           <Button className="gap-2 ml-2" onClick={openNew}>
             <Plus className="size-4" />
-            기록 추가
+            {t("addRecord")}
           </Button>
         </div>
       </div>
@@ -341,28 +357,28 @@ export default function FinancePage() {
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
-            label="이번달 수입"
+            label={t("thisMonthIncome")}
             value={KRW(summary?.income ?? 0)}
             icon={TrendingUp}
             color="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
           />
           <StatCard
-            label="이번달 지출"
+            label={t("thisMonthExpense")}
             value={KRW(summary?.expense ?? 0)}
             icon={TrendingDown}
             color="bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400"
           />
           <StatCard
-            label="순이익"
+            label={t("net")}
             value={KRW(summary?.net ?? 0)}
-            sub={(summary?.net ?? 0) >= 0 ? "흑자" : "적자"}
+            sub={(summary?.net ?? 0) >= 0 ? t("surplus") : t("deficit")}
             icon={Wallet}
             color="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
           />
           <StatCard
-            label="저축률"
+            label={t("savingsRate")}
             value={`${(summary?.savings_rate ?? 0).toFixed(1)}%`}
-            sub={`순이익 / 수입`}
+            sub={t("netOverIncome")}
             icon={PiggyBank}
             color="bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400"
           />
@@ -373,7 +389,7 @@ export default function FinancePage() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Monthly bar chart */}
         <div className="rounded-xl border bg-card p-5">
-          <p className="text-sm font-medium mb-4">월별 수입/지출 추이</p>
+          <p className="text-sm font-medium mb-4">{t("monthlyChart")}</p>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
@@ -405,14 +421,14 @@ export default function FinancePage() {
                 />
                 <Bar
                   dataKey="income"
-                  name="수입"
+                  name={t("income")}
                   fill="#22c55e"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={28}
                 />
                 <Bar
                   dataKey="expense"
-                  name="지출"
+                  name={t("expense")}
                   fill="#f97316"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={28}
@@ -424,10 +440,10 @@ export default function FinancePage() {
 
         {/* Category pie chart */}
         <div className="rounded-xl border bg-card p-5">
-          <p className="text-sm font-medium mb-4">카테고리별 지출 비중</p>
+          <p className="text-sm font-medium mb-4">{t("categoryChart")}</p>
           {pieData.length === 0 ? (
             <div className="h-[220px] flex items-center justify-center text-sm text-muted-foreground">
-              이번달 지출 내역이 없어요
+              {t("noExpense")}
             </div>
           ) : (
             <div className="h-[220px]">
@@ -474,7 +490,7 @@ export default function FinancePage() {
       <div className="rounded-xl border bg-card">
         {/* Filters bar */}
         <div className="flex items-center gap-3 px-4 py-3 border-b">
-          <p className="text-sm font-medium mr-auto">거래 내역</p>
+          <p className="text-sm font-medium mr-auto">{t("transactions")}</p>
           <Select
             value={filterType}
             onValueChange={(v) => {
@@ -486,9 +502,9 @@ export default function FinancePage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">전체</SelectItem>
-              <SelectItem value="expense">지출</SelectItem>
-              <SelectItem value="income">수입</SelectItem>
+              <SelectItem value="all">{t("all")}</SelectItem>
+              <SelectItem value="expense">{t("expense")}</SelectItem>
+              <SelectItem value="income">{t("income")}</SelectItem>
             </SelectContent>
           </Select>
           <Select
@@ -502,10 +518,10 @@ export default function FinancePage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">모든 카테고리</SelectItem>
+              <SelectItem value="all">{t("allCategories")}</SelectItem>
               {CATEGORIES.map((c) => (
                 <SelectItem key={c} value={c}>
-                  {c}
+                  {categoryLabel(c)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -515,10 +531,10 @@ export default function FinancePage() {
         <Table>
           <TableHeader>
             <TableRow className="text-xs">
-              <TableHead className="w-24">날짜</TableHead>
-              <TableHead>내용</TableHead>
-              <TableHead className="w-24">카테고리</TableHead>
-              <TableHead className="text-right w-36">금액</TableHead>
+              <TableHead className="w-24">{t("date")}</TableHead>
+              <TableHead>{t("description")}</TableHead>
+              <TableHead className="w-24">{t("category")}</TableHead>
+              <TableHead className="text-right w-36">{t("amount")}</TableHead>
               <TableHead className="w-16" />
             </TableRow>
           </TableHeader>
@@ -535,7 +551,7 @@ export default function FinancePage() {
                   colSpan={5}
                   className="text-center py-12 text-muted-foreground text-sm"
                 >
-                  거래 내역이 없어요
+                  {t("noTransactions")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -559,7 +575,7 @@ export default function FinancePage() {
                           (CATEGORY_COLORS[tx.category] ?? "#6b7280") + "44",
                       }}
                     >
-                      {tx.category}
+                      {categoryLabel(tx.category)}
                     </Badge>
                   </TableCell>
                   <TableCell
@@ -601,7 +617,7 @@ export default function FinancePage() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
             <span>
-              총 {txList.total}건 ({page} / {totalPages})
+              {t("total", { total: txList.total, page, totalPages })}
             </span>
             <div className="flex gap-1">
               <Button
@@ -632,12 +648,12 @@ export default function FinancePage() {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>
-              {editTarget ? "내역 수정" : "거래 추가"}
+              {editTarget ? t("editTransaction") : t("addTransaction")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <Label>유형</Label>
+              <Label>{t("type")}</Label>
               <RadioGroup
                 value={form.type}
                 onValueChange={(v) =>
@@ -648,19 +664,19 @@ export default function FinancePage() {
                 <div className="flex items-center gap-2">
                   <RadioGroupItem value="expense" id="dlg-expense" />
                   <Label htmlFor="dlg-expense" className="font-normal cursor-pointer">
-                    지출
+                    {t("expense")}
                   </Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <RadioGroupItem value="income" id="dlg-income" />
                   <Label htmlFor="dlg-income" className="font-normal cursor-pointer">
-                    수입
+                    {t("income")}
                   </Label>
                 </div>
               </RadioGroup>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="dlg-amount">금액 (원)</Label>
+              <Label htmlFor="dlg-amount">{t("amountWon")}</Label>
               <Input
                 id="dlg-amount"
                 type="number"
@@ -670,7 +686,7 @@ export default function FinancePage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="dlg-category">카테고리</Label>
+              <Label htmlFor="dlg-category">{t("category")}</Label>
               <Select
                 value={form.category}
                 onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
@@ -681,17 +697,17 @@ export default function FinancePage() {
                 <SelectContent>
                   {CATEGORIES.map((c) => (
                     <SelectItem key={c} value={c}>
-                      {c}
+                      {categoryLabel(c)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="dlg-desc">메모</Label>
+              <Label htmlFor="dlg-desc">{t("memo")}</Label>
               <Input
                 id="dlg-desc"
-                placeholder="점심 김치찌개"
+                placeholder=""
                 value={form.description}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, description: e.target.value }))
@@ -699,7 +715,7 @@ export default function FinancePage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="dlg-date">날짜</Label>
+              <Label htmlFor="dlg-date">{t("date")}</Label>
               <Input
                 id="dlg-date"
                 type="date"
@@ -713,11 +729,11 @@ export default function FinancePage() {
                 onClick={() => setDialogOpen(false)}
                 disabled={saving}
               >
-                취소
+                {tc("cancel")}
               </Button>
               <Button onClick={handleSave} disabled={saving}>
                 {saving && <Loader2 className="size-3.5 animate-spin mr-1.5" />}
-                저장
+                {tc("save")}
               </Button>
             </div>
           </div>

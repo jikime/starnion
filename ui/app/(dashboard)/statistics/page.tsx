@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import {
   Select,
@@ -97,8 +98,6 @@ const CATEGORY_COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b",
   "#10b981", "#3b82f6", "#ef4444", "#14b8a6",
 ]
-
-const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -210,7 +209,7 @@ function CurrencyTooltip({ active, payload, label }: {
 
 // ─── Heatmap ─────────────────────────────────────────────────────────────────
 
-function SpendingHeatmap({ data }: { data: HeatmapRow[] }) {
+function SpendingHeatmap({ data, lessLabel, moreLabel }: { data: HeatmapRow[]; lessLabel: string; moreLabel: string }) {
   const map = new Map(data.map((d) => [d.date, d.total]))
   const max = Math.max(...data.map((d) => d.total), 1)
 
@@ -259,12 +258,12 @@ function SpendingHeatmap({ data }: { data: HeatmapRow[] }) {
         ))}
       </div>
       <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-        <span>적음</span>
+        <span>{lessLabel}</span>
         {["bg-muted/40", "bg-indigo-200 dark:bg-indigo-900", "bg-indigo-400 dark:bg-indigo-700",
           "bg-indigo-600 dark:bg-indigo-500", "bg-indigo-800 dark:bg-indigo-300"].map((c, i) => (
           <div key={i} className={`size-3.5 rounded-sm ${c}`} />
         ))}
-        <span>많음</span>
+        <span>{moreLabel}</span>
       </div>
     </div>
   )
@@ -273,10 +272,22 @@ function SpendingHeatmap({ data }: { data: HeatmapRow[] }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function StatisticsPage() {
+  const t = useTranslations("statistics")
+
   const [months, setMonths] = useState("6")
   const [stats, setStats] = useState<StatsData | null>(null)
   const [insights, setInsights] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+
+  const WEEKDAY_LABELS = [
+    t("weekdays.sun"),
+    t("weekdays.mon"),
+    t("weekdays.tue"),
+    t("weekdays.wed"),
+    t("weekdays.thu"),
+    t("weekdays.fri"),
+    t("weekdays.sat"),
+  ]
 
   const fetchData = useCallback(async (m: string) => {
     setLoading(true)
@@ -315,7 +326,6 @@ export default function StatisticsPage() {
   const cats = stats?.category_breakdown ?? []
   const weekdays = stats?.weekday_spending ?? []
   const heatmap = stats?.heatmap ?? []
-  const conv = stats?.conversation
 
   const weekdayData = WEEKDAY_LABELS.map((label, i) => {
     const found = weekdays.find((w) => w.weekday === i)
@@ -330,19 +340,19 @@ export default function StatisticsPage() {
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
             <TrendingUp className="size-6 text-indigo-500" />
-            소비 분석
+            {t("title")}
           </h1>
-          <p className="text-sm text-muted-foreground">지출 패턴을 분석하고 인사이트를 확인하세요</p>
+          <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Select value={months} onValueChange={(v) => setMonths(v)}>
           <SelectTrigger className="w-36">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="1">최근 1개월</SelectItem>
-            <SelectItem value="3">최근 3개월</SelectItem>
-            <SelectItem value="6">최근 6개월</SelectItem>
-            <SelectItem value="12">최근 1년</SelectItem>
+            <SelectItem value="1">{t("month1")}</SelectItem>
+            <SelectItem value="3">{t("month3")}</SelectItem>
+            <SelectItem value="6">{t("month6")}</SelectItem>
+            <SelectItem value="12">{t("month12")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -350,40 +360,40 @@ export default function StatisticsPage() {
       {/* ── Summary Cards ──────────────────────────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="총 지출"
+          label={t("totalExpense")}
           value={`₩${formatKRW(s?.total_expense ?? 0)}`}
-          sub={`${months}개월 합계`}
+          sub={t("totalExpenseSub", { months })}
           icon={CreditCard}
           color="rose"
         />
         <StatCard
-          label="이번달 지출"
+          label={t("thisMonthExpense")}
           value={`₩${formatKRW(s?.this_month_expense ?? 0)}`}
           trend={s?.mom}
-          sub="전월 대비"
+          sub={t("prevMonthCompare")}
           icon={Wallet}
           color="indigo"
         />
         <StatCard
-          label="일 평균 지출"
+          label={t("avgDailyExpense")}
           value={`₩${formatKRW(s?.avg_daily ?? 0)}`}
           icon={CalendarDays}
           color="violet"
         />
         <StatCard
-          label="거래 건수"
-          value={`${s?.tx_count ?? 0}건`}
-          sub={s?.top_category ? `최다: ${s.top_category}` : undefined}
+          label={t("txCount")}
+          value={`${s?.tx_count ?? 0}`}
+          sub={s?.top_category ? t("topCategory", { category: s.top_category }) : undefined}
           icon={BarChart3}
           color="emerald"
         />
       </div>
 
       {/* ── Monthly Trend ──────────────────────────────────────────────────── */}
-      <Panel title="월별 수입 / 지출 추이" icon={TrendingUp} iconClass="text-indigo-500">
+      <Panel title={t("monthlyTrend")} icon={TrendingUp} iconClass="text-indigo-500">
         {trend.length === 0 ? (
           <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
-            데이터가 없습니다
+            {t("noData")}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={240}>
@@ -393,8 +403,8 @@ export default function StatisticsPage() {
               <YAxis tickFormatter={(v) => `${formatKRW(v)}`} tick={{ fontSize: 11 }} width={56} />
               <Tooltip content={<CurrencyTooltip />} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="income" name="수입" fill="#6366f1" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="expense" name="지출" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="income" name={t("incomeLabel")} fill="#6366f1" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="expense" name={t("expenseLabel")} fill="#f43f5e" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -402,10 +412,10 @@ export default function StatisticsPage() {
 
       {/* ── Category Breakdown + Insights ──────────────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="카테고리별 지출" icon={BarChart3} iconClass="text-violet-500">
+        <Panel title={t("categoryBreakdown")} icon={BarChart3} iconClass="text-violet-500">
           {cats.length === 0 ? (
             <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
-              데이터가 없습니다
+              {t("noData")}
             </div>
           ) : (
             <div className="flex flex-col gap-4">
@@ -447,7 +457,7 @@ export default function StatisticsPage() {
           )}
         </Panel>
 
-        <Panel title="AI 인사이트" icon={Lightbulb} iconClass="text-amber-500">
+        <Panel title={t("aiInsights")} icon={Lightbulb} iconClass="text-amber-500">
           <ul className="space-y-3">
             {insights.map((insight, i) => (
               <li
@@ -464,10 +474,10 @@ export default function StatisticsPage() {
 
       {/* ── Weekday + Heatmap ──────────────────────────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="요일별 지출 패턴" icon={CalendarDays} iconClass="text-emerald-500">
+        <Panel title={t("weekdayPattern")} icon={CalendarDays} iconClass="text-emerald-500">
           {weekdays.length === 0 ? (
             <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-              데이터가 없습니다
+              {t("noData")}
             </div>
           ) : (
             <div className="space-y-3">
@@ -487,10 +497,10 @@ export default function StatisticsPage() {
                     </div>
                     <div className="flex gap-3 text-xs text-right">
                       <span className="w-16 font-medium">{formatKRWFull(w.total)}</span>
-                      <span className="w-12 text-muted-foreground">{w.count}건</span>
+                      <span className="w-12 text-muted-foreground">{w.count}</span>
                     </div>
                     {isMax && (
-                      <Badge variant="secondary" className="text-xs px-1.5 py-0">최다</Badge>
+                      <Badge variant="secondary" className="text-xs px-1.5 py-0">{t("most")}</Badge>
                     )}
                   </div>
                 )
@@ -499,13 +509,13 @@ export default function StatisticsPage() {
           )}
         </Panel>
 
-        <Panel title="최근 90일 지출 히트맵" icon={CalendarDays} iconClass="text-indigo-500">
+        <Panel title={t("heatmap90")} icon={CalendarDays} iconClass="text-indigo-500">
           {heatmap.length === 0 ? (
             <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
-              데이터가 없습니다
+              {t("noData")}
             </div>
           ) : (
-            <SpendingHeatmap data={heatmap} />
+            <SpendingHeatmap data={heatmap} lessLabel={t("less")} moreLabel={t("more")} />
           )}
         </Panel>
       </div>
@@ -513,17 +523,17 @@ export default function StatisticsPage() {
       {/* ── MoM Detail ─────────────────────────────────────────────────────── */}
       {s && s.last_month_expense > 0 && (
         <Panel
-          title="전월 대비 지출 변화"
+          title={t("momChange")}
           icon={s.mom > 0 ? TrendingUp : TrendingDown}
           iconClass={s.mom > 0 ? "text-rose-500" : "text-emerald-500"}
         >
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="text-center rounded-lg border border-border/60 bg-muted/20 p-4">
-              <p className="text-xs text-muted-foreground mb-1">지난달</p>
+              <p className="text-xs text-muted-foreground mb-1">{t("lastMonth")}</p>
               <p className="text-xl font-bold">{formatKRWFull(s.last_month_expense)}</p>
             </div>
             <div className="text-center rounded-lg border border-border/60 bg-muted/20 p-4">
-              <p className="text-xs text-muted-foreground mb-1">이번달</p>
+              <p className="text-xs text-muted-foreground mb-1">{t("thisMonth")}</p>
               <p className="text-xl font-bold">{formatKRWFull(s.this_month_expense)}</p>
             </div>
             <div className={`text-center rounded-lg border p-4 ${
@@ -531,7 +541,7 @@ export default function StatisticsPage() {
                 ? "border-rose-200 bg-rose-50 dark:border-rose-900 dark:bg-rose-950"
                 : "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950"
             }`}>
-              <p className="text-xs text-muted-foreground mb-1">변화율</p>
+              <p className="text-xs text-muted-foreground mb-1">{t("changeRate")}</p>
               <p className={`text-xl font-bold flex items-center justify-center gap-1 ${
                 s.mom > 0 ? "text-rose-600" : "text-emerald-600"
               }`}>

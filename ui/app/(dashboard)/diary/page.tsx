@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useTranslations } from "next-intl"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -87,6 +88,9 @@ const EMPTY_FORM: EntryFormData = {
 }
 
 export default function DiaryPage() {
+  const t = useTranslations("diary")
+  const tc = useTranslations("common")
+
   const [entries, setEntries] = useState<DiaryEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
@@ -100,6 +104,17 @@ export default function DiaryPage() {
   const [form, setForm] = useState<EntryFormData>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<DiaryEntry | null>(null)
+
+  const moodLabel = (mood: string) => {
+    const map: Record<string, string> = {
+      "매우좋음": t("moods.veryGood"),
+      "좋음": t("moods.good"),
+      "보통": t("moods.neutral"),
+      "나쁨": t("moods.bad"),
+      "매우나쁨": t("moods.veryBad"),
+    }
+    return map[mood] ?? mood
+  }
 
   const fetchEntries = useCallback(async () => {
     setLoading(true)
@@ -227,13 +242,13 @@ export default function DiaryPage() {
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <NotebookPen className="size-6 text-primary" />
-            일기
+            {t("title")}
           </h1>
-          <p className="text-muted-foreground">매일의 기록</p>
+          <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Button className="gap-2" onClick={openCreate}>
           <Plus className="size-4" />
-          새 일기
+          {t("newEntry")}
         </Button>
       </div>
 
@@ -263,18 +278,18 @@ export default function DiaryPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">
-                목록 ({entries.length}개)
+                {t("list", { count: entries.length })}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <ScrollArea className="h-[200px]">
                 {loading ? (
                   <p className="px-4 py-3 text-sm text-muted-foreground">
-                    불러오는 중...
+                    {t("loading")}
                   </p>
                 ) : entries.length === 0 ? (
                   <p className="px-4 py-3 text-sm text-muted-foreground">
-                    이번 달 일기가 없어요
+                    {t("empty")}
                   </p>
                 ) : (
                   entries.map((entry) => (
@@ -316,7 +331,7 @@ export default function DiaryPage() {
                   <CardTitle>
                     {selectedEntry.title
                       ? selectedEntry.title
-                      : formatDate(selectedEntry.entry_date) + " 일기"}
+                      : t("diaryOf", { date: formatDate(selectedEntry.entry_date) })}
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
                     {formatDate(selectedEntry.entry_date)}
@@ -328,7 +343,7 @@ export default function DiaryPage() {
                       MOOD_COLORS[selectedEntry.mood] ?? MOOD_COLORS["보통"]
                     }
                   >
-                    {selectedEntry.mood}
+                    {moodLabel(selectedEntry.mood)}
                   </Badge>
                   <Button
                     variant="ghost"
@@ -366,7 +381,7 @@ export default function DiaryPage() {
           <Card className="flex items-center justify-center min-h-[300px]">
             <div className="text-center text-muted-foreground space-y-2">
               <BookOpen className="size-10 mx-auto opacity-30" />
-              <p>날짜를 선택하거나 새 일기를 작성해보세요</p>
+              <p>{t("emptyHint")}</p>
             </div>
           </Card>
         )}
@@ -377,13 +392,13 @@ export default function DiaryPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {editingEntry ? "일기 수정" : "새 일기 작성"}
+              {editingEntry ? t("editTitle") : t("createTitle")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="entry-date">날짜</Label>
+                <Label htmlFor="entry-date">{t("date")}</Label>
                 <Input
                   id="entry-date"
                   type="date"
@@ -394,7 +409,7 @@ export default function DiaryPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="mood">기분</Label>
+                <Label htmlFor="mood">{t("mood")}</Label>
                 <Select
                   value={form.mood}
                   onValueChange={(v) => setForm((f) => ({ ...f, mood: v }))}
@@ -405,7 +420,7 @@ export default function DiaryPage() {
                   <SelectContent>
                     {MOOD_OPTIONS.map((m) => (
                       <SelectItem key={m} value={m}>
-                        {m}
+                        {moodLabel(m)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -414,10 +429,10 @@ export default function DiaryPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="title">제목 (선택)</Label>
+              <Label htmlFor="title">{t("titleLabel")}</Label>
               <Input
                 id="title"
-                placeholder="제목을 입력하세요"
+                placeholder={t("titlePlaceholder")}
                 value={form.title}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, title: e.target.value }))
@@ -426,10 +441,10 @@ export default function DiaryPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="content">내용 *</Label>
+              <Label htmlFor="content">{t("content")}</Label>
               <Textarea
                 id="content"
-                placeholder="오늘 있었던 일을 기록해보세요..."
+                placeholder={t("contentPlaceholder")}
                 rows={6}
                 value={form.content}
                 onChange={(e) =>
@@ -439,10 +454,10 @@ export default function DiaryPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="tags">태그 (쉼표로 구분)</Label>
+              <Label htmlFor="tags">{t("tags")}</Label>
               <Input
                 id="tags"
-                placeholder="예: 회사, 점심, 운동"
+                placeholder={t("tagsPlaceholder")}
                 value={form.tags}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, tags: e.target.value }))
@@ -456,13 +471,13 @@ export default function DiaryPage() {
                 onClick={() => setFormOpen(false)}
                 disabled={saving}
               >
-                취소
+                {tc("cancel")}
               </Button>
               <Button
                 onClick={handleSave}
                 disabled={saving || !form.content.trim()}
               >
-                {saving ? "저장 중..." : "저장"}
+                {saving ? t("saving") : tc("save")}
               </Button>
             </div>
           </div>
@@ -476,25 +491,25 @@ export default function DiaryPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>일기를 삭제할까요?</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteConfirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget && (
                 <>
                   <strong>
                     {deleteTarget.title || formatDate(deleteTarget.entry_date)}
                   </strong>{" "}
-                  일기가 영구적으로 삭제됩니다.
+                  {t("deleteConfirmDesc")}
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              삭제
+              {tc("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

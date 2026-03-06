@@ -238,6 +238,45 @@ func (h *DocumentHandler) indexDocument(docID int64, userID, fileURL, fileName s
 	log.Info().Int64("doc_id", docID).Int("status", resp.StatusCode).Msg("index document: queued")
 }
 
+// RecordDocument inserts a user_documents row for an AI-generated file.
+// Called by chat_stream and telegram bot after uploading a document to MinIO.
+func RecordDocument(db *sql.DB, userID, url, name, mime string, size int64) {
+	if db == nil || !isDocumentMime(mime) {
+		return
+	}
+	// Derive MinIO object key from the URL (last two path segments: <hex>/<name>).
+	parts := strings.Split(url, "/")
+	objectKey := ""
+	if len(parts) >= 2 {
+		objectKey = parts[len(parts)-2] + "/" + parts[len(parts)-1]
+	}
+	_, err := db.ExecContext(context.Background(), `
+		INSERT INTO user_documents (user_id, title, file_type, file_url, object_key, size)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, userID, name, mime, url, objectKey, size)
+	if err != nil {
+		log.Warn().Err(err).Str("user_id", userID).Str("url", url).Msg("record document failed")
+	}
+}
+
+// isDocumentMime reports whether mime is a supported document type.
+func isDocumentMime(mime string) bool {
+	switch mime {
+	case "application/pdf",
+		"application/msword",
+		"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"application/vnd.ms-excel",
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		"application/vnd.ms-powerpoint",
+		"application/vnd.openxmlformats-officedocument.presentationml.presentation",
+		"text/plain",
+		"text/markdown",
+		"text/csv":
+		return true
+	}
+	return false
+}
+
 func formatFromFilename(name, mime string) string {
 	if idx := strings.LastIndex(name, "."); idx >= 0 {
 		return strings.ToUpper(name[idx+1:])

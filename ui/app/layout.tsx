@@ -1,13 +1,16 @@
 import type { Metadata, Viewport } from 'next'
-import { Noto_Sans_KR } from 'next/font/google'
+import localFont from 'next/font/local'
 import { Analytics } from '@vercel/analytics/next'
 import { SessionProvider } from 'next-auth/react'
+import { NextIntlClientProvider } from 'next-intl'
+import { getLocale, getMessages } from 'next-intl/server'
 import './globals.css'
 
-const notoSansKr = Noto_Sans_KR({ 
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-sans"
+const pretendard = localFont({
+  src: '../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2',
+  display: 'swap',
+  weight: '45 920',
+  variable: '--font-sans',
 });
 
 export const metadata: Metadata = {
@@ -39,17 +42,22 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const locale = await getLocale()
+  const messages = await getMessages()
+
   return (
-    <html lang="ko">
-      <body className={`${notoSansKr.variable} font-sans antialiased`}>
-        <SessionProvider>
-          {children}
-        </SessionProvider>
+    <html lang={locale}>
+      <body className={`${pretendard.variable} font-sans antialiased`}>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <SessionProvider>
+            {children}
+          </SessionProvider>
+        </NextIntlClientProvider>
         <Analytics />
       </body>
     </html>

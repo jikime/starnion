@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useTranslations } from "next-intl"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -56,6 +57,9 @@ function DDayBadge({ label, value }: { label: string; value: number }) {
 }
 
 export default function DdayPage() {
+  const t = useTranslations("dday")
+  const tc = useTranslations("common")
+
   const [items, setItems] = useState<Dday[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -143,12 +147,12 @@ export default function DdayPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">디데이</h1>
-          <p className="text-muted-foreground">중요한 날까지 남은 시간을 확인하세요</p>
+          <h1 className="text-2xl font-semibold">{t("title")}</h1>
+          <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Button className="gap-2" onClick={openCreate}>
           <Plus className="size-4" />
-          디데이 추가
+          {t("addButton")}
         </Button>
       </div>
 
@@ -159,15 +163,15 @@ export default function DdayPage() {
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
           <Clock className="size-10" />
-          <p className="text-base">등록된 디데이가 없습니다.</p>
-          <Button variant="outline" onClick={openCreate}>첫 디데이 추가하기</Button>
+          <p className="text-base">{t("empty")}</p>
+          <Button variant="outline" onClick={openCreate}>{t("addFirst")}</Button>
         </div>
       ) : (
         <div className="space-y-8">
           {upcoming.length > 0 && (
             <section className="space-y-3">
               <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                예정된 날
+                {t("upcoming")}
               </h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {upcoming.map((item) => (
@@ -186,7 +190,7 @@ export default function DdayPage() {
           {past.length > 0 && (
             <section className="space-y-3">
               <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                지난 날
+                {t("past")}
               </h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {past.map((item) => (
@@ -208,11 +212,11 @@ export default function DdayPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editTarget ? "디데이 수정" : "새 디데이"}</DialogTitle>
+            <DialogTitle>{editTarget ? t("editTitle") : t("createTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>아이콘</Label>
+              <Label>{t("iconLabel")}</Label>
               <div className="flex gap-2 flex-wrap">
                 {ICON_OPTIONS.map((icon) => (
                   <button
@@ -233,17 +237,17 @@ export default function DdayPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="ddayTitle">제목</Label>
+              <Label htmlFor="ddayTitle">{t("titleLabel")}</Label>
               <Input
                 id="ddayTitle"
-                placeholder="예: 결혼기념일, 여행 출발"
+                placeholder={t("titlePlaceholder")}
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="ddayDate">날짜</Label>
+              <Label htmlFor="ddayDate">{t("dateLabel")}</Label>
               <Input
                 id="ddayDate"
                 type="date"
@@ -253,10 +257,10 @@ export default function DdayPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="ddayDesc">메모 (선택)</Label>
+              <Label htmlFor="ddayDesc">{t("memoLabel")}</Label>
               <Textarea
                 id="ddayDesc"
-                placeholder="간단한 메모..."
+                placeholder={t("memoPlaceholder")}
                 className="min-h-[80px]"
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -265,14 +269,14 @@ export default function DdayPage() {
 
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                취소
+                {tc("cancel")}
               </Button>
               <Button
                 onClick={handleSave}
                 disabled={saving || !form.title.trim() || !form.target_date}
               >
                 {saving && <Loader2 className="size-4 animate-spin mr-2" />}
-                저장
+                {tc("save")}
               </Button>
             </div>
           </div>
@@ -293,6 +297,7 @@ function DdayCard({
   onDelete: (id: number) => void
   deleting: boolean
 }) {
+  const t = useTranslations("dday")
   const isToday = item.dday_value === 0
   const isPast = item.dday_value > 0
 
@@ -338,7 +343,7 @@ function DdayCard({
         <p className={cn("text-xs", isPast ? "text-muted-foreground" : "text-foreground/70")}>
           {item.target_date}
           {isToday && (
-            <span className="ml-2 font-semibold text-green-500">오늘!</span>
+            <span className="ml-2 font-semibold text-green-500">{t("today")}</span>
           )}
         </p>
       </CardContent>

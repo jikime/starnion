@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useTranslations, useLocale } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -111,7 +112,7 @@ function SparkArea({ data }: { data: MonthlyPoint[] }) {
   )
 }
 
-// ── top metric card (image row 1 style) ────────────────────────────────────
+// ── top metric card ─────────────────────────────────────────────────────────
 
 function MetricCard({
   label,
@@ -163,7 +164,7 @@ function MetricCard({
   )
 }
 
-// ── icon stat card (image row 2 style) ─────────────────────────────────────
+// ── icon stat card ──────────────────────────────────────────────────────────
 
 function IconCard({
   icon: Icon,
@@ -216,6 +217,11 @@ function IconCard({
 // ── main page ───────────────────────────────────────────────────────────────
 
 export default function BudgetPage() {
+  const t = useTranslations("budget")
+  const tc = useTranslations("common")
+  const tf = useTranslations("finance")
+  const locale = useLocale()
+
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -227,6 +233,19 @@ export default function BudgetPage() {
   const [formWarn, setFormWarn] = useState("70")
   const [formDanger, setFormDanger] = useState("90")
   const [saving, setSaving] = useState(false)
+
+  const categoryLabel = (cat: string) => {
+    const map: Record<string, string> = {
+      "식비": tf("categories.food"),
+      "교통": tf("categories.transport"),
+      "쇼핑": tf("categories.shopping"),
+      "구독": tf("categories.subscription"),
+      "의료": tf("categories.medical"),
+      "문화": tf("categories.culture"),
+      "기타": tf("categories.other"),
+    }
+    return map[cat] ?? cat
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -299,11 +318,12 @@ export default function BudgetPage() {
     b => b.percent >= (data?.warning_threshold ?? 70) && b.percent < (data?.danger_threshold ?? 90)
   )
 
-  // Sort by spent desc for bar chart
   const sortedItems = [...budgetItems].sort((a, b) => b.spent - a.spent)
   const maxSpent = sortedItems[0]?.spent || 1
 
-  const monthLabel = `${year}년 ${month}월`
+  const monthLabel = new Intl.DateTimeFormat(locale, { year: "numeric", month: "long" }).format(
+    new Date(year, month - 1)
+  )
 
   if (loading) {
     return (
@@ -318,7 +338,7 @@ export default function BudgetPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">예산 관리</h1>
+          <h1 className="text-2xl font-semibold">{t("title")}</h1>
           <p className="text-sm text-muted-foreground">{monthLabel}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -331,17 +351,17 @@ export default function BudgetPage() {
           </Button>
           <Button variant="outline" className="gap-2 ml-2" onClick={openSettings}>
             <Settings className="size-4" />
-            예산 설정
+            {t("settings")}
           </Button>
         </div>
       </div>
 
-      {/* Row 1 — metric cards with sparklines (image top row style) */}
+      {/* Row 1 — metric cards */}
       <div className="grid sm:grid-cols-3 gap-4">
         <MetricCard
-          label="총 예산"
+          label={t("totalBudget")}
           value={KRW_SHORT(data?.total_budget ?? 0) + "원"}
-          sub="설정된 월 예산 합계"
+          sub={t("totalBudgetSub")}
           delta={undefined}
           chart={
             <div className="text-blue-500">
@@ -351,11 +371,11 @@ export default function BudgetPage() {
           color=""
         />
         <MetricCard
-          label="이번달 지출"
+          label={t("thisMonthExpense")}
           value={KRW_SHORT(curMonthSpent) + "원"}
-          sub={`전월 대비`}
+          sub={t("prevMonthCompare")}
           delta={spentDelta}
-          deltaLabel="지난달 비교"
+          deltaLabel={t("lastMonthCompare")}
           chart={
             <div className="text-orange-500">
               <SparkBar data={chart} />
@@ -364,9 +384,9 @@ export default function BudgetPage() {
           color=""
         />
         <MetricCard
-          label="잔여 예산"
+          label={t("remainingBudget")}
           value={KRW_SHORT(data?.total_remaining ?? 0) + "원"}
-          sub="이번달 남은 예산"
+          sub={t("remainingBudgetSub")}
           delta={
             data?.total_budget
               ? ((data.total_remaining / data.total_budget) * 100) - 100
@@ -381,43 +401,43 @@ export default function BudgetPage() {
         />
       </div>
 
-      {/* Row 2 — icon stat cards (image row 2 style) */}
+      {/* Row 2 — icon stat cards */}
       <div className="grid sm:grid-cols-3 gap-4">
         <IconCard
           icon={Wallet}
           iconBg="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
           value={`${(data?.total_percent ?? 0).toFixed(1)}%`}
-          label="전체 예산 사용률"
+          label={t("totalUsageRate")}
           period={monthLabel}
           delta={spentDelta}
         />
         <IconCard
           icon={AlertTriangle}
           iconBg="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
-          value={`${warnItems.length}개`}
-          label="주의 카테고리"
-          period={`${data?.warning_threshold ?? 70}% 이상`}
+          value={t("count", { n: warnItems.length })}
+          label={t("warningCategories")}
+          period={t("warningThreshold", { n: data?.warning_threshold ?? 70 })}
           delta={-warnItems.length * 5}
         />
         <IconCard
           icon={AlertTriangle}
           iconBg="bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400"
-          value={`${overItems.length}개`}
-          label="초과 위험 카테고리"
-          period={`${data?.danger_threshold ?? 90}% 이상`}
+          value={t("count", { n: overItems.length })}
+          label={t("dangerCategories")}
+          period={t("warningThreshold", { n: data?.danger_threshold ?? 90 })}
           delta={-overItems.length * 10}
         />
       </div>
 
-      {/* Main — Top Services style: horizontal bars + grid */}
+      {/* Main — category budget status */}
       <div className="rounded-2xl border bg-card p-6">
         <div className="flex items-center justify-between mb-6">
-          <p className="font-semibold text-base">카테고리별 예산 현황</p>
-          <span className="text-xs text-muted-foreground">지출 / 예산</span>
+          <p className="font-semibold text-base">{t("categoryStatus")}</p>
+          <span className="text-xs text-muted-foreground">{t("spentOverBudget")}</span>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8">
-          {/* Left: horizontal bar chart (image "Top Services" style) */}
+          {/* Left: horizontal bar chart */}
           <div className="space-y-3">
             {sortedItems.filter(b => b.budget > 0 || b.spent > 0).map((item, idx) => {
               const barW = maxSpent > 0 ? (item.spent / maxSpent) * 100 : 0
@@ -435,16 +455,13 @@ export default function BudgetPage() {
                     {idx + 1}
                   </span>
                   <div className="flex-1 relative h-8 flex items-center">
-                    {/* background track */}
                     <div className="absolute inset-0 rounded-md bg-muted" />
-                    {/* fill bar */}
                     <div
                       className="absolute left-0 top-0 bottom-0 rounded-md transition-all duration-500"
                       style={{ width: `${barW}%`, backgroundColor: color }}
                     />
-                    {/* label */}
                     <span className="relative z-10 px-3 text-xs font-medium text-white mix-blend-overlay">
-                      {item.category}
+                      {categoryLabel(item.category)}
                     </span>
                   </div>
                   <span className="text-xs text-muted-foreground w-10 text-right shrink-0">
@@ -454,9 +471,8 @@ export default function BudgetPage() {
               )
             })}
             {sortedItems.filter(b => b.budget > 0 || b.spent > 0).length === 0 && (
-              <p className="text-sm text-muted-foreground py-4">이번달 지출 내역이 없어요</p>
+              <p className="text-sm text-muted-foreground py-4">{t("noExpense")}</p>
             )}
-            {/* X-axis labels */}
             <div className="flex justify-between text-xs text-muted-foreground pt-1 ml-7">
               <span>0%</span>
               <span>25%</span>
@@ -466,7 +482,7 @@ export default function BudgetPage() {
             </div>
           </div>
 
-          {/* Right: category grid with % (image right-side grid style) */}
+          {/* Right: category grid */}
           <div className="grid grid-cols-2 gap-x-8 gap-y-5">
             {sortedItems.filter(b => b.budget > 0 || b.spent > 0).map(item => {
               const over = item.percent >= (data?.danger_threshold ?? 90)
@@ -491,7 +507,7 @@ export default function BudgetPage() {
                           : undefined
                       }
                     />
-                    <span className="text-xs text-muted-foreground">{item.category}</span>
+                    <span className="text-xs text-muted-foreground">{categoryLabel(item.category)}</span>
                   </div>
                   <p className="text-xl font-bold ml-3.5">{item.percent.toFixed(0)}%</p>
                   <p className="text-xs text-muted-foreground ml-3.5">
@@ -510,12 +526,11 @@ export default function BudgetPage() {
       {/* Bottom — total progress bar */}
       <div className="rounded-2xl border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
-          <p className="font-semibold text-base">전체 예산 진행률</p>
+          <p className="font-semibold text-base">{t("totalProgress")}</p>
           <span className="text-sm text-muted-foreground">
             {KRW(data?.total_spent ?? 0)} / {KRW(data?.total_budget ?? 0)}
           </span>
         </div>
-        {/* Big progress bar */}
         <div className="relative h-5 rounded-full bg-muted overflow-hidden">
           {(() => {
             const pct = Math.min(data?.total_percent ?? 0, 100)
@@ -531,8 +546,8 @@ export default function BudgetPage() {
           })()}
         </div>
         <div className="flex justify-between text-xs text-muted-foreground mt-2">
-          <span>사용: {(data?.total_percent ?? 0).toFixed(1)}%</span>
-          <span>잔여: {KRW(data?.total_remaining ?? 0)}</span>
+          <span>{t("used")} {(data?.total_percent ?? 0).toFixed(1)}%</span>
+          <span>{t("remaining")} {KRW(data?.total_remaining ?? 0)}</span>
         </div>
       </div>
 
@@ -540,13 +555,13 @@ export default function BudgetPage() {
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>예산 설정</DialogTitle>
+            <DialogTitle>{t("settingsTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2 max-h-[70vh] overflow-y-auto pr-1">
-            <p className="text-xs text-muted-foreground">카테고리별 월 예산 (원)</p>
+            <p className="text-xs text-muted-foreground">{t("categoryBudgetDesc")}</p>
             {CATEGORIES.map(cat => (
               <div key={cat} className="flex items-center gap-3">
-                <Label className="w-14 shrink-0 text-sm">{cat}</Label>
+                <Label className="w-14 shrink-0 text-sm">{categoryLabel(cat)}</Label>
                 <Input
                   type="number"
                   placeholder="0"
@@ -558,9 +573,9 @@ export default function BudgetPage() {
               </div>
             ))}
             <div className="border-t pt-4 space-y-3">
-              <p className="text-xs text-muted-foreground font-medium">알림 임계값</p>
+              <p className="text-xs text-muted-foreground font-medium">{t("alertThreshold")}</p>
               <div className="flex items-center gap-3">
-                <Label className="w-14 shrink-0 text-sm text-amber-500">주의</Label>
+                <Label className="w-14 shrink-0 text-sm text-amber-500">{t("warning")}</Label>
                 <Input
                   type="number"
                   value={formWarn}
@@ -570,7 +585,7 @@ export default function BudgetPage() {
                 <span className="text-sm text-muted-foreground">%</span>
               </div>
               <div className="flex items-center gap-3">
-                <Label className="w-14 shrink-0 text-sm text-rose-500">위험</Label>
+                <Label className="w-14 shrink-0 text-sm text-rose-500">{t("danger")}</Label>
                 <Input
                   type="number"
                   value={formDanger}
@@ -582,11 +597,11 @@ export default function BudgetPage() {
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setSettingsOpen(false)} disabled={saving}>
-                취소
+                {tc("cancel")}
               </Button>
               <Button onClick={handleSave} disabled={saving}>
                 {saving && <Loader2 className="size-3.5 animate-spin mr-1.5" />}
-                저장
+                {tc("save")}
               </Button>
             </div>
           </div>

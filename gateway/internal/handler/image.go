@@ -30,6 +30,7 @@ type imageItem struct {
 	Source    string `json:"source"`
 	Type      string `json:"type"`
 	Prompt    string `json:"prompt"`
+	Analysis  string `json:"analysis"`
 	SizeLabel string `json:"size_label"`
 	CreatedAt string `json:"created_at"`
 }
@@ -59,7 +60,7 @@ func (h *ImageHandler) ListImages(c echo.Context) error {
 	defer cancel()
 
 	query := `
-		SELECT id, url, name, mime, size, source, type, COALESCE(prompt,''), created_at
+		SELECT id, url, name, mime, size, source, type, COALESCE(prompt,''), COALESCE(analysis,''), created_at
 		FROM user_images
 		WHERE user_id = $1`
 	args := []any{userID}
@@ -90,7 +91,7 @@ func (h *ImageHandler) ListImages(c echo.Context) error {
 		var item imageItem
 		var createdAt time.Time
 		if err := rows.Scan(&item.ID, &item.URL, &item.Name, &item.Mime, &item.Size,
-			&item.Source, &item.Type, &item.Prompt, &createdAt); err != nil {
+			&item.Source, &item.Type, &item.Prompt, &item.Analysis, &createdAt); err != nil {
 			continue
 		}
 		item.SizeLabel = formatSize(item.Size)

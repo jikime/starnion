@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -43,22 +44,21 @@ interface SearchResult {
 // ── Source config ─────────────────────────────────────────────────────────────
 
 const SOURCE_CONFIG: Record<string, {
-  label: string
   href: string | null
   Icon: React.ComponentType<{ className?: string }>
   badge: string
 }> = {
-  diary:      { label: "일기",    href: "/diary",      Icon: BookOpen,      badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
-  memo:       { label: "메모",    href: "/memo",       Icon: StickyNote,    badge: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" },
-  document:   { label: "문서",    href: "/documents",  Icon: FileText,      badge: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
-  web_search: { label: "웹검색",  href: "/search",     Icon: Globe,         badge: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
-  finance:    { label: "가계부",  href: "/finance",    Icon: Wallet,        badge: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" },
-  daily_log:  { label: "대화",    href: null,          Icon: MessageCircle, badge: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300" },
-  knowledge:  { label: "지식",    href: null,          Icon: Brain,         badge: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" },
+  diary:      { href: "/diary",      Icon: BookOpen,      badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
+  memo:       { href: "/memo",       Icon: StickyNote,    badge: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" },
+  document:   { href: "/documents",  Icon: FileText,      badge: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
+  web_search: { href: "/search",     Icon: Globe,         badge: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
+  finance:    { href: "/finance",    Icon: Wallet,        badge: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" },
+  daily_log:  { href: null,          Icon: MessageCircle, badge: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300" },
+  knowledge:  { href: null,          Icon: Brain,         badge: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" },
 }
 
 const DEFAULT_SOURCE = {
-  label: "기타", href: null, Icon: Search,
+  href: null, Icon: Search,
   badge: "bg-muted text-muted-foreground",
 }
 
@@ -66,8 +66,10 @@ const DEFAULT_SOURCE = {
 
 function ResultCard({ result }: { result: SearchResult }) {
   const router = useRouter()
+  const t = useTranslations()
   const cfg = SOURCE_CONFIG[result.source] ?? DEFAULT_SOURCE
-  const { label, href, Icon, badge } = cfg
+  const { href, Icon, badge } = cfg
+  const label = t(`sources.${result.source}` as Parameters<typeof t>[0], { defaultValue: result.source })
   const pct = Math.round(result.similarity * 100)
 
   return (
@@ -104,7 +106,7 @@ function ResultCard({ result }: { result: SearchResult }) {
                 className="h-6 text-xs gap-1 px-2"
                 onClick={() => router.push(href)}
               >
-                이동
+                {t("search.goTo")}
                 <ArrowRight className="size-3" />
               </Button>
             )}
@@ -135,6 +137,7 @@ function ResultCard({ result }: { result: SearchResult }) {
 export default function LocalSearchPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const t = useTranslations()
 
   const initialQ = searchParams.get("q") ?? ""
   const [inputVal, setInputVal] = useState(initialQ)
@@ -181,8 +184,8 @@ export default function LocalSearchPage() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold">통합 검색</h1>
-        <p className="text-muted-foreground text-sm">일기, 메모, 문서 등 내 모든 데이터를 AI로 검색합니다</p>
+        <h1 className="text-2xl font-semibold">{t("search.title")}</h1>
+        <p className="text-muted-foreground text-sm">{t("search.description")}</p>
       </div>
 
       {/* Search input */}
@@ -191,7 +194,7 @@ export default function LocalSearchPage() {
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="검색어를 입력하세요..."
+            placeholder={t("search.inputPlaceholder")}
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
             className="pl-9"
@@ -200,7 +203,7 @@ export default function LocalSearchPage() {
         </div>
         <Button type="submit" disabled={loading || !inputVal.trim()} className="gap-2 shrink-0">
           {loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-          검색
+          {t("search.button")}
         </Button>
       </form>
 
@@ -208,7 +211,7 @@ export default function LocalSearchPage() {
       {loading && (
         <div className="flex items-center gap-2 text-muted-foreground py-8">
           <RefreshCw className="size-4 animate-spin" />
-          <span className="text-sm">검색 중...</span>
+          <span className="text-sm">{t("search.searching")}</span>
         </div>
       )}
 
@@ -217,16 +220,17 @@ export default function LocalSearchPage() {
           {/* Summary */}
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-sm text-muted-foreground">
-              &quot;{lastQ}&quot; 검색 결과 {results.length}개
+              {t("search.results", { query: lastQ, count: results.length })}
             </span>
             {Object.entries(sourceCounts).map(([src, cnt]) => {
               const cfg = SOURCE_CONFIG[src] ?? DEFAULT_SOURCE
+              const srcLabel = t(`sources.${src}` as Parameters<typeof t>[0], { defaultValue: src })
               return (
                 <span
                   key={src}
                   className={`text-xs px-2 py-0.5 rounded-full font-medium ${cfg.badge}`}
                 >
-                  {cfg.label} {cnt}
+                  {srcLabel} {cnt}
                 </span>
               )
             })}
@@ -235,8 +239,8 @@ export default function LocalSearchPage() {
           {results.length === 0 ? (
             <div className="flex flex-col items-center py-16 text-muted-foreground gap-3">
               <Search className="size-12 opacity-20" />
-              <p className="text-sm">검색 결과가 없어요</p>
-              <p className="text-xs">다른 검색어로 시도해보세요</p>
+              <p className="text-sm">{t("search.noResults")}</p>
+              <p className="text-xs">{t("search.noResultsHint")}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -252,7 +256,7 @@ export default function LocalSearchPage() {
       {!loading && !searched && (
         <div className="flex flex-col items-center py-16 text-muted-foreground gap-3">
           <Search className="size-12 opacity-20" />
-          <p className="text-sm">검색어를 입력해 내 데이터를 검색하세요</p>
+          <p className="text-sm">{t("search.emptyHint")}</p>
         </div>
       )}
     </div>

@@ -64,7 +64,7 @@ SKILLS: dict[str, SkillDef] = {
         emoji="🎯",
         description="목표 설정, 추적, 달성도 평가",
         category="productivity",
-        tools=["set_goal", "get_goals", "update_goal_status"],
+        tools=["set_goal", "get_goals", "update_goal_status", "update_goal_progress"],
         reports=["goal_evaluate", "goal_status"],
         sort_order=4,
     ),

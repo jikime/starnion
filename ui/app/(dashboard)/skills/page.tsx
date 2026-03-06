@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useTranslations } from "next-intl"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
@@ -32,6 +33,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 export default function SkillsPage() {
+  const t = useTranslations("skills")
   const [skills, setSkills] = useState<Skill[]>([])
   const [loading, setLoading] = useState(true)
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -77,13 +79,13 @@ export default function SkillsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">스킬 관리</h1>
-          <p className="text-muted-foreground">사용할 스킬을 활성화하거나 비활성화하세요</p>
+          <h1 className="text-2xl font-semibold">{t("title")}</h1>
+          <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         {loading ? (
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
         ) : (
-          <Badge variant="secondary" className="text-sm">활성: {activeCount}/{totalCount}</Badge>
+          <Badge variant="secondary" className="text-sm">{t("active", { n: activeCount, total: totalCount })}</Badge>
         )}
       </div>
 
@@ -120,7 +122,7 @@ export default function SkillsPage() {
                           )}
                           {isSystem && (
                             <Badge variant="secondary" className="text-xs shrink-0">
-                              필수
+                              {t("required")}
                             </Badge>
                           )}
                         </div>

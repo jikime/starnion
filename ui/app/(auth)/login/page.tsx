@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useTranslations } from "next-intl"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -21,16 +22,17 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
 
-const schema = z.object({
-  email: z.string().email("올바른 이메일 형식이 아닙니다"),
-  password: z.string().min(8, "비밀번호는 8자 이상이어야 합니다"),
-})
-
-type FormData = z.infer<typeof schema>
+type FormData = { email: string; password: string }
 
 export default function LoginPage() {
+  const t = useTranslations("auth")
   const router = useRouter()
   const [error, setError] = useState("")
+
+  const schema = useMemo(() => z.object({
+    email: z.string().email(t("login.emailInvalid")),
+    password: z.string().min(8, t("login.passwordTooShort")),
+  }), [t])
 
   const {
     register,
@@ -47,7 +49,7 @@ export default function LoginPage() {
     })
 
     if (result?.error) {
-      setError("이메일 또는 비밀번호가 올바르지 않습니다")
+      setError(t("login.invalidCredentials"))
       return
     }
 
@@ -58,8 +60,8 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center space-y-1">
-        <CardTitle className="text-2xl font-bold">로그인</CardTitle>
-        <CardDescription>JIKI AI 어시스턴트에 로그인하세요</CardDescription>
+        <CardTitle className="text-2xl font-bold">{t("login.title")}</CardTitle>
+        <CardDescription>{t("login.description")}</CardDescription>
       </CardHeader>
 
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -71,7 +73,7 @@ export default function LoginPage() {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="email">이메일</Label>
+            <Label htmlFor="email">{t("login.emailLabel")}</Label>
             <Input
               id="email"
               type="email"
@@ -85,7 +87,7 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">비밀번호</Label>
+            <Label htmlFor="password">{t("login.passwordLabel")}</Label>
             <Input
               id="password"
               type="password"
@@ -102,12 +104,12 @@ export default function LoginPage() {
         <CardFooter className="flex flex-col gap-3">
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-            로그인
+            {t("login.submit")}
           </Button>
           <p className="text-sm text-muted-foreground text-center">
-            계정이 없으신가요?{" "}
+            {t("login.noAccount")}{" "}
             <Link href="/register" className="underline text-primary font-medium">
-              회원가입
+              {t("login.register")}
             </Link>
           </p>
         </CardFooter>

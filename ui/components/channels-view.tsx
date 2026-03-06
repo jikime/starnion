@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useSession } from "next-auth/react"
+import { useTranslations } from "next-intl"
 import {
   Card,
   CardContent,
@@ -56,6 +57,7 @@ interface ToastState {
 // ── Main component ─────────────────────────────────────────────────────────
 
 export function ChannelsView() {
+  const t = useTranslations("channels")
   const { data: session, update } = useSession()
 
   const [status, setStatus] = useState<TelegramStatus | null>(null)
@@ -146,11 +148,11 @@ export function ChannelsView() {
       })
       if (res.ok) {
         setTokenInput("")
-        showToast("봇 토큰이 저장됐어요.")
+        showToast(t("toast.tokenSaved"))
         fetchStatus()
       } else {
         const data = await res.json().catch(() => ({}))
-        showToast((data as { error?: string }).error ?? "저장에 실패했어요.", "error")
+        showToast((data as { error?: string }).error ?? t("toast.saveFailed"), "error")
       }
     } finally {
       setSavingToken(false)
@@ -170,12 +172,12 @@ export function ChannelsView() {
         body: JSON.stringify({ action: "set-enabled", enabled }),
       })
       if (res.ok) {
-        showToast(enabled ? "봇이 시작됐어요." : "봇이 중지됐어요.")
+        showToast(enabled ? t("toast.botStarted") : t("toast.botStopped"))
         fetchStatus()
       } else {
         setStatus(prev)
         const data = await res.json().catch(() => ({}))
-        showToast((data as { error?: string }).error ?? "설정 변경에 실패했어요.", "error")
+        showToast((data as { error?: string }).error ?? t("toast.settingFailed"), "error")
       }
     } finally {
       setTogglingEnabled(false)
@@ -195,11 +197,11 @@ export function ChannelsView() {
         body: JSON.stringify({ action: "set-policy", dmPolicy, groupPolicy }),
       })
       if (res.ok) {
-        showToast("정책이 저장됐어요.")
+        showToast(t("toast.policySaved"))
       } else {
         setStatus(prev)
         const data = await res.json().catch(() => ({}))
-        showToast((data as { error?: string }).error ?? "저장에 실패했어요.", "error")
+        showToast((data as { error?: string }).error ?? t("toast.saveFailed"), "error")
       }
     } finally {
       setSavingPolicy(false)
@@ -226,10 +228,10 @@ export function ChannelsView() {
         await update({ userId: (data as { userId?: string }).userId })
         setLinkSuccess(true)
         setLinkCode("")
-        showToast("계정이 연결됐어요!")
+        showToast(t("toast.accountLinked"))
         fetchStatus()
       } else {
-        showToast((data as { error?: string }).error ?? "연결에 실패했어요.", "error")
+        showToast((data as { error?: string }).error ?? t("toast.linkFailed"), "error")
       }
     } finally {
       setLinking(false)
@@ -243,13 +245,13 @@ export function ChannelsView() {
       const res = await fetch(`/api/channels/telegram/pairing/${id}/${action}`, { method: "POST" })
       if (res.ok) {
         setPairingRequests(prev => prev.filter(r => r.id !== id))
-        showToast(action === "approve" ? "승인했어요." : "거부했어요.")
+        showToast(action === "approve" ? t("toast.approved") : t("toast.denied"))
       } else {
         const data = await res.json().catch(() => ({}))
-        showToast((data as { error?: string }).error ?? "처리에 실패했어요.", "error")
+        showToast((data as { error?: string }).error ?? t("toast.processFailed"), "error")
       }
     } catch {
-      showToast("처리에 실패했어요.", "error")
+      showToast(t("toast.processFailed"), "error")
     }
   }
 
@@ -257,9 +259,9 @@ export function ChannelsView() {
 
   const statusBadge = () => {
     if (!status) return null
-    if (status.status === "running") return <Badge className="bg-green-500 text-white">실행중</Badge>
-    if (status.status === "configured") return <Badge variant="secondary">설정됨</Badge>
-    return <Badge variant="outline">미설정</Badge>
+    if (status.status === "running") return <Badge className="bg-green-500 text-white">{t("statusRunning")}</Badge>
+    if (status.status === "configured") return <Badge variant="secondary">{t("statusConfigured")}</Badge>
+    return <Badge variant="outline">{t("statusNotConfigured")}</Badge>
   }
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -279,9 +281,9 @@ export function ChannelsView() {
 
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold">채널</h1>
+        <h1 className="text-2xl font-bold">{t("title")}</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          외부 메시징 채널을 연결하여 어디서든 지키와 대화하세요.
+          {t("subtitle")}
         </p>
       </div>
 
@@ -298,13 +300,13 @@ export function ChannelsView() {
                   {statusBadge()}
                 </CardTitle>
                 <CardDescription className="mt-1">
-                  개인 텔레그램 봇을 연결하여 대화하세요.
+                  {t("telegram.description")}
                 </CardDescription>
               </div>
               {status?.configured && (
                 <div className="flex items-center gap-2 shrink-0">
                   <Label htmlFor="bot-enabled" className="text-sm">
-                    {status.enabled ? "실행중" : "중지됨"}
+                    {status.enabled ? t("enabled") : t("disabled")}
                   </Label>
                   <Switch
                     id="bot-enabled"
@@ -318,19 +320,19 @@ export function ChannelsView() {
 
             <CardContent className="space-y-5">
               {loading ? (
-                <p className="text-sm text-muted-foreground">불러오는 중...</p>
+                <p className="text-sm text-muted-foreground">{t("loading")}</p>
               ) : (
                 <>
                   {/* ── Bot Token ── */}
                   <div className="space-y-2">
                     <Label htmlFor="bot-token">
-                      봇 토큰{" "}
+                      {t("botToken.label")}{" "}
                       {status?.configured && (
-                        <span className="text-green-600 text-xs ml-1">✓ 설정됨</span>
+                        <span className="text-green-600 text-xs ml-1">{t("botToken.set")}</span>
                       )}
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      @BotFather에서 발급받은 봇 토큰을 입력하세요.
+                      {t("botToken.hint")}
                     </p>
                     <div className="flex gap-2">
                       <Input
@@ -338,8 +340,8 @@ export function ChannelsView() {
                         type="password"
                         placeholder={
                           status?.configured
-                            ? "새 토큰으로 교체하려면 입력하세요"
-                            : "1234567890:ABCDEFGhijklmnopqrstuvwxyz"
+                            ? t("botToken.replacePlaceholder")
+                            : t("botToken.placeholder")
                         }
                         value={tokenInput}
                         onChange={e => setTokenInput(e.target.value)}
@@ -347,7 +349,7 @@ export function ChannelsView() {
                         className="flex-1 font-mono text-sm"
                       />
                       <Button onClick={saveToken} disabled={savingToken || !tokenInput.trim()} size="sm">
-                        {savingToken ? "저장중..." : "저장"}
+                        {savingToken ? t("botToken.saving") : t("botToken.save")}
                       </Button>
                     </div>
                   </div>
@@ -355,7 +357,7 @@ export function ChannelsView() {
                   {/* ── Linked Accounts ── */}
                   {status?.accounts && status.accounts.length > 0 && (
                     <div className="space-y-1">
-                      <Label>연결된 텔레그램 계정</Label>
+                      <Label>{t("linkedAccounts")}</Label>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {status.accounts.map(a => (
                           <Badge key={a} variant="secondary">{a}</Badge>
@@ -369,7 +371,7 @@ export function ChannelsView() {
                     <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
                       <CollapsibleTrigger asChild>
                         <Button variant="outline" className="w-full justify-between">
-                          채널 설정
+                          {t("channelSettings")}
                           {settingsOpen
                             ? <ChevronUp className="h-4 w-4" />
                             : <ChevronDown className="h-4 w-4" />}
@@ -380,68 +382,67 @@ export function ChannelsView() {
                         {/* DM Policy */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="space-y-1">
-                            <Label>DM 정책</Label>
+                            <Label>{t("dmPolicy.label")}</Label>
                             <p className="text-xs text-muted-foreground">
-                              개인 DM 처리 방식
+                              {t("dmPolicy.hint")}
                             </p>
                             <Select value={dmPolicy} onValueChange={setDmPolicy}>
                               <SelectTrigger>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="allow">허용 — 누구나 DM 가능</SelectItem>
-                                <SelectItem value="pairing">페어링 — 승인된 사용자만</SelectItem>
-                                <SelectItem value="deny">거부 — DM 차단</SelectItem>
+                                <SelectItem value="allow">{t("dmPolicy.allow")}</SelectItem>
+                                <SelectItem value="pairing">{t("dmPolicy.pairing")}</SelectItem>
+                                <SelectItem value="deny">{t("dmPolicy.deny")}</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
 
                           {/* Group Policy */}
                           <div className="space-y-1">
-                            <Label>그룹 정책</Label>
+                            <Label>{t("groupPolicy.label")}</Label>
                             <p className="text-xs text-muted-foreground">
-                              그룹 채팅 응답 방식
+                              {t("groupPolicy.hint")}
                             </p>
                             <Select value={groupPolicy} onValueChange={setGroupPolicy}>
                               <SelectTrigger>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="allow">허용 — 모든 메시지에 응답</SelectItem>
-                                <SelectItem value="mention">멘션 — @봇이름 호출 시만</SelectItem>
-                                <SelectItem value="deny">거부 — 그룹 무시</SelectItem>
+                                <SelectItem value="allow">{t("groupPolicy.allow")}</SelectItem>
+                                <SelectItem value="mention">{t("groupPolicy.mention")}</SelectItem>
+                                <SelectItem value="deny">{t("groupPolicy.deny")}</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
                         </div>
 
                         <Button onClick={savePolicy} disabled={savingPolicy} size="sm">
-                          {savingPolicy ? "저장중..." : "정책 저장"}
+                          {savingPolicy ? t("savingPolicy") : t("savePolicy")}
                         </Button>
 
                         {/* Account Link */}
                         <div className="border-t pt-4 space-y-2">
                           <Label className="flex items-center gap-1">
                             <Link2 className="h-4 w-4" />
-                            계정 연결
+                            {t("accountLink.label")}
                           </Label>
                           <p className="text-xs text-muted-foreground">
-                            텔레그램에서{" "}
-                            <code className="font-mono">/link</code> 명령어로 코드를 받은 후 입력하세요.
+                            {t("accountLink.hint")}
                           </p>
                           {linkSuccess ? (
-                            <p className="text-sm text-green-600">✓ 계정이 연결됐어요!</p>
+                            <p className="text-sm text-green-600">{t("accountLink.success")}</p>
                           ) : (
                             <div className="flex gap-2">
                               <Input
-                                placeholder="JIKI-XXXXXX"
+                                placeholder={t("accountLink.placeholder")}
                                 value={linkCode}
                                 onChange={e => setLinkCode(e.target.value)}
                                 onKeyDown={e => { if (e.key === "Enter") handleLink() }}
                                 className="flex-1 font-mono uppercase"
                               />
                               <Button onClick={handleLink} disabled={linking || !linkCode.trim()} size="sm">
-                                {linking ? "연결중..." : "연결"}
+                                {linking ? t("accountLink.linking") : t("accountLink.link")}
                               </Button>
                             </div>
                           )}
@@ -453,12 +454,12 @@ export function ChannelsView() {
                   {/* Setup guide */}
                   {!status?.configured && (
                     <div className="rounded-md bg-muted/50 p-4 text-sm space-y-2 text-muted-foreground">
-                      <p className="font-medium text-foreground">봇 설정 방법</p>
+                      <p className="font-medium text-foreground">{t("setup.title")}</p>
                       <ol className="list-decimal list-inside space-y-1">
-                        <li>텔레그램에서 <code className="font-mono">@BotFather</code>를 검색하세요.</li>
-                        <li><code className="font-mono">/newbot</code> 명령어로 새 봇을 만드세요.</li>
-                        <li>발급받은 토큰을 위 입력창에 붙여넣기 하세요.</li>
-                        <li>저장 후 토글을 켜면 봇이 시작돼요.</li>
+                        <li>{t("setup.step1")}</li>
+                        <li>{t("setup.step2")}</li>
+                        <li>{t("setup.step3")}</li>
+                        <li>{t("setup.step4")}</li>
                       </ol>
                     </div>
                   )}
@@ -472,18 +473,18 @@ export function ChannelsView() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-3">
                 <div>
-                  <CardTitle className="text-base">페어링 요청</CardTitle>
+                  <CardTitle className="text-base">{t("pairing.title")}</CardTitle>
                   <CardDescription className="text-xs mt-0.5">
-                    DM을 보낸 사용자를 승인하거나 거부하세요.
+                    {t("pairing.description")}
                   </CardDescription>
                 </div>
                 <Button variant="ghost" size="sm" onClick={fetchPairing} disabled={pairingLoading} className="text-xs h-7">
-                  {pairingLoading ? "새로고침중..." : "새로고침"}
+                  {pairingLoading ? t("pairing.refreshing") : t("pairing.refresh")}
                 </Button>
               </CardHeader>
               <CardContent>
                 {pairingRequests.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">대기중인 요청이 없어요.</p>
+                  <p className="text-xs text-muted-foreground">{t("pairing.empty")}</p>
                 ) : (
                   <div className="space-y-2">
                     {pairingRequests.map(req => (
@@ -501,14 +502,14 @@ export function ChannelsView() {
                           <Button
                             size="icon" variant="ghost"
                             className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
-                            onClick={() => resolvePairing(req.id, "approve")} title="승인"
+                            onClick={() => resolvePairing(req.id, "approve")} title={t("pairing.approve")}
                           >
                             <Check className="h-4 w-4" />
                           </Button>
                           <Button
                             size="icon" variant="ghost"
                             className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"
-                            onClick={() => resolvePairing(req.id, "deny")} title="거부"
+                            onClick={() => resolvePairing(req.id, "deny")} title={t("pairing.deny")}
                           >
                             <X className="h-4 w-4" />
                           </Button>

@@ -1,10 +1,16 @@
+"use client"
+
+import { useTranslations, useLocale } from "next-intl"
 import { DashboardStats } from "@/components/dashboard/stats-cards"
 import { CategoryChart } from "@/components/dashboard/category-chart"
 import { RecentAlerts } from "@/components/dashboard/recent-alerts"
 import { GoalsProgress } from "@/components/dashboard/goals-progress"
 
 export default function DashboardPage() {
-  const today = new Date().toLocaleDateString("ko-KR", {
+  const t = useTranslations("dashboard")
+  const locale = useLocale()
+
+  const today = new Date().toLocaleDateString(locale, {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -16,7 +22,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">
-            안녕하세요! StarPion
+            {t("greeting")}
           </h1>
           <p className="text-muted-foreground">{today}</p>
         </div>

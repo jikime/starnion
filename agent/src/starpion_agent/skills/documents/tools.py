@@ -82,12 +82,24 @@ async def parse_document(file_url: str, file_name: str = "document.pdf") -> str:
         text=text,
     )
 
-    preview = text[:200] + "..." if len(text) > 200 else text
+    # Return up to 6000 chars of document content directly so the LLM can
+    # answer questions without needing a separate retrieve_memory call.
+    # For documents longer than 6000 chars, the rest is in the vector DB
+    # and can be found via retrieve_memory.
+    _INLINE_LIMIT = 6000
+    if len(text) <= _INLINE_LIMIT:
+        content_block = text
+        note = ""
+    else:
+        content_block = text[:_INLINE_LIMIT]
+        note = (
+            f"\n\n... (이하 {len(text) - _INLINE_LIMIT:,}자 생략) "
+            f"더 많은 내용은 retrieve_memory로 검색하세요."
+        )
+
     return (
-        f"문서 '{file_name}'를 처리했어요.\n"
-        f"- 추출된 텍스트: {len(text)}자\n"
-        f"- 저장된 섹션: {section_count}개\n\n"
-        f"미리보기:\n{preview}"
+        f"문서 '{file_name}' 처리 완료 (총 {len(text):,}자 / {section_count}개 섹션으로 벡터 DB 저장)\n\n"
+        f"=== 문서 내용 ===\n{content_block}{note}"
     )
 
 
@@ -97,30 +109,37 @@ async def generate_document(
     content: str, format: str = "pdf", title: str = "문서",
 ) -> str:
     """요청한 내용으로 문서 파일을 생성합니다. 사용자가 워드, 엑셀, PDF, PPT, 발표자료 등 문서 파일 생성을 요청하면 반드시 이 도구를 호출하세요. 포맷: pdf, docx(워드), xlsx(엑셀), pptx(PPT/발표자료), md, txt."""
+    import logging
+    _log = logging.getLogger(__name__)
+
     fmt = format.lower().strip(".")
     mime = _MIME_TYPES.get(fmt)
     if not mime:
         return f"지원하지 않는 포맷이에요: {format}. pdf, docx, xlsx, pptx, md, txt 중에서 선택해주세요."
 
-    if fmt == "pdf":
-        data = generate_pdf(title, content)
-    elif fmt == "docx":
-        data = generate_docx(title, content)
-    elif fmt == "pptx":
-        data = generate_pptx(title, content)
-    elif fmt == "xlsx":
-        # Parse simple table: first line = headers, rest = rows.
-        lines = [line for line in content.strip().split("\n") if line.strip()]
-        if lines:
-            headers = [h.strip() for h in lines[0].split(",")]
-            rows = [[c.strip() for c in line.split(",")] for line in lines[1:]]
+    try:
+        if fmt == "pdf":
+            data = generate_pdf(title, content)
+        elif fmt == "docx":
+            data = generate_docx(title, content)
+        elif fmt == "pptx":
+            data = generate_pptx(title, content)
+        elif fmt == "xlsx":
+            # Parse simple table: first line = headers, rest = rows.
+            lines = [line for line in content.strip().split("\n") if line.strip()]
+            if lines:
+                headers = [h.strip() for h in lines[0].split(",")]
+                rows = [[c.strip() for c in line.split(",")] for line in lines[1:]]
+            else:
+                headers, rows = ["내용"], [[content]]
+            data = generate_xlsx(headers, rows)
+        elif fmt == "md":
+            data = generate_md(title, content)
         else:
-            headers, rows = ["내용"], [[content]]
-        data = generate_xlsx(headers, rows)
-    elif fmt == "md":
-        data = generate_md(title, content)
-    else:
-        data = generate_txt(content)
+            data = generate_txt(content)
+    except Exception as e:
+        _log.exception("generate_document: failed for format=%s title=%s", fmt, title)
+        return f"문서 생성 중 오류가 발생했어요 ({fmt}): {e}"
 
     file_name = f"{title}.{fmt}"
     add_pending_file(data, file_name, mime)

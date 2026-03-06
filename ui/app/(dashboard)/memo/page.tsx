@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useTranslations } from "next-intl"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus, Search, Edit, Trash2, Brain, StickyNote, Loader2 } from "lucide-react"
 
+// DB values for tags (kept as Korean for API compatibility)
 const TAGS = ["전체", "업무", "개인", "쇼핑", "아이디어"]
 
 interface Memo {
@@ -36,6 +38,20 @@ interface MemoForm {
 const emptyForm: MemoForm = { title: "", content: "", tag: "개인" }
 
 export default function MemoPage() {
+  const t = useTranslations("memo")
+  const tc = useTranslations("common")
+
+  const tagLabel = (tag: string) => {
+    const map: Record<string, string> = {
+      "전체": t("tags.all"),
+      "업무": t("tags.work"),
+      "개인": t("tags.personal"),
+      "쇼핑": t("tags.shopping"),
+      "아이디어": t("tags.idea"),
+    }
+    return map[tag] ?? tag
+  }
+
   const [memos, setMemos] = useState<Memo[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedTag, setSelectedTag] = useState("전체")
@@ -120,14 +136,14 @@ export default function MemoPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">기억 & 메모</h1>
-          <p className="text-muted-foreground">메모, AI 기억, 통합 검색</p>
+          <h1 className="text-2xl font-semibold">{t("title")}</h1>
+          <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="검색..."
+            placeholder={t("searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -139,11 +155,11 @@ export default function MemoPage() {
         <TabsList>
           <TabsTrigger value="memos">
             <StickyNote className="mr-2 size-4" />
-            메모
+            {t("tabMemo")}
           </TabsTrigger>
           <TabsTrigger value="aiMemory">
             <Brain className="mr-2 size-4" />
-            AI 기억 (지식베이스)
+            {t("tabAiMemory")}
           </TabsTrigger>
         </TabsList>
 
@@ -157,13 +173,13 @@ export default function MemoPage() {
                   size="sm"
                   onClick={() => setSelectedTag(tag)}
                 >
-                  {tag}
+                  {tagLabel(tag)}
                 </Button>
               ))}
             </div>
             <Button className="gap-2" onClick={openCreate}>
               <Plus className="size-4" />
-              메모 추가
+              {t("addMemo")}
             </Button>
           </div>
 
@@ -174,7 +190,7 @@ export default function MemoPage() {
           ) : memos.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
               <StickyNote className="size-8" />
-              <p>메모가 없습니다.</p>
+              <p>{t("empty")}</p>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -186,7 +202,7 @@ export default function MemoPage() {
                         <StickyNote className="size-4 text-primary shrink-0" />
                         <CardTitle className="text-base truncate">{memo.title}</CardTitle>
                       </div>
-                      <Badge variant="secondary" className="ml-2 shrink-0">{memo.tag}</Badge>
+                      <Badge variant="secondary" className="ml-2 shrink-0">{tagLabel(memo.tag)}</Badge>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -225,12 +241,12 @@ export default function MemoPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Brain className="size-5" />
-                AI 기억
+                {t("aiMemoryTitle")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                AI가 대화에서 기억한 내용이 여기에 표시됩니다.
+                {t("aiMemoryDesc")}
               </p>
             </CardContent>
           </Card>
@@ -241,30 +257,30 @@ export default function MemoPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editTarget ? "메모 수정" : "새 메모"}</DialogTitle>
+            <DialogTitle>{editTarget ? t("editTitle") : t("createTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="memoTitle">제목</Label>
+              <Label htmlFor="memoTitle">{t("titleLabel")}</Label>
               <Input
                 id="memoTitle"
-                placeholder="메모 제목"
+                placeholder={t("titlePlaceholder")}
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="memoContent">내용</Label>
+              <Label htmlFor="memoContent">{t("contentLabel")}</Label>
               <Textarea
                 id="memoContent"
-                placeholder="메모 내용..."
+                placeholder={t("contentPlaceholder")}
                 className="min-h-[120px]"
                 value={form.content}
                 onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
               />
             </div>
             <div className="space-y-2">
-              <Label>태그</Label>
+              <Label>{t("tagLabel")}</Label>
               <div className="flex gap-2 flex-wrap">
                 {TAGS.slice(1).map((tag) => (
                   <Button
@@ -273,18 +289,18 @@ export default function MemoPage() {
                     size="sm"
                     onClick={() => setForm((f) => ({ ...f, tag }))}
                   >
-                    {tag}
+                    {tagLabel(tag)}
                   </Button>
                 ))}
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                취소
+                {tc("cancel")}
               </Button>
               <Button onClick={handleSave} disabled={saving || !form.title.trim()}>
                 {saving && <Loader2 className="size-4 animate-spin mr-2" />}
-                저장
+                {tc("save")}
               </Button>
             </div>
           </div>

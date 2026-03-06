@@ -47,10 +47,10 @@ class SaveDiaryEntryInput(BaseModel):
 @tool(args_schema=SaveDailyLogInput)
 @skill_guard("diary")
 async def save_daily_log(content: str, sentiment: str = "") -> str:
-    """사용자의 일상 기록을 AI 메모리에 저장합니다.
+    """사용자의 일상 기록을 저장합니다.
 
-    일상 대화, 컨디션, 기분, 하루 일과 등을 기록하면 나중에 맥락으로 활용합니다.
-    구조화된 일기 항목은 save_diary_entry를 사용하세요.
+    일상 대화, 컨디션, 기분, 하루 일과 등을 기록합니다.
+    AI 메모리(daily_logs)와 다이어리 UI(diary_entries) 모두에 저장됩니다.
     """
     user_id = get_current_user()
     if not user_id:
@@ -59,11 +59,26 @@ async def save_daily_log(content: str, sentiment: str = "") -> str:
     pool = get_pool()
     embedding = await embed_text(content)
 
+    # Save to AI memory (daily_logs)
     await daily_log_repo.create(
         pool,
         user_id=user_id,
         content=content,
         sentiment=sentiment,
+        embedding=embedding,
+    )
+
+    # Also save to diary_entries so it appears in the Diary UI
+    mood = sentiment if sentiment else "보통"
+    title = content[:50] + ("…" if len(content) > 50 else "")
+    await diary_entry_repo.create(
+        pool,
+        user_id=user_id,
+        content=content,
+        title=title,
+        mood=mood,
+        tags=[],
+        entry_date=None,
         embedding=embedding,
     )
 

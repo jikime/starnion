@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import signal
+import sys
 
 from starpion_agent.config import settings
 from starpion_agent.db.pool import close_pool, get_pool, init_pool
@@ -11,9 +12,16 @@ from starpion_agent.grpc.server import serve
 from starpion_agent.log_buffer import install as install_log_buffer, set_embed_search_callback, set_index_callback, start_http_server
 from starpion_agent.skills.registry import register_skills
 
+# Log to stdout so Docker logs / terminal always show output.
+_stdout_handler = logging.StreamHandler(sys.stdout)
+_stdout_handler.setFormatter(
+    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+)
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
+    stream=sys.stdout,
+    force=True,
 )
 # Install in-memory log buffer after basicConfig so both the console StreamHandler
 # (added by basicConfig) and the buffer handler are active.

@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -144,12 +145,15 @@ function SourceBadge({ source }: { source: string }) {
 }
 
 function TypeBadge({ type }: { type: string }) {
-  const map: Record<string, { label: string; className: string }> = {
-    uploaded:  { label: "업로드",  className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
-    recorded:  { label: "녹음",    className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
-    generated: { label: "생성됨",  className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
+  const t = useTranslations("audio")
+  const map: Record<string, { labelKey: string; className: string }> = {
+    uploaded:  { labelKey: "typeBadges.uploaded",  className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
+    recorded:  { labelKey: "typeBadges.recorded",  className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
+    generated: { labelKey: "typeBadges.generated", className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
   }
-  const { label, className } = map[type] ?? { label: type, className: "" }
+  const entry = map[type]
+  const label = entry ? t(entry.labelKey as Parameters<typeof t>[0]) : type
+  const className = entry?.className ?? ""
   return <Badge variant="outline" className={`text-xs ${className}`}>{label}</Badge>
 }
 
@@ -158,6 +162,7 @@ function TypeBadge({ type }: { type: string }) {
 // ────────────────────────────────────────────────────────────────────────────
 
 function RecordTab({ onSaved }: { onSaved: () => void }) {
+  const t = useTranslations("audio")
   const [showRecorder, setShowRecorder] = useState(false)
   const [status, setStatus] = useState<"idle" | "uploading" | "transcribing" | "done" | "error">("idle")
   const [transcript, setTranscript] = useState("")
@@ -196,10 +201,10 @@ function RecordTab({ onSaved }: { onSaved: () => void }) {
       setStatus("done")
       onSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : "오류가 발생했어요.")
+      setError(e instanceof Error ? e.message : t("error"))
       setStatus("error")
     }
-  }, [onSaved])
+  }, [onSaved, t])
 
   const handleCancel = useCallback(() => {
     setShowRecorder(false)
@@ -208,7 +213,7 @@ function RecordTab({ onSaved }: { onSaved: () => void }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>음성 녹음</CardTitle>
+        <CardTitle>{t("recordTitle")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6 py-6">
         {/* Recorder widget */}
@@ -221,10 +226,10 @@ function RecordTab({ onSaved }: { onSaved: () => void }) {
                 <div className="size-24 rounded-full bg-primary/10 flex items-center justify-center">
                   <Mic className="size-12 text-primary" />
                 </div>
-                <p className="text-sm text-muted-foreground">마이크 버튼을 눌러 녹음을 시작하세요</p>
+                <p className="text-sm text-muted-foreground">{t("micPrompt")}</p>
                 <Button size="lg" className="gap-2" onClick={() => setShowRecorder(true)}>
                   <Mic className="size-5" />
-                  녹음 시작
+                  {t("startRecording")}
                 </Button>
               </>
             )}
@@ -233,7 +238,7 @@ function RecordTab({ onSaved }: { onSaved: () => void }) {
               <div className="flex flex-col items-center gap-3">
                 <RefreshCw className="size-8 animate-spin text-primary" />
                 <p className="text-sm text-muted-foreground">
-                  {status === "uploading" ? "업로드 중..." : "텍스트 변환 중..."}
+                  {status === "uploading" ? t("uploading") : t("transcribing")}
                 </p>
               </div>
             )}
@@ -241,14 +246,14 @@ function RecordTab({ onSaved }: { onSaved: () => void }) {
             {status === "done" && (
               <Button variant="outline" size="sm" className="gap-2" onClick={reset}>
                 <Mic className="size-4" />
-                다시 녹음
+                {t("reRecord")}
               </Button>
             )}
 
             {status === "error" && (
               <div className="flex flex-col items-center gap-3">
                 <p className="text-sm text-destructive">{error}</p>
-                <Button variant="outline" size="sm" onClick={reset}>다시 시도</Button>
+                <Button variant="outline" size="sm" onClick={reset}>{t("retry")}</Button>
               </div>
             )}
           </div>
@@ -257,7 +262,7 @@ function RecordTab({ onSaved }: { onSaved: () => void }) {
         {/* Live transcript */}
         {transcript && (
           <div className="rounded-lg border border-border bg-muted/30 p-4">
-            <p className="text-xs text-muted-foreground mb-1">변환 결과</p>
+            <p className="text-xs text-muted-foreground mb-1">{t("transcriptResult")}</p>
             <p className="text-sm whitespace-pre-wrap">{transcript}</p>
           </div>
         )}
@@ -271,6 +276,7 @@ function RecordTab({ onSaved }: { onSaved: () => void }) {
 // ────────────────────────────────────────────────────────────────────────────
 
 function TranscribeTab({ onSaved }: { onSaved: () => void }) {
+  const t = useTranslations("audio")
   const [file, setFile] = useState<File | null>(null)
   const [status, setStatus] = useState<"idle" | "uploading" | "transcribing" | "done" | "error">("idle")
   const [transcript, setTranscript] = useState("")
@@ -316,7 +322,7 @@ function TranscribeTab({ onSaved }: { onSaved: () => void }) {
       setStatus("done")
       onSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : "오류가 발생했어요.")
+      setError(e instanceof Error ? e.message : t("error"))
       setStatus("error")
     }
   }
@@ -326,7 +332,7 @@ function TranscribeTab({ onSaved }: { onSaved: () => void }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>텍스트 변환 (STT)</CardTitle>
+        <CardTitle>{t("transcribeTitle")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         <div
@@ -347,22 +353,22 @@ function TranscribeTab({ onSaved }: { onSaved: () => void }) {
             <p className="font-medium">{file.name}</p>
           ) : (
             <>
-              <p className="font-medium mb-1">오디오 파일 업로드</p>
-              <p className="text-sm text-muted-foreground">MP3, M4A, WAV, OGG, WebM 지원 (클릭 또는 드래그)</p>
+              <p className="font-medium mb-1">{t("uploadAudio")}</p>
+              <p className="text-sm text-muted-foreground">{t("audioFormats")}</p>
             </>
           )}
         </div>
 
         <Button className="w-full gap-2" disabled={!file || busy} onClick={handleTranscribe}>
           {busy ? <RefreshCw className="size-4 animate-spin" /> : <FileAudio className="size-4" />}
-          {status === "uploading" ? "업로드 중..." : status === "transcribing" ? "변환 중..." : "텍스트로 변환"}
+          {status === "uploading" ? t("uploading") : status === "transcribing" ? t("converting") : t("convertButton")}
         </Button>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         {transcript && (
           <div className="rounded-lg border border-border bg-muted/30 p-4">
-            <p className="text-xs text-muted-foreground mb-1">변환 결과</p>
+            <p className="text-xs text-muted-foreground mb-1">{t("transcriptResult")}</p>
             <p className="text-sm whitespace-pre-wrap">{transcript}</p>
           </div>
         )}
@@ -376,6 +382,7 @@ function TranscribeTab({ onSaved }: { onSaved: () => void }) {
 // ────────────────────────────────────────────────────────────────────────────
 
 function FileListTab({ refreshKey }: { refreshKey: number }) {
+  const t = useTranslations("audio")
   const [items, setItems] = useState<AudioItem[]>([])
   const [loading, setLoading] = useState(true)
   const [playingId, setPlayingId] = useState<number | null>(null)
@@ -394,7 +401,7 @@ function FileListTab({ refreshKey }: { refreshKey: number }) {
   useEffect(() => { load() }, [load, refreshKey])
 
   const handleDelete = async (id: number) => {
-    if (!confirm("삭제하시겠어요?")) return
+    if (!confirm(t("deleteConfirm"))) return
     await fetch(`/api/audios/${id}`, { method: "DELETE" })
     setItems((prev) => prev.filter((i) => i.id !== id))
   }
@@ -426,17 +433,17 @@ function FileListTab({ refreshKey }: { refreshKey: number }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>오디오 파일</CardTitle>
+        <CardTitle>{t("filesTitle")}</CardTitle>
         <Button variant="ghost" size="sm" onClick={load} className="gap-1">
           <RefreshCw className="size-4" />
-          새로고침
+          {t("refresh")}
         </Button>
       </CardHeader>
       <CardContent>
         {items.length === 0 ? (
           <div className="flex flex-col items-center py-12 text-muted-foreground gap-2">
             <FileAudio className="size-10" />
-            <p className="text-sm">저장된 오디오가 없어요</p>
+            <p className="text-sm">{t("noFiles")}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -461,7 +468,7 @@ function FileListTab({ refreshKey }: { refreshKey: number }) {
                       variant="ghost"
                       size="sm"
                       className="h-8 w-8 p-0"
-                      title={playingId === item.id ? "정지" : "재생"}
+                      title={playingId === item.id ? t("stop") : t("play")}
                       onClick={() => handlePlay(item)}
                     >
                       {playingId === item.id
@@ -470,7 +477,7 @@ function FileListTab({ refreshKey }: { refreshKey: number }) {
                       }
                     </Button>
                     <a href={item.url} download={item.name} target="_blank" rel="noreferrer">
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="다운로드">
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title={t("download")}>
                         <Download className="size-4" />
                       </Button>
                     </a>
@@ -478,7 +485,7 @@ function FileListTab({ refreshKey }: { refreshKey: number }) {
                       variant="ghost"
                       size="sm"
                       className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                      title="삭제"
+                      title={t("delete")}
                       onClick={() => handleDelete(item.id)}
                     >
                       <Trash2 className="size-4" />
@@ -493,13 +500,13 @@ function FileListTab({ refreshKey }: { refreshKey: number }) {
 
                 {item.transcript && (
                   <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">전사: </span>
+                    <span className="font-medium text-foreground">{t("transcript")}: </span>
                     {item.transcript}
                   </div>
                 )}
                 {item.prompt && (
                   <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">프롬프트: </span>
+                    <span className="font-medium text-foreground">{t("prompt")}: </span>
                     {item.prompt}
                   </div>
                 )}
@@ -517,29 +524,30 @@ function FileListTab({ refreshKey }: { refreshKey: number }) {
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function AudioPage() {
+  const t = useTranslations("audio")
   const [refreshKey, setRefreshKey] = useState(0)
   const refresh = () => setRefreshKey((k) => k + 1)
 
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">오디오</h1>
-        <p className="text-muted-foreground">음성 녹음, 텍스트 변환 및 파일 관리</p>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
+        <p className="text-muted-foreground">{t("subtitle")}</p>
       </div>
 
       <Tabs defaultValue="record" className="space-y-6">
         <TabsList>
           <TabsTrigger value="record" className="gap-2">
             <Mic className="size-4" />
-            녹음
+            {t("tabRecord")}
           </TabsTrigger>
           <TabsTrigger value="transcribe" className="gap-2">
             <FileAudio className="size-4" />
-            텍스트 변환
+            {t("tabTranscribe")}
           </TabsTrigger>
           <TabsTrigger value="files" className="gap-2">
             <Upload className="size-4" />
-            파일 목록
+            {t("tabFiles")}
           </TabsTrigger>
         </TabsList>
 

@@ -99,12 +99,15 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 
 	// Map attached files to gRPC FileInput.
 	// The first file is sent as FileInput; additional files are appended as text annotations.
+	// Also record user-uploaded images to the gallery immediately.
 	var fileInput *starpionv1.FileInput
 	message := req.Message
 	for i, f := range req.Files {
 		fileType := "document"
 		if strings.HasPrefix(f.Mime, "image/") {
 			fileType = "image"
+			// Record user-uploaded image to gallery as "uploaded" type.
+			RecordImage(h.db, req.UserID, f.URL, f.Name, f.Mime, 0, "web", "uploaded", req.Message)
 		} else if strings.HasPrefix(f.Mime, "audio/") {
 			fileType = "audio"
 		}
@@ -153,7 +156,17 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 		flusher.Flush()
 		// Use a fresh context: the request context is already canceled by the time
 		// the HTTP response has been fully written.
-		h.persistAssistant(context.Background(), req.ThreadID, assistantBuf.String(), attachments)
+		bg := context.Background()
+		h.persistAssistant(bg, req.ThreadID, assistantBuf.String(), attachments)
+		// Backfill analysis column for any image files uploaded in this request.
+		// The LLM analyzed them via multimodal vision — the response IS the analysis.
+		if assistantBuf.Len() > 0 {
+			for _, f := range req.Files {
+				if strings.HasPrefix(f.Mime, "image/") {
+					h.updateImageAnalysis(bg, req.UserID, f.URL, assistantBuf.String())
+				}
+			}
+		}
 	}
 
 	for {
@@ -173,14 +186,19 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 			sseEvent(map[string]any{"type": "text-delta", "id": textPartID, "delta": resp.Content})
 
 		case starpionv1.ResponseType_TOOL_CALL:
-			// Tool execution is handled transparently on the backend.
-			// Suppress tool-input-available to avoid AI SDK ID-matching errors
-			// when ToolName is not propagated to the TOOL_RESULT event.
-			log.Debug().Str("tool", resp.ToolName).Msg("chat_stream: tool call (suppressed from SSE)")
+			log.Info().Str("tool", resp.ToolName).Str("user_id", req.UserID).Msg("chat_stream: tool call")
+			// Emit a transient status indicator so the user can see tool activity.
+			// Deliberately NOT added to assistantBuf so it is not persisted.
+			if !textStarted {
+				sseEvent(map[string]string{"type": "text-start", "id": textPartID})
+				textStarted = true
+			}
+			toolNote := fmt.Sprintf("\n🔧 `%s` 실행 중...\n", resp.ToolName)
+			sseEvent(map[string]any{"type": "text-delta", "id": textPartID, "delta": toolNote})
 
 		case starpionv1.ResponseType_TOOL_RESULT:
-			// Suppress tool-output-available; the model's text output follows.
-			log.Debug().Str("tool", resp.ToolName).Msg("chat_stream: tool result (suppressed from SSE)")
+			log.Info().Str("tool", resp.ToolName).Str("user_id", req.UserID).Msg("chat_stream: tool result")
+			// Tool result is processed; the model's text response follows.
 
 		case starpionv1.ResponseType_FILE:
 			if h.minio != nil && len(resp.FileData) > 0 {
@@ -197,11 +215,13 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 					sseEvent(map[string]any{"type": "text-delta", "id": textPartID, "delta": note})
 				} else {
 					attachments = append(attachments, att)
-					// Record image/audio to gallery tables.
+					// Record image/audio/document to gallery tables.
 					if strings.HasPrefix(att.Mime, "image/") {
 						RecordImage(h.db, req.UserID, att.URL, att.Name, att.Mime, att.Size, "web", imageTypeFromFileName(resp.FileName), req.Message)
 					} else if strings.HasPrefix(att.Mime, "audio/") {
 						RecordAudio(h.db, req.UserID, att.URL, att.Name, att.Mime, att.Size, 0, "web", "generated", "", req.Message)
+					} else if isDocumentMime(att.Mime) {
+						RecordDocument(h.db, req.UserID, att.URL, att.Name, att.Mime, att.Size)
 					}
 					// Emit AI SDK v6 file chunk — creates a FileUIPart in the UIMessage.
 					// name and size are non-standard extras; the frontend intercepts them
@@ -255,6 +275,21 @@ func (h *ChatStreamHandler) persistAssistant(ctx context.Context, conversationID
 	`, conversationID, "assistant", content, attJSON)
 	if err != nil {
 		log.Warn().Err(err).Str("conversation_id", conversationID).Msg("chat_stream: persist assistant failed")
+	}
+}
+
+// updateImageAnalysis backfills the analysis column on a user_images row identified
+// by (user_id, url). Called after streaming when the LLM response is the analysis text.
+func (h *ChatStreamHandler) updateImageAnalysis(ctx context.Context, userID, url, analysis string) {
+	if h.db == nil || userID == "" || url == "" || analysis == "" {
+		return
+	}
+	_, err := h.db.ExecContext(ctx, `
+		UPDATE user_images SET analysis = $1, type = 'analyzed'
+		WHERE user_id = $2 AND url = $3
+	`, analysis, userID, url)
+	if err != nil {
+		log.Warn().Err(err).Str("url", url).Msg("chat_stream: update image analysis failed")
 	}
 }
 

@@ -203,10 +203,13 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                         )
 
                 elif kind == "on_tool_start":
+                    tool_name = event.get("name", "")
+                    logger.info("tool_call: %s", tool_name)
+                    print(f"[tool_call] {tool_name}", flush=True)
                     yield agent_pb2.ChatResponse(
                         content="",
                         type=agent_pb2.TOOL_CALL,
-                        tool_name=event.get("name", ""),
+                        tool_name=tool_name,
                     )
 
                 elif kind == "on_tool_end":

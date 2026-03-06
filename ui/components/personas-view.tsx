@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useTranslations } from "next-intl"
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card"
@@ -116,6 +117,7 @@ const CUSTOM_MODEL_VALUE = "__custom__"
 // ── Main component ──────────────────────────────────────────────────────────
 
 export function PersonasView() {
+  const t = useTranslations("personas")
   const [personas, setPersonas] = useState<Persona[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -263,12 +265,12 @@ export function PersonasView() {
         body: JSON.stringify(form),
       })
       if (res.ok) {
-        showToast(editing ? "페르소나가 수정됐어요." : "페르소나가 추가됐어요.")
+        showToast(editing ? t("toast.updated") : t("toast.created"))
         setDialogOpen(false)
         fetchPersonas()
       } else {
         const data = await res.json().catch(() => ({}))
-        showToast((data as { error?: string }).error ?? "저장에 실패했어요.", false)
+        showToast((data as { error?: string }).error ?? t("toast.saveFailed"), false)
       }
     } finally {
       setSaving(false)
@@ -291,10 +293,10 @@ export function PersonasView() {
         }),
       })
       if (res.ok) {
-        showToast(`'${p.name}'을(를) 기본 페르소나로 설정했어요.`)
+        showToast(t("toast.defaultSet", { name: p.name }))
         fetchPersonas()
       } else {
-        showToast("기본 설정에 실패했어요.", false)
+        showToast(t("toast.defaultFailed"), false)
       }
     } finally {
       setSettingDefaultId(null)
@@ -306,7 +308,7 @@ export function PersonasView() {
     try {
       const res = await fetch(`/api/settings/personas/${id}`, { method: "DELETE" })
       if (res.ok) {
-        showToast("페르소나가 삭제됐어요.")
+        showToast(t("toast.deleted"))
         fetchPersonas()
       }
     } finally {
@@ -335,26 +337,25 @@ export function PersonasView() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">페르소나</h1>
+          <h1 className="text-2xl font-bold">{t("title")}</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            용도별 페르소나를 만들고 각각 다른 프로바이더와 모델을 지정하세요.
-            기본 페르소나로 설정된 것이 채팅에 자동 적용됩니다.
+            {t("subtitle")}
           </p>
         </div>
         <Button size="sm" onClick={openCreate} className="gap-1.5 shrink-0">
           <Plus className="h-4 w-4" />
-          새 페르소나
+          {t("newPersona")}
         </Button>
       </div>
 
       {/* List */}
       {loading ? (
-        <p className="text-sm text-muted-foreground">불러오는 중...</p>
+        <p className="text-sm text-muted-foreground">{t("loading")}</p>
       ) : personas.length === 0 ? (
         <Card className="shadow-none border-dashed">
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            <p>아직 페르소나가 없어요.</p>
-            <p className="mt-1">위 버튼으로 첫 페르소나를 만들어보세요.</p>
+            <p>{t("empty")}</p>
+            <p className="mt-1">{t("emptyHint")}</p>
           </CardContent>
         </Card>
       ) : (
@@ -385,10 +386,10 @@ export function PersonasView() {
                           className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
                           disabled={settingDefaultId === p.id}
                           onClick={() => setAsDefault(p)}
-                          title="기본 페르소나로 설정"
+                          title={t("setDefaultTitle")}
                         >
                           <Star className="h-3.5 w-3.5" />
-                          기본
+                          {t("setDefault")}
                         </Button>
                       )}
                       <Button
@@ -423,7 +424,7 @@ export function PersonasView() {
                     )}
                     {p.isDefault && (
                       <Badge className="text-xs bg-primary/10 text-primary border-primary/20">
-                        기본 적용
+                        {t("defaultBadge")}
                       </Badge>
                     )}
                   </div>
@@ -443,19 +444,18 @@ export function PersonasView() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? "페르소나 수정" : "새 페르소나"}</DialogTitle>
+            <DialogTitle>{editing ? t("dialog.editTitle") : t("dialog.createTitle")}</DialogTitle>
             <DialogDescription>
-              페르소나 이름과 사용할 프로바이더 / 모델을 설정하세요.
-              기본 페르소나로 설정하면 채팅 시 자동으로 적용됩니다.
+              {t("dialog.description")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             {/* Name */}
             <div className="space-y-1.5">
-              <Label>이름 *</Label>
+              <Label>{t("dialog.nameLabel")}</Label>
               <Input
-                placeholder="예: 비서, 코드 리뷰어, 번역가"
+                placeholder={t("dialog.namePlaceholder")}
                 value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
               />
@@ -463,9 +463,9 @@ export function PersonasView() {
 
             {/* Description */}
             <div className="space-y-1.5">
-              <Label>설명</Label>
+              <Label>{t("dialog.descriptionLabel")}</Label>
               <Input
-                placeholder="이 페르소나의 역할을 간단히 설명하세요"
+                placeholder={t("dialog.descriptionPlaceholder")}
                 value={form.description}
                 onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               />
@@ -473,10 +473,10 @@ export function PersonasView() {
 
             {/* Provider */}
             <div className="space-y-1.5">
-              <Label>프로바이더</Label>
+              <Label>{t("dialog.providerLabel")}</Label>
               <Select value={form.provider} onValueChange={handleProviderChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="프로바이더 선택" />
+                  <SelectValue placeholder={t("dialog.providerPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {PROVIDER_ORDER.map(pk => {
@@ -487,7 +487,7 @@ export function PersonasView() {
                         <span className="flex items-center gap-2">
                           {m.icon} {m.name}
                           {!connected && (
-                            <span className="text-xs text-muted-foreground">(미연결)</span>
+                            <span className="text-xs text-muted-foreground">{t("notConnected")}</span>
                           )}
                         </span>
                       </SelectItem>
@@ -499,12 +499,12 @@ export function PersonasView() {
 
             {/* Model */}
             <div className="space-y-1.5">
-              <Label>모델</Label>
+              <Label>{t("dialog.modelLabel")}</Label>
 
               {/* Custom provider → always text input */}
               {form.provider === "custom" ? (
                 <Input
-                  placeholder="모델 이름 입력 (예: llama3, mistral)"
+                  placeholder={t("dialog.customModelPlaceholder")}
                   value={form.model}
                   onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
                   className="font-mono text-xs"
@@ -518,7 +518,7 @@ export function PersonasView() {
                   >
                     <SelectTrigger>
                       <SelectValue
-                        placeholder={form.provider ? "모델 선택" : "프로바이더를 먼저 선택하세요"}
+                        placeholder={form.provider ? t("dialog.modelSelectPlaceholder") : t("dialog.modelProviderFirst")}
                       />
                     </SelectTrigger>
                     <SelectContent>
@@ -536,7 +536,7 @@ export function PersonasView() {
                       <SelectItem value={CUSTOM_MODEL_VALUE}>
                         <span className="flex items-center gap-1.5 text-muted-foreground">
                           <PenLine className="h-3.5 w-3.5" />
-                          직접 입력...
+                          {t("dialog.modelCustom")}
                         </span>
                       </SelectItem>
                     </SelectContent>
@@ -546,7 +546,7 @@ export function PersonasView() {
                   {customModelMode && (
                     <Input
                       autoFocus
-                      placeholder="모델 ID 직접 입력 (예: claude-opus-4-6)"
+                      placeholder={t("dialog.modelIdPlaceholder")}
                       value={form.model}
                       onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
                       className="font-mono text-xs mt-1.5"
@@ -555,8 +555,7 @@ export function PersonasView() {
 
                   {form.provider && models.length === 0 && !customModelMode && (
                     <p className="text-xs text-muted-foreground">
-                      모델 페이지에서 활성화된 모델이 없어요. 위 목록에서 직접 입력을 선택하거나
-                      먼저 모델 페이지에서 사용할 모델을 선택하세요.
+                      {t("dialog.noModelsHint")}
                     </p>
                   )}
                 </>
@@ -565,9 +564,9 @@ export function PersonasView() {
 
             {/* System prompt */}
             <div className="space-y-1.5">
-              <Label>시스템 프롬프트</Label>
+              <Label>{t("dialog.systemPromptLabel")}</Label>
               <Textarea
-                placeholder="이 페르소나에게 부여할 역할과 지침을 작성하세요. 비워두면 기본 프롬프트가 사용됩니다."
+                placeholder={t("dialog.systemPromptPlaceholder")}
                 value={form.systemPrompt}
                 onChange={e => setForm(f => ({ ...f, systemPrompt: e.target.value }))}
                 rows={4}
@@ -584,10 +583,10 @@ export function PersonasView() {
               />
               <div>
                 <Label htmlFor="persona-default" className="text-sm font-medium cursor-pointer">
-                  기본 페르소나로 설정
+                  {t("dialog.defaultLabel")}
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  채팅 시 이 페르소나의 모델이 자동으로 사용됩니다.
+                  {t("dialog.defaultHint")}
                 </p>
               </div>
             </div>
@@ -595,10 +594,10 @@ export function PersonasView() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              취소
+              {t("dialog.cancel")}
             </Button>
             <Button onClick={savePersona} disabled={saving || !form.name.trim()}>
-              {saving ? "저장중..." : editing ? "수정" : "추가"}
+              {saving ? t("dialog.saving") : editing ? t("dialog.update") : t("dialog.add")}
             </Button>
           </DialogFooter>
         </DialogContent>

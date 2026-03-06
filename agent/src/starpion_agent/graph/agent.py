@@ -26,7 +26,7 @@ from starpion_agent.skills.budget.tools import get_budget_status, set_budget
 from starpion_agent.skills.diary.tools import save_daily_log, save_diary_entry
 from starpion_agent.skills.documents.tools import generate_document, parse_document
 from starpion_agent.skills.finance.tools import get_monthly_total, save_finance
-from starpion_agent.skills.goals.tools import get_goals, set_goal, update_goal_status
+from starpion_agent.skills.goals.tools import get_goals, set_goal, update_goal_progress, update_goal_status
 from starpion_agent.skills.image.tools import analyze_image, edit_image, generate_image
 from starpion_agent.skills.loader import (
     build_skill_catalog,
@@ -111,6 +111,7 @@ ALL_TOOLS = [
     set_goal,
     get_goals,
     update_goal_status,
+    update_goal_progress,
     create_schedule,
     list_schedules,
     cancel_schedule,
@@ -335,7 +336,7 @@ async def _agent_node(state: MessagesState) -> dict:
             custom_system_prompt,
         ) = await _get_enabled_context(user_id)
     except Exception:
-        logger.debug("Failed to load persona/skills, using defaults", exc_info=True)
+        logger.warning("Failed to load persona/skills, using defaults", exc_info=True)
         persona_id = DEFAULT_PERSONA
         enabled_tool_names = []
         catalog_text = ""
@@ -374,8 +375,10 @@ async def _agent_node(state: MessagesState) -> dict:
     # Dynamic tool binding: LLM only sees enabled tools.
     if enabled_tool_names:
         enabled_tools = [t for t in ALL_TOOLS if t.name in set(enabled_tool_names)]
+        logger.info("[Tools] user=%s | enabled=%s", user_id, enabled_tool_names)
     else:
         enabled_tools = ALL_TOOLS
+        logger.info("[Tools] user=%s | no skill context, binding ALL_TOOLS", user_id)
 
     bound_model = active_llm.bind_tools(enabled_tools)
     response = await bound_model.ainvoke(messages)

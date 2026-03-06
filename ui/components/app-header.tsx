@@ -1,10 +1,12 @@
 "use client"
 
-import { Bell, Search, Loader2, ArrowRight, BookOpen, StickyNote, FileText, Globe, Wallet, MessageCircle, Brain } from "lucide-react"
+import { Bell, Search, Loader2, ArrowRight, BookOpen, StickyNote, FileText, Globe, Wallet, MessageCircle, Brain, Check } from "lucide-react"
 import { signOut, useSession } from "next-auth/react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, useTransition } from "react"
+import { useTranslations, useLocale } from "next-intl"
+import { setLocale } from "@/app/actions/locale"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -19,6 +21,13 @@ import {
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Badge } from "@/components/ui/badge"
 
+const LOCALES = [
+  { code: "ko", label: "한국어" },
+  { code: "en", label: "English" },
+  { code: "zh", label: "中文" },
+  { code: "ja", label: "日本語" },
+] as const
+
 // ── Search types & config ─────────────────────────────────────────────────────
 
 interface SearchResult {
@@ -30,23 +39,25 @@ interface SearchResult {
   created_at?: string
 }
 
-const SOURCE_CONFIG: Record<string, {
-  label: string
+const SOURCE_ICON_MAP: Record<string, {
   href: string | null
   Icon: React.ComponentType<{ className?: string }>
 }> = {
-  diary:      { label: "일기",   href: "/diary",      Icon: BookOpen },
-  memo:       { label: "메모",   href: "/memo",       Icon: StickyNote },
-  document:   { label: "문서",   href: "/documents",  Icon: FileText },
-  web_search: { label: "웹검색", href: "/search",     Icon: Globe },
-  finance:    { label: "가계부", href: "/finance",    Icon: Wallet },
-  daily_log:  { label: "대화",   href: null,          Icon: MessageCircle },
-  knowledge:  { label: "지식",   href: null,          Icon: Brain },
+  diary:      { href: "/diary",      Icon: BookOpen },
+  memo:       { href: "/memo",       Icon: StickyNote },
+  document:   { href: "/documents",  Icon: FileText },
+  web_search: { href: "/search",     Icon: Globe },
+  finance:    { href: "/finance",    Icon: Wallet },
+  daily_log:  { href: null,          Icon: MessageCircle },
+  knowledge:  { href: null,          Icon: Brain },
 }
 
 export function AppHeader() {
   const { data: session } = useSession()
   const router = useRouter()
+  const t = useTranslations()
+  const locale = useLocale()
+  const [, startTransition] = useTransition()
 
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
@@ -93,7 +104,7 @@ export function AppHeader() {
   }
 
   const handleResultClick = (result: SearchResult) => {
-    const href = SOURCE_CONFIG[result.source]?.href
+    const href = SOURCE_ICON_MAP[result.source]?.href
     if (href) router.push(href)
     setOpen(false)
     setQuery("")
@@ -131,7 +142,7 @@ export function AppHeader() {
             }
             <Input
               type="search"
-              placeholder="내 데이터 검색..."
+              placeholder={t("search.placeholder")}
               value={query}
               onChange={handleChange}
               className="pl-9 bg-muted/50 border-0 focus-visible:ring-1"
@@ -144,9 +155,9 @@ export function AppHeader() {
           <div className="absolute top-full mt-1 w-full z-50 rounded-lg border border-border bg-background shadow-lg overflow-hidden">
             <div className="max-h-72 overflow-y-auto divide-y divide-border/50">
               {results.map((result, i) => {
-                const cfg = SOURCE_CONFIG[result.source]
+                const cfg = SOURCE_ICON_MAP[result.source]
                 const Icon = cfg?.Icon ?? Search
-                const label = cfg?.label ?? result.source
+                const label = t(`sources.${result.source}` as Parameters<typeof t>[0], { defaultValue: result.source })
                 const href = cfg?.href ?? null
                 const date = result.entry_date ?? result.created_at?.slice(0, 10)
                 return (
@@ -176,7 +187,7 @@ export function AppHeader() {
                 className="text-xs text-primary hover:underline flex items-center gap-1"
                 onClick={() => setOpen(false)}
               >
-                전체 결과 보기 ({results.length}개)
+                {t("search.viewAll", { count: results.length })}
                 <ArrowRight className="size-3" />
               </Link>
             </div>
@@ -186,6 +197,33 @@ export function AppHeader() {
 
       {/* Right-side actions */}
       <div className="ml-auto flex items-center gap-1">
+        {/* Language switcher */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-1.5 px-2 text-muted-foreground hover:text-foreground">
+              <Globe className="size-4" />
+              <span className="text-xs font-medium uppercase">{locale}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-36">
+            {LOCALES.map(({ code, label }) => (
+              <DropdownMenuItem
+                key={code}
+                className="gap-2 cursor-pointer"
+                onClick={() =>
+                  startTransition(async () => {
+                    await setLocale(code)
+                    window.location.reload()
+                  })
+                }
+              >
+                {locale === code && <Check className="size-3.5 shrink-0" />}
+                <span className={locale === code ? "ml-0" : "ml-[19px]"}>{label}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -197,23 +235,23 @@ export function AppHeader() {
               >
                 3
               </Badge>
-              <span className="sr-only">알림</span>
+              <span className="sr-only">{t("notifications.title")}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>알림</DropdownMenuLabel>
+            <DropdownMenuLabel>{t("notifications.title")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <span className="font-medium">예산 72% 도달</span>
-              <span className="text-xs text-muted-foreground">2시간 전</span>
+              <span className="font-medium">{t("notifications.budgetAlert")}</span>
+              <span className="text-xs text-muted-foreground">{t("notifications.hoursAgo")}</span>
             </DropdownMenuItem>
             <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <span className="font-medium">주간 리포트 생성됨</span>
-              <span className="text-xs text-muted-foreground">4시간 전</span>
+              <span className="font-medium">{t("notifications.weeklyReport")}</span>
+              <span className="text-xs text-muted-foreground">{t("notifications.fourHoursAgo")}</span>
             </DropdownMenuItem>
             <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <span className="font-medium">목표 &quot;운동&quot; 7일 달성</span>
-              <span className="text-xs text-muted-foreground">어제</span>
+              <span className="font-medium">{t("notifications.goalAchieved")}</span>
+              <span className="text-xs text-muted-foreground">{t("notifications.yesterday")}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -227,7 +265,7 @@ export function AppHeader() {
                   {initials}
                 </AvatarFallback>
               </Avatar>
-              <span className="sr-only">사용자 메뉴</span>
+              <span className="sr-only">{t("user.menu")}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
@@ -243,14 +281,14 @@ export function AppHeader() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/settings?tab=account">설정</Link>
+              <Link href="/settings?tab=account">{t("user.settings")}</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive cursor-pointer"
               onClick={() => signOut({ callbackUrl: "/login" })}
             >
-              로그아웃
+              {t("user.logout")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -19,9 +19,14 @@ class RetrieveMemoryInput(BaseModel):
 @tool(args_schema=RetrieveMemoryInput)
 @skill_guard("memory")
 async def retrieve_memory(query: str) -> str:
-    """사용자의 과거 기록과 지식에서 관련 정보를 검색합니다.
+    """사용자의 과거 기록, 업로드된 문서, 지식 베이스에서 관련 정보를 검색합니다.
 
-    일상 기록, 사용자 선호도, 과거 대화에서 추출된 정보 등을 검색합니다.
+    다음 상황에서 반드시 이 도구를 먼저 호출하세요:
+    - 업로드된 문서(PDF, DOCX, XLSX 등)의 내용에 대한 질문
+    - 문서 요약 요청
+    - 과거 기록, 일상, 사용자 선호도 질문
+    - "이 문서에서 ~", "방금 보낸 파일 ~", "문서 내용이 뭐야?" 등
+    이 도구 없이 문서 내용을 직접 답변하지 마세요.
     """
     user_id = get_current_user()
     if not user_id:

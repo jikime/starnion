@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import NextImage from "next/image"
+import { useTranslations } from "next-intl"
 import {
   LayoutDashboard,
   MessageCircle,
@@ -42,77 +43,80 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
-const mainNav = [
-  { title: "대시보드", icon: LayoutDashboard, href: "/" },
-  { title: "웹챗", icon: MessageCircle, href: "/chat" },
-  { title: "채널", icon: Radio, href: "/channels" },
-]
+const mainNavItems = [
+  { key: "dashboard", icon: LayoutDashboard, href: "/" },
+  { key: "chat", icon: MessageCircle, href: "/chat" },
+  { key: "channels", icon: Radio, href: "/channels" },
+] as const
 
-const financeNav = [
-  { title: "가계부", icon: Wallet, href: "/finance" },
-  { title: "예산 관리", icon: PieChart, href: "/budget" },
-  { title: "소비 분석", icon: TrendingUp, href: "/statistics" },
-]
+const financeNavItems = [
+  { key: "finance", icon: Wallet, href: "/finance" },
+  { key: "budget", icon: PieChart, href: "/budget" },
+  { key: "statistics", icon: TrendingUp, href: "/statistics" },
+] as const
 
-const lifeNav = [
-  { title: "일기", icon: BookOpen, href: "/diary" },
-  { title: "목표 관리", icon: Target, href: "/goals" },
-  { title: "디데이", icon: Clock, href: "/dday" },
-  { title: "메모", icon: StickyNote, href: "/memo" },
-]
+const lifeNavItems = [
+  { key: "diary", icon: BookOpen, href: "/diary" },
+  { key: "goals", icon: Target, href: "/goals" },
+  { key: "dday", icon: Clock, href: "/dday" },
+  { key: "memo", icon: StickyNote, href: "/memo" },
+] as const
 
-const reportsNav = [
-  { title: "리포트 센터", icon: FileBarChart, href: "/reports" },
-  { title: "통계/분석", icon: BarChart3, href: "/analytics" },
-]
+const reportsNavItems = [
+  { key: "reports", icon: FileBarChart, href: "/reports" },
+  { key: "analytics", icon: BarChart3, href: "/analytics" },
+] as const
 
-const mediaNav = [
-  { title: "문서", icon: FileText, href: "/documents" },
-  { title: "이미지", icon: Image, href: "/images" },
-  { title: "오디오", icon: Music, href: "/audio" },
-]
+const mediaNavItems = [
+  { key: "documents", icon: FileText, href: "/documents" },
+  { key: "images", icon: Image, href: "/images" },
+  { key: "audio", icon: Music, href: "/audio" },
+] as const
 
-const toolsNav = [
-  { title: "웹검색", icon: Search, href: "/search" },
-  { title: "스킬", icon: Cog, href: "/skills" },
-]
+const toolsNavItems = [
+  { key: "search", icon: Search, href: "/search" },
+  { key: "skills", icon: Cog, href: "/skills" },
+] as const
 
-const monitoringNav = [
-  { title: "로그", icon: ScrollText, href: "/logs" },
-  { title: "사용량", icon: Activity, href: "/usage" },
-]
+const monitoringNavItems = [
+  { key: "logs", icon: ScrollText, href: "/logs" },
+  { key: "usage", icon: Activity, href: "/usage" },
+] as const
 
-const settingsNav = [
-  { title: "설정", icon: Settings, href: "/settings" },
-  { title: "알림 센터", icon: Bell, href: "/cron" },
-  { title: "모델", icon: BrainCircuit, href: "/models" },
-  { title: "페르소나", icon: UserCircle, href: "/personas" },
-  { title: "연동", icon: Link2, href: "/integrations" },
-]
+const settingsNavItems = [
+  { key: "settings", icon: Settings, href: "/settings" },
+  { key: "notifications", icon: Bell, href: "/cron" },
+  { key: "models", icon: BrainCircuit, href: "/models" },
+  { key: "personas", icon: UserCircle, href: "/personas" },
+  { key: "integrations", icon: Link2, href: "/integrations" },
+] as const
 
-export function AppSidebar() {
-  const pathname = usePathname()
+type NavItem = { key: string; icon: React.ComponentType<{ className?: string }>; href: string }
 
-  const NavGroup = ({ 
-    label, 
-    items 
-  }: { 
-    label?: string
-    items: { title: string; icon: React.ComponentType<{ className?: string }>; href: string }[] 
-  }) => (
+function NavGroup({
+  label,
+  items,
+  pathname,
+}: {
+  label?: string
+  items: readonly NavItem[]
+  pathname: string
+}) {
+  const tNav = useTranslations("nav")
+  return (
     <SidebarGroup>
       {label && <SidebarGroupLabel>{label}</SidebarGroupLabel>}
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => {
-            const isActive = pathname === item.href || 
+            const isActive = pathname === item.href ||
               (item.href !== "/" && pathname.startsWith(item.href))
             return (
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton asChild isActive={isActive}>
                   <Link href={item.href}>
                     <item.icon className="size-4" />
-                    <span>{item.title}</span>
+                    <span>{tNav(item.key as Parameters<typeof tNav>[0])}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -122,6 +126,11 @@ export function AppSidebar() {
       </SidebarGroupContent>
     </SidebarGroup>
   )
+}
+
+export function AppSidebar() {
+  const pathname = usePathname()
+  const tGroups = useTranslations("groups")
 
   return (
     <Sidebar>
@@ -139,14 +148,14 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent>
-        <NavGroup items={mainNav} />
-        <NavGroup label="FINANCE" items={financeNav} />
-        <NavGroup label="LIFE" items={lifeNav} />
-        <NavGroup label="REPORTS" items={reportsNav} />
-        <NavGroup label="MEDIA" items={mediaNav} />
-        <NavGroup label="TOOLS" items={toolsNav} />
-        <NavGroup label="MONITORING" items={monitoringNav} />
-        <NavGroup label="SETTINGS" items={settingsNav} />
+        <NavGroup items={mainNavItems} pathname={pathname} />
+        <NavGroup label={tGroups("finance")} items={financeNavItems} pathname={pathname} />
+        <NavGroup label={tGroups("life")} items={lifeNavItems} pathname={pathname} />
+        <NavGroup label={tGroups("reports")} items={reportsNavItems} pathname={pathname} />
+        <NavGroup label={tGroups("media")} items={mediaNavItems} pathname={pathname} />
+        <NavGroup label={tGroups("tools")} items={toolsNavItems} pathname={pathname} />
+        <NavGroup label={tGroups("monitoring")} items={monitoringNavItems} pathname={pathname} />
+        <NavGroup label={tGroups("settings")} items={settingsNavItems} pathname={pathname} />
       </SidebarContent>
       <SidebarRail />
     </Sidebar>
