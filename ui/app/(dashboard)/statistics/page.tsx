@@ -26,7 +26,6 @@ import {
   TrendingUp,
   TrendingDown,
   Brain,
-  MessageSquare,
   CreditCard,
   Wallet,
   ArrowUpRight,
@@ -329,7 +328,10 @@ export default function StatisticsPage() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">통계 & 패턴 분석</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+            <TrendingUp className="size-6 text-indigo-500" />
+            소비 분석
+          </h1>
           <p className="text-sm text-muted-foreground">지출 패턴을 분석하고 인사이트를 확인하세요</p>
         </div>
         <Select value={months} onValueChange={(v) => setMonths(v)}>
@@ -460,72 +462,53 @@ export default function StatisticsPage() {
         </Panel>
       </div>
 
-      {/* ── Weekday Spending ───────────────────────────────────────────────── */}
-      <Panel title="요일별 지출 패턴" icon={CalendarDays} iconClass="text-emerald-500">
-        {weekdays.length === 0 ? (
-          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-            데이터가 없습니다
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {weekdayData.map((w) => {
-              const pct = Math.round((w.total / maxWeekday) * 100)
-              const isMax = w.total === maxWeekday
-              return (
-                <div key={w.label} className="flex items-center gap-3">
-                  <span className="w-5 text-center text-sm font-medium">{w.label}</span>
-                  <div className="flex-1 h-6 bg-muted/40 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        isMax ? "bg-indigo-500" : "bg-indigo-300 dark:bg-indigo-700"
-                      }`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <div className="flex gap-3 text-xs text-right">
-                    <span className="w-16 font-medium">{formatKRWFull(w.total)}</span>
-                    <span className="w-12 text-muted-foreground">{w.count}건</span>
-                  </div>
-                  {isMax && (
-                    <Badge variant="secondary" className="text-xs px-1.5 py-0">최다</Badge>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </Panel>
-
-      {/* ── Heatmap ────────────────────────────────────────────────────────── */}
-      <Panel title="최근 90일 지출 히트맵" icon={CalendarDays} iconClass="text-indigo-500">
-        {heatmap.length === 0 ? (
-          <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
-            데이터가 없습니다
-          </div>
-        ) : (
-          <SpendingHeatmap data={heatmap} />
-        )}
-      </Panel>
-
-      {/* ── Conversation Stats ─────────────────────────────────────────────── */}
-      <Panel title="대화 통계" icon={MessageSquare} iconClass="text-blue-500">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "총 메시지", value: conv?.total_messages ?? 0, suffix: "개" },
-            { label: "이번달 메시지", value: conv?.this_month ?? 0, suffix: "개" },
-            { label: "내 메시지", value: conv?.user_messages ?? 0, suffix: "개" },
-            { label: "대화 수", value: conv?.conversations ?? 0, suffix: "건" },
-          ].map((item) => (
-            <div key={item.label} className="rounded-lg border border-border/60 bg-muted/20 p-4 text-center">
-              <p className="text-2xl font-bold">
-                {item.value.toLocaleString()}
-                <span className="text-sm font-normal text-muted-foreground ml-1">{item.suffix}</span>
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">{item.label}</p>
+      {/* ── Weekday + Heatmap ──────────────────────────────────────────────── */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Panel title="요일별 지출 패턴" icon={CalendarDays} iconClass="text-emerald-500">
+          {weekdays.length === 0 ? (
+            <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+              데이터가 없습니다
             </div>
-          ))}
-        </div>
-      </Panel>
+          ) : (
+            <div className="space-y-3">
+              {weekdayData.map((w) => {
+                const pct = Math.round((w.total / maxWeekday) * 100)
+                const isMax = w.total === maxWeekday
+                return (
+                  <div key={w.label} className="flex items-center gap-3">
+                    <span className="w-5 text-center text-sm font-medium">{w.label}</span>
+                    <div className="flex-1 h-6 bg-muted/40 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          isMax ? "bg-indigo-500" : "bg-indigo-300 dark:bg-indigo-700"
+                        }`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <div className="flex gap-3 text-xs text-right">
+                      <span className="w-16 font-medium">{formatKRWFull(w.total)}</span>
+                      <span className="w-12 text-muted-foreground">{w.count}건</span>
+                    </div>
+                    {isMax && (
+                      <Badge variant="secondary" className="text-xs px-1.5 py-0">최다</Badge>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Panel>
+
+        <Panel title="최근 90일 지출 히트맵" icon={CalendarDays} iconClass="text-indigo-500">
+          {heatmap.length === 0 ? (
+            <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
+              데이터가 없습니다
+            </div>
+          ) : (
+            <SpendingHeatmap data={heatmap} />
+          )}
+        </Panel>
+      </div>
 
       {/* ── MoM Detail ─────────────────────────────────────────────────────── */}
       {s && s.last_month_expense > 0 && (

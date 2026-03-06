@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.skills.encode.tools module.
+"""Unit tests for starpion_agent.skills.encode.tools module.
 
 Tests cover:
 - ``EncodeDecodeInput``: Pydantic schema
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from jiki_agent.skills.encode.tools import EncodeDecodeInput, encode_decode
+from starpion_agent.skills.encode.tools import EncodeDecodeInput, encode_decode
 
 
 # =========================================================================

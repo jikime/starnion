@@ -53,7 +53,7 @@ const mainNav = [
 const financeNav = [
   { title: "가계부", icon: Wallet, href: "/finance" },
   { title: "예산 관리", icon: PieChart, href: "/budget" },
-  { title: "소비 분석", icon: TrendingUp, href: "/analysis" },
+  { title: "소비 분석", icon: TrendingUp, href: "/statistics" },
 ]
 
 const lifeNav = [
@@ -66,7 +66,7 @@ const lifeNav = [
 
 const reportsNav = [
   { title: "리포트 센터", icon: FileBarChart, href: "/reports" },
-  { title: "통계/분석", icon: BarChart3, href: "/statistics" },
+  { title: "통계/분석", icon: BarChart3, href: "/analytics" },
 ]
 
 const mediaNav = [

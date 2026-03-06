@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.skills.file_context module.
+"""Unit tests for starpion_agent.skills.file_context module.
 
 Tests cover:
 - add_pending_file: Adding files to the context-local queue
@@ -6,7 +6,7 @@ Tests cover:
 - Isolation between add/pop cycles
 """
 
-from jiki_agent.skills.file_context import add_pending_file, pop_pending_files
+from starpion_agent.skills.file_context import add_pending_file, pop_pending_files
 
 
 class TestAddPendingFile:

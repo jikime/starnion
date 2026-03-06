@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.skills.wordcount.tools module.
+"""Unit tests for starpion_agent.skills.wordcount.tools module.
 
 Tests cover:
 - ``CountTextInput``: Pydantic schema
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from jiki_agent.skills.wordcount.tools import CountTextInput, count_text
+from starpion_agent.skills.wordcount.tools import CountTextInput, count_text
 
 
 # =========================================================================

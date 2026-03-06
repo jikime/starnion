@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.skills.loader module.
+"""Unit tests for starpion_agent.skills.loader module.
 
 Tests cover:
 - _split_frontmatter: YAML frontmatter parsing
@@ -8,7 +8,7 @@ Tests cover:
 - load_all_skill_docs: Batch loading
 """
 
-from jiki_agent.skills.loader import (
+from starpion_agent.skills.loader import (
     SkillDoc,
     _split_frontmatter,
     build_skill_catalog,

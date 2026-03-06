@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.skills.hash.tools module.
+"""Unit tests for starpion_agent.skills.hash.tools module.
 
 Tests cover:
 - ``GenerateHashInput``: Pydantic schema
@@ -11,7 +11,7 @@ import hashlib
 
 import pytest
 
-from jiki_agent.skills.hash.tools import GenerateHashInput, generate_hash
+from starpion_agent.skills.hash.tools import GenerateHashInput, generate_hash
 
 
 # =========================================================================

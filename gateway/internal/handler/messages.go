@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
-	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
+	starpionv1 "github.com/jikime/starpion/gateway/gen/starpion/v1"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -16,14 +16,14 @@ import (
 // MessageHandler provides paginated REST endpoints for conversation messages.
 type MessageHandler struct {
 	db         *sql.DB
-	grpcClient jikiv1.AgentServiceClient
+	grpcClient starpionv1.AgentServiceClient
 }
 
 // NewMessageHandler creates a MessageHandler backed by db and grpcConn.
 func NewMessageHandler(db *sql.DB, grpcConn *grpc.ClientConn) *MessageHandler {
 	return &MessageHandler{
 		db:         db,
-		grpcClient: jikiv1.NewAgentServiceClient(grpcConn),
+		grpcClient: starpionv1.NewAgentServiceClient(grpcConn),
 	}
 }
 
@@ -156,7 +156,7 @@ func (h *MessageHandler) seedFromHistory(ctx context.Context, convID string) {
 		threadID = convID
 	}
 
-	resp, err := h.grpcClient.GetHistory(ctx, &jikiv1.HistoryRequest{ThreadId: threadID})
+	resp, err := h.grpcClient.GetHistory(ctx, &starpionv1.HistoryRequest{ThreadId: threadID})
 	if err != nil || len(resp.Messages) == 0 {
 		return
 	}

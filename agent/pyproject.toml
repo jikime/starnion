@@ -1,7 +1,7 @@
 [project]
-name = "jiki-agent"
+name = "starpion-agent"
 version = "0.1.0"
-description = "Jiki AI Agent - Personal assistant powered by LangGraph and Gemini"
+description = "Starpion AI Agent - Personal assistant powered by LangGraph and Gemini"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -46,8 +46,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/jiki_agent"]
-artifacts = ["src/jiki_agent/document/fonts/*.ttf"]
+packages = ["src/starpion_agent"]
+artifacts = ["src/starpion_agent/document/fonts/*.ttf"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

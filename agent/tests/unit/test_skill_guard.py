@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.skills.guard module.
+"""Unit tests for starpion_agent.skills.guard module.
 
 Tests cover:
 - skill_guard decorator allowing enabled skills
@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from jiki_agent.skills.guard import skill_guard
+from starpion_agent.skills.guard import skill_guard
 
 
 @skill_guard("finance")
@@ -31,9 +31,9 @@ class TestSkillGuard:
     """Tests for the skill_guard decorator."""
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.guard.skill_repo")
-    @patch("jiki_agent.skills.guard.get_pool")
-    @patch("jiki_agent.skills.guard.get_current_user", return_value="tg_user_42")
+    @patch("starpion_agent.skills.guard.skill_repo")
+    @patch("starpion_agent.skills.guard.get_pool")
+    @patch("starpion_agent.skills.guard.get_current_user", return_value="tg_user_42")
     async def test_enabled_skill_executes(
         self,
         mock_user: MagicMock,
@@ -47,9 +47,9 @@ class TestSkillGuard:
         assert result == "tool executed"
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.guard.skill_repo")
-    @patch("jiki_agent.skills.guard.get_pool")
-    @patch("jiki_agent.skills.guard.get_current_user", return_value="tg_user_42")
+    @patch("starpion_agent.skills.guard.skill_repo")
+    @patch("starpion_agent.skills.guard.get_pool")
+    @patch("starpion_agent.skills.guard.get_current_user", return_value="tg_user_42")
     async def test_disabled_skill_returns_message(
         self,
         mock_user: MagicMock,
@@ -64,9 +64,9 @@ class TestSkillGuard:
         assert "/skills" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.guard.skill_repo")
-    @patch("jiki_agent.skills.guard.get_pool")
-    @patch("jiki_agent.skills.guard.get_current_user", return_value="tg_user_42")
+    @patch("starpion_agent.skills.guard.skill_repo")
+    @patch("starpion_agent.skills.guard.get_pool")
+    @patch("starpion_agent.skills.guard.get_current_user", return_value="tg_user_42")
     async def test_disabled_skill_includes_skill_name(
         self,
         mock_user: MagicMock,
@@ -81,9 +81,9 @@ class TestSkillGuard:
         assert "가계부" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.guard.skill_repo")
-    @patch("jiki_agent.skills.guard.get_pool")
-    @patch("jiki_agent.skills.guard.get_current_user", return_value="tg_user_42")
+    @patch("starpion_agent.skills.guard.skill_repo")
+    @patch("starpion_agent.skills.guard.get_pool")
+    @patch("starpion_agent.skills.guard.get_current_user", return_value="tg_user_42")
     async def test_guard_passes_arguments(
         self,
         mock_user: MagicMock,
@@ -97,9 +97,9 @@ class TestSkillGuard:
         assert result == "video: sunset timelapse"
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.guard.skill_repo")
-    @patch("jiki_agent.skills.guard.get_pool")
-    @patch("jiki_agent.skills.guard.get_current_user", return_value="tg_user_42")
+    @patch("starpion_agent.skills.guard.skill_repo")
+    @patch("starpion_agent.skills.guard.get_pool")
+    @patch("starpion_agent.skills.guard.get_current_user", return_value="tg_user_42")
     async def test_guard_calls_is_enabled_with_correct_args(
         self,
         mock_user: MagicMock,

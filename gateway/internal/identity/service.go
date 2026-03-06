@@ -242,6 +242,7 @@ func (s *Service) UseLinkCode(code, newPlatform, newPlatformID, displayName stri
 // 병합 후:
 //   - fromUserID의 platform_identities 레코드가 toUserID로 이동합니다.
 //   - fromUserID의 user_credentials 레코드가 toUserID로 이동합니다.
+//   - fromUserID의 google_tokens 레코드가 toUserID로 이전됩니다 (FK 없어 명시적 처리).
 //   - fromUserID의 users 레코드가 삭제됩니다 (관련 데이터 CASCADE 삭제).
 //   - 링크 코드가 소비됩니다 (일회용).
 //
@@ -307,6 +308,31 @@ func (s *Service) MergeAndLink(fromUserID, code string) (string, error) {
 	_, err = tx.Exec(`DELETE FROM platform_identities WHERE user_id = $1`, fromUserID)
 	if err != nil {
 		return "", fmt.Errorf("delete old platform identities: %w", err)
+	}
+
+	// 4.5. google_tokens 이전 (fromUserID → toUserID)
+	// google_tokens은 users에 FK가 없으므로 CASCADE 삭제되지 않아 명시적으로 처리.
+	// toUserID에 이미 토큰이 있으면 fromUserID 토큰으로 덮어씌움 (더 최신일 가능성).
+	_, err = tx.Exec(`
+		INSERT INTO google_tokens (user_id, access_token, refresh_token, scopes, expires_at, updated_at)
+		SELECT $1, access_token, refresh_token, scopes, expires_at, updated_at
+		FROM google_tokens
+		WHERE user_id = $2
+		ON CONFLICT (user_id) DO UPDATE SET
+			access_token = EXCLUDED.access_token,
+			refresh_token = EXCLUDED.refresh_token,
+			scopes = EXCLUDED.scopes,
+			expires_at = EXCLUDED.expires_at,
+			updated_at = EXCLUDED.updated_at
+	`, toUserID, fromUserID)
+	if err != nil {
+		return "", fmt.Errorf("migrate google tokens: %w", err)
+	}
+
+	// 이전 완료 후 orphan 토큰 삭제
+	_, err = tx.Exec(`DELETE FROM google_tokens WHERE user_id = $1`, fromUserID)
+	if err != nil {
+		return "", fmt.Errorf("delete old google tokens: %w", err)
 	}
 
 	// 5. fromUserID의 users 레코드 삭제 (CASCADE로 나머지 데이터 정리)
@@ -423,11 +449,11 @@ func generateUUID() (string, error) {
 		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16]), nil
 }
 
-// generateLinkCode는 사람이 읽기 쉬운 페어링 코드를 생성합니다 (예: JIKI-7A4B).
+// generateLinkCode는 사람이 읽기 쉬운 페어링 코드를 생성합니다 (예: STAR-7A4B).
 func generateLinkCode() string {
 	b := make([]byte, 3)
 	rand.Read(b)
-	return fmt.Sprintf("JIKI-%s", strings.ToUpper(fmt.Sprintf("%06X", b))[:6])
+	return fmt.Sprintf("STAR-%s", strings.ToUpper(fmt.Sprintf("%06X", b))[:6])
 }
 
 // nullableString은 빈 문자열을 sql.NullString으로 변환합니다.

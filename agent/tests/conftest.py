@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for jiki-agent tests.
+"""Shared pytest fixtures for starpion-agent tests.
 
 Provides reusable mock objects for the async psycopg3 connection pool,
 connection, and cursor chain used across all repository and tool tests.
@@ -88,7 +88,7 @@ def reset_current_user():
     Use this fixture (or request it explicitly) whenever tests touch
     ``set_current_user`` / ``get_current_user``.
     """
-    from jiki_agent.context import set_current_user
+    from starpion_agent.context import set_current_user
     set_current_user("")
     yield
     set_current_user("")
@@ -106,13 +106,13 @@ def _bypass_skill_guard():
     """
     mock_pool = MagicMock()
     with (
-        patch("jiki_agent.skills.guard.get_pool", return_value=mock_pool),
-        patch("jiki_agent.skills.guard.skill_repo") as mock_repo,
+        patch("starpion_agent.skills.guard.get_pool", return_value=mock_pool),
+        patch("starpion_agent.skills.guard.skill_repo") as mock_repo,
     ):
         mock_repo.is_enabled = AsyncMock(return_value=True)
         # Also patch profile_repo used by finance tools for budget checking.
         with patch(
-            "jiki_agent.skills.finance.tools.profile_repo"
+            "starpion_agent.skills.finance.tools.profile_repo"
         ) as mock_profile:
             mock_profile.get_by_telegram_id = AsyncMock(return_value=None)
             yield

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
+	starpionv1 "github.com/jikime/starpion/gateway/gen/starpion/v1"
 	"github.com/rs/zerolog/log"
 )
 
@@ -210,7 +210,7 @@ func (s *Scheduler) runPatternAnalysisRule() {
 			continue
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
-		resp, err := s.grpcClient.GenerateReport(ctx, &jikiv1.ReportRequest{
+		resp, err := s.grpcClient.GenerateReport(ctx, &starpionv1.ReportRequest{
 			UserId:     u.userID,
 			ReportType: "pattern_analysis",
 		})
@@ -376,7 +376,7 @@ func (s *Scheduler) runGoalEvaluationRule() {
 			continue
 		}
 		rctx, rcancel := context.WithTimeout(context.Background(), 180*time.Second)
-		resp, err := s.grpcClient.GenerateReport(rctx, &jikiv1.ReportRequest{
+		resp, err := s.grpcClient.GenerateReport(rctx, &starpionv1.ReportRequest{
 			UserId:     u.userID,
 			ReportType: "goal_evaluate",
 		})
@@ -454,7 +454,7 @@ func (s *Scheduler) sendGeneratedNotification(user activeUser, reportType string
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	resp, err := s.grpcClient.GenerateReport(ctx, &jikiv1.ReportRequest{
+	resp, err := s.grpcClient.GenerateReport(ctx, &starpionv1.ReportRequest{
 		UserId:     user.userID,
 		ReportType: reportType,
 	})
@@ -564,7 +564,7 @@ func (s *Scheduler) runConversationAnalysisRule() {
 
 		// Trigger background analysis via gRPC.
 		ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
-		resp, err := s.grpcClient.GenerateReport(ctx, &jikiv1.ReportRequest{
+		resp, err := s.grpcClient.GenerateReport(ctx, &starpionv1.ReportRequest{
 			UserId:     userID,
 			ReportType: "conversation_analysis",
 		})
@@ -619,7 +619,7 @@ func (s *Scheduler) runMemoryCompactionRule() {
 	var successCount, failCount int
 	for _, u := range users {
 		ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
-		resp, err := s.grpcClient.GenerateReport(ctx, &jikiv1.ReportRequest{
+		resp, err := s.grpcClient.GenerateReport(ctx, &starpionv1.ReportRequest{
 			UserId:     u.userID,
 			ReportType: "memory_compaction",
 		})

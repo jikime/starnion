@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.document.parser module.
+"""Unit tests for starpion_agent.document.parser module.
 
 Tests cover:
 - extract_text router: dispatches to correct extractor by extension
@@ -13,7 +13,7 @@ Tests cover:
 - extract_text_from_ppt: Legacy PPT graceful fallback
 """
 
-from jiki_agent.document.parser import (
+from starpion_agent.document.parser import (
     extract_text,
     extract_text_from_md,
     extract_text_from_txt,
@@ -101,8 +101,8 @@ class TestExtractTextFromDocx:
 
     def test_roundtrip_docx(self):
         """Generate a DOCX, then extract text from it."""
-        from jiki_agent.document.generator import generate_docx
-        from jiki_agent.document.parser import extract_text_from_docx
+        from starpion_agent.document.generator import generate_docx
+        from starpion_agent.document.parser import extract_text_from_docx
 
         docx_bytes = generate_docx("Test Title", "First paragraph.\n\nSecond paragraph.")
         text = extract_text_from_docx(docx_bytes)
@@ -116,8 +116,8 @@ class TestExtractTextFromXlsx:
 
     def test_roundtrip_xlsx(self):
         """Generate an XLSX, then extract text from it."""
-        from jiki_agent.document.generator import generate_xlsx
-        from jiki_agent.document.parser import extract_text_from_xlsx
+        from starpion_agent.document.generator import generate_xlsx
+        from starpion_agent.document.parser import extract_text_from_xlsx
 
         xlsx_bytes = generate_xlsx(["Name", "Age"], [["Alice", 30], ["Bob", 25]])
         text = extract_text_from_xlsx(xlsx_bytes)
@@ -132,8 +132,8 @@ class TestExtractTextFromDoc:
 
     def test_docx_with_doc_extension(self):
         """A .docx file saved with .doc extension is handled by python-docx fallback."""
-        from jiki_agent.document.generator import generate_docx
-        from jiki_agent.document.parser import extract_text_from_doc
+        from starpion_agent.document.generator import generate_docx
+        from starpion_agent.document.parser import extract_text_from_doc
 
         # generate_docx creates a valid .docx (ZIP-based) file
         docx_bytes = generate_docx("Test", "Hello from docx fallback.")
@@ -143,7 +143,7 @@ class TestExtractTextFromDoc:
 
     def test_invalid_data_returns_fallback(self):
         """Non-OLE, non-ZIP data returns a friendly fallback message."""
-        from jiki_agent.document.parser import extract_text_from_doc
+        from starpion_agent.document.parser import extract_text_from_doc
 
         result = extract_text_from_doc(b"this is not a doc file")
         assert ".docx" in result
@@ -151,7 +151,7 @@ class TestExtractTextFromDoc:
 
     def test_empty_data_returns_fallback(self):
         """Empty data returns a friendly fallback message."""
-        from jiki_agent.document.parser import extract_text_from_doc
+        from starpion_agent.document.parser import extract_text_from_doc
 
         result = extract_text_from_doc(b"")
         assert ".docx" in result
@@ -161,7 +161,7 @@ class TestExtractTextFromDoc:
         import olefile
         from io import BytesIO
 
-        from jiki_agent.document.parser import extract_text_from_doc
+        from starpion_agent.document.parser import extract_text_from_doc
 
         # Create a minimal OLE file without WordDocument stream
         buf = BytesIO()
@@ -187,8 +187,8 @@ class TestExtractTextFromXls:
 
     def test_xlsx_with_xls_extension(self):
         """A .xlsx file saved with .xls extension is handled by openpyxl fallback."""
-        from jiki_agent.document.generator import generate_xlsx
-        from jiki_agent.document.parser import extract_text_from_xls
+        from starpion_agent.document.generator import generate_xlsx
+        from starpion_agent.document.parser import extract_text_from_xls
 
         xlsx_bytes = generate_xlsx(["Col1"], [["Data1"]])
         text = extract_text_from_xls(xlsx_bytes)
@@ -198,7 +198,7 @@ class TestExtractTextFromXls:
 
     def test_old_xls_returns_fallback(self):
         """A real old XLS binary returns a friendly fallback, not a crash."""
-        from jiki_agent.document.parser import extract_text_from_xls
+        from starpion_agent.document.parser import extract_text_from_xls
 
         ole_header = b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"
         fake_xls = ole_header + b"\x00" * 500
@@ -218,7 +218,7 @@ class TestExtractTextFromPpt:
 
     def test_old_ppt_returns_fallback(self):
         """Old PPT binary returns a friendly fallback, not a crash."""
-        from jiki_agent.document.parser import extract_text_from_ppt
+        from starpion_agent.document.parser import extract_text_from_ppt
 
         ole_header = b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"
         fake_ppt = ole_header + b"\x00" * 500

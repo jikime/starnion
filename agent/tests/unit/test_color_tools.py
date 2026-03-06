@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.skills.color.tools module.
+"""Unit tests for starpion_agent.skills.color.tools module.
 
 Tests cover:
 - ``ConvertColorInput``: Pydantic schema
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from jiki_agent.skills.color.tools import ConvertColorInput, convert_color
+from starpion_agent.skills.color.tools import ConvertColorInput, convert_color
 
 
 # =========================================================================

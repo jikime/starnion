@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
-	"github.com/jikime/jiki/gateway/internal/storage"
+	starpionv1 "github.com/jikime/starpion/gateway/gen/starpion/v1"
+	"github.com/jikime/starpion/gateway/internal/storage"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 )
@@ -28,13 +28,13 @@ type Hub struct {
 	mu      sync.RWMutex
 	clients map[string]*Client // userID → client
 
-	grpcClient jikiv1.AgentServiceClient
+	grpcClient starpionv1.AgentServiceClient
 	db         *sql.DB
 	store      *storage.MinIO // nil = file upload disabled
 }
 
 // NewHub creates a Hub backed by the gRPC agent service.
-func NewHub(grpcClient jikiv1.AgentServiceClient, db *sql.DB, store *storage.MinIO) *Hub {
+func NewHub(grpcClient starpionv1.AgentServiceClient, db *sql.DB, store *storage.MinIO) *Hub {
 	return &Hub{
 		clients:    make(map[string]*Client),
 		grpcClient: grpcClient,
@@ -237,7 +237,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 	// Save user message immediately.
 	c.hub.saveMessage(threadID, "user", message, nil)
 
-	stream, err := c.hub.grpcClient.ChatStream(ctx, &jikiv1.ChatRequest{
+	stream, err := c.hub.grpcClient.ChatStream(ctx, &starpionv1.ChatRequest{
 		UserId:   c.userID,
 		Message:  message,
 		Model:    model,
@@ -261,7 +261,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 		}
 
 		switch resp.Type {
-		case jikiv1.ResponseType_TEXT:
+		case starpionv1.ResponseType_TEXT:
 			assistantBuf.WriteString(resp.Content)
 			c.send <- OutFrame{
 				Type:    FrameEvent,
@@ -270,7 +270,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 				Payload: map[string]any{"text": resp.Content},
 			}
 
-		case jikiv1.ResponseType_TOOL_CALL:
+		case starpionv1.ResponseType_TOOL_CALL:
 			c.send <- OutFrame{
 				Type:  FrameEvent,
 				ID:    frame.ID,
@@ -281,7 +281,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 				},
 			}
 
-		case jikiv1.ResponseType_TOOL_RESULT:
+		case starpionv1.ResponseType_TOOL_RESULT:
 			c.send <- OutFrame{
 				Type:  FrameEvent,
 				ID:    frame.ID,
@@ -292,7 +292,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 				},
 			}
 
-		case jikiv1.ResponseType_FILE:
+		case starpionv1.ResponseType_FILE:
 			att, uploadErr := c.hub.uploadFile(ctx, resp.FileName, resp.FileMime, resp.FileData)
 			if uploadErr != nil {
 				log.Warn().Err(uploadErr).Str("file", resp.FileName).Msg("ws: file upload failed")
@@ -311,7 +311,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 				},
 			}
 
-		case jikiv1.ResponseType_ERROR:
+		case starpionv1.ResponseType_ERROR:
 			c.send <- OutFrame{
 				Type:    FrameEvent,
 				ID:      frame.ID,
@@ -319,7 +319,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 				Payload: map[string]any{"message": resp.Content},
 			}
 
-		case jikiv1.ResponseType_STREAM_END:
+		case starpionv1.ResponseType_STREAM_END:
 			// Save completed assistant message with any file attachments.
 			if assistantBuf.Len() > 0 || len(attachments) > 0 {
 				c.hub.saveMessage(threadID, "assistant", assistantBuf.String(), attachments)

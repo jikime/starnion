@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jikime/jiki/gateway/internal/telegram"
+	"github.com/jikime/starpion/gateway/internal/telegram"
 	"github.com/labstack/echo/v4"
 )
 

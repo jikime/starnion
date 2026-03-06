@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
-	"github.com/jikime/jiki/gateway/internal/auth"
-	"github.com/jikime/jiki/gateway/internal/wschat"
+	"github.com/jikime/starpion/gateway/internal/auth"
+	"github.com/jikime/starpion/gateway/internal/wschat"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 )

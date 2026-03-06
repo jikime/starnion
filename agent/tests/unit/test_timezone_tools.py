@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.skills.timezone.tools module.
+"""Unit tests for starpion_agent.skills.timezone.tools module.
 
 Tests cover:
 - ``GetWorldTimeInput`` / ``ConvertTimezoneInput``: Pydantic schemas
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from jiki_agent.skills.timezone.tools import (
+from starpion_agent.skills.timezone.tools import (
     ConvertTimezoneInput,
     GetWorldTimeInput,
     convert_timezone,

@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.document.generator module.
+"""Unit tests for starpion_agent.document.generator module.
 
 Tests cover:
 - generate_pdf: PDF creation
@@ -8,7 +8,7 @@ Tests cover:
 - generate_txt: Plain text file creation
 """
 
-from jiki_agent.document.generator import (
+from starpion_agent.document.generator import (
     generate_docx,
     generate_md,
     generate_pdf,
@@ -52,7 +52,7 @@ class TestGenerateDocx:
 
     def test_contains_content(self):
         """Extracting text from generated DOCX recovers content."""
-        from jiki_agent.document.parser import extract_text_from_docx
+        from starpion_agent.document.parser import extract_text_from_docx
 
         result = generate_docx("My Doc", "Hello World.\n\nSecond line.")
         text = extract_text_from_docx(result)
@@ -60,7 +60,7 @@ class TestGenerateDocx:
 
     def test_multiple_paragraphs(self):
         """Multiple paragraphs separated by double newlines are preserved."""
-        from jiki_agent.document.parser import extract_text_from_docx
+        from starpion_agent.document.parser import extract_text_from_docx
 
         result = generate_docx("Doc", "Para 1.\n\nPara 2.\n\nPara 3.")
         text = extract_text_from_docx(result)
@@ -84,7 +84,7 @@ class TestGenerateXlsx:
 
     def test_contains_data(self):
         """Extracting text from generated XLSX recovers data."""
-        from jiki_agent.document.parser import extract_text_from_xlsx
+        from starpion_agent.document.parser import extract_text_from_xlsx
 
         result = generate_xlsx(
             ["Name", "Score"],

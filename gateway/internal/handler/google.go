@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -132,4 +133,47 @@ func (h *GoogleCallbackHandler) Callback(c echo.Context) error {
 			"<p>텔레그램으로 돌아가서 구글 서비스를 사용해보세요.</p>"+
 			"<p>이 창은 닫아도 됩니다.</p>",
 	)
+}
+
+// TelegramOAuthStart handles GET /auth/google/telegram?uid=<user_id>
+// Generates a Google OAuth2 URL and redirects the browser directly.
+// This avoids Telegram Markdown underscore-stripping issues that corrupt
+// query parameter names (response_type → responsetype) when the full URL
+// is sent as a chat message.
+func (h *GoogleCallbackHandler) TelegramOAuthStart(c echo.Context) error {
+	userID := c.QueryParam("uid")
+	if userID == "" {
+		return c.HTML(http.StatusBadRequest, "<h2>uid 파라미터가 필요해요.</h2>")
+	}
+
+	clientID := os.Getenv("GOOGLE_CLIENT_ID")
+	clientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
+	redirectURI := os.Getenv("GOOGLE_REDIRECT_URI")
+
+	if clientID == "" || clientSecret == "" {
+		return c.HTML(http.StatusInternalServerError, "<h2>구글 설정이 올바르지 않아요.</h2>")
+	}
+
+	scopes := []string{
+		"https://www.googleapis.com/auth/calendar",
+		"https://www.googleapis.com/auth/documents",
+		"https://www.googleapis.com/auth/tasks",
+		"https://www.googleapis.com/auth/drive.file",
+		"https://www.googleapis.com/auth/gmail.compose",
+		"https://www.googleapis.com/auth/gmail.readonly",
+	}
+
+	params := url.Values{}
+	params.Set("client_id", clientID)
+	params.Set("redirect_uri", redirectURI)
+	params.Set("response_type", "code")
+	params.Set("access_type", "offline")
+	params.Set("prompt", "consent")
+	params.Set("state", userID) // no "web:" prefix → Telegram flow
+	params.Set("scope", strings.Join(scopes, " "))
+	params.Set("include_granted_scopes", "true")
+
+	authURL := "https://accounts.google.com/o/oauth2/v2/auth?" + params.Encode()
+	log.Info().Str("user_id", userID).Msg("Telegram OAuth start redirect")
+	return c.Redirect(http.StatusFound, authURL)
 }

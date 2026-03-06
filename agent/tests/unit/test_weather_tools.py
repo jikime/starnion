@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.skills.weather.tools module.
+"""Unit tests for starpion_agent.skills.weather.tools module.
 
 Tests cover:
 - ``WeatherInput`` / ``ForecastInput``: Pydantic input schemas
@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from jiki_agent.skills.weather.tools import (
+from starpion_agent.skills.weather.tools import (
     ForecastInput,
     WeatherInput,
     _geocode,
@@ -93,7 +93,7 @@ def _patch_httpx(mock_response=None, side_effect=None):
     else:
         mock_ctx.get = AsyncMock(return_value=mock_response)
     return patch(
-        "jiki_agent.skills.weather.tools.httpx.AsyncClient",
+        "starpion_agent.skills.weather.tools.httpx.AsyncClient",
         return_value=mock_ctx,
     )
 
@@ -186,7 +186,7 @@ class TestGetWeather:
         mock_ctx.get = AsyncMock(side_effect=[geocode_resp, weather_resp])
 
         with patch(
-            "jiki_agent.skills.weather.tools.httpx.AsyncClient",
+            "starpion_agent.skills.weather.tools.httpx.AsyncClient",
             return_value=mock_ctx,
         ):
             result = await get_weather.ainvoke({"location": "서울"})
@@ -220,7 +220,7 @@ class TestGetWeather:
         mock_ctx.get = AsyncMock(side_effect=[geocode_resp, weather_resp])
 
         with patch(
-            "jiki_agent.skills.weather.tools.httpx.AsyncClient",
+            "starpion_agent.skills.weather.tools.httpx.AsyncClient",
             return_value=mock_ctx,
         ):
             result = await get_weather.ainvoke({"location": "서울"})
@@ -259,7 +259,7 @@ class TestGetForecast:
         mock_ctx.get = AsyncMock(side_effect=[geocode_resp, forecast_resp])
 
         with patch(
-            "jiki_agent.skills.weather.tools.httpx.AsyncClient",
+            "starpion_agent.skills.weather.tools.httpx.AsyncClient",
             return_value=mock_ctx,
         ):
             result = await get_forecast.ainvoke({"location": "서울", "days": 3})
@@ -294,7 +294,7 @@ class TestGetForecast:
         mock_ctx.get = AsyncMock(side_effect=[geocode_resp, forecast_resp])
 
         with patch(
-            "jiki_agent.skills.weather.tools.httpx.AsyncClient",
+            "starpion_agent.skills.weather.tools.httpx.AsyncClient",
             return_value=mock_ctx,
         ):
             # days=20 should be clamped to 7
@@ -314,7 +314,7 @@ class TestGetForecast:
         mock_ctx.get = AsyncMock(side_effect=[geocode_resp, forecast_resp])
 
         with patch(
-            "jiki_agent.skills.weather.tools.httpx.AsyncClient",
+            "starpion_agent.skills.weather.tools.httpx.AsyncClient",
             return_value=mock_ctx,
         ):
             result = await get_forecast.ainvoke({"location": "서울", "days": 1})

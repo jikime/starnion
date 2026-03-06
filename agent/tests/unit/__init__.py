@@ -1,1 +1,1 @@
-"""Unit tests for jiki-agent."""
+"""Unit tests for starpion-agent."""

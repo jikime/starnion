@@ -39,13 +39,13 @@ type MinIO struct {
 //	MINIO_ENDPOINT   internal host:port  (default: localhost:9000)
 //	MINIO_ACCESS_KEY access key
 //	MINIO_SECRET_KEY secret key
-//	MINIO_BUCKET     bucket name         (default: jiki-files)
+//	MINIO_BUCKET     bucket name         (default: starpion-files)
 //	MINIO_PUBLIC_URL browser-facing URL  (default: http://localhost:9000)
 func NewMinIO() (*MinIO, error) {
 	endpoint := envOr("MINIO_ENDPOINT", "localhost:9000")
 	accessKey := os.Getenv("MINIO_ACCESS_KEY")
 	secretKey := os.Getenv("MINIO_SECRET_KEY")
-	bucket := envOr("MINIO_BUCKET", "jiki-files")
+	bucket := envOr("MINIO_BUCKET", "starpion-files")
 	publicURL := strings.TrimRight(envOr("MINIO_PUBLIC_URL", "http://localhost:9000"), "/")
 
 	client, err := minio.New(endpoint, &minio.Options{

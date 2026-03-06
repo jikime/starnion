@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.skills.translate.tools module.
+"""Unit tests for starpion_agent.skills.translate.tools module.
 
 Tests cover:
 - ``TranslateTextInput``: Pydantic input schema
@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from jiki_agent.skills.translate.tools import (
+from starpion_agent.skills.translate.tools import (
     SUPPORTED_LANGS,
     TranslateTextInput,
     _build_translate_prompt,
@@ -81,7 +81,7 @@ def _patch_gemini(content: str = "번역 결과입니다."):
     mock_response.content = content
     mock_llm.ainvoke = AsyncMock(return_value=mock_response)
     return patch(
-        "jiki_agent.skills.translate.tools.ChatGoogleGenerativeAI",
+        "starpion_agent.skills.translate.tools.ChatGoogleGenerativeAI",
         return_value=mock_llm,
     )
 
@@ -91,35 +91,35 @@ def _patch_gemini(content: str = "번역 결과입니다."):
 # =========================================================================
 class TestTranslateText:
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.translate.tools.settings")
+    @patch("starpion_agent.skills.translate.tools.settings")
     async def test_no_api_key(self, mock_settings):
         mock_settings.gemini_api_key = ""
         result = await translate_text.ainvoke({"text": "hello"})
         assert "Gemini API 키" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.translate.tools.settings")
+    @patch("starpion_agent.skills.translate.tools.settings")
     async def test_empty_text(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         result = await translate_text.ainvoke({"text": ""})
         assert "텍스트를 입력" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.translate.tools.settings")
+    @patch("starpion_agent.skills.translate.tools.settings")
     async def test_whitespace_only(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         result = await translate_text.ainvoke({"text": "   "})
         assert "텍스트를 입력" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.translate.tools.settings")
+    @patch("starpion_agent.skills.translate.tools.settings")
     async def test_unsupported_target_lang(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         result = await translate_text.ainvoke({"text": "hello", "target_lang": "xx"})
         assert "지원하지 않는 언어" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.translate.tools.settings")
+    @patch("starpion_agent.skills.translate.tools.settings")
     async def test_invalid_source_lang(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         result = await translate_text.ainvoke(
@@ -128,7 +128,7 @@ class TestTranslateText:
         assert "원본 언어 코드" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.translate.tools.settings")
+    @patch("starpion_agent.skills.translate.tools.settings")
     async def test_successful_translation(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         mock_settings.gemini_model = "gemini-2.0-flash"
@@ -139,7 +139,7 @@ class TestTranslateText:
         assert "안녕하세요" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.translate.tools.settings")
+    @patch("starpion_agent.skills.translate.tools.settings")
     async def test_explicit_source_lang(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         mock_settings.gemini_model = "gemini-2.0-flash"
@@ -150,12 +150,12 @@ class TestTranslateText:
         assert "Hello" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.translate.tools.settings")
+    @patch("starpion_agent.skills.translate.tools.settings")
     async def test_llm_error(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         mock_settings.gemini_model = "gemini-2.0-flash"
         with patch(
-            "jiki_agent.skills.translate.tools.ChatGoogleGenerativeAI",
+            "starpion_agent.skills.translate.tools.ChatGoogleGenerativeAI",
             side_effect=Exception("LLM error"),
         ):
             result = await translate_text.ainvoke(

@@ -4,7 +4,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/jikime/jiki/gateway/internal/storage"
+	"github.com/jikime/starpion/gateway/internal/storage"
 	"github.com/labstack/echo/v4"
 )
 

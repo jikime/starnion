@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.skills.registry module.
+"""Unit tests for starpion_agent.skills.registry module.
 
 Tests cover:
 - SKILLS dictionary structure and required fields
@@ -7,7 +7,7 @@ Tests cover:
 - Skill metadata consistency
 """
 
-from jiki_agent.skills.registry import SKILLS, SkillDef, get_skill_for_tool
+from starpion_agent.skills.registry import SKILLS, SkillDef, get_skill_for_tool
 
 
 class TestSkillsDict:

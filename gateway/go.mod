@@ -1,4 +1,4 @@
-module github.com/jikime/jiki/gateway
+module github.com/jikime/starpion/gateway
 
 go 1.25.7
 

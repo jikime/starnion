@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jikime/jiki/gateway/internal/activity"
+	"github.com/jikime/starpion/gateway/internal/activity"
 	"github.com/rs/zerolog/log"
 )
 

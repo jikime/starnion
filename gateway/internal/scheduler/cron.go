@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
-	"github.com/jikime/jiki/gateway/internal/activity"
-	"github.com/jikime/jiki/gateway/internal/skill"
+	starpionv1 "github.com/jikime/starpion/gateway/gen/starpion/v1"
+	"github.com/jikime/starpion/gateway/internal/activity"
+	"github.com/jikime/starpion/gateway/internal/skill"
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -23,7 +23,7 @@ type TelegramSender interface {
 // Scheduler manages periodic tasks such as weekly reports and proactive notifications.
 type Scheduler struct {
 	cron       *cron.Cron
-	grpcClient jikiv1.AgentServiceClient
+	grpcClient starpionv1.AgentServiceClient
 	telegram   TelegramSender
 	db         *sql.DB
 	fatigue    *fatigueManager
@@ -46,7 +46,7 @@ func New(grpcConn *grpc.ClientConn, telegram TelegramSender, db *sql.DB, tracker
 
 	return &Scheduler{
 		cron:           cron.New(cron.WithLocation(loc)),
-		grpcClient:     jikiv1.NewAgentServiceClient(grpcConn),
+		grpcClient:     starpionv1.NewAgentServiceClient(grpcConn),
 		telegram:       telegram,
 		db:             db,
 		fatigue:        newFatigueManager(tracker, loc),
@@ -154,7 +154,7 @@ func (s *Scheduler) GenerateAndSendType(userID string, chatID int64, reportType 
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	resp, err := s.grpcClient.GenerateReport(ctx, &jikiv1.ReportRequest{
+	resp, err := s.grpcClient.GenerateReport(ctx, &starpionv1.ReportRequest{
 		UserId:     userID,
 		ReportType: reportType,
 	})

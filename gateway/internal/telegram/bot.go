@@ -12,11 +12,11 @@ import (
 	"sync"
 	"time"
 
-	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
-	"github.com/jikime/jiki/gateway/internal/activity"
-	"github.com/jikime/jiki/gateway/internal/identity"
-	"github.com/jikime/jiki/gateway/internal/skill"
-	"github.com/jikime/jiki/gateway/internal/storage"
+	starpionv1 "github.com/jikime/starpion/gateway/gen/starpion/v1"
+	"github.com/jikime/starpion/gateway/internal/activity"
+	"github.com/jikime/starpion/gateway/internal/identity"
+	"github.com/jikime/starpion/gateway/internal/skill"
+	"github.com/jikime/starpion/gateway/internal/storage"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -35,7 +35,7 @@ const policyCacheTTL = 30 * time.Second
 // Bot wraps the Telegram bot API and forwards messages to the agent via gRPC.
 type Bot struct {
 	api          *tgbotapi.BotAPI
-	grpcClient   jikiv1.AgentServiceClient
+	grpcClient   starpionv1.AgentServiceClient
 	tracker      *activity.Tracker
 	db           *sql.DB
 	store        *storage.MinIO
@@ -60,7 +60,7 @@ func NewBot(token, ownerUserID string, grpcConn *grpc.ClientConn, tracker *activ
 
 	return &Bot{
 		api:          api,
-		grpcClient:   jikiv1.NewAgentServiceClient(grpcConn),
+		grpcClient:   starpionv1.NewAgentServiceClient(grpcConn),
 		tracker:      tracker,
 		db:           db,
 		store:        store,
@@ -327,7 +327,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	// Build the gRPC request from message content.
 	// Always use telegramID as ThreadId so LangGraph checkpoints stay continuous
 	// regardless of whether identity resolution succeeded.
-	chatReq := &jikiv1.ChatRequest{
+	chatReq := &starpionv1.ChatRequest{
 		UserId:   userID,
 		Message:  msg.Text,
 		ThreadId: telegramID,
@@ -345,7 +345,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		if fileURL != "" {
 			// Pass the Telegram CDN URL to the agent for Gemini analysis.
 			// Mirror to MinIO in the background so it never blocks the response.
-			chatReq.File = &jikiv1.FileInput{
+			chatReq.File = &starpionv1.FileInput{
 				FileType: "image",
 				FileUrl:  fileURL,
 				FileName: "photo.jpg",
@@ -372,7 +372,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	if msg.Voice != nil {
 		fileURL := b.getFileURL(msg.Voice.FileID)
 		if fileURL != "" {
-			chatReq.File = &jikiv1.FileInput{
+			chatReq.File = &starpionv1.FileInput{
 				FileType: "audio",
 				FileUrl:  fileURL,
 				FileName: "voice.ogg",
@@ -396,7 +396,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	if msg.Video != nil {
 		fileURL := b.getFileURL(msg.Video.FileID)
 		if fileURL != "" {
-			chatReq.File = &jikiv1.FileInput{
+			chatReq.File = &starpionv1.FileInput{
 				FileType: "video",
 				FileUrl:  fileURL,
 				FileName: "video.mp4",
@@ -427,7 +427,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			if docMime == "" {
 				docMime = "application/octet-stream"
 			}
-			chatReq.File = &jikiv1.FileInput{
+			chatReq.File = &starpionv1.FileInput{
 				FileType: "document",
 				FileUrl:  fileURL,
 				FileName: msg.Document.FileName,
@@ -494,7 +494,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 
 // handleMessageStream processes a chat request via server-side streaming.
 // Sends an initial message to Telegram and progressively edits it as tokens arrive.
-func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID int, userID, convID string, req *jikiv1.ChatRequest) error {
+func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID int, userID, convID string, req *starpionv1.ChatRequest) error {
 	reqCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 
@@ -542,7 +542,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 		}
 
 		switch resp.Type {
-		case jikiv1.ResponseType_TEXT:
+		case starpionv1.ResponseType_TEXT:
 			accumulated.WriteString(resp.Content)
 
 			// First text chunk: transition status message or send new.
@@ -573,7 +573,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 				lastLen = accumulated.Len()
 			}
 
-		case jikiv1.ResponseType_STREAM_END:
+		case starpionv1.ResponseType_STREAM_END:
 			// Transition status message if text accumulated but not yet sent.
 			if statusMsgID != 0 && sentMsgID == 0 && accumulated.Len() > 0 {
 				sentMsgID = statusMsgID
@@ -607,7 +607,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 			b.setReaction(chatID, messageID, "👍")
 			return nil
 
-		case jikiv1.ResponseType_ERROR:
+		case starpionv1.ResponseType_ERROR:
 			errText := resp.Content
 			if errText == "" {
 				errText = "잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요."
@@ -627,7 +627,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 			b.setReaction(chatID, messageID, "😢")
 			return nil
 
-		case jikiv1.ResponseType_FILE:
+		case starpionv1.ResponseType_FILE:
 			b.sendFile(chatID, resp.FileData, resp.FileName, resp.FileMime)
 			// Upload to MinIO and collect attachment for DB persistence.
 			if att, uploadErr := b.uploadFileToStorage(reqCtx, resp.FileName, resp.FileMime, resp.FileData); uploadErr != nil {
@@ -636,7 +636,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 				attachments = append(attachments, att)
 			}
 
-		case jikiv1.ResponseType_TOOL_CALL:
+		case starpionv1.ResponseType_TOOL_CALL:
 			// Update status message with tool-specific text.
 			if statusMsgID != 0 {
 				statusText := getToolStatus(resp.ToolName)
@@ -644,7 +644,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 				b.api.Send(edit) // best-effort
 			}
 
-		case jikiv1.ResponseType_TOOL_RESULT:
+		case starpionv1.ResponseType_TOOL_RESULT:
 			// Ignored; tool results are processed internally by the agent.
 		}
 	}
@@ -678,7 +678,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 }
 
 // handleMessageUnary processes a chat request via unary gRPC call (fallback).
-func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID int, userID, convID string, req *jikiv1.ChatRequest) {
+func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID int, userID, convID string, req *starpionv1.ChatRequest) {
 	typingCtx, typingCancel := context.WithCancel(ctx)
 	go b.typingLoop(typingCtx, chatID)
 
@@ -905,7 +905,7 @@ func (b *Bot) uploadFileToStorage(ctx context.Context, name, mime string, data [
 }
 
 func (b *Bot) handleStart(chatID int64) {
-	text := "안녕하세요! 저는 지기(jiki)예요.\n" +
+	text := "안녕하세요! 저는 스타피온(Starpion)이에요.\n" +
 		"가계부 기록, 지출 조회, 일상 기록 등을 도와드릴게요.\n" +
 		"편하게 말씀해 주세요!"
 	msg := tgbotapi.NewMessage(chatID, text)

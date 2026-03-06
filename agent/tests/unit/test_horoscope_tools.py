@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.skills.horoscope.tools module.
+"""Unit tests for starpion_agent.skills.horoscope.tools module.
 
 Tests cover:
 - ``GetHoroscopeInput``: Pydantic schema
@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from jiki_agent.skills.horoscope.tools import GetHoroscopeInput, get_horoscope
+from starpion_agent.skills.horoscope.tools import GetHoroscopeInput, get_horoscope
 
 
 # =========================================================================
@@ -56,7 +56,7 @@ class TestGetHoroscopeSuccess:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("jiki_agent.skills.horoscope.tools.httpx.AsyncClient", return_value=mock_client):
+        with patch("starpion_agent.skills.horoscope.tools.httpx.AsyncClient", return_value=mock_client):
             result = await get_horoscope.ainvoke({"sign": "사자자리"})
 
         assert "사자자리" in result
@@ -74,7 +74,7 @@ class TestGetHoroscopeSuccess:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("jiki_agent.skills.horoscope.tools.httpx.AsyncClient", return_value=mock_client):
+        with patch("starpion_agent.skills.horoscope.tools.httpx.AsyncClient", return_value=mock_client):
             result = await get_horoscope.ainvoke({"sign": "aries"})
 
         assert "양자리" in result
@@ -94,7 +94,7 @@ class TestGetHoroscopeErrors:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("jiki_agent.skills.horoscope.tools.httpx.AsyncClient", return_value=mock_client):
+        with patch("starpion_agent.skills.horoscope.tools.httpx.AsyncClient", return_value=mock_client):
             result = await get_horoscope.ainvoke({"sign": "양자리"})
 
         assert "느려요" in result or "다시 시도" in result
@@ -113,7 +113,7 @@ class TestGetHoroscopeErrors:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("jiki_agent.skills.horoscope.tools.httpx.AsyncClient", return_value=mock_client):
+        with patch("starpion_agent.skills.horoscope.tools.httpx.AsyncClient", return_value=mock_client):
             result = await get_horoscope.ainvoke({"sign": "양자리"})
 
         assert "접속할 수 없" in result
@@ -129,7 +129,7 @@ class TestGetHoroscopeErrors:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("jiki_agent.skills.horoscope.tools.httpx.AsyncClient", return_value=mock_client):
+        with patch("starpion_agent.skills.horoscope.tools.httpx.AsyncClient", return_value=mock_client):
             result = await get_horoscope.ainvoke({"sign": "양자리"})
 
         assert "가져올 수 없" in result

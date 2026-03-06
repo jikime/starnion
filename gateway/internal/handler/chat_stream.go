@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
-	"github.com/jikime/jiki/gateway/internal/storage"
+	starpionv1 "github.com/jikime/starpion/gateway/gen/starpion/v1"
+	"github.com/jikime/starpion/gateway/internal/storage"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -20,7 +20,7 @@ import (
 // Stream protocol: SSE where each event carries a UIMessageChunk JSON payload.
 // Reference: https://sdk.vercel.ai/docs/ai-sdk-ui/stream-protocol (v6 format)
 type ChatStreamHandler struct {
-	grpcClient jikiv1.AgentServiceClient
+	grpcClient starpionv1.AgentServiceClient
 	db         *sql.DB        // may be nil
 	minio      *storage.MinIO // may be nil
 }
@@ -28,7 +28,7 @@ type ChatStreamHandler struct {
 // NewChatStreamHandler creates a new ChatStreamHandler.
 func NewChatStreamHandler(conn *grpc.ClientConn, db *sql.DB, minio *storage.MinIO) *ChatStreamHandler {
 	return &ChatStreamHandler{
-		grpcClient: jikiv1.NewAgentServiceClient(conn),
+		grpcClient: starpionv1.NewAgentServiceClient(conn),
 		db:         db,
 		minio:      minio,
 	}
@@ -99,7 +99,7 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 
 	// Map attached files to gRPC FileInput.
 	// The first file is sent as FileInput; additional files are appended as text annotations.
-	var fileInput *jikiv1.FileInput
+	var fileInput *starpionv1.FileInput
 	message := req.Message
 	for i, f := range req.Files {
 		fileType := "document"
@@ -109,7 +109,7 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 			fileType = "audio"
 		}
 		if i == 0 {
-			fileInput = &jikiv1.FileInput{
+			fileInput = &starpionv1.FileInput{
 				FileType: fileType,
 				FileUrl:  f.URL,
 				FileName: f.Name,
@@ -119,7 +119,7 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 		}
 	}
 
-	stream, err := h.grpcClient.ChatStream(ctx, &jikiv1.ChatRequest{
+	stream, err := h.grpcClient.ChatStream(ctx, &starpionv1.ChatRequest{
 		UserId:   req.UserID,
 		Message:  message,
 		ThreadId: req.ThreadID,
@@ -164,7 +164,7 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 		}
 
 		switch resp.Type {
-		case jikiv1.ResponseType_TEXT:
+		case starpionv1.ResponseType_TEXT:
 			if !textStarted {
 				sseEvent(map[string]string{"type": "text-start", "id": textPartID})
 				textStarted = true
@@ -172,17 +172,17 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 			assistantBuf.WriteString(resp.Content)
 			sseEvent(map[string]any{"type": "text-delta", "id": textPartID, "delta": resp.Content})
 
-		case jikiv1.ResponseType_TOOL_CALL:
+		case starpionv1.ResponseType_TOOL_CALL:
 			// Tool execution is handled transparently on the backend.
 			// Suppress tool-input-available to avoid AI SDK ID-matching errors
 			// when ToolName is not propagated to the TOOL_RESULT event.
 			log.Debug().Str("tool", resp.ToolName).Msg("chat_stream: tool call (suppressed from SSE)")
 
-		case jikiv1.ResponseType_TOOL_RESULT:
+		case starpionv1.ResponseType_TOOL_RESULT:
 			// Suppress tool-output-available; the model's text output follows.
 			log.Debug().Str("tool", resp.ToolName).Msg("chat_stream: tool result (suppressed from SSE)")
 
-		case jikiv1.ResponseType_FILE:
+		case starpionv1.ResponseType_FILE:
 			if h.minio != nil && len(resp.FileData) > 0 {
 				att, uploadErr := h.minio.Upload(context.Background(), resp.FileName, resp.FileMime, resp.FileData)
 				if uploadErr != nil {
@@ -219,13 +219,13 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 				sseEvent(map[string]any{"type": "text-delta", "id": textPartID, "delta": note})
 			}
 
-		case jikiv1.ResponseType_ERROR:
+		case starpionv1.ResponseType_ERROR:
 			sseEvent(map[string]string{"type": "error", "errorText": resp.Content})
 			fmt.Fprintf(w, "data: [DONE]\n\n")
 			flusher.Flush()
 			return nil
 
-		case jikiv1.ResponseType_STREAM_END:
+		case starpionv1.ResponseType_STREAM_END:
 			finish("stop")
 			return nil
 		}

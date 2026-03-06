@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.skills.dday.tools module.
+"""Unit tests for starpion_agent.skills.dday.tools module.
 
 Tests cover:
 - ``SetDdayInput`` / ``ListDdaysInput`` / ``DeleteDdayInput``: Pydantic schemas
@@ -16,8 +16,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from jiki_agent.context import set_current_user
-from jiki_agent.skills.dday.tools import (
+from starpion_agent.context import set_current_user
+from starpion_agent.skills.dday.tools import (
     DeleteDdayInput,
     ListDdaysInput,
     SetDdayInput,
@@ -112,8 +112,8 @@ class TestSetDday:
         assert "형식이 올바르지" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.dday.tools.knowledge_repo")
-    @patch("jiki_agent.skills.dday.tools.get_pool")
+    @patch("starpion_agent.skills.dday.tools.knowledge_repo")
+    @patch("starpion_agent.skills.dday.tools.get_pool")
     async def test_max_ddays(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -127,8 +127,8 @@ class TestSetDday:
         assert "최대" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.dday.tools.knowledge_repo")
-    @patch("jiki_agent.skills.dday.tools.get_pool")
+    @patch("starpion_agent.skills.dday.tools.knowledge_repo")
+    @patch("starpion_agent.skills.dday.tools.get_pool")
     async def test_successful_creation(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -146,8 +146,8 @@ class TestSetDday:
         mock_repo.upsert.assert_awaited_once()
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.dday.tools.knowledge_repo")
-    @patch("jiki_agent.skills.dday.tools.get_pool")
+    @patch("starpion_agent.skills.dday.tools.knowledge_repo")
+    @patch("starpion_agent.skills.dday.tools.get_pool")
     async def test_recurring_label(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -172,8 +172,8 @@ class TestListDdays:
         assert "사용자 정보" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.dday.tools.knowledge_repo")
-    @patch("jiki_agent.skills.dday.tools.get_pool")
+    @patch("starpion_agent.skills.dday.tools.knowledge_repo")
+    @patch("starpion_agent.skills.dday.tools.get_pool")
     async def test_no_ddays(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -183,8 +183,8 @@ class TestListDdays:
         assert "없어요" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.dday.tools.knowledge_repo")
-    @patch("jiki_agent.skills.dday.tools.get_pool")
+    @patch("starpion_agent.skills.dday.tools.knowledge_repo")
+    @patch("starpion_agent.skills.dday.tools.get_pool")
     async def test_list_future_only(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -212,8 +212,8 @@ class TestListDdays:
         assert "지난행사" not in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.dday.tools.knowledge_repo")
-    @patch("jiki_agent.skills.dday.tools.get_pool")
+    @patch("starpion_agent.skills.dday.tools.knowledge_repo")
+    @patch("starpion_agent.skills.dday.tools.get_pool")
     async def test_list_include_past(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -241,8 +241,8 @@ class TestListDdays:
         assert "과거" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.dday.tools.knowledge_repo")
-    @patch("jiki_agent.skills.dday.tools.get_pool")
+    @patch("starpion_agent.skills.dday.tools.knowledge_repo")
+    @patch("starpion_agent.skills.dday.tools.get_pool")
     async def test_recurring_past_shown(self, mock_get_pool, mock_repo):
         """Recurring D-days should be shown even if target date is past."""
         mock_pool = MagicMock()
@@ -275,8 +275,8 @@ class TestDeleteDday:
         assert "사용자 정보" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.dday.tools.knowledge_repo")
-    @patch("jiki_agent.skills.dday.tools.get_pool")
+    @patch("starpion_agent.skills.dday.tools.knowledge_repo")
+    @patch("starpion_agent.skills.dday.tools.get_pool")
     async def test_not_found(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -286,8 +286,8 @@ class TestDeleteDday:
         assert "찾을 수 없" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.dday.tools.knowledge_repo")
-    @patch("jiki_agent.skills.dday.tools.get_pool")
+    @patch("starpion_agent.skills.dday.tools.knowledge_repo")
+    @patch("starpion_agent.skills.dday.tools.get_pool")
     async def test_successful_deletion(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool

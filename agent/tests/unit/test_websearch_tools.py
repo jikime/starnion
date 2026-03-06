@@ -1,4 +1,4 @@
-"""Unit tests for jiki_agent.skills.websearch.tools module.
+"""Unit tests for starpion_agent.skills.websearch.tools module.
 
 Tests cover:
 - ``WebSearchInput`` / ``WebFetchInput``: Pydantic input schemas
@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from jiki_agent.skills.websearch.tools import (
+from starpion_agent.skills.websearch.tools import (
     WebFetchInput,
     WebSearchInput,
     _format_search_results,
@@ -93,14 +93,14 @@ class TestFormatSearchResults:
 # =========================================================================
 class TestWebSearchTool:
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.websearch.tools.settings")
+    @patch("starpion_agent.skills.websearch.tools.settings")
     async def test_no_api_key_returns_error(self, mock_settings):
         mock_settings.tavily_api_key = ""
         result = await web_search.ainvoke({"query": "test"})
         assert "Tavily API 키" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.websearch.tools.settings")
+    @patch("starpion_agent.skills.websearch.tools.settings")
     async def test_successful_search(self, mock_settings):
         mock_settings.tavily_api_key = "test-key"
 
@@ -121,7 +121,7 @@ class TestWebSearchTool:
         assert "https://example.com" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.websearch.tools.settings")
+    @patch("starpion_agent.skills.websearch.tools.settings")
     async def test_search_api_error(self, mock_settings):
         mock_settings.tavily_api_key = "test-key"
 
@@ -133,7 +133,7 @@ class TestWebSearchTool:
         assert "오류가 발생했어요" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.websearch.tools.settings")
+    @patch("starpion_agent.skills.websearch.tools.settings")
     async def test_empty_results(self, mock_settings):
         mock_settings.tavily_api_key = "test-key"
 
@@ -179,7 +179,7 @@ def _patch_httpx(mock_response=None, side_effect=None):
         mock_ctx.get = AsyncMock(side_effect=side_effect)
     else:
         mock_ctx.get = AsyncMock(return_value=mock_response)
-    return patch("jiki_agent.skills.websearch.tools.httpx.AsyncClient", return_value=mock_ctx)
+    return patch("starpion_agent.skills.websearch.tools.httpx.AsyncClient", return_value=mock_ctx)
 
 
 class TestWebFetchTool:
@@ -221,7 +221,7 @@ class TestWebFetchTool:
         assert "5MB" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.websearch.tools._extract_readable_text")
+    @patch("starpion_agent.skills.websearch.tools._extract_readable_text")
     async def test_html_content_extracted(self, mock_extract):
         mock_extract.return_value = "Extracted article text"
         resp = _make_mock_response(text="<html><body><p>Hello</p></body></html>")
@@ -244,7 +244,7 @@ class TestWebFetchTool:
         assert '"key"' in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.websearch.tools._extract_readable_text")
+    @patch("starpion_agent.skills.websearch.tools._extract_readable_text")
     async def test_truncation_applied(self, mock_extract):
         mock_extract.return_value = "A" * 10000
         resp = _make_mock_response(text="<html>long</html>")
@@ -254,7 +254,7 @@ class TestWebFetchTool:
         assert "잘렸어요" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.websearch.tools._extract_readable_text", side_effect=Exception)
+    @patch("starpion_agent.skills.websearch.tools._extract_readable_text", side_effect=Exception)
     async def test_readability_fallback_to_strip(self, _mock_extract):
         resp = _make_mock_response(text="<p>Fallback text</p>")
         with _patch_httpx(mock_response=resp):
@@ -262,7 +262,7 @@ class TestWebFetchTool:
         assert "Fallback text" in result
 
     @pytest.mark.asyncio
-    @patch("jiki_agent.skills.websearch.tools._extract_readable_text", return_value="")
+    @patch("starpion_agent.skills.websearch.tools._extract_readable_text", return_value="")
     async def test_empty_extraction_returns_error(self, _mock_extract):
         resp = _make_mock_response(text="<html></html>")
         with _patch_httpx(mock_response=resp):

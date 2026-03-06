@@ -1,1 +1,1 @@
-"""Test package for jiki-agent."""
+"""Test package for starpion-agent."""

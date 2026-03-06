@@ -11,18 +11,18 @@ import (
 	"syscall"
 	"time"
 
-	jikiv1 "github.com/jikime/jiki/gateway/gen/jiki/v1"
-	"github.com/jikime/jiki/gateway/internal/activity"
-	"github.com/jikime/jiki/gateway/internal/auth"
-	"github.com/jikime/jiki/gateway/internal/handler"
-	"github.com/jikime/jiki/gateway/internal/identity"
-	"github.com/jikime/jiki/gateway/internal/logbuf"
-	"github.com/jikime/jiki/gateway/internal/middleware"
-	"github.com/jikime/jiki/gateway/internal/scheduler"
-	"github.com/jikime/jiki/gateway/internal/skill"
-	"github.com/jikime/jiki/gateway/internal/storage"
-	"github.com/jikime/jiki/gateway/internal/telegram"
-	"github.com/jikime/jiki/gateway/internal/wschat"
+	starpionv1 "github.com/jikime/starpion/gateway/gen/starpion/v1"
+	"github.com/jikime/starpion/gateway/internal/activity"
+	"github.com/jikime/starpion/gateway/internal/auth"
+	"github.com/jikime/starpion/gateway/internal/handler"
+	"github.com/jikime/starpion/gateway/internal/identity"
+	"github.com/jikime/starpion/gateway/internal/logbuf"
+	"github.com/jikime/starpion/gateway/internal/middleware"
+	"github.com/jikime/starpion/gateway/internal/scheduler"
+	"github.com/jikime/starpion/gateway/internal/skill"
+	"github.com/jikime/starpion/gateway/internal/storage"
+	"github.com/jikime/starpion/gateway/internal/telegram"
+	"github.com/jikime/starpion/gateway/internal/wschat"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
@@ -201,7 +201,7 @@ func main() {
 	}
 
 	// Create WebSocket hub for web chat.
-	wsHub := wschat.NewHub(jikiv1.NewAgentServiceClient(grpcConn), db, minioStore)
+	wsHub := wschat.NewHub(starpionv1.NewAgentServiceClient(grpcConn), db, minioStore)
 
 	// Start per-user Telegram bot pool.
 	// Pass the gateway root context so bot goroutines live for the process lifetime.
@@ -462,6 +462,8 @@ func main() {
 	if db != nil {
 		googleHandler := handler.NewGoogleCallbackHandler(db)
 		e.GET("/auth/google/callback", googleHandler.Callback)
+		// Telegram OAuth start: short URL with no underscores to avoid Markdown corruption.
+		e.GET("/auth/google/telegram", googleHandler.TelegramOAuthStart)
 
 		// Integration management endpoints.
 		integrationHandler := handler.NewIntegrationHandler(db)
@@ -506,6 +508,10 @@ func main() {
 		api.GET("/statistics", statsHandler.GetStatistics)
 		api.GET("/statistics/insights", statsHandler.GetInsights)
 
+		// Communication analytics endpoints.
+		analyticsHandler := handler.NewAnalyticsHandler(db)
+		api.GET("/analytics", analyticsHandler.GetAnalytics)
+
 		// Cron / user schedule endpoints.
 		if db != nil {
 			cronHandler := handler.NewCronHandler(db)
@@ -535,6 +541,24 @@ func main() {
 		api.POST("/personas", modelsHandler.CreatePersona)
 		api.PUT("/personas/:id", modelsHandler.UpdatePersona)
 		api.DELETE("/personas/:id", modelsHandler.DeletePersona)
+
+		// Diary / journal endpoints.
+		diaryHandler := handler.NewDiaryHandler(db)
+		api.GET("/diary/entries", diaryHandler.ListEntries)
+		api.POST("/diary/entries", diaryHandler.CreateEntry)
+		api.GET("/diary/entries/:id", diaryHandler.GetEntry)
+		api.PUT("/diary/entries/:id", diaryHandler.UpdateEntry)
+		api.DELETE("/diary/entries/:id", diaryHandler.DeleteEntry)
+
+		// Goals management endpoints.
+		goalsHandler := handler.NewGoalsHandler(db)
+		api.GET("/goals", goalsHandler.ListGoals)
+		api.POST("/goals", goalsHandler.CreateGoal)
+		api.GET("/goals/:id", goalsHandler.GetGoal)
+		api.PUT("/goals/:id", goalsHandler.UpdateGoal)
+		api.DELETE("/goals/:id", goalsHandler.DeleteGoal)
+		api.POST("/goals/:id/checkin", goalsHandler.AddCheckin)
+		api.DELETE("/goals/:id/checkin", goalsHandler.RemoveCheckin)
 	}
 
 	// Manual report trigger for testing proactive notifications.

@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/jikime/jiki/gateway/internal/activity"
-	"github.com/jikime/jiki/gateway/internal/identity"
-	"github.com/jikime/jiki/gateway/internal/skill"
-	"github.com/jikime/jiki/gateway/internal/storage"
+	"github.com/jikime/starpion/gateway/internal/activity"
+	"github.com/jikime/starpion/gateway/internal/identity"
+	"github.com/jikime/starpion/gateway/internal/skill"
+	"github.com/jikime/starpion/gateway/internal/storage"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 )
