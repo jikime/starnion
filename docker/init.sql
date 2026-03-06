@@ -139,6 +139,48 @@ CREATE INDEX IF NOT EXISTS idx_document_sections_content_tsv
     ON document_sections USING gin(content_tsv);
 
 -- =============================================================
+-- IMAGES
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS user_images (
+    id         BIGSERIAL   PRIMARY KEY,
+    user_id    TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    url        TEXT        NOT NULL,
+    name       TEXT        NOT NULL DEFAULT 'image.png',
+    mime       TEXT        NOT NULL DEFAULT 'image/png',
+    size       BIGINT      NOT NULL DEFAULT 0,
+    source     TEXT        NOT NULL DEFAULT 'web',   -- 'web', 'telegram', 'webchat'
+    type       TEXT        NOT NULL DEFAULT 'generated',  -- 'generated', 'edited', 'analyzed'
+    prompt     TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_images_user_id ON user_images(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_images_created_at ON user_images(created_at DESC);
+
+-- =============================================================
+-- AUDIOS
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS user_audios (
+    id         BIGSERIAL   PRIMARY KEY,
+    user_id    TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    url        TEXT        NOT NULL,
+    name       TEXT        NOT NULL DEFAULT 'audio.wav',
+    mime       TEXT        NOT NULL DEFAULT 'audio/wav',
+    size       BIGINT      NOT NULL DEFAULT 0,
+    duration   INTEGER     NOT NULL DEFAULT 0,
+    source     TEXT        NOT NULL DEFAULT 'web',
+    type       TEXT        NOT NULL DEFAULT 'uploaded',
+    transcript TEXT,
+    prompt     TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_audios_user_id    ON user_audios(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_audios_created_at ON user_audios(created_at DESC);
+
+-- =============================================================
 -- REPORTS
 -- =============================================================
 

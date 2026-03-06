@@ -197,6 +197,12 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 					sseEvent(map[string]any{"type": "text-delta", "id": textPartID, "delta": note})
 				} else {
 					attachments = append(attachments, att)
+					// Record image/audio to gallery tables.
+					if strings.HasPrefix(att.Mime, "image/") {
+						RecordImage(h.db, req.UserID, att.URL, att.Name, att.Mime, att.Size, "web", imageTypeFromFileName(resp.FileName), req.Message)
+					} else if strings.HasPrefix(att.Mime, "audio/") {
+						RecordAudio(h.db, req.UserID, att.URL, att.Name, att.Mime, att.Size, 0, "web", "generated", "", req.Message)
+					}
 					// Emit AI SDK v6 file chunk — creates a FileUIPart in the UIMessage.
 					// name and size are non-standard extras; the frontend intercepts them
 					// via a custom fetch middleware before the AI SDK strips them.

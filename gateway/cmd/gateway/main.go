@@ -587,6 +587,16 @@ func main() {
 		api.GET("/documents", documentHandler.ListDocuments)
 		api.POST("/documents", documentHandler.UploadDocument)
 		api.DELETE("/documents/:id", documentHandler.DeleteDocument)
+
+		// Image gallery endpoints.
+		imageHandler := handler.NewImageHandler(db)
+		api.GET("/images", imageHandler.ListImages)
+		api.DELETE("/images/:id", imageHandler.DeleteImage)
+
+		// Audio gallery endpoints.
+		audioHandler := handler.NewAudioHandler(db)
+		api.GET("/audios", audioHandler.ListAudios)
+		api.DELETE("/audios/:id", audioHandler.DeleteAudio)
 	}
 
 	// Manual report trigger for testing proactive notifications.

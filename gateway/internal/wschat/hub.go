@@ -299,6 +299,12 @@ func (c *Client) handleChatMessage(frame InFrame) {
 				continue
 			}
 			attachments = append(attachments, att)
+			// Record image/audio to gallery tables.
+			if strings.HasPrefix(att.Mime, "image/") {
+				recordImage(c.hub.db, c.userID, att.URL, att.Name, att.Mime, att.Size, "webchat", wsImageType(resp.FileName), message)
+			} else if strings.HasPrefix(att.Mime, "audio/") {
+				recordAudio(c.hub.db, c.userID, att.URL, att.Name, att.Mime, att.Size, 0, "webchat", "generated", "", message)
+			}
 			c.send <- OutFrame{
 				Type:  FrameEvent,
 				ID:    frame.ID,
@@ -337,6 +343,42 @@ func (h *Hub) uploadFile(ctx context.Context, name, mime string, data []byte) (s
 		return storage.FileAttachment{}, fmt.Errorf("storage not configured")
 	}
 	return h.store.Upload(ctx, name, mime, data)
+}
+
+// recordImage inserts an image row into user_images (fire-and-forget).
+func recordImage(db *sql.DB, userID, url, name, mime string, size int64, source, imgType, prompt string) {
+	if db == nil || !strings.HasPrefix(mime, "image/") {
+		return
+	}
+	_, err := db.ExecContext(context.Background(), `
+		INSERT INTO user_images (user_id, url, name, mime, size, source, type, prompt)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, userID, url, name, mime, size, source, imgType, prompt)
+	if err != nil {
+		log.Warn().Err(err).Str("user_id", userID).Msg("ws: record image failed")
+	}
+}
+
+// wsImageType infers 'generated' or 'edited' from agent file name.
+func wsImageType(name string) string {
+	if strings.HasPrefix(name, "edited") {
+		return "edited"
+	}
+	return "generated"
+}
+
+// recordAudio inserts an audio row into user_audios (fire-and-forget).
+func recordAudio(db *sql.DB, userID, url, name, mime string, size int64, duration int, source, audioType, transcript, prompt string) {
+	if db == nil || !strings.HasPrefix(mime, "audio/") {
+		return
+	}
+	_, err := db.ExecContext(context.Background(), `
+		INSERT INTO user_audios (user_id, url, name, mime, size, duration, source, type, transcript, prompt)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, userID, url, name, mime, size, duration, source, audioType, transcript, prompt)
+	if err != nil {
+		log.Warn().Err(err).Str("user_id", userID).Msg("ws: record audio failed")
+	}
 }
 
 // sendError delivers an error response frame to the browser.

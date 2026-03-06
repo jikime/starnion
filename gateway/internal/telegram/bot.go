@@ -377,15 +377,17 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 				FileUrl:  fileURL,
 				FileName: "voice.ogg",
 			}
-			go func(u string) {
+			go func(u string, dur int) {
 				mirrorCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
 				if att, err := b.mirrorToStorage(mirrorCtx, "voice.ogg", "audio/ogg", u); err != nil {
 					log.Warn().Err(err).Msg("telegram: mirror voice to storage failed")
 				} else {
 					mirrorCh <- att
+					// Record uploaded voice to audio library.
+					b.recordAudio(userID, att.URL, att.Name, att.Mime, att.Size, dur, "uploaded", "", "")
 				}
-			}(fileURL)
+			}(fileURL, msg.Voice.Duration)
 			if chatReq.Message == "" {
 				chatReq.Message = "이 음성을 텍스트로 변환해주세요."
 			}
@@ -634,6 +636,11 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 				log.Warn().Err(uploadErr).Str("file", resp.FileName).Msg("telegram: file upload to storage failed")
 			} else {
 				attachments = append(attachments, att)
+				if strings.HasPrefix(att.Mime, "image/") {
+					b.recordImage(userID, att.URL, att.Name, att.Mime, att.Size, tgImageType(resp.FileName), req.Message)
+				} else if strings.HasPrefix(att.Mime, "audio/") {
+					b.recordAudio(userID, att.URL, att.Name, att.Mime, att.Size, 0, "generated", req.Message, "")
+				}
 			}
 
 		case starpionv1.ResponseType_TOOL_CALL:
@@ -708,6 +715,11 @@ func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID in
 			log.Warn().Err(uploadErr).Str("file", resp.FileName).Msg("telegram: file upload to storage failed (unary)")
 		} else {
 			attachments = append(attachments, att)
+			if strings.HasPrefix(att.Mime, "image/") {
+				b.recordImage(userID, att.URL, att.Name, att.Mime, att.Size, tgImageType(resp.FileName), req.Message)
+			} else if strings.HasPrefix(att.Mime, "audio/") {
+				b.recordAudio(userID, att.URL, att.Name, att.Mime, att.Size, 0, "generated", req.Message, "")
+			}
 		}
 	}
 
@@ -1264,4 +1276,41 @@ func (b *Bot) handleSkillToggle(ctx context.Context, callback *tgbotapi.Callback
 	b.api.Request(callbackCfg)
 
 	log.Info().Str("user_id", userID).Str("skill_id", skillID).Bool("enabled", enabled).Msg("skill toggled")
+}
+
+// recordImage inserts an image row into user_images (fire-and-forget).
+func (b *Bot) recordImage(userID, url, name, mime string, size int64, imgType, prompt string) {
+	if b.db == nil || !strings.HasPrefix(mime, "image/") {
+		return
+	}
+	_, err := b.db.ExecContext(context.Background(), `
+		INSERT INTO user_images (user_id, url, name, mime, size, source, type, prompt)
+		VALUES ($1, $2, $3, $4, $5, 'telegram', $6, $7)
+	`, userID, url, name, mime, size, imgType, prompt)
+	if err != nil {
+		log.Warn().Err(err).Str("user_id", userID).Msg("telegram: record image failed")
+	}
+}
+
+// tgImageType infers 'generated' or 'edited' from agent file name.
+func tgImageType(name string) string {
+	if strings.HasPrefix(name, "edited") {
+		return "edited"
+	}
+	return "generated"
+}
+
+// recordAudio inserts an audio row into user_audios.
+// audioType: 'uploaded' | 'recorded' | 'generated'
+func (b *Bot) recordAudio(userID, url, name, mime string, size int64, duration int, audioType, prompt, transcript string) {
+	if b.db == nil || !strings.HasPrefix(mime, "audio/") {
+		return
+	}
+	_, err := b.db.ExecContext(context.Background(), `
+		INSERT INTO user_audios (user_id, url, name, mime, size, duration, source, type, prompt, transcript)
+		VALUES ($1, $2, $3, $4, $5, $6, 'telegram', $7, $8, $9)
+	`, userID, url, name, mime, size, duration, audioType, prompt, transcript)
+	if err != nil {
+		log.Warn().Err(err).Str("user_id", userID).Msg("telegram: record audio failed")
+	}
 }
