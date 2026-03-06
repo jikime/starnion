@@ -21,7 +21,6 @@ import {
   Image,
   Music,
   Search,
-  Wrench,
   Settings,
   Link2,
   BrainCircuit,
@@ -75,7 +74,6 @@ const mediaNav = [
 
 const toolsNav = [
   { title: "웹검색", icon: Search, href: "/search" },
-  { title: "유틸리티", icon: Wrench, href: "/utilities" },
   { title: "스킬", icon: Cog, href: "/skills" },
 ]
 

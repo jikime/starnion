@@ -6,6 +6,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from typing import Any, Callable, Coroutine
+from urllib.parse import unquote_plus
 
 
 MAX_ENTRIES = 2000
@@ -217,6 +218,39 @@ async def _handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) ->
                 "sources": list(sources),
             }).encode()
             _write_response(writer, 200, payload, content_type="application/json")
+
+        elif path == "/search":
+            # Hybrid RAG search endpoint — proxy to retriever.
+            user_id_param = unquote_plus(params.get("user_id", ""))
+            q = unquote_plus(params.get("q", ""))
+            top_k = min(int(params.get("limit", 10)), 50)
+
+            if not user_id_param or not q:
+                _write_response(writer, 400, b'{"error":"user_id and q required"}',
+                                content_type="application/json")
+                return
+
+            try:
+                from starpion_agent.memory import retriever as _retriever
+                results = await _retriever.search(q, user_id_param, top_k=top_k)
+
+                def _safe(v: Any) -> Any:
+                    if v is None or isinstance(v, (str, int, float, bool)):
+                        return v
+                    if hasattr(v, "isoformat"):
+                        return v.isoformat()
+                    return str(v)
+
+                serialized = [
+                    {k: _safe(v) for k, v in r.items() if k != "embedding"}
+                    for r in results
+                ]
+                payload = json.dumps(serialized, ensure_ascii=False).encode()
+                _write_response(writer, 200, payload, content_type="application/json")
+            except Exception as exc:
+                _write_response(writer, 500,
+                                json.dumps({"error": str(exc)}).encode(),
+                                content_type="application/json")
 
         elif path == "/logs/stream":
             # SSE endpoint.

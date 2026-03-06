@@ -598,6 +598,7 @@ func main() {
 		api.GET("/searches", searchHandler.ListSearches)
 		api.POST("/searches", searchHandler.SaveSearch)
 		api.DELETE("/searches/:id", searchHandler.DeleteSearch)
+		api.GET("/search/hybrid", searchHandler.HybridSearch)
 
 		// Audio gallery endpoints.
 		audioHandler := handler.NewAudioHandler(db)

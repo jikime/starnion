@@ -5,7 +5,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -123,6 +126,47 @@ func (h *SearchHandler) embedSearch(userID string, searchID int64) {
 	if resp.StatusCode != http.StatusAccepted {
 		log.Warn().Int("status", resp.StatusCode).Int64("search_id", searchID).Msg("embed-search unexpected status")
 	}
+}
+
+// HybridSearch GET /api/v1/search/hybrid?q=&user_id=&limit=
+// Proxies to the Python agent's GET /search endpoint on port 8082.
+func (h *SearchHandler) HybridSearch(c echo.Context) error {
+	userID := c.QueryParam("user_id")
+	q := c.QueryParam("q")
+	if userID == "" || q == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and q are required"})
+	}
+
+	limit := 10
+	if v, err := strconv.Atoi(c.QueryParam("limit")); err == nil && v > 0 && v <= 50 {
+		limit = v
+	}
+
+	if h.agentHTTPURL == "" {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "agent not configured"})
+	}
+
+	agentURL := fmt.Sprintf("%s/search?user_id=%s&q=%s&limit=%d",
+		h.agentHTTPURL,
+		url.QueryEscape(userID),
+		url.QueryEscape(q),
+		limit,
+	)
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Get(agentURL)
+	if err != nil {
+		log.Error().Err(err).Str("q", q).Msg("hybrid search agent request failed")
+		return c.JSON(http.StatusBadGateway, map[string]string{"error": "agent unavailable"})
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "read failed"})
+	}
+
+	return c.JSONBlob(resp.StatusCode, body)
 }
 
 // DeleteSearch DELETE /api/v1/searches/:id?user_id=
