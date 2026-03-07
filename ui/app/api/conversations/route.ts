@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function GET() {
   const session = await auth()
@@ -9,8 +9,8 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
   }
 
-  const res = await fetch(
-    `${API_URL}/api/v1/conversations?user_id=${encodeURIComponent(session.user.id)}`,
+  const res = await gatewayFetch(
+    `/api/v1/conversations?user_id=${encodeURIComponent(session.user.id)}`,
     { cache: "no-store" }
   )
   const data = await res.json().catch(() => [])
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null)
   const title: string = body?.title ?? "새 대화"
 
-  const res = await fetch(`${API_URL}/api/v1/conversations`, {
+  const res = await gatewayFetch(`/api/v1/conversations`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user_id: session.user.id, title }),

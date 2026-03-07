@@ -15,7 +15,7 @@
 import { auth } from "@/auth"
 import { NextRequest, NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     payload.files = [{ url: file_url, name: file_name ?? "audio.webm", mime: file_mime ?? "audio/webm" }]
   }
 
-  const upstream = await fetch(`${API_URL}/api/v1/chat/stream`, {
+  const upstream = await gatewayFetch(`/api/v1/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextRequest, NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function DELETE(
   _req: NextRequest,
@@ -13,7 +13,7 @@ export async function DELETE(
   }
 
   const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await fetch(`${API_URL}/api/v1/documents/${params.id}?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/documents/${params.id}?${qs}`, {
     method: "DELETE",
   })
   const data = await res.json().catch(() => ({}))

@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function PATCH(
   request: Request,
@@ -18,7 +18,7 @@ export async function PATCH(
     return NextResponse.json({ error: "title is required" }, { status: 400 })
   }
 
-  const res = await fetch(`${API_URL}/api/v1/conversations/${id}`, {
+  const res = await gatewayFetch(`/api/v1/conversations/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user_id: session.user.id, title: body.title }),

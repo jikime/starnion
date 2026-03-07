@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function PUT(request: Request) {
   const session = await auth()
@@ -15,7 +15,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "api_key required" }, { status: 400 })
   }
 
-  const res = await fetch(`${API_URL}/api/v1/integrations/github`, {
+  const res = await gatewayFetch(`/api/v1/integrations/github`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user_id: session.user.id, api_key: apiKey }),
@@ -30,8 +30,8 @@ export async function DELETE() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
   }
 
-  const res = await fetch(
-    `${API_URL}/api/v1/integrations/github?user_id=${encodeURIComponent(session.user.id)}`,
+  const res = await gatewayFetch(
+    `/api/v1/integrations/github?user_id=${encodeURIComponent(session.user.id)}`,
     { method: "DELETE" }
   )
   const data = await res.json().catch(() => ({}))

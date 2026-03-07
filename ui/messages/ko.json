@@ -460,7 +460,7 @@
   "auth": {
     "login": {
       "title": "로그인",
-      "description": "JIKI AI 어시스턴트에 로그인하세요",
+      "description": "NION AI 어시스턴트에 로그인하세요",
       "emailLabel": "이메일",
       "passwordLabel": "비밀번호",
       "submit": "로그인",
@@ -472,7 +472,7 @@
     },
     "register": {
       "title": "회원가입",
-      "description": "JIKI AI 어시스턴트 계정을 만드세요",
+      "description": "NION AI 어시스턴트 계정을 만드세요",
       "nameLabel": "이름",
       "namePlaceholder": "홍길동",
       "emailLabel": "이메일",
@@ -831,7 +831,7 @@
     "accountLink": {
       "label": "계정 연결",
       "hint": "텔레그램에서 /link 명령어로 코드를 받은 후 입력하세요.",
-      "placeholder": "JIKI-XXXXXX",
+      "placeholder": "NION-XXXXXX",
       "link": "연결",
       "linking": "연결중...",
       "success": "✓ 계정이 연결됐어요!"

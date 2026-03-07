@@ -947,7 +947,7 @@ func (b *Bot) uploadFileToStorage(ctx context.Context, name, mime string, data [
 }
 
 func (b *Bot) handleStart(chatID int64) {
-	text := "안녕하세요! 저는 스타피온(Starnion)이에요.\n" +
+	text := "안녕하세요! 저는 니온(Starnion)이에요.\n" +
 		"가계부 기록, 지출 조회, 일상 기록 등을 도와드릴게요.\n" +
 		"편하게 말씀해 주세요!"
 	msg := tgbotapi.NewMessage(chatID, text)
@@ -973,7 +973,7 @@ func (b *Bot) handleLink(chatID int64, userID string) {
 
 	text := fmt.Sprintf(
 		"🔗 계정 연결 코드: *%s*\n\n"+
-			"웹 앱의 설정 → 계정 탭에서 이 코드를 입력하세요.\n"+
+			"웹 앱의 채널 → 채널 설정 → 계정 연결에서 이 코드를 입력하세요.\n"+
 			"_코드는 10분 후 만료됩니다._",
 		code,
 	)

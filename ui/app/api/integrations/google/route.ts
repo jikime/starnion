@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function DELETE() {
   const session = await auth()
@@ -9,8 +9,8 @@ export async function DELETE() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
   }
 
-  const res = await fetch(
-    `${API_URL}/api/v1/integrations/google?user_id=${encodeURIComponent(session.user.id)}`,
+  const res = await gatewayFetch(
+    `/api/v1/integrations/google?user_id=${encodeURIComponent(session.user.id)}`,
     { method: "DELETE" }
   )
   const data = await res.json().catch(() => ({}))

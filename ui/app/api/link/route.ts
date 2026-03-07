@@ -2,7 +2,7 @@ import { auth } from "@/auth"
 import { SignJWT } from "jose"
 import { NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? "change-me-in-production")
 
 export async function POST(request: Request) {
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     .setExpirationTime("5m")
     .sign(secret)
 
-  const res = await fetch(`${API_URL}/auth/link`, {
+  const res = await gatewayFetch(`/auth/link`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

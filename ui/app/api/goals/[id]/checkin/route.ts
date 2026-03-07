@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextRequest, NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const body = await req.json().catch(() => ({}))
   const qs = new URLSearchParams({ user_id: session.user.id })
 
-  const res = await fetch(`${API_URL}/api/v1/goals/${id}/checkin?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/goals/${id}/checkin?${qs}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -33,7 +33,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const qs = new URLSearchParams({ user_id: session.user.id })
   if (date) qs.set("date", date)
 
-  const res = await fetch(`${API_URL}/api/v1/goals/${id}/checkin?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/goals/${id}/checkin?${qs}`, {
     method: "DELETE",
   })
   const data = await res.json().catch(() => ({}))

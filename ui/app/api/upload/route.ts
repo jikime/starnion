@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function POST(request: Request) {
   const session = await auth()
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   }
 
   // Proxy multipart upload to Go gateway.
-  const res = await fetch(`${API_URL}/api/v1/upload`, {
+  const res = await gatewayFetch(`/api/v1/upload`, {
     method: "POST",
     body: formData,
   }).catch(() => null)

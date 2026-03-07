@@ -337,10 +337,7 @@ async def _agent_node(state: MessagesState) -> dict:
         custom_system_prompt = None
 
     if llm_override is None:
-        raise RuntimeError(
-            "AI provider not configured. "
-            "Please add a provider and select a default persona in Settings → AI Provider."
-        )
+        raise RuntimeError("AI provider not configured")
 
     active_llm = llm_override
     logger.info(

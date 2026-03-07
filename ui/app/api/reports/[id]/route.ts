@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextRequest, NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function GET(
   _req: NextRequest,
@@ -13,7 +13,7 @@ export async function GET(
   }
 
   const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await fetch(`${API_URL}/api/v1/reports/${params.id}?${qs}`, { cache: "no-store" })
+  const res = await gatewayFetch(`/api/v1/reports/${params.id}?${qs}`, { cache: "no-store" })
   const data = await res.json().catch(() => ({}))
   return NextResponse.json(data, { status: res.ok ? 200 : res.status })
 }

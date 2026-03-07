@@ -246,8 +246,33 @@ func RunSetup(projectRoot string) error {
 	fmt.Println(sSuccess.Render(strings.Repeat("═", tw)))
 	fmt.Println()
 	PrintInfo("설정 파일: " + ConfigPath())
-	PrintInfo("시작 명령:  starnion dev")
 	fmt.Println()
+
+	// ── Onboarding steps ──────────────────────────────────────────────────────
+	PrintInlineHeader("시작하기 전에")
+	fmt.Println()
+
+	step := func(n, title, desc string) {
+		fmt.Printf("  %s  %s\n", sGold.Render(n+"."), sBold.Render(title))
+		fmt.Printf("     %s\n", sNebula.Render(desc))
+		fmt.Println()
+	}
+
+	step("1", "서비스 시작",
+		"starnion dev  (또는 docker: starnion docker setup)")
+	step("2", "로그인",
+		"브라우저에서 http://localhost:3000 접속 후 회원가입 또는 로그인")
+	step("3", "모델 설정",
+		"Settings → Model → 프로바이더(Anthropic / OpenAI 등) 선택 → 사용할 모델 선택 후 API Key 입력")
+	step("4", "페르소나 설정",
+		"Settings → Personas → 페르소나별로 프로바이더와 모델을 선택  (기본 페르소나를 반드시 지정)")
+	step("5", "채널 연결 (선택)",
+		"Settings → Channels → 사용할 채널(Telegram 등)의 봇 토큰 입력 후 활성화")
+	step("6", "계정 연결 (선택)",
+		"텔레그램에서 /link 명령을 보내면 웹 계정과 텔레그램 계정이 연결됩니다")
+
+	fmt.Println(sNebula.Render(strings.Repeat("─", tw)))
+	fmt.Printf("  %s  %s\n\n", sSuccess.Render("▶"), sBold.Render("starnion dev"))
 
 	return nil
 }

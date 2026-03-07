@@ -279,17 +279,26 @@ func (s *Service) MergeAndLink(fromUserID, code string) (string, error) {
 	}
 
 	// 2. email/password_hash 이전 (fromUserID → toUserID)
-	// toUserID에 이미 email이 있으면 건너뜀.
+	// fromUserID의 email을 먼저 NULL로 클리어하고 toUserID에 설정하는 것을
+	// 단일 CTE로 원자적으로 처리한다. 이렇게 하지 않으면 UPDATE 시점에 두
+	// 행이 동시에 같은 email을 갖게 되어 unique 제약 위반이 발생한다.
 	_, err = tx.Exec(`
-		UPDATE users AS t
-		SET email         = f.email,
-		    password_hash = f.password_hash,
+		WITH cleared AS (
+			UPDATE users
+			SET email         = NULL,
+			    password_hash = NULL,
+			    updated_at    = NOW()
+			WHERE id = $2
+			  AND email IS NOT NULL
+			RETURNING email, password_hash
+		)
+		UPDATE users
+		SET email         = cleared.email,
+		    password_hash = cleared.password_hash,
 		    updated_at    = NOW()
-		FROM users AS f
-		WHERE t.id = $1
-		  AND f.id = $2
-		  AND f.email IS NOT NULL
-		  AND t.email IS NULL
+		FROM cleared
+		WHERE users.id = $1
+		  AND users.email IS NULL
 	`, toUserID, fromUserID)
 	if err != nil {
 		return "", fmt.Errorf("migrate credentials: %w", err)
@@ -337,6 +346,77 @@ func (s *Service) MergeAndLink(fromUserID, code string) (string, error) {
 	_, err = tx.Exec(`DELETE FROM google_tokens WHERE user_id = $1`, fromUserID)
 	if err != nil {
 		return "", fmt.Errorf("delete old google tokens: %w", err)
+	}
+
+	// 4.6. providers 이전 (CASCADE 삭제 전 처리)
+	_, err = tx.Exec(`
+		INSERT INTO providers (user_id, provider, api_key, base_url, enabled_models, created_at, updated_at)
+		SELECT $1, provider, api_key, base_url, enabled_models, created_at, updated_at
+		FROM providers
+		WHERE user_id = $2
+		ON CONFLICT (user_id, provider) DO NOTHING
+	`, toUserID, fromUserID)
+	if err != nil {
+		return "", fmt.Errorf("migrate providers: %w", err)
+	}
+
+	// 4.7. personas 이전 (CASCADE 삭제 전 처리)
+	_, err = tx.Exec(`
+		INSERT INTO personas (id, user_id, name, description, provider, model, system_prompt, is_default, created_at, updated_at)
+		SELECT id, $1, name, description, provider, model, system_prompt, is_default, created_at, updated_at
+		FROM personas
+		WHERE user_id = $2
+		ON CONFLICT (id) DO NOTHING
+	`, toUserID, fromUserID)
+	if err != nil {
+		return "", fmt.Errorf("migrate personas: %w", err)
+	}
+
+	// 4.8. integration_keys 이전 (CASCADE 삭제 전 처리)
+	_, err = tx.Exec(`
+		INSERT INTO integration_keys (user_id, provider, api_key, created_at, updated_at)
+		SELECT $1, provider, api_key, created_at, updated_at
+		FROM integration_keys
+		WHERE user_id = $2
+		ON CONFLICT (user_id, provider) DO NOTHING
+	`, toUserID, fromUserID)
+	if err != nil {
+		return "", fmt.Errorf("migrate integration keys: %w", err)
+	}
+
+	// 4.9. conversations 이전 (CASCADE 삭제 전 처리)
+	_, err = tx.Exec(`
+		UPDATE conversations SET user_id = $1 WHERE user_id = $2
+	`, toUserID, fromUserID)
+	if err != nil {
+		return "", fmt.Errorf("migrate conversations: %w", err)
+	}
+
+	// 4.10. 사용자 데이터 이전 (CASCADE 삭제 전 처리): finances, daily_logs, documents, images, audios, knowledge_base, searches
+	for _, tbl := range []string{"finances", "daily_logs", "documents", "images", "audios", "knowledge_base", "searches"} {
+		if _, err = tx.Exec(`UPDATE `+tbl+` SET user_id = $1 WHERE user_id = $2`, toUserID, fromUserID); err != nil {
+			return "", fmt.Errorf("migrate %s: %w", tbl, err)
+		}
+	}
+
+	// 4.11. FK 없는 테이블 user_id 업데이트 (orphan 방지)
+	for _, tbl := range []string{
+		"channel_settings", "user_skills",
+		"diary_entries", "goals", "memos", "ddays", "reports", "usage_logs",
+	} {
+		if _, err = tx.Exec(`UPDATE `+tbl+` SET user_id = $1 WHERE user_id = $2`, toUserID, fromUserID); err != nil {
+			return "", fmt.Errorf("migrate %s: %w", tbl, err)
+		}
+	}
+
+	// 4.12. telegram_approved_contacts / telegram_pairing_requests (owner_user_id 컬럼)
+	_, err = tx.Exec(`UPDATE telegram_approved_contacts SET owner_user_id = $1 WHERE owner_user_id = $2`, toUserID, fromUserID)
+	if err != nil {
+		return "", fmt.Errorf("migrate telegram_approved_contacts: %w", err)
+	}
+	_, err = tx.Exec(`UPDATE telegram_pairing_requests SET owner_user_id = $1 WHERE owner_user_id = $2`, toUserID, fromUserID)
+	if err != nil {
+		return "", fmt.Errorf("migrate telegram_pairing_requests: %w", err)
 	}
 
 	// 5. fromUserID의 users 레코드 삭제 (CASCADE로 나머지 데이터 정리)
@@ -453,11 +533,11 @@ func generateUUID() (string, error) {
 		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16]), nil
 }
 
-// generateLinkCode는 사람이 읽기 쉬운 페어링 코드를 생성합니다 (예: STAR-7A4B).
+// generateLinkCode는 사람이 읽기 쉬운 페어링 코드를 생성합니다 (예: NION-F84E4).
 func generateLinkCode() string {
 	b := make([]byte, 3)
 	rand.Read(b)
-	return fmt.Sprintf("STAR-%s", strings.ToUpper(fmt.Sprintf("%06X", b))[:6])
+	return fmt.Sprintf("NION-%s", strings.ToUpper(fmt.Sprintf("%06X", b))[:6])
 }
 
 // nullableString은 빈 문자열을 sql.NullString으로 변환합니다.

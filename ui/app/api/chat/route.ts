@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 // AI SDK v6 UIMessage part shape (subset we need)
 type TextPart = { type: "text"; text: string }
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   const threadId: string = body.thread_id ?? ""
 
   // Forward to Go gateway SSE stream endpoint.
-  const upstream = await fetch(`${API_URL}/api/v1/chat/stream`, {
+  const upstream = await gatewayFetch(`/api/v1/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

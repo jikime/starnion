@@ -12,7 +12,7 @@
 import { auth } from "@/auth"
 import { NextRequest, NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   if (file) {
     const uploadForm = new FormData()
     uploadForm.append("file", file)
-    const uploadRes = await fetch(`${API_URL}/api/v1/upload`, {
+    const uploadRes = await gatewayFetch(`/api/v1/upload`, {
       method: "POST",
       body: uploadForm,
     }).catch(() => null)
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Forward to backend SSE stream.
-  const upstream = await fetch(`${API_URL}/api/v1/chat/stream`, {
+  const upstream = await gatewayFetch(`/api/v1/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

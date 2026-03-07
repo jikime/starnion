@@ -234,13 +234,25 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                 type=agent_pb2.STREAM_END,
             )
 
-        except Exception:
-            logger.exception("Stream error for user %s", user_id)
+        except Exception as exc:
             pop_pending_files()  # Discard pending files on error.
-            yield agent_pb2.ChatResponse(
-                content="잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요.",
-                type=agent_pb2.ERROR,
-            )
+            if "AI provider not configured" in str(exc):
+                logger.info("No provider configured for user %s", user_id)
+                yield agent_pb2.ChatResponse(
+                    content=(
+                        "⚙️ AI 프로바이더 설정이 필요해요.\n\n"
+                        "Settings → AI Provider 에서 프로바이더를 추가하고, "
+                        "페르소나에서 프로바이더와 모델을 선택해 주세요."
+                    ),
+                    type=agent_pb2.TEXT,
+                )
+                yield agent_pb2.ChatResponse(content="", type=agent_pb2.STREAM_END)
+            else:
+                logger.exception("Stream error for user %s", user_id)
+                yield agent_pb2.ChatResponse(
+                    content="잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요.",
+                    type=agent_pb2.ERROR,
+                )
 
     async def _invoke_agent(self, message, thread_id: str):
         """Invoke agent with automatic history reset on corrupted state.

@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextRequest, NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function GET() {
   const session = await auth()
@@ -10,7 +10,7 @@ export async function GET() {
   }
 
   const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await fetch(`${API_URL}/api/v1/documents?${qs}`, { cache: "no-store" })
+  const res = await gatewayFetch(`/api/v1/documents?${qs}`, { cache: "no-store" })
   const data = await res.json().catch(() => [])
   return NextResponse.json(data, { status: res.ok ? 200 : res.status })
 }
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData()
   formData.set("user_id", session.user.id)
 
-  const res = await fetch(`${API_URL}/api/v1/documents`, {
+  const res = await gatewayFetch(`/api/v1/documents`, {
     method: "POST",
     body: formData,
   })

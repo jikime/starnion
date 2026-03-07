@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function GET() {
   const session = await auth()
@@ -9,8 +9,8 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
   }
 
-  const res = await fetch(
-    `${API_URL}/api/v1/channels/telegram?user_id=${encodeURIComponent(session.user.id)}`,
+  const res = await gatewayFetch(
+    `/api/v1/channels/telegram?user_id=${encodeURIComponent(session.user.id)}`,
     { cache: "no-store" }
   )
 
@@ -36,8 +36,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid request" }, { status: 400 })
   }
 
-  const res = await fetch(
-    `${API_URL}/api/v1/channels/telegram?user_id=${encodeURIComponent(session.user.id)}`,
+  const res = await gatewayFetch(
+    `/api/v1/channels/telegram?user_id=${encodeURIComponent(session.user.id)}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

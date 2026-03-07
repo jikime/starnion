@@ -460,7 +460,7 @@
   "auth": {
     "login": {
       "title": "ログイン",
-      "description": "JIKI AI アシスタントにログイン",
+      "description": "NION AI アシスタントにログイン",
       "emailLabel": "メールアドレス",
       "passwordLabel": "パスワード",
       "submit": "ログイン",
@@ -472,7 +472,7 @@
     },
     "register": {
       "title": "新規登録",
-      "description": "JIKI AI アシスタントのアカウントを作成",
+      "description": "NION AI アシスタントのアカウントを作成",
       "nameLabel": "名前",
       "namePlaceholder": "山田太郎",
       "emailLabel": "メールアドレス",
@@ -831,7 +831,7 @@
     "accountLink": {
       "label": "アカウント連携",
       "hint": "Telegramで/linkコマンドからコードを受け取って入力してください。",
-      "placeholder": "JIKI-XXXXXX",
+      "placeholder": "NION-XXXXXX",
       "link": "連携",
       "linking": "連携中...",
       "success": "✓ アカウントが連携されました！"

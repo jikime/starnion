@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextRequest, NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function DELETE(
   _req: NextRequest,
@@ -14,7 +14,7 @@ export async function DELETE(
 
   const { id } = await params
   const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await fetch(`${API_URL}/api/v1/audios/${id}?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/audios/${id}?${qs}`, {
     method: "DELETE",
   })
   const data = await res.json().catch(() => ({}))
@@ -38,7 +38,7 @@ export async function PATCH(
   }
 
   const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await fetch(`${API_URL}/api/v1/audios/${id}/transcript?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/audios/${id}/transcript?${qs}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

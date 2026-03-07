@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function POST(
   _request: Request,
@@ -13,8 +13,8 @@ export async function POST(
   }
 
   const { id } = await params
-  const res = await fetch(
-    `${API_URL}/api/v1/skills/${encodeURIComponent(id)}/toggle?user_id=${encodeURIComponent(session.user.id)}`,
+  const res = await gatewayFetch(
+    `/api/v1/skills/${encodeURIComponent(id)}/toggle?user_id=${encodeURIComponent(session.user.id)}`,
     { method: "POST" }
   )
   const data = await res.json().catch(() => ({}))

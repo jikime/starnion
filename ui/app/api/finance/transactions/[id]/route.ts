@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextRequest, NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function PUT(
   req: NextRequest,
@@ -14,8 +14,8 @@ export async function PUT(
 
   const { id } = await params
   const body = await req.json().catch(() => ({}))
-  const res = await fetch(
-    `${API_URL}/api/v1/finance/transactions/${encodeURIComponent(id)}?user_id=${encodeURIComponent(session.user.id)}`,
+  const res = await gatewayFetch(
+    `/api/v1/finance/transactions/${encodeURIComponent(id)}?user_id=${encodeURIComponent(session.user.id)}`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -36,8 +36,8 @@ export async function DELETE(
   }
 
   const { id } = await params
-  const res = await fetch(
-    `${API_URL}/api/v1/finance/transactions/${encodeURIComponent(id)}?user_id=${encodeURIComponent(session.user.id)}`,
+  const res = await gatewayFetch(
+    `/api/v1/finance/transactions/${encodeURIComponent(id)}?user_id=${encodeURIComponent(session.user.id)}`,
     { method: "DELETE" }
   )
   const data = await res.json().catch(() => ({}))

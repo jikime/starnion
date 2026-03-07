@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function GET(
   request: Request,
@@ -18,12 +18,10 @@ export async function GET(
   const before = url.searchParams.get("before") ?? ""
   const limit = url.searchParams.get("limit") ?? "30"
 
-  const upstream = new URL(`${API_URL}/api/v1/conversations/${id}/messages`)
-  upstream.searchParams.set("user_id", session.user.id)
-  if (before) upstream.searchParams.set("before", before)
-  upstream.searchParams.set("limit", limit)
+  const qs = new URLSearchParams({ user_id: session.user.id, limit })
+  if (before) qs.set("before", before)
 
-  const res = await fetch(upstream.toString(), { cache: "no-store" })
+  const res = await gatewayFetch(`/api/v1/conversations/${id}/messages?${qs}`, { cache: "no-store" })
   const data = await res.json().catch(() => ({ messages: [], has_more: false, next_cursor: null }))
   if (!res.ok) {
     return NextResponse.json({ error: "history unavailable" }, { status: res.status })

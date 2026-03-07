@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -11,8 +11,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const { id } = await params
 
-  const res = await fetch(
-    `${API_URL}/api/v1/channels/telegram/pairing/${encodeURIComponent(id)}/deny?user_id=${encodeURIComponent(session.user.id)}`,
+  const res = await gatewayFetch(
+    `/api/v1/channels/telegram/pairing/${encodeURIComponent(id)}/deny?user_id=${encodeURIComponent(session.user.id)}`,
     { method: "POST" }
   )
 

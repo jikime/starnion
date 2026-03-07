@@ -460,7 +460,7 @@
   "auth": {
     "login": {
       "title": "登录",
-      "description": "登录到 JIKI AI 助手",
+      "description": "登录到 NION AI 助手",
       "emailLabel": "邮箱",
       "passwordLabel": "密码",
       "submit": "登录",
@@ -472,7 +472,7 @@
     },
     "register": {
       "title": "注册",
-      "description": "创建您的 JIKI AI 助手账号",
+      "description": "创建您的 NION AI 助手账号",
       "nameLabel": "姓名",
       "namePlaceholder": "张三",
       "emailLabel": "邮箱",
@@ -831,7 +831,7 @@
     "accountLink": {
       "label": "账号关联",
       "hint": "在Telegram中使用/link命令获取代码后输入。",
-      "placeholder": "JIKI-XXXXXX",
+      "placeholder": "NION-XXXXXX",
       "link": "关联",
       "linking": "关联中...",
       "success": "✓ 账号已关联！"

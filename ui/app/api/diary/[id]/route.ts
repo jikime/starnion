@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextRequest, NextResponse } from "next/server"
 
-const API_URL = process.env.API_URL ?? "http://localhost:8080"
+import { gatewayFetch } from "@/lib/gateway"
 
 export async function GET(
   req: NextRequest,
@@ -14,7 +14,7 @@ export async function GET(
 
   const { id } = await params
   const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await fetch(`${API_URL}/api/v1/diary/entries/${id}?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/diary/entries/${id}?${qs}`, {
     cache: "no-store",
   })
   const data = await res.json().catch(() => ({}))
@@ -32,8 +32,8 @@ export async function PUT(
 
   const { id } = await params
   const body = await req.json().catch(() => ({}))
-  const res = await fetch(
-    `${API_URL}/api/v1/diary/entries/${id}?user_id=${encodeURIComponent(session.user.id)}`,
+  const res = await gatewayFetch(
+    `/api/v1/diary/entries/${id}?user_id=${encodeURIComponent(session.user.id)}`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -54,8 +54,8 @@ export async function DELETE(
   }
 
   const { id } = await params
-  const res = await fetch(
-    `${API_URL}/api/v1/diary/entries/${id}?user_id=${encodeURIComponent(session.user.id)}`,
+  const res = await gatewayFetch(
+    `/api/v1/diary/entries/${id}?user_id=${encodeURIComponent(session.user.id)}`,
     { method: "DELETE" }
   )
   const data = await res.json().catch(() => ({}))
