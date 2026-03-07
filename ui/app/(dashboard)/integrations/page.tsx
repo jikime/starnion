@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { CheckCircle2, XCircle, Loader2, ExternalLink, Unlink } from "lucide-react"
+import { CheckCircle2, XCircle, Link2, Loader2, ExternalLink, Unlink } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -209,7 +209,10 @@ function IntegrationsPageInner() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold">{t("title")}</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold">
+          <Link2 className="size-6 text-primary" />
+          {t("title")}
+        </h1>
         <p className="text-muted-foreground mt-1">
           {t("subtitle")}
         </p>

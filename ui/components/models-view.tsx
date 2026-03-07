@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Eye, EyeOff, Trash2, Plus, ExternalLink, RefreshCw } from "lucide-react"
+import { BrainCircuit, Eye, EyeOff, Trash2, Plus, ExternalLink, RefreshCw } from "lucide-react"
 
 // ── Provider catalog ────────────────────────────────────────────────────────
 
@@ -340,7 +340,10 @@ export function ModelsView() {
       )}
 
       <div>
-        <h1 className="text-2xl font-bold">{t("title")}</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-bold">
+          <BrainCircuit className="size-6 text-primary" />
+          {t("title")}
+        </h1>
         <p className="text-muted-foreground text-sm mt-1">
           {t("subtitle")}
         </p>

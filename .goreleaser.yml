@@ -1,0 +1,82 @@
+version: 2
+
+project_name: starpion
+
+before:
+  hooks:
+    # Sync migration files into the CLI embed directory before build
+    - sh -c "rm -rf gateway/internal/cli/migrations && cp -r docker/migrations gateway/internal/cli/migrations"
+
+builds:
+  - id: starpion
+    dir: gateway
+    main: ./cmd/starpion
+    binary: starpion
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/jikime/starpion/gateway/internal/cli.version={{.Version}}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: starpion
+    builds:
+      - starpion
+    name_template: "starpion_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+    files:
+      - none*  # binary only
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+release:
+  github:
+    owner: jikime
+    name: starpion
+  name_template: "v{{ .Version }}"
+  header: |
+    ## StarPion v{{ .Version }}
+
+    Personal AI Assistant — CLI release.
+
+    ### 설치
+    ```bash
+    curl -fsSL https://jikime.github.io/starpion/install.sh | bash
+    ```
+
+    ### 업데이트
+    ```bash
+    starpion update
+    ```
+  footer: |
+    ---
+    **Full Changelog**: https://github.com/jikime/starpion/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: "새 기능"
+      regexp: "^feat"
+      order: 0
+    - title: "버그 수정"
+      regexp: "^fix"
+      order: 1
+    - title: "기타"
+      order: 999
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"
+      - "^ci:"
+      - "^test:"
+      - "typo"

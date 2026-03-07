@@ -1,0 +1,46 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: gateway/go.mod
+          cache: true
+          cache-dependency-path: gateway/go.sum
+
+      - name: Sync migrations for embed
+        run: |
+          rm -rf gateway/internal/cli/migrations
+          cp -r docker/migrations gateway/internal/cli/migrations
+
+      - name: Build starpion CLI
+        run: |
+          cd gateway
+          go build -ldflags="-s -w -X github.com/jikime/starpion/gateway/internal/cli.version=dev" \
+            -o /tmp/starpion ./cmd/starpion
+
+      - name: Build gateway server
+        run: |
+          cd gateway
+          go build -o /tmp/gateway ./cmd/gateway
+
+      - name: Verify CLI runs
+        run: /tmp/starpion version
+
+      - name: Go vet
+        run: |
+          cd gateway
+          go vet ./...

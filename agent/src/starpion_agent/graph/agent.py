@@ -20,6 +20,8 @@ from starpion_agent.db.pool import get_pool
 from starpion_agent.db.repositories import profile as profile_repo
 from starpion_agent.db.repositories import skill as skill_repo
 from starpion_agent.db.repositories import provider as provider_repo
+from starpion_agent.db.repositories import usage as usage_repo
+from starpion_agent.pricing import calculate_cost, get_provider
 from starpion_agent.persona import DEFAULT_PERSONA, build_system_prompt
 from starpion_agent.skills.audio.tools import generate_audio, transcribe_audio
 from starpion_agent.skills.budget.tools import get_budget_status, set_budget
@@ -381,8 +383,84 @@ async def _agent_node(state: MessagesState) -> dict:
         logger.info("[Tools] user=%s | no skill context, binding ALL_TOOLS", user_id)
 
     bound_model = active_llm.bind_tools(enabled_tools)
-    response = await bound_model.ainvoke(messages)
 
+    # Determine model name and provider for usage logging.
+    active_model = getattr(active_llm, "model", getattr(active_llm, "model_name", "unknown"))
+    active_provider = get_provider(active_model) if llm_override is not None else "gemini"
+
+    llm_status = "error"
+    response = None
+    try:
+        response = await bound_model.ainvoke(messages)
+        llm_status = "success"
+    except Exception:
+        raise
+    finally:
+        # Extract token counts from response usage metadata (best-effort).
+        if llm_status == "success":
+            try:
+                um = getattr(response, "usage_metadata", {}) or {}
+                raw_input     = int(um.get("input_tokens", 0))
+                output_tokens = int(um.get("output_tokens", 0))
+
+                # ── Provider-specific token extraction ──────────────────────
+                # Anthropic API semantics (via langchain-anthropic):
+                #   input_tokens            = standard-rate tokens ONLY
+                #                             (excludes cache_read and cache_creation)
+                #   cache_read_input_tokens = tokens served from cache
+                #   cache_creation_input_tokens = tokens written to cache
+                #
+                # OpenAI / Gemini / ZAI semantics:
+                #   input_tokens            = TOTAL prompt tokens (including cached)
+                #   input_token_details.cache_read = cached portion
+                #
+                # calculate_cost() formula:
+                #   non_cached_input = input_tokens - cached_tokens   (billed at inp_price)
+                #   + cached_tokens at cache_read_price
+                #   + cache_write_tokens at cache_write_price
+                #
+                # For Anthropic we must normalize: cost_input = standard + cache_read
+                # so that (cost_input - cache_read) = standard ✓
+                if active_provider == "anthropic":
+                    cache_read         = int(um.get("cache_read_input_tokens", 0))
+                    cache_write_tokens = int(um.get("cache_creation_input_tokens", 0))
+                    # DB: store true total prompt tokens for display
+                    input_tokens  = raw_input + cache_read + cache_write_tokens
+                    cached_tokens = cache_read
+                    # For cost formula: exclude cache_write (it has its own price bucket)
+                    cost_input    = raw_input + cache_read
+                else:
+                    # OpenAI / Gemini / ZAI: input_tokens already = total
+                    itd                = um.get("input_token_details") or {}
+                    cached_tokens      = int(itd.get("cache_read", 0))
+                    cache_write_tokens = int(itd.get("cache_creation", 0))
+                    input_tokens       = raw_input
+                    cost_input         = raw_input
+
+                cost = calculate_cost(
+                    active_model,
+                    cost_input,
+                    output_tokens,
+                    cached_tokens,
+                    cache_write_tokens,
+                )
+                if user_id:
+                    pool = get_pool()
+                    await usage_repo.save_usage_log(
+                        pool,
+                        user_id,
+                        active_model,
+                        active_provider,
+                        input_tokens,
+                        output_tokens,
+                        cached_tokens,
+                        cost,
+                        status="success",
+                    )
+            except Exception:
+                logger.debug("Usage log extraction failed", exc_info=True)
+
+    assert response is not None
     return {"messages": [response]}
 
 

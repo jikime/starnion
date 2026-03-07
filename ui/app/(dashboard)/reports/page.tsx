@@ -19,6 +19,7 @@ import {
   CalendarDays,
   BarChart3,
   AlertTriangle,
+  FileBarChart,
   FileText,
   Eye,
   Loader2,
@@ -118,7 +119,10 @@ export default function ReportsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">{t("title")}</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            <FileBarChart className="size-6 text-primary" />
+            {t("title")}
+          </h1>
           <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchReports} className="gap-2">

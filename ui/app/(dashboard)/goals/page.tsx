@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Plus, Edit, Check, Flame, Loader2, Trash2, RotateCcw } from "lucide-react"
+import { Plus, Edit, Check, Flame, Loader2, Target, Trash2, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // ── types ──────────────────────────────────────────────────────────────────────
@@ -444,7 +444,10 @@ export default function GoalsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">{t("title")}</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            <Target className="size-6 text-primary" />
+            {t("title")}
+          </h1>
           <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <GoalFormDialog

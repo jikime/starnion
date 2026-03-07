@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AudioRecorder } from "@/components/chat/audio-recorder"
-import { Download, FileAudio, Mic, RefreshCw, Square, Trash2, Upload } from "lucide-react"
+import { Download, FileAudio, Mic, Music, RefreshCw, Square, Trash2, Upload } from "lucide-react"
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -531,7 +531,10 @@ export default function AudioPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">{t("title")}</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold">
+          <Music className="size-6 text-primary" />
+          {t("title")}
+        </h1>
         <p className="text-muted-foreground">{t("subtitle")}</p>
       </div>
 

@@ -606,6 +606,10 @@ func main() {
 		api.POST("/audios", audioHandler.SaveAudio)
 		api.PATCH("/audios/:id/transcript", audioHandler.UpdateTranscript)
 		api.DELETE("/audios/:id", audioHandler.DeleteAudio)
+
+		// LLM usage log endpoints.
+		usageHandler := handler.NewUsageHandler(db)
+		api.GET("/usage", usageHandler.GetUsage)
 	}
 
 	// Manual report trigger for testing proactive notifications.

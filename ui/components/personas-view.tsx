@@ -18,7 +18,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import { Pencil, Trash2, Plus, Star, PenLine } from "lucide-react"
+import { Pencil, Trash2, Plus, Star, PenLine, UserCircle } from "lucide-react"
 
 // ── Provider catalog (fallback when no models are enabled in DB) ─────────────
 
@@ -337,7 +337,10 @@ export function PersonasView() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{t("title")}</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold">
+            <UserCircle className="size-6 text-primary" />
+            {t("title")}
+          </h1>
           <p className="text-muted-foreground text-sm mt-1">
             {t("subtitle")}
           </p>

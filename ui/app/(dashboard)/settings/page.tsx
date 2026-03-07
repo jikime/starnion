@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Bell, User } from "lucide-react"
+import { Bell, Settings, User } from "lucide-react"
 
 export default function SettingsPage() {
   const t = useTranslations("settings")
@@ -16,7 +16,10 @@ export default function SettingsPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">{t("title")}</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold">
+          <Settings className="size-6 text-primary" />
+          {t("title")}
+        </h1>
         <p className="text-muted-foreground">{t("subtitle")}</p>
       </div>
 

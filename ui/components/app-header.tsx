@@ -1,7 +1,8 @@
 "use client"
 
-import { Bell, Search, Loader2, ArrowRight, BookOpen, StickyNote, FileText, Globe, Wallet, MessageCircle, Brain, Check } from "lucide-react"
+import { Bell, Moon, Search, Sun, Loader2, ArrowRight, BookOpen, StickyNote, FileText, Globe, Wallet, MessageCircle, Brain, Check } from "lucide-react"
 import { signOut, useSession } from "next-auth/react"
+import { useTheme } from "next-themes"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
@@ -58,6 +59,7 @@ export function AppHeader() {
   const t = useTranslations()
   const locale = useLocale()
   const [, startTransition] = useTransition()
+  const { resolvedTheme, setTheme } = useTheme()
 
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
@@ -223,6 +225,18 @@ export function AppHeader() {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Theme toggle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+          aria-label="테마 전환"
+          className="relative"
+        >
+          <Sun className="size-5 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
+          <Moon className="absolute size-5 scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
+        </Button>
 
         {/* Notifications */}
         <DropdownMenu>

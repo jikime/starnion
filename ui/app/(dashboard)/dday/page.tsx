@@ -147,7 +147,10 @@ export default function DdayPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">{t("title")}</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            <Clock className="size-6 text-primary" />
+            {t("title")}
+          </h1>
           <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Button className="gap-2" onClick={openCreate}>

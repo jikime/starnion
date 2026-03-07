@@ -1,0 +1,33 @@
+title: StarPion
+description: "Personal AI Assistant — Self-hosted, privacy-first AI platform"
+url: "https://jikime.github.io"
+baseurl: "/starpion"
+lang: en
+
+remote_theme: just-the-docs/just-the-docs@v0.10.0
+
+color_scheme: dark
+
+# Navigation
+nav_enabled: true
+nav_sort: order
+
+# Search
+search_enabled: true
+search_tokenizer_separator: /[\s/]+/
+
+# Footer
+footer_content: "Copyright &copy; 2025 StarPion. Released under the MIT License."
+
+# Plugins
+plugins:
+  - jekyll-remote-theme
+  - jekyll-seo-tag
+  - jekyll-github-metadata
+
+# Exclude from build
+exclude:
+  - "*.sh"
+  - Gemfile
+  - Gemfile.lock
+  - node_modules

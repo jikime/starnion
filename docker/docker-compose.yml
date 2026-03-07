@@ -1,66 +1,104 @@
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: jiki-postgres
+    container_name: starpion-postgres
     environment:
-      POSTGRES_DB: jiki
-      POSTGRES_USER: jiki
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jiki_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-starpion}
+      POSTGRES_USER: ${POSTGRES_USER:-starpion}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jiki"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-starpion}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: starpion-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-starpion}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
   agent:
     build:
       context: ../agent
       dockerfile: ../docker/Dockerfile.agent
-    container_name: jiki-agent
+    container_name: starpion-agent
     ports:
-      - "50051:50051"
+      - "${GRPC_PORT:-50051}:50051"
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - DATABASE_URL=postgres://jiki:${POSTGRES_PASSWORD:-jiki_dev_password}@postgres:5432/jiki?sslmode=disable
-      - GRPC_PORT=50051
+      DATABASE_URL: postgres://${POSTGRES_USER:-starpion}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-starpion}?sslmode=disable
+      GRPC_PORT: ${GRPC_PORT:-50051}
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
 
   gateway:
     build:
       context: ../gateway
       dockerfile: ../docker/Dockerfile.gateway
-    container_name: jiki-gateway
+    container_name: starpion-gateway
     ports:
-      - "8080:8080"
+      - "${GATEWAY_PORT:-8080}:8080"
     environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - GRPC_AGENT_HOST=agent
-      - DATABASE_URL=postgres://jiki:${POSTGRES_PASSWORD:-jiki_dev_password}@postgres:5432/jiki?sslmode=disable
-      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
-      - MINIO_ENDPOINT=gilgeori-minio:9000
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-gilgeori}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-gilgeori3893}
-      - MINIO_BUCKET=${MINIO_BUCKET:-jiki-files}
-      - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL:-http://localhost:9000}
-    networks:
-      - default
-      - gilgeori_net
+      DATABASE_URL: postgres://${POSTGRES_USER:-starpion}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-starpion}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET}
+      GRPC_AGENT_HOST: agent
+      GRPC_PORT: ${GRPC_PORT:-50051}
+      GOOGLE_REDIRECT_URI: ${GATEWAY_PUBLIC_URL:-http://localhost:8080}/auth/google/callback
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-starpion}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-starpion-files}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
     depends_on:
       postgres:
         condition: service_healthy
       agent:
         condition: service_started
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
 
-networks:
-  gilgeori_net:
-    external: true
+  ui:
+    build:
+      context: ../ui
+      dockerfile: ../docker/Dockerfile.ui
+    container_name: starpion-ui
+    ports:
+      - "${UI_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      AUTH_SECRET: ${AUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      GATEWAY_API_URL: http://gateway:${GATEWAY_PORT:-8080}
+      GATEWAY_WS_URL: ws://gateway:${GATEWAY_PORT:-8080}
+      API_URL: http://gateway:${GATEWAY_PORT:-8080}
+      NEXT_PUBLIC_API_URL: ${GATEWAY_PUBLIC_URL:-http://localhost:8080}
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - gateway
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  minio_data:

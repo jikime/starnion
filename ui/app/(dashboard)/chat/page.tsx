@@ -9,7 +9,7 @@ import { ChatInput, type AttachedFile } from "@/components/chat/chat-input"
 import { useChat } from "@/hooks/use-chat"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { PanelLeftClose, PanelLeft, WifiOff, Loader2 } from "lucide-react"
+import { MessageCircle, PanelLeftClose, PanelLeft, WifiOff, Loader2 } from "lucide-react"
 
 function ChatPageInner() {
   const t = useTranslations("chat")
@@ -126,7 +126,10 @@ function ChatPageInner() {
                 <PanelLeft className="size-5" />
               )}
             </Button>
-            <h1 className="text-lg font-semibold">{t("title")}</h1>
+            <h1 className="flex items-center gap-2 text-lg font-semibold">
+              <MessageCircle className="size-5 text-primary" />
+              {t("title")}
+            </h1>
             {isStreaming && (
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
             )}

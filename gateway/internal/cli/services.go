@@ -1,0 +1,277 @@
+package cli
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"os/signal"
+	"path/filepath"
+	"sync"
+	"syscall"
+	"time"
+)
+
+// projectRoot attempts to locate the starpion project root by walking up from
+// the executable's directory until it finds an "agent" sibling directory.
+func projectRoot() string {
+	exe, _ := os.Executable()
+	dir := filepath.Dir(exe)
+	for i := 0; i < 6; i++ {
+		if _, err := os.Stat(filepath.Join(dir, "agent")); err == nil {
+			return dir
+		}
+		dir = filepath.Dir(dir)
+	}
+	// fallback: current working directory
+	wd, _ := os.Getwd()
+	return wd
+}
+
+// ensureConfigured checks that setup has been run; prints hint if not.
+func ensureConfigured() bool {
+	if ConfigExists() {
+		return true
+	}
+	fmt.Println()
+	PrintFail("Setup", "StarPion이 설정되지 않았습니다.")
+	PrintHint("먼저 'starpion setup'을 실행하세요.")
+	return false
+}
+
+// ── Dependency auto-install ───────────────────────────────────────────────────
+
+func ensureAgentDeps(root string) error {
+	agentDir := filepath.Join(root, "agent")
+	venvDir := filepath.Join(agentDir, ".venv")
+
+	venvStat, venvErr := os.Stat(venvDir)
+	pyprojectStat, ppErr := os.Stat(filepath.Join(agentDir, "pyproject.toml"))
+
+	needsSync := venvErr != nil // venv doesn't exist
+	if venvErr == nil && ppErr == nil {
+		// venv exists but pyproject.toml is newer → re-sync
+		needsSync = pyprojectStat.ModTime().After(venvStat.ModTime())
+	}
+
+	if !needsSync {
+		return nil
+	}
+
+	PrintInfo("Python 패키지 설치 중... (uv sync)")
+	cmd := exec.Command("uv", "sync")
+	cmd.Dir = agentDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func ensureUIDeps(root string) error {
+	uiDir := filepath.Join(root, "ui")
+	nmDir := filepath.Join(uiDir, "node_modules")
+
+	nmStat, nmErr := os.Stat(nmDir)
+	lockStat, lockErr := os.Stat(filepath.Join(uiDir, "pnpm-lock.yaml"))
+
+	needsInstall := nmErr != nil // node_modules doesn't exist
+	if nmErr == nil && lockErr == nil {
+		// node_modules exists but lock file is newer
+		needsInstall = lockStat.ModTime().After(nmStat.ModTime())
+	}
+
+	if !needsInstall {
+		return nil
+	}
+
+	PrintInfo("Node.js 패키지 설치 중... (pnpm install)")
+	cmd := exec.Command("pnpm", "install")
+	cmd.Dir = uiDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+// ── Service launchers ─────────────────────────────────────────────────────────
+
+// serviceCmd builds an *exec.Cmd with stdout/stderr connected to the terminal.
+func serviceCmd(dir, colorPrefix string, name string, args ...string) *exec.Cmd {
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	cmd.Stdout = newPrefixWriter(os.Stdout, colorPrefix)
+	cmd.Stderr = newPrefixWriter(os.Stderr, colorPrefix)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	return cmd
+}
+
+// RunGateway starts the gateway server.
+func RunGateway(devMode bool) error {
+	if !ensureConfigured() {
+		return nil
+	}
+	root := projectRoot()
+	_ = WriteEnvFilesFromConfig(root) // refresh .env from config
+
+	PrintSectionHeader(0, 0, "GATEWAY")
+	PrintInfo("게이트웨이 서버를 시작합니다...")
+
+	gwDir := filepath.Join(root, "gateway")
+	var cmd *exec.Cmd
+	if devMode {
+		cmd = serviceCmd(gwDir, sAntares.Render("[gateway]"), "go", "run", "./cmd/gateway")
+	} else {
+		cmd = serviceCmd(gwDir, sAntares.Render("[gateway]"), "go", "run", "./cmd/gateway")
+	}
+
+	return runWithSignal(cmd)
+}
+
+// RunAgent ensures Python deps and starts the agent.
+func RunAgent() error {
+	if !ensureConfigured() {
+		return nil
+	}
+	root := projectRoot()
+	_ = WriteEnvFilesFromConfig(root)
+
+	PrintSectionHeader(0, 0, "AGENT")
+
+	if err := ensureAgentDeps(root); err != nil {
+		return fmt.Errorf("agent 패키지 설치 실패: %w", err)
+	}
+
+	PrintInfo("에이전트를 시작합니다...")
+	agentDir := filepath.Join(root, "agent")
+	cmd := serviceCmd(agentDir, sCrimson.Render("[agent]"), "uv", "run", "python", "-m", "starpion_agent")
+	return runWithSignal(cmd)
+}
+
+// RunUI ensures Node deps and starts the UI.
+func RunUI(devMode bool) error {
+	if !ensureConfigured() {
+		return nil
+	}
+	root := projectRoot()
+	_ = WriteEnvFilesFromConfig(root)
+
+	PrintSectionHeader(0, 0, "UI")
+
+	if err := ensureUIDeps(root); err != nil {
+		return fmt.Errorf("UI 패키지 설치 실패: %w", err)
+	}
+
+	PrintInfo("UI를 시작합니다...")
+	uiDir := filepath.Join(root, "ui")
+	pnpmCmd := "start"
+	if devMode {
+		pnpmCmd = "dev"
+	}
+	cmd := serviceCmd(uiDir, sGold.Render("[ui]"), "pnpm", pnpmCmd)
+	return runWithSignal(cmd)
+}
+
+// RunDev starts all three services concurrently.
+// One service exiting causes the others to be terminated.
+func RunDev() error {
+	if !ensureConfigured() {
+		return nil
+	}
+	root := projectRoot()
+	_ = WriteEnvFilesFromConfig(root)
+
+	if err := ensureAgentDeps(root); err != nil {
+		return fmt.Errorf("agent 패키지 설치 실패: %w", err)
+	}
+	if err := ensureUIDeps(root); err != nil {
+		return fmt.Errorf("UI 패키지 설치 실패: %w", err)
+	}
+
+	PrintSectionHeader(0, 0, "DEV MODE  ·  gateway + agent + ui")
+	PrintInfo("Ctrl+C로 모든 서비스를 종료합니다.")
+	fmt.Println()
+
+	gwDir := filepath.Join(root, "gateway")
+	agentDir := filepath.Join(root, "agent")
+	uiDir := filepath.Join(root, "ui")
+
+	cmds := []*exec.Cmd{
+		serviceCmd(gwDir, sAntares.Render("[gateway]"), "go", "run", "./cmd/gateway"),
+		serviceCmd(agentDir, sCrimson.Render("[agent] "), "uv", "run", "python", "-m", "starpion_agent"),
+		serviceCmd(uiDir, sGold.Render("[ui]     "), "pnpm", "dev"),
+	}
+
+	// Start all
+	for _, cmd := range cmds {
+		if err := cmd.Start(); err != nil {
+			killAll(cmds)
+			return fmt.Errorf("서비스 시작 실패: %w", err)
+		}
+	}
+
+	// Wait for Ctrl+C or any process exit
+	done := make(chan error, len(cmds))
+	var wg sync.WaitGroup
+	for _, cmd := range cmds {
+		wg.Add(1)
+		c := cmd
+		go func() {
+			defer wg.Done()
+			done <- c.Wait()
+		}()
+	}
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case <-sig:
+		PrintInfo("종료 신호 수신 — 서비스를 종료합니다...")
+	case err := <-done:
+		if err != nil {
+			PrintFail("서비스", err.Error())
+		}
+		PrintInfo("서비스가 종료되었습니다. 나머지 서비스를 종료합니다...")
+	}
+
+	killAll(cmds)
+	wg.Wait()
+	return nil
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+func runWithSignal(cmd *exec.Cmd) error {
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+
+	select {
+	case <-sig:
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+		time.Sleep(500 * time.Millisecond)
+	case err := <-done:
+		return err
+	}
+	return nil
+}
+
+func killAll(cmds []*exec.Cmd) {
+	for _, cmd := range cmds {
+		if cmd.Process != nil {
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+		}
+	}
+}
+
+// WriteEnvFilesFromConfig loads config and regenerates .env files.
+func WriteEnvFilesFromConfig(root string) error {
+	cfg, err := LoadConfig()
+	if err != nil {
+		return err
+	}
+	return WriteEnvFiles(cfg, root)
+}

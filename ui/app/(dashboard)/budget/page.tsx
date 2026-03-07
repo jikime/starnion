@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  PieChart,
   Settings,
   TrendingUp,
   TrendingDown,
@@ -338,7 +339,10 @@ export default function BudgetPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">{t("title")}</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            <PieChart className="size-6 text-primary" />
+            {t("title")}
+          </h1>
           <p className="text-sm text-muted-foreground">{monthLabel}</p>
         </div>
         <div className="flex items-center gap-2">

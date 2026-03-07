@@ -248,7 +248,10 @@ export default function SearchPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">{t("webTitle")}</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            <Search className="size-6 text-primary" />
+            {t("webTitle")}
+          </h1>
           <p className="text-muted-foreground">{t("webSubtitle")}</p>
         </div>
         <Button

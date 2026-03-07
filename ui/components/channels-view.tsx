@@ -27,7 +27,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { ChevronDown, ChevronUp, Check, X, Link2 } from "lucide-react"
+import { ChevronDown, ChevronUp, Check, Radio, X, Link2 } from "lucide-react"
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -281,7 +281,10 @@ export function ChannelsView() {
 
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold">{t("title")}</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-bold">
+          <Radio className="size-6 text-primary" />
+          {t("title")}
+        </h1>
         <p className="text-muted-foreground text-sm mt-1">
           {t("subtitle")}
         </p>
