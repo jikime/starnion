@@ -19,26 +19,26 @@ nav_order: 3
 ## 1. Install the CLI
 
 ```bash
-curl -fsSL https://jikime.github.io/starpion/install.sh | bash
+curl -fsSL https://jikime.github.io/starnion/install.sh | bash
 ```
 
 Verify:
 
 ```bash
-starpion version
+starnion version
 ```
 
 ---
 
 ## 2. Start PostgreSQL and MinIO
 
-StarPion requires PostgreSQL (with pgvector) and MinIO before running setup.
+StarNion requires PostgreSQL (with pgvector) and MinIO before running setup.
 
 ### Using Docker (recommended for local setup)
 
 ```bash
 # Start only infra services
-cd path/to/starpion/docker
+cd path/to/starnion/docker
 docker compose up -d postgres minio
 ```
 
@@ -51,7 +51,7 @@ If you have PostgreSQL and MinIO running locally, make sure:
 Check connectivity:
 
 ```bash
-starpion doctor
+starnion doctor
 ```
 
 ---
@@ -59,7 +59,7 @@ starpion doctor
 ## 3. Run Setup Wizard
 
 ```bash
-starpion setup
+starnion setup
 ```
 
 The interactive wizard guides you through 5 steps:
@@ -72,7 +72,7 @@ The interactive wizard guides you through 5 steps:
 | **File Storage** | MinIO endpoint, credentials, bucket |
 | **Service URLs** | Gateway URL for the web UI |
 
-Config is saved to `~/.config/starpion/config.yaml`.
+Config is saved to `~/.config/starnion/config.yaml`.
 
 ---
 
@@ -83,21 +83,21 @@ Config is saved to `~/.config/starpion/config.yaml`.
 Runs gateway (Go), agent (Python), and UI (Next.js) as local processes with colored log output:
 
 ```bash
-starpion dev
+starnion dev
 ```
 
 Or start services individually:
 
 ```bash
-starpion gateway   # Go API server      :8080
-starpion agent     # Python AI engine   :50051
-starpion ui        # Next.js interface  :3000
+starnion gateway   # Go API server      :8080
+starnion agent     # Python AI engine   :50051
+starnion ui        # Next.js interface  :3000
 ```
 
 ### Option B — Docker
 
 ```bash
-starpion docker up --build
+starnion docker up --build
 ```
 
 Or with Docker Compose directly:
@@ -117,12 +117,12 @@ Navigate to [http://localhost:3000](http://localhost:3000) and log in with the a
 ## Quick Reference
 
 ```bash
-starpion setup          # Run configuration wizard
-starpion dev            # Start all services (native)
-starpion docker up      # Start all services (Docker)
-starpion docker logs -f # Stream Docker logs
-starpion doctor         # Check system health
-starpion update         # Update to latest version
+starnion setup          # Run configuration wizard
+starnion dev            # Start all services (native)
+starnion docker up      # Start all services (Docker)
+starnion docker logs -f # Stream Docker logs
+starnion doctor         # Check system health
+starnion update         # Update to latest version
 ```
 
 ---
@@ -130,4 +130,4 @@ starpion update         # Update to latest version
 ## Next Steps
 
 - [Deployment](deploy) — production and Docker deployment
-- [Update](update) — keeping StarPion up to date
+- [Update](update) — keeping StarNion up to date

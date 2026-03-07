@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	starpionv1 "github.com/jikime/starpion/gateway/gen/starpion/v1"
+	starnionv1 "github.com/jikime/starnion/gateway/gen/starnion/v1"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -17,13 +17,13 @@ import (
 // ReportHandler handles report listing and on-demand generation.
 type ReportHandler struct {
 	db         *sql.DB
-	grpcClient starpionv1.AgentServiceClient
+	grpcClient starnionv1.AgentServiceClient
 }
 
 func NewReportHandler(db *sql.DB, grpcConn *grpc.ClientConn) *ReportHandler {
 	return &ReportHandler{
 		db:         db,
-		grpcClient: starpionv1.NewAgentServiceClient(grpcConn),
+		grpcClient: starnionv1.NewAgentServiceClient(grpcConn),
 	}
 }
 
@@ -143,7 +143,7 @@ func (h *ReportHandler) GenerateReport(c echo.Context) error {
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 120*time.Second)
 	defer cancel()
 
-	resp, err := h.grpcClient.GenerateReport(ctx, &starpionv1.ReportRequest{
+	resp, err := h.grpcClient.GenerateReport(ctx, &starnionv1.ReportRequest{
 		UserId:     req.UserID,
 		ReportType: req.ReportType,
 	})

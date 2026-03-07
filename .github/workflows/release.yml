@@ -53,13 +53,13 @@ jobs:
 
       - name: Update version in docs/install.sh
         run: |
-          sed -i "s/^STARPION_VERSION=.*/STARPION_VERSION=\"${{ steps.version.outputs.version }}\"/" docs/install.sh
+          sed -i "s/^STARNION_VERSION=.*/STARNION_VERSION=\"${{ steps.version.outputs.version }}\"/" docs/install.sh
 
       - name: Update version in docs/update.md
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           # Update any hardcoded version examples in update.md
-          sed -i "s/STARPION_VERSION=[0-9]*\.[0-9]*\.[0-9]*/STARPION_VERSION=${VERSION}/g" docs/update.md || true
+          sed -i "s/STARNION_VERSION=[0-9]*\.[0-9]*\.[0-9]*/STARNION_VERSION=${VERSION}/g" docs/update.md || true
 
       - name: Commit updated docs
         run: |

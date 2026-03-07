@@ -1,4 +1,4 @@
-"""Unit tests for starpion_agent.skills.summarize.tools module.
+"""Unit tests for starnion_agent.skills.summarize.tools module.
 
 Tests cover:
 - ``SummarizeUrlInput`` / ``SummarizeTextInput``: Pydantic input schemas
@@ -16,7 +16,7 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from starpion_agent.skills.summarize.tools import (
+from starnion_agent.skills.summarize.tools import (
     SummarizeTextInput,
     SummarizeUrlInput,
     _STYLE_INSTRUCTIONS,
@@ -138,7 +138,7 @@ def _patch_httpx(mock_response=None, side_effect=None):
     else:
         mock_ctx.get = AsyncMock(return_value=mock_response)
     return patch(
-        "starpion_agent.skills.summarize.tools.httpx.AsyncClient",
+        "starnion_agent.skills.summarize.tools.httpx.AsyncClient",
         return_value=mock_ctx,
     )
 
@@ -150,7 +150,7 @@ def _patch_gemini(content: str = "요약 결과입니다."):
     mock_response.content = content
     mock_llm.ainvoke = AsyncMock(return_value=mock_response)
     return patch(
-        "starpion_agent.skills.summarize.tools.ChatGoogleGenerativeAI",
+        "starnion_agent.skills.summarize.tools.ChatGoogleGenerativeAI",
         return_value=mock_llm,
     )
 
@@ -160,21 +160,21 @@ def _patch_gemini(content: str = "요약 결과입니다."):
 # =========================================================================
 class TestSummarizeUrl:
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_no_api_key(self, mock_settings):
         mock_settings.gemini_api_key = ""
         result = await summarize_url.ainvoke({"url": "https://example.com"})
         assert "Gemini API 키" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_invalid_url(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         result = await summarize_url.ainvoke({"url": "not-a-url"})
         assert "올바른 URL" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_timeout(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         with _patch_httpx(side_effect=httpx.TimeoutException("timeout")):
@@ -182,7 +182,7 @@ class TestSummarizeUrl:
         assert "시간이 초과" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_http_error(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         err_resp = MagicMock()
@@ -194,7 +194,7 @@ class TestSummarizeUrl:
         assert "HTTP 404" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_binary_content(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         resp = _make_mock_response(content_type="application/pdf")
@@ -203,7 +203,7 @@ class TestSummarizeUrl:
         assert "바이너리" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_oversized(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         resp = _make_mock_response(content_length=str(10 * 1024 * 1024))
@@ -212,8 +212,8 @@ class TestSummarizeUrl:
         assert "5MB" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools._extract_readable_text", return_value="")
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools._extract_readable_text", return_value="")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_empty_extraction(self, mock_settings, _mock_extract):
         mock_settings.gemini_api_key = "test-key"
         resp = _make_mock_response(text="<html></html>")
@@ -222,8 +222,8 @@ class TestSummarizeUrl:
         assert "추출할 수 없었어요" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools._extract_readable_text")
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools._extract_readable_text")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_successful_html(self, mock_settings, mock_extract):
         mock_settings.gemini_api_key = "test-key"
         mock_settings.gemini_model = "gemini-2.0-flash"
@@ -236,7 +236,7 @@ class TestSummarizeUrl:
         assert "파이썬" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_plain_text_url(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         mock_settings.gemini_model = "gemini-2.0-flash"
@@ -251,8 +251,8 @@ class TestSummarizeUrl:
         assert "AI" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools._extract_readable_text")
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools._extract_readable_text")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_llm_error(self, mock_settings, mock_extract):
         mock_settings.gemini_api_key = "test-key"
         mock_settings.gemini_model = "gemini-2.0-flash"
@@ -261,7 +261,7 @@ class TestSummarizeUrl:
         resp = _make_mock_response(text="<html>content</html>")
         with _patch_httpx(mock_response=resp):
             with patch(
-                "starpion_agent.skills.summarize.tools.ChatGoogleGenerativeAI",
+                "starnion_agent.skills.summarize.tools.ChatGoogleGenerativeAI",
                 side_effect=Exception("LLM error"),
             ):
                 result = await summarize_url.ainvoke({"url": "https://example.com"})
@@ -269,7 +269,7 @@ class TestSummarizeUrl:
         assert "오류가 발생했어요" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_invalid_style_defaults(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         mock_settings.gemini_model = "gemini-2.0-flash"
@@ -282,7 +282,7 @@ class TestSummarizeUrl:
         assert "요약 결과" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_network_error(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         with _patch_httpx(side_effect=Exception("Connection refused")):
@@ -295,28 +295,28 @@ class TestSummarizeUrl:
 # =========================================================================
 class TestSummarizeText:
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_no_api_key(self, mock_settings):
         mock_settings.gemini_api_key = ""
         result = await summarize_text.ainvoke({"text": "some text"})
         assert "Gemini API 키" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_empty_text(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         result = await summarize_text.ainvoke({"text": ""})
         assert "텍스트를 입력" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_whitespace_only(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         result = await summarize_text.ainvoke({"text": "   "})
         assert "텍스트를 입력" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_successful_concise(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         mock_settings.gemini_model = "gemini-2.0-flash"
@@ -327,7 +327,7 @@ class TestSummarizeText:
         assert "핵심 요약" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_successful_bullets(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         mock_settings.gemini_model = "gemini-2.0-flash"
@@ -340,13 +340,13 @@ class TestSummarizeText:
         assert "포인트" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_llm_error(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         mock_settings.gemini_model = "gemini-2.0-flash"
 
         with patch(
-            "starpion_agent.skills.summarize.tools.ChatGoogleGenerativeAI",
+            "starnion_agent.skills.summarize.tools.ChatGoogleGenerativeAI",
             side_effect=Exception("LLM error"),
         ):
             result = await summarize_text.ainvoke({"text": "some text"})
@@ -354,7 +354,7 @@ class TestSummarizeText:
         assert "오류가 발생했어요" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.summarize.tools.settings")
+    @patch("starnion_agent.skills.summarize.tools.settings")
     async def test_invalid_style_defaults(self, mock_settings):
         mock_settings.gemini_api_key = "test-key"
         mock_settings.gemini_model = "gemini-2.0-flash"

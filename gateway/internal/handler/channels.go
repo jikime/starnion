@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jikime/starpion/gateway/internal/telegram"
+	"github.com/jikime/starnion/gateway/internal/telegram"
 	"github.com/labstack/echo/v4"
 )
 
@@ -68,7 +68,7 @@ func (h *ChannelHandler) GetTelegram(c echo.Context) error {
 
 	row := h.db.QueryRowContext(c.Request().Context(), `
 		SELECT bot_token, enabled, dm_policy, group_policy
-		FROM user_channel_settings
+		FROM channel_settings
 		WHERE user_id = $1 AND channel = 'telegram'
 	`, userID)
 	if err := row.Scan(&botToken, &enabled, &dmPolicy, &groupPolicy); err != nil && err != sql.ErrNoRows {
@@ -146,7 +146,7 @@ func (h *ChannelHandler) UpdateTelegram(c echo.Context) error {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "botToken is required"})
 		}
 		if _, err := h.db.ExecContext(c.Request().Context(), `
-			INSERT INTO user_channel_settings (user_id, channel, bot_token, enabled, updated_at)
+			INSERT INTO channel_settings (user_id, channel, bot_token, enabled, updated_at)
 			VALUES ($1, 'telegram', $2, FALSE, $3)
 			ON CONFLICT (user_id, channel)
 			DO UPDATE SET bot_token = $2, updated_at = $3
@@ -165,7 +165,7 @@ func (h *ChannelHandler) UpdateTelegram(c echo.Context) error {
 		// Fetch current token.
 		var token string
 		row := h.db.QueryRowContext(c.Request().Context(), `
-			SELECT bot_token FROM user_channel_settings
+			SELECT bot_token FROM channel_settings
 			WHERE user_id = $1 AND channel = 'telegram'
 		`, userID)
 		if err := row.Scan(&token); err != nil {
@@ -175,7 +175,7 @@ func (h *ChannelHandler) UpdateTelegram(c echo.Context) error {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "봇 토큰을 먼저 설정해 주세요"})
 		}
 		if _, err := h.db.ExecContext(c.Request().Context(), `
-			UPDATE user_channel_settings
+			UPDATE channel_settings
 			SET enabled = $2, updated_at = $3
 			WHERE user_id = $1 AND channel = 'telegram'
 		`, userID, *req.Enabled, now); err != nil {
@@ -204,14 +204,14 @@ func (h *ChannelHandler) UpdateTelegram(c echo.Context) error {
 
 		// Upsert row with selective policy update.
 		if _, err := h.db.ExecContext(c.Request().Context(), `
-			INSERT INTO user_channel_settings (user_id, channel, dm_policy, group_policy, updated_at)
+			INSERT INTO channel_settings (user_id, channel, dm_policy, group_policy, updated_at)
 			VALUES ($1, 'telegram',
 				COALESCE(NULLIF($2,''), 'allow'),
 				COALESCE(NULLIF($3,''), 'allow'),
 				$4)
 			ON CONFLICT (user_id, channel) DO UPDATE
-			SET dm_policy    = CASE WHEN $2 != '' THEN $2 ELSE user_channel_settings.dm_policy END,
-			    group_policy = CASE WHEN $3 != '' THEN $3 ELSE user_channel_settings.group_policy END,
+			SET dm_policy    = CASE WHEN $2 != '' THEN $2 ELSE channel_settings.dm_policy END,
+			    group_policy = CASE WHEN $3 != '' THEN $3 ELSE channel_settings.group_policy END,
 			    updated_at   = $4
 		`, userID, req.DMPolicy, req.GroupPolicy, now); err != nil {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})

@@ -1,4 +1,4 @@
-"""Unit tests for starpion_agent.skills.random.tools module.
+"""Unit tests for starnion_agent.skills.random.tools module.
 
 Tests cover:
 - ``RandomPickInput``: Pydantic schema
@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from starpion_agent.skills.random.tools import RandomPickInput, random_pick
+from starnion_agent.skills.random.tools import RandomPickInput, random_pick
 
 
 # =========================================================================

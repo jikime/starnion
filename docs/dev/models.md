@@ -46,7 +46,7 @@ custom:
 ## DB 스키마
 
 ```sql
-CREATE TABLE user_providers (
+CREATE TABLE providers (
     user_id        UUID        NOT NULL REFERENCES profiles(uuid_id),
     provider       TEXT        NOT NULL,           -- anthropic | gemini | openai | zai | custom
     api_key        TEXT        NOT NULL DEFAULT '',
@@ -75,10 +75,10 @@ CREATE TABLE user_providers (
 ### UpsertProvider 동작
 
 ```sql
-INSERT INTO user_providers (user_id, provider, api_key, base_url, enabled_models, updated_at)
+INSERT INTO providers (user_id, provider, api_key, base_url, enabled_models, updated_at)
 VALUES ($1, $2, $3, $4, $5, NOW())
 ON CONFLICT (user_id, provider) DO UPDATE SET
-    api_key        = CASE WHEN $3 = '' THEN user_providers.api_key ELSE $3 END,
+    api_key        = CASE WHEN $3 = '' THEN providers.api_key ELSE $3 END,
     base_url       = $4,
     enabled_models = $5,
     updated_at     = NOW()
@@ -148,7 +148,7 @@ ON CONFLICT (user_id, provider) DO UPDATE SET
 
 ## Python 에이전트 연동
 
-`user_providers` 테이블은 Python 에이전트에서 페르소나 조회 시 함께 읽힌다:
+`providers` 테이블은 Python 에이전트에서 페르소나 조회 시 함께 읽힌다:
 
 ```python
 # db/repositories/provider.py
@@ -156,14 +156,14 @@ SELECT
     p.name, p.description, p.provider, p.model, p.system_prompt,
     COALESCE(pr.api_key,  '') AS api_key,
     COALESCE(pr.base_url, '') AS base_url
-FROM user_personas p
-LEFT JOIN user_providers pr
+FROM personas p
+LEFT JOIN providers pr
     ON pr.user_id = p.user_id AND pr.provider = p.provider
 WHERE p.user_id = %s AND p.is_default = TRUE
 LIMIT 1
 ```
 
-- `user_personas.provider` + `user_providers.api_key` 조합으로 LLM 인스턴스 생성.
+- `personas.provider` + `providers.api_key` 조합으로 LLM 인스턴스 생성.
 - `api_key`가 없으면 기본 Gemini 인스턴스 사용.
 
 ---

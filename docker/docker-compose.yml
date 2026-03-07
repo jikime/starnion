@@ -1,10 +1,10 @@
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: starpion-postgres
+    container_name: starnion-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-starpion}
-      POSTGRES_USER: ${POSTGRES_USER:-starpion}
+      POSTGRES_DB: ${POSTGRES_DB:-starnion}
+      POSTGRES_USER: ${POSTGRES_USER:-starnion}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -12,7 +12,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-starpion}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-starnion}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -20,10 +20,10 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: starpion-minio
+    container_name: starnion-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-starpion}
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-starnion}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     ports:
       - "${MINIO_PORT:-9000}:9000"
@@ -41,11 +41,11 @@ services:
     build:
       context: ../agent
       dockerfile: ../docker/Dockerfile.agent
-    container_name: starpion-agent
+    container_name: starnion-agent
     ports:
       - "${GRPC_PORT:-50051}:50051"
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-starpion}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-starpion}?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:-starnion}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-starnion}?sslmode=disable
       GRPC_PORT: ${GRPC_PORT:-50051}
     depends_on:
       postgres:
@@ -56,19 +56,19 @@ services:
     build:
       context: ../gateway
       dockerfile: ../docker/Dockerfile.gateway
-    container_name: starpion-gateway
+    container_name: starnion-gateway
     ports:
       - "${GATEWAY_PORT:-8080}:8080"
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-starpion}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-starpion}?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:-starnion}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-starnion}?sslmode=disable
       JWT_SECRET: ${JWT_SECRET}
       GRPC_AGENT_HOST: agent
       GRPC_PORT: ${GRPC_PORT:-50051}
       GOOGLE_REDIRECT_URI: ${GATEWAY_PUBLIC_URL:-http://localhost:8080}/auth/google/callback
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-starpion}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-starnion}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
-      MINIO_BUCKET: ${MINIO_BUCKET:-starpion-files}
+      MINIO_BUCKET: ${MINIO_BUCKET:-starnion-files}
       MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
     depends_on:
       postgres:
@@ -83,15 +83,13 @@ services:
     build:
       context: ../ui
       dockerfile: ../docker/Dockerfile.ui
-    container_name: starpion-ui
+    container_name: starnion-ui
     ports:
       - "${UI_PORT:-3000}:3000"
     environment:
       NODE_ENV: production
       AUTH_SECRET: ${AUTH_SECRET}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
-      GATEWAY_API_URL: http://gateway:${GATEWAY_PORT:-8080}
-      GATEWAY_WS_URL: ws://gateway:${GATEWAY_PORT:-8080}
       API_URL: http://gateway:${GATEWAY_PORT:-8080}
       NEXT_PUBLIC_API_URL: ${GATEWAY_PUBLIC_URL:-http://localhost:8080}
       JWT_SECRET: ${JWT_SECRET}

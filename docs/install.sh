@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# StarPion Installer
-# Usage: curl -fsSL https://jikime.github.io/starpion/install.sh | bash
+# StarNion Installer
+# Usage: curl -fsSL https://jikime.github.io/starnion/install.sh | bash
 #
 # Environment variables:
-#   STARPION_VERSION  — install specific version (default: latest from releases)
-#   STARPION_DIR      — install directory (default: /usr/local/bin or ~/.local/bin)
+#   STARNION_VERSION  — install specific version (default: latest from releases)
+#   STARNION_DIR      — install directory (default: /usr/local/bin or ~/.local/bin)
 #   NO_PROMPT=1       — skip all interactive prompts
 set -euo pipefail
 
 # ── Pinned version (updated automatically on release) ─────────────────────────
-STARPION_VERSION="1.0.0"
+STARNION_VERSION="1.0.0"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 if [[ -t 1 ]] && [[ "${NO_COLOR:-}" == "" ]]; then
@@ -29,15 +29,15 @@ warn()    { echo -e "${GOLD}  ⚠  $*${NC}"; }
 fail()    { echo -e "${RED}  ✗  $*${NC}" >&2; exit 1; }
 dim()     { echo -e "${DIM}      $*${NC}"; }
 
-REPO="jikime/starpion"
-BINARY="starpion"
+REPO="jikime/starnion"
+BINARY="starnion"
 TMPDIR_WORK="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_WORK"' EXIT
 
 # ── Banner ────────────────────────────────────────────────────────────────────
 echo
 echo -e "${GOLD}  ╔══════════════════════════════════════╗${NC}"
-echo -e "${GOLD}  ║     ✦  StarPion  Installer  ✦        ║${NC}"
+echo -e "${GOLD}  ║     ✦  StarNion  Installer  ✦        ║${NC}"
 echo -e "${GOLD}  ╚══════════════════════════════════════╝${NC}"
 echo
 
@@ -79,7 +79,7 @@ esac
 info "OS: ${OS} / Arch: ${ARCH}"
 
 # ── Resolve version ───────────────────────────────────────────────────────────
-VERSION="${STARPION_VERSION}"
+VERSION="${STARNION_VERSION}"
 
 # If "latest" or "dev", resolve from GitHub API
 if [[ "$VERSION" == "latest" || "$VERSION" == "dev" ]]; then
@@ -92,16 +92,16 @@ if [[ "$VERSION" == "latest" || "$VERSION" == "dev" ]]; then
 fi
 
 if [[ -z "$VERSION" ]]; then
-  fail "버전을 확인할 수 없습니다. STARPION_VERSION 환경변수로 지정하세요."
+  fail "버전을 확인할 수 없습니다. STARNION_VERSION 환경변수로 지정하세요."
 fi
 
 info "설치 버전: v${VERSION}"
 
 # ── Check existing install ────────────────────────────────────────────────────
-if command -v starpion &>/dev/null; then
-  CURRENT="$(starpion version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+if command -v starnion &>/dev/null; then
+  CURRENT="$(starnion version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
   if [[ -n "$CURRENT" && "$CURRENT" == "$VERSION" ]]; then
-    ok "StarPion v${VERSION}이 이미 설치되어 있습니다."
+    ok "StarNion v${VERSION}이 이미 설치되어 있습니다."
     exit 0
   fi
   if [[ -n "$CURRENT" ]]; then
@@ -110,8 +110,8 @@ if command -v starpion &>/dev/null; then
 fi
 
 # ── Determine install directory ───────────────────────────────────────────────
-if [[ -n "${STARPION_DIR:-}" ]]; then
-  INSTALL_DIR="$STARPION_DIR"
+if [[ -n "${STARNION_DIR:-}" ]]; then
+  INSTALL_DIR="$STARNION_DIR"
 elif [[ -w "/usr/local/bin" ]]; then
   INSTALL_DIR="/usr/local/bin"
 elif sudo -n true 2>/dev/null; then
@@ -126,7 +126,7 @@ mkdir -p "$INSTALL_DIR"
 info "설치 위치: ${INSTALL_DIR}"
 
 # ── Download ──────────────────────────────────────────────────────────────────
-ASSET="starpion_${OS}_${ARCH}.tar.gz"
+ASSET="starnion_${OS}_${ARCH}.tar.gz"
 BASE_URL="https://github.com/${REPO}/releases/download/v${VERSION}"
 TARBALL_URL="${BASE_URL}/${ASSET}"
 CHECKSUMS_URL="${BASE_URL}/checksums.txt"
@@ -157,6 +157,7 @@ fi
 info "설치 중..."
 tar -xzf "$TARBALL" -C "$TMPDIR_WORK"
 
+# Install CLI binary
 BINARY_SRC="$TMPDIR_WORK/$BINARY"
 if [[ ! -f "$BINARY_SRC" ]]; then
   fail "바이너리를 찾을 수 없습니다: $BINARY_SRC"
@@ -170,7 +171,28 @@ else
   mv "$BINARY_SRC" "$BINARY_DEST"
 fi
 
-ok "StarPion v${VERSION} 설치 완료 → ${BINARY_DEST}"
+# Install gateway server binary, agent and ui to ~/.starnion/
+STARNION_HOME="${HOME}/.starnion"
+mkdir -p "${STARNION_HOME}/bin"
+
+GW_SRC="$TMPDIR_WORK/starnion-gateway"
+if [[ -f "$GW_SRC" ]]; then
+  chmod +x "$GW_SRC"
+  mv "$GW_SRC" "${STARNION_HOME}/bin/starnion-gateway"
+fi
+
+if [[ -d "$TMPDIR_WORK/agent" ]]; then
+  rm -rf "${STARNION_HOME}/agent"
+  mv "$TMPDIR_WORK/agent" "${STARNION_HOME}/agent"
+fi
+
+if [[ -d "$TMPDIR_WORK/ui" ]]; then
+  rm -rf "${STARNION_HOME}/ui"
+  mv "$TMPDIR_WORK/ui" "${STARNION_HOME}/ui"
+fi
+
+ok "StarNion v${VERSION} 설치 완료 → ${BINARY_DEST}"
+ok "런타임 파일 설치 완료 → ${STARNION_HOME}/"
 
 # ── PATH check ────────────────────────────────────────────────────────────────
 if ! echo "$PATH" | tr ':' '\n' | grep -qx "$INSTALL_DIR"; then
@@ -191,8 +213,8 @@ echo -e "${GOLD}  ✦  설치 완료  ✦${NC}"
 echo -e "${GOLD}  ══════════════════════════════════════════${NC}"
 echo
 echo -e "  시작하기:"
-dim "starpion setup      # 초기 설정 마법사"
-dim "starpion dev        # 전체 서비스 실행"
-dim "starpion docker up  # Docker로 실행"
-dim "starpion update     # 최신 버전으로 업데이트"
+dim "starnion setup      # 초기 설정 마법사"
+dim "starnion dev        # 전체 서비스 실행"
+dim "starnion docker up  # Docker로 실행"
+dim "starnion update     # 최신 버전으로 업데이트"
 echo

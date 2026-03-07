@@ -23,7 +23,7 @@ nav_order: 5
 The simplest way — checks GitHub Releases, downloads and replaces the binary:
 
 ```bash
-starpion update
+starnion update
 ```
 
 Sample output:
@@ -35,13 +35,13 @@ Sample output:
   ·  최신 버전 확인 중...
   ·  현재 버전: v1.0.0
   ·  최신 버전: v1.1.0
-  ✓  StarPion v1.1.0 설치 완료
+  ✓  StarNion v1.1.0 설치 완료
 ```
 
 ### Check version only
 
 ```bash
-starpion update --check
+starnion update --check
 ```
 
 Prints whether a new version is available without installing anything.
@@ -51,13 +51,13 @@ Prints whether a new version is available without installing anything.
 Re-run the installer — it handles upgrades automatically:
 
 ```bash
-curl -fsSL https://jikime.github.io/starpion/install.sh | bash
+curl -fsSL https://jikime.github.io/starnion/install.sh | bash
 ```
 
 ### Update to a specific version
 
 ```bash
-STARPION_VERSION=1.2.0 curl -fsSL https://jikime.github.io/starpion/install.sh | bash
+STARNION_VERSION=1.2.0 curl -fsSL https://jikime.github.io/starnion/install.sh | bash
 ```
 
 ---
@@ -67,8 +67,8 @@ STARPION_VERSION=1.2.0 curl -fsSL https://jikime.github.io/starpion/install.sh |
 When a new version is released, rebuild your Docker images:
 
 ```bash
-starpion docker down
-starpion docker up --build
+starnion docker down
+starnion docker up --build
 ```
 
 Or with Compose directly:
@@ -80,7 +80,7 @@ docker compose up -d
 ```
 
 {: .warning }
-> **Data safety**: `starpion docker down` without `--volumes` preserves your PostgreSQL and MinIO data. Only `down --volumes` deletes data.
+> **Data safety**: `starnion docker down` without `--volumes` preserves your PostgreSQL and MinIO data. Only `down --volumes` deletes data.
 
 ---
 
@@ -90,10 +90,10 @@ If a new release changes required environment variables:
 
 ```bash
 # Regenerate docker/.env from your saved config
-starpion docker setup --env-only
+starnion docker setup --env-only
 
 # Re-run the full setup wizard
-starpion setup
+starnion setup
 ```
 
 ---
@@ -101,8 +101,8 @@ starpion setup
 ## Version Information
 
 ```bash
-starpion version     # current CLI version
-starpion doctor      # system health + dependency check
+starnion version     # current CLI version
+starnion doctor      # system health + dependency check
 ```
 
 ---
@@ -111,7 +111,7 @@ starpion doctor      # system health + dependency check
 
 All release notes are available at:
 
-[github.com/jikime/starpion/releases](https://github.com/jikime/starpion/releases)
+[github.com/jikime/starnion/releases](https://github.com/jikime/starnion/releases)
 
 ---
 
@@ -120,5 +120,5 @@ All release notes are available at:
 To roll back to a previous version:
 
 ```bash
-STARPION_VERSION=1.0.0 curl -fsSL https://jikime.github.io/starpion/install.sh | bash
+STARNION_VERSION=1.0.0 curl -fsSL https://jikime.github.io/starnion/install.sh | bash
 ```

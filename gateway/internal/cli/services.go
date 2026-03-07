@@ -11,9 +11,27 @@ import (
 	"time"
 )
 
-// projectRoot attempts to locate the starpion project root by walking up from
-// the executable's directory until it finds an "agent" sibling directory.
+// installRoot returns the starnion data directory (~/.starnion).
+// All release-installed assets (gateway binary, agent, ui) live here.
+func installRoot() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".starnion")
+}
+
+// isInstalled returns true when the release-installed layout is present
+// (~/.starnion/agent exists). In development the source tree is used instead.
+func isInstalled() bool {
+	_, err := os.Stat(filepath.Join(installRoot(), "agent"))
+	return err == nil
+}
+
+// projectRoot returns the directory containing agent/, ui/, gateway/ subdirs.
+// For installed binaries it returns installRoot(); for development it walks up
+// from the executable until it finds the source tree.
 func projectRoot() string {
+	if isInstalled() {
+		return installRoot()
+	}
 	exe, _ := os.Executable()
 	dir := filepath.Dir(exe)
 	for i := 0; i < 6; i++ {
@@ -33,8 +51,8 @@ func ensureConfigured() bool {
 		return true
 	}
 	fmt.Println()
-	PrintFail("Setup", "StarPion이 설정되지 않았습니다.")
-	PrintHint("먼저 'starpion setup'을 실행하세요.")
+	PrintFail("Setup", "StarNion이 설정되지 않았습니다.")
+	PrintHint("먼저 'starnion setup'을 실행하세요.")
 	return false
 }
 
@@ -107,17 +125,18 @@ func RunGateway(devMode bool) error {
 	if !ensureConfigured() {
 		return nil
 	}
-	root := projectRoot()
-	_ = WriteEnvFilesFromConfig(root) // refresh .env from config
 
 	PrintSectionHeader(0, 0, "GATEWAY")
 	PrintInfo("게이트웨이 서버를 시작합니다...")
 
-	gwDir := filepath.Join(root, "gateway")
 	var cmd *exec.Cmd
-	if devMode {
-		cmd = serviceCmd(gwDir, sAntares.Render("[gateway]"), "go", "run", "./cmd/gateway")
+	if isInstalled() {
+		gwBin := filepath.Join(installRoot(), "bin", "starnion-gateway")
+		cmd = serviceCmd(installRoot(), sAntares.Render("[gateway]"), gwBin)
 	} else {
+		root := projectRoot()
+		_ = WriteEnvFilesFromConfig(root)
+		gwDir := filepath.Join(root, "gateway")
 		cmd = serviceCmd(gwDir, sAntares.Render("[gateway]"), "go", "run", "./cmd/gateway")
 	}
 
@@ -129,18 +148,17 @@ func RunAgent() error {
 	if !ensureConfigured() {
 		return nil
 	}
-	root := projectRoot()
-	_ = WriteEnvFilesFromConfig(root)
 
 	PrintSectionHeader(0, 0, "AGENT")
 
+	root := projectRoot()
 	if err := ensureAgentDeps(root); err != nil {
 		return fmt.Errorf("agent 패키지 설치 실패: %w", err)
 	}
 
 	PrintInfo("에이전트를 시작합니다...")
 	agentDir := filepath.Join(root, "agent")
-	cmd := serviceCmd(agentDir, sCrimson.Render("[agent]"), "uv", "run", "python", "-m", "starpion_agent")
+	cmd := serviceCmd(agentDir, sCrimson.Render("[agent]"), "uv", "run", "python", "-m", "starnion_agent")
 	return runWithSignal(cmd)
 }
 
@@ -149,22 +167,30 @@ func RunUI(devMode bool) error {
 	if !ensureConfigured() {
 		return nil
 	}
-	root := projectRoot()
-	_ = WriteEnvFilesFromConfig(root)
 
 	PrintSectionHeader(0, 0, "UI")
-
-	if err := ensureUIDeps(root); err != nil {
-		return fmt.Errorf("UI 패키지 설치 실패: %w", err)
-	}
-
 	PrintInfo("UI를 시작합니다...")
-	uiDir := filepath.Join(root, "ui")
-	pnpmCmd := "start"
-	if devMode {
-		pnpmCmd = "dev"
+
+	var cmd *exec.Cmd
+	if isInstalled() {
+		// Installed: run Next.js standalone server; env vars are loaded from
+		// ~/.starnion/ui/.env which WriteEnvFilesFromConfig writes.
+		uiDir := filepath.Join(installRoot(), "ui")
+		_ = WriteEnvFilesFromConfig(installRoot())
+		cmd = serviceCmd(uiDir, sGold.Render("[ui]"), "node", "server.js")
+	} else {
+		root := projectRoot()
+		_ = WriteEnvFilesFromConfig(root)
+		uiDir := filepath.Join(root, "ui")
+		if err := ensureUIDeps(root); err != nil {
+			return fmt.Errorf("UI 패키지 설치 실패: %w", err)
+		}
+		pnpmCmd := "start"
+		if devMode {
+			pnpmCmd = "dev"
+		}
+		cmd = serviceCmd(uiDir, sGold.Render("[ui]"), "pnpm", pnpmCmd)
 	}
-	cmd := serviceCmd(uiDir, sGold.Render("[ui]"), "pnpm", pnpmCmd)
 	return runWithSignal(cmd)
 }
 
@@ -174,29 +200,44 @@ func RunDev() error {
 	if !ensureConfigured() {
 		return nil
 	}
-	root := projectRoot()
-	_ = WriteEnvFilesFromConfig(root)
 
-	if err := ensureAgentDeps(root); err != nil {
-		return fmt.Errorf("agent 패키지 설치 실패: %w", err)
-	}
-	if err := ensureUIDeps(root); err != nil {
-		return fmt.Errorf("UI 패키지 설치 실패: %w", err)
+	root := projectRoot()
+
+	var cmds []*exec.Cmd
+	if isInstalled() {
+		_ = WriteEnvFilesFromConfig(installRoot())
+		agentDir := filepath.Join(root, "agent")
+		uiDir := filepath.Join(root, "ui")
+		gwBin := filepath.Join(installRoot(), "bin", "starnion-gateway")
+		if err := ensureAgentDeps(root); err != nil {
+			return fmt.Errorf("agent 패키지 설치 실패: %w", err)
+		}
+		cmds = []*exec.Cmd{
+			serviceCmd(installRoot(), sAntares.Render("[gateway]"), gwBin),
+			serviceCmd(agentDir, sCrimson.Render("[agent] "), "uv", "run", "python", "-m", "starnion_agent"),
+			serviceCmd(uiDir, sGold.Render("[ui]     "), "node", "server.js"),
+		}
+	} else {
+		_ = WriteEnvFilesFromConfig(root)
+		if err := ensureAgentDeps(root); err != nil {
+			return fmt.Errorf("agent 패키지 설치 실패: %w", err)
+		}
+		if err := ensureUIDeps(root); err != nil {
+			return fmt.Errorf("UI 패키지 설치 실패: %w", err)
+		}
+		gwDir := filepath.Join(root, "gateway")
+		agentDir := filepath.Join(root, "agent")
+		uiDir := filepath.Join(root, "ui")
+		cmds = []*exec.Cmd{
+			serviceCmd(gwDir, sAntares.Render("[gateway]"), "go", "run", "./cmd/gateway"),
+			serviceCmd(agentDir, sCrimson.Render("[agent] "), "uv", "run", "python", "-m", "starnion_agent"),
+			serviceCmd(uiDir, sGold.Render("[ui]     "), "pnpm", "dev"),
+		}
 	}
 
 	PrintSectionHeader(0, 0, "DEV MODE  ·  gateway + agent + ui")
 	PrintInfo("Ctrl+C로 모든 서비스를 종료합니다.")
 	fmt.Println()
-
-	gwDir := filepath.Join(root, "gateway")
-	agentDir := filepath.Join(root, "agent")
-	uiDir := filepath.Join(root, "ui")
-
-	cmds := []*exec.Cmd{
-		serviceCmd(gwDir, sAntares.Render("[gateway]"), "go", "run", "./cmd/gateway"),
-		serviceCmd(agentDir, sCrimson.Render("[agent] "), "uv", "run", "python", "-m", "starpion_agent"),
-		serviceCmd(uiDir, sGold.Render("[ui]     "), "pnpm", "dev"),
-	}
 
 	// Start all
 	for _, cmd := range cmds {
@@ -267,11 +308,11 @@ func killAll(cmds []*exec.Cmd) {
 	}
 }
 
-// WriteEnvFilesFromConfig loads config and regenerates .env files.
+// WriteEnvFilesFromConfig loads config and regenerates the UI .env file.
 func WriteEnvFilesFromConfig(root string) error {
 	cfg, err := LoadConfig()
 	if err != nil {
 		return err
 	}
-	return WriteEnvFiles(cfg, root)
+	return WriteUIEnv(cfg, root)
 }

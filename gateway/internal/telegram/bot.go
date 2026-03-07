@@ -12,11 +12,11 @@ import (
 	"sync"
 	"time"
 
-	starpionv1 "github.com/jikime/starpion/gateway/gen/starpion/v1"
-	"github.com/jikime/starpion/gateway/internal/activity"
-	"github.com/jikime/starpion/gateway/internal/identity"
-	"github.com/jikime/starpion/gateway/internal/skill"
-	"github.com/jikime/starpion/gateway/internal/storage"
+	starnionv1 "github.com/jikime/starnion/gateway/gen/starnion/v1"
+	"github.com/jikime/starnion/gateway/internal/activity"
+	"github.com/jikime/starnion/gateway/internal/identity"
+	"github.com/jikime/starnion/gateway/internal/skill"
+	"github.com/jikime/starnion/gateway/internal/storage"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -35,7 +35,7 @@ const policyCacheTTL = 30 * time.Second
 // Bot wraps the Telegram bot API and forwards messages to the agent via gRPC.
 type Bot struct {
 	api          *tgbotapi.BotAPI
-	grpcClient   starpionv1.AgentServiceClient
+	grpcClient   starnionv1.AgentServiceClient
 	tracker      *activity.Tracker
 	db           *sql.DB
 	store        *storage.MinIO
@@ -60,7 +60,7 @@ func NewBot(token, ownerUserID string, grpcConn *grpc.ClientConn, tracker *activ
 
 	return &Bot{
 		api:          api,
-		grpcClient:   starpionv1.NewAgentServiceClient(grpcConn),
+		grpcClient:   starnionv1.NewAgentServiceClient(grpcConn),
 		tracker:      tracker,
 		db:           db,
 		store:        store,
@@ -88,7 +88,7 @@ func (b *Bot) loadPolicy() (dmPolicy, groupPolicy string) {
 	if b.db != nil && b.ownerUserID != "" {
 		row := b.db.QueryRowContext(context.Background(), `
 			SELECT dm_policy, group_policy
-			FROM user_channel_settings
+			FROM channel_settings
 			WHERE user_id = $1 AND channel = 'telegram'
 		`, b.ownerUserID)
 		var d, g string
@@ -329,7 +329,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	// Build the gRPC request from message content.
 	// Always use telegramID as ThreadId so LangGraph checkpoints stay continuous
 	// regardless of whether identity resolution succeeded.
-	chatReq := &starpionv1.ChatRequest{
+	chatReq := &starnionv1.ChatRequest{
 		UserId:   userID,
 		Message:  msg.Text,
 		ThreadId: telegramID,
@@ -339,7 +339,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	// Mirroring runs in a background goroutine so it never delays the agent call.
 	mirrorCh := make(chan storage.FileAttachment, 1)
 
-	// imgIDCh receives the user_images row ID for uploaded photos so that the
+	// imgIDCh receives the images row ID for uploaded photos so that the
 	// stream/unary handler can backfill the analysis column once the LLM responds.
 	var imgIDCh chan int64
 
@@ -351,7 +351,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		if fileURL != "" {
 			// Pass the Telegram CDN URL to the agent for Gemini analysis.
 			// Mirror to MinIO in the background so it never blocks the response.
-			chatReq.File = &starpionv1.FileInput{
+			chatReq.File = &starnionv1.FileInput{
 				FileType: "image",
 				FileUrl:  fileURL,
 				FileName: "photo.jpg",
@@ -388,7 +388,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	if msg.Voice != nil {
 		fileURL := b.getFileURL(msg.Voice.FileID)
 		if fileURL != "" {
-			chatReq.File = &starpionv1.FileInput{
+			chatReq.File = &starnionv1.FileInput{
 				FileType: "audio",
 				FileUrl:  fileURL,
 				FileName: "voice.ogg",
@@ -414,7 +414,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	if msg.Video != nil {
 		fileURL := b.getFileURL(msg.Video.FileID)
 		if fileURL != "" {
-			chatReq.File = &starpionv1.FileInput{
+			chatReq.File = &starnionv1.FileInput{
 				FileType: "video",
 				FileUrl:  fileURL,
 				FileName: "video.mp4",
@@ -445,7 +445,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			if docMime == "" {
 				docMime = "application/octet-stream"
 			}
-			chatReq.File = &starpionv1.FileInput{
+			chatReq.File = &starnionv1.FileInput{
 				FileType: "document",
 				FileUrl:  fileURL,
 				FileName: msg.Document.FileName,
@@ -512,9 +512,9 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 
 // handleMessageStream processes a chat request via server-side streaming.
 // Sends an initial message to Telegram and progressively edits it as tokens arrive.
-// imgIDCh (may be nil) carries the user_images row id for uploaded photos so
+// imgIDCh (may be nil) carries the images row id for uploaded photos so
 // that the analysis column can be backfilled once the LLM response is complete.
-func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID int, userID, convID string, req *starpionv1.ChatRequest, imgIDCh chan int64) error {
+func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID int, userID, convID string, req *starnionv1.ChatRequest, imgIDCh chan int64) error {
 	reqCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 
@@ -562,7 +562,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 		}
 
 		switch resp.Type {
-		case starpionv1.ResponseType_TEXT:
+		case starnionv1.ResponseType_TEXT:
 			accumulated.WriteString(resp.Content)
 
 			// First text chunk: transition status message or send new.
@@ -593,7 +593,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 				lastLen = accumulated.Len()
 			}
 
-		case starpionv1.ResponseType_STREAM_END:
+		case starnionv1.ResponseType_STREAM_END:
 			// Transition status message if text accumulated but not yet sent.
 			if statusMsgID != 0 && sentMsgID == 0 && accumulated.Len() > 0 {
 				sentMsgID = statusMsgID
@@ -630,7 +630,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 			b.setReaction(chatID, messageID, "👍")
 			return nil
 
-		case starpionv1.ResponseType_ERROR:
+		case starnionv1.ResponseType_ERROR:
 			errText := resp.Content
 			if errText == "" {
 				errText = "잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요."
@@ -650,7 +650,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 			b.setReaction(chatID, messageID, "😢")
 			return nil
 
-		case starpionv1.ResponseType_FILE:
+		case starnionv1.ResponseType_FILE:
 			b.sendFile(chatID, resp.FileData, resp.FileName, resp.FileMime)
 			// Upload to MinIO and collect attachment for DB persistence.
 			if att, uploadErr := b.uploadFileToStorage(reqCtx, resp.FileName, resp.FileMime, resp.FileData); uploadErr != nil {
@@ -666,7 +666,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 				}
 			}
 
-		case starpionv1.ResponseType_TOOL_CALL:
+		case starnionv1.ResponseType_TOOL_CALL:
 			// Update status message with tool-specific text.
 			if statusMsgID != 0 {
 				statusText := getToolStatus(resp.ToolName)
@@ -674,7 +674,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 				b.api.Send(edit) // best-effort
 			}
 
-		case starpionv1.ResponseType_TOOL_RESULT:
+		case starnionv1.ResponseType_TOOL_RESULT:
 			// Ignored; tool results are processed internally by the agent.
 		}
 	}
@@ -711,7 +711,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 }
 
 // handleMessageUnary processes a chat request via unary gRPC call (fallback).
-func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID int, userID, convID string, req *starpionv1.ChatRequest, imgIDCh chan int64) {
+func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID int, userID, convID string, req *starnionv1.ChatRequest, imgIDCh chan int64) {
 	typingCtx, typingCancel := context.WithCancel(ctx)
 	go b.typingLoop(typingCtx, chatID)
 
@@ -947,7 +947,7 @@ func (b *Bot) uploadFileToStorage(ctx context.Context, name, mime string, data [
 }
 
 func (b *Bot) handleStart(chatID int64) {
-	text := "안녕하세요! 저는 스타피온(Starpion)이에요.\n" +
+	text := "안녕하세요! 저는 스타피온(Starnion)이에요.\n" +
 		"가계부 기록, 지출 조회, 일상 기록 등을 도와드릴게요.\n" +
 		"편하게 말씀해 주세요!"
 	msg := tgbotapi.NewMessage(chatID, text)
@@ -1166,7 +1166,7 @@ func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQue
 		return
 	}
 
-	// personaNameByID maps Telegram persona IDs to the Korean names stored in user_personas.
+	// personaNameByID maps Telegram persona IDs to the Korean names stored in personas.
 	personaNameByID := map[string]string{
 		"assistant": "기본 비서",
 		"finance":   "금융 전문가",
@@ -1181,33 +1181,32 @@ func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQue
 
 		personaName := personaNameByID[personaID]
 
-		// Update user_personas: clear old default, set new default by name.
+		// Update personas: clear old default, set new default by name.
 		// This is the primary mechanism used by the Python agent.
 		tx, txErr := b.db.BeginTx(dbCtx, nil)
 		if txErr == nil {
 			_, err1 := tx.ExecContext(dbCtx,
-				`UPDATE user_personas SET is_default = FALSE WHERE user_id = $1`, userID)
+				`UPDATE personas SET is_default = FALSE WHERE user_id = $1`, userID)
 			_, err2 := tx.ExecContext(dbCtx,
-				`UPDATE user_personas SET is_default = TRUE, updated_at = NOW()
+				`UPDATE personas SET is_default = TRUE, updated_at = NOW()
 				 WHERE user_id = $1 AND name = $2`, userID, personaName)
 			if err1 != nil || err2 != nil {
 				tx.Rollback() //nolint:errcheck
 				log.Error().Err(err1).Err(err2).Str("user_id", userID).
-					Str("persona", personaID).Msg("failed to update user_personas default")
+					Str("persona", personaID).Msg("failed to update personas default")
 			} else if err := tx.Commit(); err != nil {
 				log.Error().Err(err).Str("user_id", userID).Msg("failed to commit persona tx")
 			}
 		}
 
-		// Also update profiles.preferences for backward compatibility.
 		_, err := b.db.ExecContext(dbCtx, `
-			UPDATE profiles
-			SET preferences = COALESCE(preferences, '{}'::jsonb) || $1::jsonb,
+			UPDATE users
+			SET preferences = preferences || $1::jsonb,
 			    updated_at = NOW()
-			WHERE uuid_id = $2
+			WHERE id = $2
 		`, fmt.Sprintf(`{"persona":"%s"}`, personaID), userID)
 		if err != nil {
-			log.Error().Err(err).Str("user_id", userID).Str("persona", personaID).Msg("failed to update profiles persona")
+			log.Error().Err(err).Str("user_id", userID).Str("persona", personaID).Msg("failed to update users persona preference")
 		}
 	}
 
@@ -1308,7 +1307,7 @@ func (b *Bot) handleSkillToggle(ctx context.Context, callback *tgbotapi.Callback
 	log.Info().Str("user_id", userID).Str("skill_id", skillID).Bool("enabled", enabled).Msg("skill toggled")
 }
 
-// recordDocument inserts a user_documents row for a generated document file.
+// recordDocument inserts a documents row for a generated document file.
 func (b *Bot) recordDocument(userID, url, name, mime string, size int64) {
 	if b.db == nil {
 		return
@@ -1333,7 +1332,7 @@ func (b *Bot) recordDocument(userID, url, name, mime string, size int64) {
 		objectKey = parts[len(parts)-2] + "/" + parts[len(parts)-1]
 	}
 	_, err := b.db.ExecContext(context.Background(), `
-		INSERT INTO user_documents (user_id, title, file_type, file_url, object_key, size)
+		INSERT INTO documents (user_id, title, file_type, file_url, object_key, size)
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`, userID, name, mime, url, objectKey, size)
 	if err != nil {
@@ -1341,19 +1340,19 @@ func (b *Bot) recordDocument(userID, url, name, mime string, size int64) {
 	}
 }
 
-// recordImage inserts an image row into user_images (fire-and-forget).
+// recordImage inserts an image row into images (fire-and-forget).
 func (b *Bot) recordImage(userID, url, name, mime string, size int64, imgType, prompt string) {
 	b.recordImageID(userID, url, name, mime, size, imgType, prompt)
 }
 
-// recordImageID inserts a user_images row and returns the new row id (0 on failure).
+// recordImageID inserts a images row and returns the new row id (0 on failure).
 func (b *Bot) recordImageID(userID, url, name, mime string, size int64, imgType, prompt string) int64 {
 	if b.db == nil || !strings.HasPrefix(mime, "image/") {
 		return 0
 	}
 	var id int64
 	err := b.db.QueryRowContext(context.Background(), `
-		INSERT INTO user_images (user_id, url, name, mime, size, source, type, prompt)
+		INSERT INTO images (user_id, url, name, mime, size, source, type, prompt)
 		VALUES ($1, $2, $3, $4, $5, 'telegram', $6, $7)
 		RETURNING id
 	`, userID, url, name, mime, size, imgType, prompt).Scan(&id)
@@ -1381,13 +1380,13 @@ func (b *Bot) backfillImageAnalysis(imgIDCh chan int64, analysis string) {
 	b.updateImageAnalysis(imgID, analysis)
 }
 
-// updateImageAnalysis sets the analysis text on an existing user_images row and marks it as analyzed.
+// updateImageAnalysis sets the analysis text on an existing images row and marks it as analyzed.
 func (b *Bot) updateImageAnalysis(id int64, analysis string) {
 	if b.db == nil || id == 0 || analysis == "" {
 		return
 	}
 	_, err := b.db.ExecContext(context.Background(), `
-		UPDATE user_images SET analysis = $1, type = 'analyzed' WHERE id = $2
+		UPDATE images SET analysis = $1, type = 'analyzed' WHERE id = $2
 	`, analysis, id)
 	if err != nil {
 		log.Warn().Err(err).Int64("id", id).Msg("telegram: update image analysis failed")
@@ -1402,14 +1401,14 @@ func tgImageType(name string) string {
 	return "generated"
 }
 
-// recordAudio inserts an audio row into user_audios.
+// recordAudio inserts an audio row into audios.
 // audioType: 'uploaded' | 'recorded' | 'generated'
 func (b *Bot) recordAudio(userID, url, name, mime string, size int64, duration int, audioType, prompt, transcript string) {
 	if b.db == nil || !strings.HasPrefix(mime, "audio/") {
 		return
 	}
 	_, err := b.db.ExecContext(context.Background(), `
-		INSERT INTO user_audios (user_id, url, name, mime, size, duration, source, type, prompt, transcript)
+		INSERT INTO audios (user_id, url, name, mime, size, duration, source, type, prompt, transcript)
 		VALUES ($1, $2, $3, $4, $5, $6, 'telegram', $7, $8, $9)
 	`, userID, url, name, mime, size, duration, audioType, prompt, transcript)
 	if err != nil {

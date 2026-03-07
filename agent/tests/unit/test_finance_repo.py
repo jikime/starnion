@@ -1,4 +1,4 @@
-"""Unit tests for starpion_agent.db.repositories.finance module.
+"""Unit tests for starnion_agent.db.repositories.finance module.
 
 Tests cover:
 - ``create``: INSERT with RETURNING
@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from starpion_agent.db.repositories import finance as finance_repo
+from starnion_agent.db.repositories import finance as finance_repo
 
 
 # =========================================================================

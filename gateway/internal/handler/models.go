@@ -43,7 +43,7 @@ func (h *ModelsHandler) ListProviders(c echo.Context) error {
 
 	rows, err := h.db.QueryContext(c.Request().Context(), `
 		SELECT provider, api_key, base_url, enabled_models, updated_at
-		FROM user_providers
+		FROM providers
 		WHERE user_id = $1
 		ORDER BY provider
 	`, userID)
@@ -105,10 +105,10 @@ func (h *ModelsHandler) UpsertProvider(c echo.Context) error {
 	}
 
 	_, err := h.db.ExecContext(c.Request().Context(), `
-		INSERT INTO user_providers (user_id, provider, api_key, base_url, enabled_models, updated_at)
+		INSERT INTO providers (user_id, provider, api_key, base_url, enabled_models, updated_at)
 		VALUES ($1, $2, $3, $4, $5, NOW())
 		ON CONFLICT (user_id, provider) DO UPDATE SET
-			api_key        = CASE WHEN $3 = '' THEN user_providers.api_key ELSE $3 END,
+			api_key        = CASE WHEN $3 = '' THEN providers.api_key ELSE $3 END,
 			base_url       = $4,
 			enabled_models = $5,
 			updated_at     = NOW()
@@ -129,7 +129,7 @@ func (h *ModelsHandler) DeleteProvider(c echo.Context) error {
 	}
 
 	if _, err := h.db.ExecContext(c.Request().Context(),
-		`DELETE FROM user_providers WHERE user_id = $1 AND provider = $2`,
+		`DELETE FROM providers WHERE user_id = $1 AND provider = $2`,
 		userID, provider,
 	); err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "delete failed"})
@@ -264,7 +264,7 @@ type builtinPersona struct {
 	IsDefault    bool
 }
 
-// builtinPersonas are seeded into user_personas on first visit.
+// builtinPersonas are seeded into personas on first visit.
 // Tones are derived from the Python agent's persona.py PERSONAS dict.
 var builtinPersonas = []builtinPersona{
 	{
@@ -326,11 +326,11 @@ func (h *ModelsHandler) ListPersonas(c echo.Context) error {
 	// Seed built-in personas on first visit (count == 0).
 	var count int
 	if err := h.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM user_personas WHERE user_id = $1`, userID,
+		`SELECT COUNT(*) FROM personas WHERE user_id = $1`, userID,
 	).Scan(&count); err == nil && count == 0 {
 		for _, p := range builtinPersonas {
 			if _, err := h.db.ExecContext(ctx, `
-				INSERT INTO user_personas (user_id, name, description, provider, model, system_prompt, is_default)
+				INSERT INTO personas (user_id, name, description, provider, model, system_prompt, is_default)
 				VALUES ($1, $2, $3, '', '', $4, $5)
 			`, userID, p.Name, p.Description, p.SystemPrompt, p.IsDefault); err != nil {
 				log.Warn().Err(err).Str("persona", p.Name).Msg("seed builtin persona failed")
@@ -340,7 +340,7 @@ func (h *ModelsHandler) ListPersonas(c echo.Context) error {
 
 	rows, err := h.db.QueryContext(ctx, `
 		SELECT id::text, name, description, provider, model, system_prompt, is_default, created_at, updated_at
-		FROM user_personas
+		FROM personas
 		WHERE user_id = $1
 		ORDER BY is_default DESC, created_at ASC
 	`, userID)
@@ -386,7 +386,7 @@ func (h *ModelsHandler) CreatePersona(c echo.Context) error {
 
 	if body.IsDefault {
 		if _, err := h.db.ExecContext(c.Request().Context(),
-			`UPDATE user_personas SET is_default = FALSE WHERE user_id = $1`, userID,
+			`UPDATE personas SET is_default = FALSE WHERE user_id = $1`, userID,
 		); err != nil {
 			log.Warn().Err(err).Msg("clear default personas failed")
 		}
@@ -394,7 +394,7 @@ func (h *ModelsHandler) CreatePersona(c echo.Context) error {
 
 	var id string
 	err := h.db.QueryRowContext(c.Request().Context(), `
-		INSERT INTO user_personas (user_id, name, description, provider, model, system_prompt, is_default)
+		INSERT INTO personas (user_id, name, description, provider, model, system_prompt, is_default)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id::text
 	`, userID, body.Name, body.Description, body.Provider, body.Model, body.SystemPrompt, body.IsDefault).Scan(&id)
@@ -433,7 +433,7 @@ func (h *ModelsHandler) UpdatePersona(c echo.Context) error {
 
 	if body.IsDefault {
 		if _, err := tx.ExecContext(c.Request().Context(),
-			`UPDATE user_personas SET is_default = FALSE WHERE user_id = $1`, userID,
+			`UPDATE personas SET is_default = FALSE WHERE user_id = $1`, userID,
 		); err != nil {
 			log.Error().Err(err).Msg("clear default personas failed")
 			return c.JSON(http.StatusInternalServerError, echo.Map{"error": "clear default failed"})
@@ -443,7 +443,7 @@ func (h *ModelsHandler) UpdatePersona(c echo.Context) error {
 	}
 
 	res, err := tx.ExecContext(c.Request().Context(), `
-		UPDATE user_personas SET
+		UPDATE personas SET
 			name          = $3,
 			description   = $4,
 			provider      = $5,
@@ -480,7 +480,7 @@ func (h *ModelsHandler) DeletePersona(c echo.Context) error {
 	}
 
 	if _, err := h.db.ExecContext(c.Request().Context(),
-		`DELETE FROM user_personas WHERE id = $1::uuid AND user_id = $2`, id, userID,
+		`DELETE FROM personas WHERE id = $1::uuid AND user_id = $2`, id, userID,
 	); err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "delete failed"})
 	}

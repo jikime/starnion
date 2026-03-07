@@ -1,4 +1,4 @@
-"""Unit tests for starpion_agent.skills.calculator.tools module.
+"""Unit tests for starnion_agent.skills.calculator.tools module.
 
 Tests cover:
 - ``CalculateInput``: Pydantic input schema
@@ -14,7 +14,7 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from starpion_agent.skills.calculator.tools import (
+from starnion_agent.skills.calculator.tools import (
     CalculateInput,
     _format_result,
     _safe_eval,

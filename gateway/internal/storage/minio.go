@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/minio/minio-go/v7"
@@ -34,23 +33,22 @@ type MinIO struct {
 	publicURL string // browser-accessible base URL (e.g. http://localhost:9000)
 }
 
-// NewMinIO initialises a MinIO client from environment variables.
-//
-//	MINIO_ENDPOINT   internal host:port  (default: localhost:9000)
-//	MINIO_ACCESS_KEY access key
-//	MINIO_SECRET_KEY secret key
-//	MINIO_BUCKET     bucket name         (default: starpion-files)
-//	MINIO_PUBLIC_URL browser-facing URL  (default: http://localhost:9000)
-func NewMinIO() (*MinIO, error) {
-	endpoint := envOr("MINIO_ENDPOINT", "localhost:9000")
-	accessKey := os.Getenv("MINIO_ACCESS_KEY")
-	secretKey := os.Getenv("MINIO_SECRET_KEY")
-	bucket := envOr("MINIO_BUCKET", "starpion-files")
-	publicURL := strings.TrimRight(envOr("MINIO_PUBLIC_URL", "http://localhost:9000"), "/")
+// NewMinIO initialises a MinIO client from the provided configuration.
+func NewMinIO(endpoint, accessKey, secretKey, bucket, publicURL string, useSSL bool) (*MinIO, error) {
+	if endpoint == "" {
+		endpoint = "localhost:9000"
+	}
+	if bucket == "" {
+		bucket = "starnion-files"
+	}
+	if publicURL == "" {
+		publicURL = "http://localhost:9000"
+	}
+	publicURL = strings.TrimRight(publicURL, "/")
 
 	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
-		Secure: false,
+		Secure: useSSL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("minio: new client: %w", err)
@@ -106,9 +104,3 @@ func uniqueName(original string) string {
 	return hex.EncodeToString(b) + "/" + original
 }
 
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}

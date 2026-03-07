@@ -13,10 +13,10 @@ var version = "dev"
 // NewRootCmd constructs the root cobra command with all subcommands registered.
 func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:   "starpion",
-		Short: "StarPion — Personal AI Assistant CLI",
-		Long:  sGold.Render("★ StarPion") + " " + sNebula.Render("Personal AI Assistant"),
-		// Print banner on bare `starpion` invocation
+		Use:   "starnion",
+		Short: "StarNion — Personal AI Assistant CLI",
+		Long:  sGold.Render("★ StarNion") + " " + sNebula.Render("Personal AI Assistant"),
+		// Print banner on bare `starnion` invocation
 		Run: func(cmd *cobra.Command, args []string) {
 			PrintBanner(version)
 			_ = cmd.Help()
@@ -49,7 +49,7 @@ func newSetupCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "setup",
 		Short: "초기 설정 마법사 실행",
-		Long:  "StarPion 서비스 실행에 필요한 초기 설정을 대화형으로 진행합니다.",
+		Long:  "StarNion 서비스 실행에 필요한 초기 설정을 대화형으로 진행합니다.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := projectRoot()
 			return RunSetup(root)
@@ -131,7 +131,7 @@ func newDoctorCmd() *cobra.Command {
 			if ConfigExists() {
 				PrintOK("Config", ConfigPath())
 			} else {
-				PrintFail("Config", "설정 파일 없음 → 'starpion setup' 실행 필요")
+				PrintFail("Config", "설정 파일 없음 → 'starnion setup' 실행 필요")
 			}
 
 			// PostgreSQL
@@ -142,8 +142,8 @@ func newDoctorCmd() *cobra.Command {
 			}
 
 			// MinIO
-			if CheckMinIO(cfg.MinIO.Endpoint) {
-				PrintOK("MinIO", cfg.MinIO.Endpoint)
+			if CheckMinIO(cfg.MinIO.PublicURL) {
+				PrintOK("MinIO", cfg.MinIO.PublicURL)
 			} else {
 				PrintFail("MinIO", "서버 미실행")
 			}
@@ -169,7 +169,7 @@ func newVersionCmd() *cobra.Command {
 		Short: "버전 정보 출력",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Printf("%s %s\n",
-				sGold.Render("★ StarPion"),
+				sGold.Render("★ StarNion"),
 				sStar.Render("v"+version),
 			)
 		},

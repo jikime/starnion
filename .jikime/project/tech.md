@@ -326,7 +326,7 @@ CREATE INDEX idx_daily_logs_embedding
 -- ============================================
 -- 문서 저장소
 -- ============================================
-CREATE TABLE user_documents (
+CREATE TABLE documents (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID NOT NULL REFERENCES profiles(user_id),
     title           VARCHAR(255) NOT NULL,
@@ -342,7 +342,7 @@ CREATE TABLE user_documents (
 -- ============================================
 CREATE TABLE document_sections (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    document_id     UUID NOT NULL REFERENCES user_documents(id) ON DELETE CASCADE,
+    document_id     UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     content         TEXT NOT NULL,              -- 청크 텍스트
     embedding       vector(1536),              -- 벡터 임베딩
     metadata        JSONB DEFAULT '{}',        -- 페이지 번호, 섹션 제목 등

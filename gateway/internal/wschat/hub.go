@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	starpionv1 "github.com/jikime/starpion/gateway/gen/starpion/v1"
-	"github.com/jikime/starpion/gateway/internal/storage"
+	starnionv1 "github.com/jikime/starnion/gateway/gen/starnion/v1"
+	"github.com/jikime/starnion/gateway/internal/storage"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 )
@@ -28,13 +28,13 @@ type Hub struct {
 	mu      sync.RWMutex
 	clients map[string]*Client // userID → client
 
-	grpcClient starpionv1.AgentServiceClient
+	grpcClient starnionv1.AgentServiceClient
 	db         *sql.DB
 	store      *storage.MinIO // nil = file upload disabled
 }
 
 // NewHub creates a Hub backed by the gRPC agent service.
-func NewHub(grpcClient starpionv1.AgentServiceClient, db *sql.DB, store *storage.MinIO) *Hub {
+func NewHub(grpcClient starnionv1.AgentServiceClient, db *sql.DB, store *storage.MinIO) *Hub {
 	return &Hub{
 		clients:    make(map[string]*Client),
 		grpcClient: grpcClient,
@@ -237,7 +237,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 	// Save user message immediately.
 	c.hub.saveMessage(threadID, "user", message, nil)
 
-	stream, err := c.hub.grpcClient.ChatStream(ctx, &starpionv1.ChatRequest{
+	stream, err := c.hub.grpcClient.ChatStream(ctx, &starnionv1.ChatRequest{
 		UserId:   c.userID,
 		Message:  message,
 		Model:    model,
@@ -261,7 +261,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 		}
 
 		switch resp.Type {
-		case starpionv1.ResponseType_TEXT:
+		case starnionv1.ResponseType_TEXT:
 			assistantBuf.WriteString(resp.Content)
 			c.send <- OutFrame{
 				Type:    FrameEvent,
@@ -270,7 +270,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 				Payload: map[string]any{"text": resp.Content},
 			}
 
-		case starpionv1.ResponseType_TOOL_CALL:
+		case starnionv1.ResponseType_TOOL_CALL:
 			c.send <- OutFrame{
 				Type:  FrameEvent,
 				ID:    frame.ID,
@@ -281,7 +281,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 				},
 			}
 
-		case starpionv1.ResponseType_TOOL_RESULT:
+		case starnionv1.ResponseType_TOOL_RESULT:
 			c.send <- OutFrame{
 				Type:  FrameEvent,
 				ID:    frame.ID,
@@ -292,7 +292,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 				},
 			}
 
-		case starpionv1.ResponseType_FILE:
+		case starnionv1.ResponseType_FILE:
 			att, uploadErr := c.hub.uploadFile(ctx, resp.FileName, resp.FileMime, resp.FileData)
 			if uploadErr != nil {
 				log.Warn().Err(uploadErr).Str("file", resp.FileName).Msg("ws: file upload failed")
@@ -317,7 +317,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 				},
 			}
 
-		case starpionv1.ResponseType_ERROR:
+		case starnionv1.ResponseType_ERROR:
 			c.send <- OutFrame{
 				Type:    FrameEvent,
 				ID:      frame.ID,
@@ -325,7 +325,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 				Payload: map[string]any{"message": resp.Content},
 			}
 
-		case starpionv1.ResponseType_STREAM_END:
+		case starnionv1.ResponseType_STREAM_END:
 			// Save completed assistant message with any file attachments.
 			if assistantBuf.Len() > 0 || len(attachments) > 0 {
 				c.hub.saveMessage(threadID, "assistant", assistantBuf.String(), attachments)
@@ -345,13 +345,13 @@ func (h *Hub) uploadFile(ctx context.Context, name, mime string, data []byte) (s
 	return h.store.Upload(ctx, name, mime, data)
 }
 
-// recordImage inserts an image row into user_images (fire-and-forget).
+// recordImage inserts an image row into images (fire-and-forget).
 func recordImage(db *sql.DB, userID, url, name, mime string, size int64, source, imgType, prompt string) {
 	if db == nil || !strings.HasPrefix(mime, "image/") {
 		return
 	}
 	_, err := db.ExecContext(context.Background(), `
-		INSERT INTO user_images (user_id, url, name, mime, size, source, type, prompt)
+		INSERT INTO images (user_id, url, name, mime, size, source, type, prompt)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`, userID, url, name, mime, size, source, imgType, prompt)
 	if err != nil {
@@ -367,13 +367,13 @@ func wsImageType(name string) string {
 	return "generated"
 }
 
-// recordAudio inserts an audio row into user_audios (fire-and-forget).
+// recordAudio inserts an audio row into audios (fire-and-forget).
 func recordAudio(db *sql.DB, userID, url, name, mime string, size int64, duration int, source, audioType, transcript, prompt string) {
 	if db == nil || !strings.HasPrefix(mime, "audio/") {
 		return
 	}
 	_, err := db.ExecContext(context.Background(), `
-		INSERT INTO user_audios (user_id, url, name, mime, size, duration, source, type, transcript, prompt)
+		INSERT INTO audios (user_id, url, name, mime, size, duration, source, type, transcript, prompt)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`, userID, url, name, mime, size, duration, source, audioType, transcript, prompt)
 	if err != nil {

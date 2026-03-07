@@ -1,4 +1,4 @@
-"""Unit tests for starpion_agent.skills.image.tools module.
+"""Unit tests for starnion_agent.skills.image.tools module.
 
 Tests cover:
 - _extract_image_bytes helper
@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from starpion_agent.skills.image.tools import (
+from starnion_agent.skills.image.tools import (
     AnalyzeImageInput,
     EditImageInput,
     GenerateImageInput,
@@ -166,7 +166,7 @@ class TestGenerateImage:
 
     @pytest.mark.asyncio
     async def test_successful_generation(self):
-        from starpion_agent.skills.image.tools import generate_image
+        from starnion_agent.skills.image.tools import generate_image
 
         image_data = b"\x89PNG_GENERATED"
         mock_response = _mock_genai_response(image_data)
@@ -175,8 +175,8 @@ class TestGenerateImage:
         mock_client_cls.return_value.models.generate_content.return_value = mock_response
 
         with (
-            patch("starpion_agent.skills.image.tools.add_pending_file") as mock_add,
-            patch("starpion_agent.skills.image.tools.settings", MagicMock(gemini_api_key="k", gemini_model="m")),
+            patch("starnion_agent.skills.image.tools.add_pending_file") as mock_add,
+            patch("starnion_agent.skills.image.tools.settings", MagicMock(gemini_api_key="k", gemini_model="m")),
             patch("google.genai.Client", mock_client_cls),
         ):
             result = await generate_image.ainvoke({"prompt": "sunset", "aspect_ratio": "16:9"})
@@ -189,7 +189,7 @@ class TestGenerateImage:
 
     @pytest.mark.asyncio
     async def test_no_image_returns_error(self):
-        from starpion_agent.skills.image.tools import generate_image
+        from starnion_agent.skills.image.tools import generate_image
 
         mock_response = _mock_genai_response(None)
 
@@ -197,8 +197,8 @@ class TestGenerateImage:
         mock_client_cls.return_value.models.generate_content.return_value = mock_response
 
         with (
-            patch("starpion_agent.skills.image.tools.add_pending_file") as mock_add,
-            patch("starpion_agent.skills.image.tools.settings", MagicMock(gemini_api_key="k", gemini_model="m")),
+            patch("starnion_agent.skills.image.tools.add_pending_file") as mock_add,
+            patch("starnion_agent.skills.image.tools.settings", MagicMock(gemini_api_key="k", gemini_model="m")),
             patch("google.genai.Client", mock_client_cls),
         ):
             result = await generate_image.ainvoke({"prompt": "impossible"})
@@ -208,7 +208,7 @@ class TestGenerateImage:
 
     @pytest.mark.asyncio
     async def test_invalid_aspect_ratio_uses_default(self):
-        from starpion_agent.skills.image.tools import generate_image
+        from starnion_agent.skills.image.tools import generate_image
 
         image_data = b"\x89PNG"
         mock_response = _mock_genai_response(image_data)
@@ -217,8 +217,8 @@ class TestGenerateImage:
         mock_client_cls.return_value.models.generate_content.return_value = mock_response
 
         with (
-            patch("starpion_agent.skills.image.tools.add_pending_file"),
-            patch("starpion_agent.skills.image.tools.settings", MagicMock(gemini_api_key="k", gemini_model="m")),
+            patch("starnion_agent.skills.image.tools.add_pending_file"),
+            patch("starnion_agent.skills.image.tools.settings", MagicMock(gemini_api_key="k", gemini_model="m")),
             patch("google.genai.Client", mock_client_cls),
         ):
             result = await generate_image.ainvoke({"prompt": "cat", "aspect_ratio": "invalid"})
@@ -236,7 +236,7 @@ class TestEditImage:
 
     @pytest.mark.asyncio
     async def test_successful_edit(self):
-        from starpion_agent.skills.image.tools import edit_image
+        from starnion_agent.skills.image.tools import edit_image
 
         image_data = b"\x89PNG_EDITED"
         mock_response = _mock_genai_response(image_data)
@@ -247,9 +247,9 @@ class TestEditImage:
         tiny_png = _make_tiny_png()
 
         with (
-            patch("starpion_agent.skills.image.tools.add_pending_file") as mock_add,
-            patch("starpion_agent.skills.image.tools.fetch_file", new_callable=AsyncMock, return_value=tiny_png),
-            patch("starpion_agent.skills.image.tools.settings", MagicMock(gemini_api_key="k", gemini_model="m")),
+            patch("starnion_agent.skills.image.tools.add_pending_file") as mock_add,
+            patch("starnion_agent.skills.image.tools.fetch_file", new_callable=AsyncMock, return_value=tiny_png),
+            patch("starnion_agent.skills.image.tools.settings", MagicMock(gemini_api_key="k", gemini_model="m")),
             patch("google.genai.Client", mock_client_cls),
         ):
             result = await edit_image.ainvoke({
@@ -265,7 +265,7 @@ class TestEditImage:
 
     @pytest.mark.asyncio
     async def test_edit_failure_returns_error(self):
-        from starpion_agent.skills.image.tools import edit_image
+        from starnion_agent.skills.image.tools import edit_image
 
         # Response with empty parts → no image
         candidate = SimpleNamespace(content=SimpleNamespace(parts=[]))
@@ -277,9 +277,9 @@ class TestEditImage:
         tiny_png = _make_tiny_png()
 
         with (
-            patch("starpion_agent.skills.image.tools.add_pending_file") as mock_add,
-            patch("starpion_agent.skills.image.tools.fetch_file", new_callable=AsyncMock, return_value=tiny_png),
-            patch("starpion_agent.skills.image.tools.settings", MagicMock(gemini_api_key="k", gemini_model="m")),
+            patch("starnion_agent.skills.image.tools.add_pending_file") as mock_add,
+            patch("starnion_agent.skills.image.tools.fetch_file", new_callable=AsyncMock, return_value=tiny_png),
+            patch("starnion_agent.skills.image.tools.settings", MagicMock(gemini_api_key="k", gemini_model="m")),
             patch("google.genai.Client", mock_client_cls),
         ):
             result = await edit_image.ainvoke({

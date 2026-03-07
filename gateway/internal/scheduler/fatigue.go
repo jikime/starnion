@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jikime/starpion/gateway/internal/activity"
+	"github.com/jikime/starnion/gateway/internal/activity"
 	"github.com/rs/zerolog/log"
 )
 
@@ -113,7 +113,7 @@ func (fm *fatigueManager) dailyCount(userID string) int {
 	return state.count
 }
 
-// notificationsEnabled checks profiles.preferences for notification opt-out.
+// notificationsEnabled checks users.preferences for notification opt-out.
 // Default is true (opt-out model). User sets {"notifications": {"enabled": false}} to disable.
 func notificationsEnabled(preferences map[string]any) bool {
 	if preferences == nil {

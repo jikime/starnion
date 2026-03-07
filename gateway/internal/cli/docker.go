@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newDockerCmd builds the `starpion docker` command tree.
+// newDockerCmd builds the `starnion docker` command tree.
 func newDockerCmd() *cobra.Command {
 	docker := &cobra.Command{
 		Use:   "docker",
@@ -43,7 +43,7 @@ func newDockerSetupCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "setup",
 		Short: "Docker 환경 파일 생성 및 서비스 시작",
-		Long:  "starpion 설정에서 docker/.env를 생성하고 setup.sh를 실행합니다.",
+		Long:  "starnion 설정에서 docker/.env를 생성하고 setup.sh를 실행합니다.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !ensureConfigured() {
 				return nil

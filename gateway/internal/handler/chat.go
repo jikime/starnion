@@ -3,7 +3,7 @@ package handler
 import (
 	"net/http"
 
-	starpionv1 "github.com/jikime/starpion/gateway/gen/starpion/v1"
+	starnionv1 "github.com/jikime/starnion/gateway/gen/starnion/v1"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -23,13 +23,13 @@ type ChatResponse struct {
 
 // ChatHandler handles chat-related HTTP requests.
 type ChatHandler struct {
-	grpcClient starpionv1.AgentServiceClient
+	grpcClient starnionv1.AgentServiceClient
 }
 
 // NewChatHandler creates a new ChatHandler with a gRPC connection.
 func NewChatHandler(conn *grpc.ClientConn) *ChatHandler {
 	return &ChatHandler{
-		grpcClient: starpionv1.NewAgentServiceClient(conn),
+		grpcClient: starnionv1.NewAgentServiceClient(conn),
 	}
 }
 
@@ -59,7 +59,7 @@ func (h *ChatHandler) Chat(c echo.Context) error {
 		Str("message", req.Message).
 		Msg("chat request received")
 
-	resp, err := h.grpcClient.Chat(c.Request().Context(), &starpionv1.ChatRequest{
+	resp, err := h.grpcClient.Chat(c.Request().Context(), &starnionv1.ChatRequest{
 		UserId:  req.UserID,
 		Message: req.Message,
 		Model:   req.Model,

@@ -25,7 +25,7 @@
 ## DB 스키마
 
 ```sql
-CREATE TABLE user_personas (
+CREATE TABLE personas (
     id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id       UUID        NOT NULL REFERENCES profiles(uuid_id),
     name          TEXT        NOT NULL,
@@ -60,11 +60,11 @@ CREATE TABLE user_personas (
 // 사용자 페르소나가 0개면 기본 5개를 INSERT
 var count int
 if err := h.db.QueryRowContext(ctx,
-    `SELECT COUNT(*) FROM user_personas WHERE user_id = $1`, userID,
+    `SELECT COUNT(*) FROM personas WHERE user_id = $1`, userID,
 ).Scan(&count); err == nil && count == 0 {
     for _, p := range builtinPersonas {
         h.db.ExecContext(ctx, `
-            INSERT INTO user_personas (user_id, name, description, provider, model, system_prompt, is_default)
+            INSERT INTO personas (user_id, name, description, provider, model, system_prompt, is_default)
             VALUES ($1, $2, $3, '', '', $4, $5)
         `, userID, p.Name, p.Description, p.SystemPrompt, p.IsDefault)
     }
@@ -79,10 +79,10 @@ defer tx.Rollback()
 
 if body.IsDefault {
     // 1. 기존 기본 페르소나 해제
-    tx.ExecContext(ctx, `UPDATE user_personas SET is_default = FALSE WHERE user_id = $1`, userID)
+    tx.ExecContext(ctx, `UPDATE personas SET is_default = FALSE WHERE user_id = $1`, userID)
 }
 // 2. 대상 페르소나 업데이트 (is_default 포함)
-tx.ExecContext(ctx, `UPDATE user_personas SET ... WHERE id = $1::uuid AND user_id = $2`, ...)
+tx.ExecContext(ctx, `UPDATE personas SET ... WHERE id = $1::uuid AND user_id = $2`, ...)
 tx.Commit()
 ```
 
@@ -136,7 +136,7 @@ tx.Commit()
 | 이름 (필수) | 페르소나 표시명 |
 | 설명 | 짧은 설명 |
 | 프로바이더 | 연결된 프로바이더 목록에서 선택 |
-| 모델 | `user_providers.enabled_models` 기반 드롭다운 + "직접 입력..." 옵션 |
+| 모델 | `providers.enabled_models` 기반 드롭다운 + "직접 입력..." 옵션 |
 | 시스템 프롬프트 | 자유 입력. 비우면 기본 built-in 톤 사용 |
 | 기본 페르소나 | 토글 스위치 |
 
@@ -161,7 +161,7 @@ const availableModels = (): { id: string; name: string }[] => {
 채팅 요청마다 `_agent_node()` → `_get_enabled_context()` 실행:
 
 ```
-1. user_personas WHERE is_default = TRUE 조회
+1. personas WHERE is_default = TRUE 조회
    └─ provider + model + api_key 있으면 → LLM override 생성 (캐시 활용)
    └─ system_prompt 있으면 → custom_system_prompt 로 사용
 
@@ -178,7 +178,7 @@ const availableModels = (): { id: string; name: string }[] => {
 ### 시스템 프롬프트 우선순위
 
 ```
-user_personas.system_prompt (DB, 사용자 정의)
+personas.system_prompt (DB, 사용자 정의)
     ↓ 없으면
 persona.py PERSONAS[persona_id]["tone"] (코드, built-in)
     ↓ 없으면
@@ -197,7 +197,7 @@ DEFAULT_PERSONA = "assistant" 톤
 ## 텔레그램 `/persona` 명령어 연동
 
 텔레그램 봇의 `/persona` 명령어는 인라인 키보드로 5개 페르소나를 표시.
-선택 시 `user_personas.is_default`를 직접 업데이트한다.
+선택 시 `personas.is_default`를 직접 업데이트한다.
 
 ### 텔레그램 ID → DB 이름 매핑
 
@@ -212,9 +212,9 @@ DEFAULT_PERSONA = "assistant" 톤
 ### 콜백 처리 (`handleCallback`)
 
 ```go
-// 1. user_personas에서 기본 페르소나 변경 (트랜잭션)
-tx.ExecContext(ctx, `UPDATE user_personas SET is_default = FALSE WHERE user_id = $1`, userID)
-tx.ExecContext(ctx, `UPDATE user_personas SET is_default = TRUE, updated_at = NOW()
+// 1. personas에서 기본 페르소나 변경 (트랜잭션)
+tx.ExecContext(ctx, `UPDATE personas SET is_default = FALSE WHERE user_id = $1`, userID)
+tx.ExecContext(ctx, `UPDATE personas SET is_default = TRUE, updated_at = NOW()
                      WHERE user_id = $1 AND name = $2`, userID, personaName)
 tx.Commit()
 
@@ -227,11 +227,11 @@ db.ExecContext(ctx, `UPDATE profiles SET preferences = ... || '{"persona":"analy
 ```
 텔레그램 /persona → 사용자가 "데이터 분석가" 선택
     ↓
-bot.go: user_personas UPDATE is_default=TRUE WHERE name='데이터 분석가'
+bot.go: personas UPDATE is_default=TRUE WHERE name='데이터 분석가'
     ↓
 다음 채팅 메시지 전송
     ↓
-agent.py: user_personas WHERE is_default=TRUE → "데이터 분석가" 조회
+agent.py: personas WHERE is_default=TRUE → "데이터 분석가" 조회
     ↓
 system_prompt = "객관적이고 간결하게 응답합니다..." 적용
 ```
@@ -242,9 +242,9 @@ system_prompt = "객관적이고 간결하게 응답합니다..." 적용
 
 | 항목 | 구 시스템 | 신 시스템 |
 |---|---|---|
-| 저장 위치 | `profiles.preferences.persona` (JSONB) | `user_personas.is_default` (전용 테이블) |
+| 저장 위치 | `profiles.preferences.persona` (JSONB) | `personas.is_default` (전용 테이블) |
 | 페르소나 정의 | `persona.py` 코드 하드코딩 | DB + 코드 병행 (사용자 커스텀 가능) |
 | 모델 연결 | 불가 (시스템 프롬프트 톤만) | 가능 (provider + model 지정) |
 | 커스텀 추가 | 불가 | 가능 (UI에서 생성) |
-| 텔레그램 연동 | `profiles.preferences` 업데이트 | `user_personas` 직접 업데이트 |
+| 텔레그램 연동 | `profiles.preferences` 업데이트 | `personas` 직접 업데이트 |
 | Fallback | — | `profiles.preferences` (하위 호환) |

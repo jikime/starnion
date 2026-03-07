@@ -15,7 +15,7 @@ const pretendard = localFont({
 });
 
 export const metadata: Metadata = {
-  title: 'StarPion - AI Personal Assistant',
+  title: 'StarNion - AI Personal Assistant',
   description: '스마트한 가계부, 일정 관리, 목표 추적을 하나의 AI 어시스턴트로',
   generator: 'v0.app',
   icons: {

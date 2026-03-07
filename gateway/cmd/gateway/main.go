@@ -11,19 +11,19 @@ import (
 	"syscall"
 	"time"
 
-	starpionv1 "github.com/jikime/starpion/gateway/gen/starpion/v1"
-	"github.com/jikime/starpion/gateway/internal/activity"
-	"github.com/jikime/starpion/gateway/internal/auth"
-	"github.com/jikime/starpion/gateway/internal/handler"
-	"github.com/jikime/starpion/gateway/internal/identity"
-	"github.com/jikime/starpion/gateway/internal/logbuf"
-	"github.com/jikime/starpion/gateway/internal/middleware"
-	"github.com/jikime/starpion/gateway/internal/scheduler"
-	"github.com/jikime/starpion/gateway/internal/skill"
-	"github.com/jikime/starpion/gateway/internal/storage"
-	"github.com/jikime/starpion/gateway/internal/telegram"
-	"github.com/jikime/starpion/gateway/internal/wschat"
-	"github.com/joho/godotenv"
+	starnionv1 "github.com/jikime/starnion/gateway/gen/starnion/v1"
+	"github.com/jikime/starnion/gateway/internal/activity"
+	"github.com/jikime/starnion/gateway/internal/auth"
+	"github.com/jikime/starnion/gateway/internal/cli"
+	"github.com/jikime/starnion/gateway/internal/handler"
+	"github.com/jikime/starnion/gateway/internal/identity"
+	"github.com/jikime/starnion/gateway/internal/logbuf"
+	"github.com/jikime/starnion/gateway/internal/middleware"
+	"github.com/jikime/starnion/gateway/internal/scheduler"
+	"github.com/jikime/starnion/gateway/internal/skill"
+	"github.com/jikime/starnion/gateway/internal/storage"
+	"github.com/jikime/starnion/gateway/internal/telegram"
+	"github.com/jikime/starnion/gateway/internal/wschat"
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
 	_ "github.com/lib/pq"
@@ -31,74 +31,12 @@ import (
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"gopkg.in/yaml.v3"
 )
-
-type Config struct {
-	Server struct {
-		Host string `yaml:"host"`
-		Port int    `yaml:"port"`
-	} `yaml:"server"`
-	GRPC struct {
-		AgentService struct {
-			Host string `yaml:"host"`
-			Port int    `yaml:"port"`
-		} `yaml:"agent_service"`
-	} `yaml:"grpc"`
-	Database struct {
-		URL string `yaml:"url"`
-	} `yaml:"database"`
-	Auth struct {
-		JWTSecret string `yaml:"jwt_secret"`
-	} `yaml:"auth"`
-	Telegram struct {
-		BotToken string `yaml:"bot_token"`
-		Enabled  bool   `yaml:"enabled"`
-	} `yaml:"telegram"`
-	CORS struct {
-		AllowedOrigins []string `yaml:"allowed_origins"`
-		AllowedMethods []string `yaml:"allowed_methods"`
-		AllowedHeaders []string `yaml:"allowed_headers"`
-	} `yaml:"cors"`
-	Log struct {
-		Level  string `yaml:"level"`
-		Format string `yaml:"format"`
-	} `yaml:"log"`
-}
-
-func loadConfig(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read config: %w", err)
-	}
-
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("parse config: %w", err)
-	}
-
-	// Allow environment variable overrides.
-	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
-		cfg.Telegram.BotToken = token
-		cfg.Telegram.Enabled = true
-	}
-	if host := os.Getenv("GRPC_AGENT_HOST"); host != "" {
-		cfg.GRPC.AgentService.Host = host
-	}
-	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
-		cfg.Database.URL = dbURL
-	}
-	if secret := os.Getenv("JWT_SECRET"); secret != "" {
-		cfg.Auth.JWTSecret = secret
-	}
-
-	return &cfg, nil
-}
 
 // logBuf is the global in-memory log buffer shared across the process.
 var logBuf = logbuf.New()
 
-func setupLogger(cfg *Config) {
+func setupLogger(cfg cli.StarNionConfig) {
 	zerolog.TimeFieldFormat = time.RFC3339
 
 	level, err := zerolog.ParseLevel(cfg.Log.Level)
@@ -115,8 +53,8 @@ func setupLogger(cfg *Config) {
 	}
 }
 
-func connectGRPC(cfg *Config) (*grpc.ClientConn, error) {
-	addr := fmt.Sprintf("%s:%d", cfg.GRPC.AgentService.Host, cfg.GRPC.AgentService.Port)
+func connectGRPC(cfg cli.StarNionConfig) (*grpc.ClientConn, error) {
+	addr := fmt.Sprintf("%s:%d", cfg.Gateway.AgentHost, cfg.Gateway.GRPCPort)
 
 	conn, err := grpc.NewClient(
 		addr,
@@ -131,10 +69,7 @@ func connectGRPC(cfg *Config) (*grpc.ClientConn, error) {
 }
 
 func main() {
-	// Load root .env (fallback to ../env if gateway is run from gateway/).
-	_ = godotenv.Load("../.env", ".env")
-
-	cfg, err := loadConfig("config.yaml")
+	cfg, err := cli.LoadConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
 		os.Exit(1)
@@ -142,7 +77,7 @@ func main() {
 
 	setupLogger(cfg)
 
-	// Derive JWT secret: prefer env, fall back to config, then a default for dev.
+	// Derive JWT secret from config, fall back to insecure default for dev.
 	jwtSecret := cfg.Auth.JWTSecret
 	if jwtSecret == "" {
 		jwtSecret = "change-me-in-production"
@@ -156,21 +91,18 @@ func main() {
 	}
 	defer grpcConn.Close()
 
-	// Connect to database for scheduler queries.
+	// Connect to database. db stays nil if unreachable so DB-dependent
+	// handlers are skipped gracefully.
 	var db *sql.DB
-	if cfg.Database.URL != "" {
-		var dbErr error
-		db, dbErr = sql.Open("postgres", cfg.Database.URL)
-		if dbErr != nil {
-			log.Fatal().Err(dbErr).Msg("failed to open database")
-		}
+	if opened, dbErr := sql.Open("postgres", cfg.Database.DSN()); dbErr != nil {
+		log.Fatal().Err(dbErr).Msg("failed to open database")
+	} else if err := opened.Ping(); err != nil {
+		log.Warn().Err(err).Msg("database unavailable — DB-dependent features disabled")
+		opened.Close()
+	} else {
+		db = opened
 		defer db.Close()
-
-		if err := db.Ping(); err != nil {
-			log.Warn().Err(err).Msg("database ping failed (scheduler may not work)")
-		} else {
-			log.Info().Msg("database connected for scheduler")
-		}
+		log.Info().Msg("database connected")
 	}
 
 	// Global context for graceful shutdown.
@@ -194,14 +126,15 @@ func main() {
 
 	// Initialise MinIO for file storage (non-fatal if unavailable).
 	var minioStore *storage.MinIO
-	if s, err := storage.NewMinIO(); err != nil {
+	mc := cfg.MinIO
+	if s, err := storage.NewMinIO(mc.Endpoint, mc.AccessKey, mc.SecretKey, mc.Bucket, mc.PublicURL, mc.UseSSL); err != nil {
 		log.Warn().Err(err).Msg("MinIO unavailable — file uploads disabled")
 	} else {
 		minioStore = s
 	}
 
 	// Create WebSocket hub for web chat.
-	wsHub := wschat.NewHub(starpionv1.NewAgentServiceClient(grpcConn), db, minioStore)
+	wsHub := wschat.NewHub(starnionv1.NewAgentServiceClient(grpcConn), db, minioStore)
 
 	// Start per-user Telegram bot pool.
 	// Pass the gateway root context so bot goroutines live for the process lifetime.
@@ -582,7 +515,7 @@ func main() {
 
 		// Document endpoints.
 		// The agent's log HTTP server (port 8082) also handles POST /index-document.
-		agentHTTPURL := fmt.Sprintf("http://%s:8082", cfg.GRPC.AgentService.Host)
+		agentHTTPURL := fmt.Sprintf("http://%s:8082", cfg.Gateway.AgentHost)
 		documentHandler := handler.NewDocumentHandler(db, minioStore, agentHTTPURL)
 		api.GET("/documents", documentHandler.ListDocuments)
 		api.POST("/documents", documentHandler.UploadDocument)
@@ -654,7 +587,7 @@ func main() {
 	})
 
 	// Start HTTP server.
-	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+	addr := fmt.Sprintf("%s:%d", cfg.Gateway.Host, cfg.Gateway.Port)
 	go func() {
 		log.Info().Str("addr", addr).Msg("starting gateway server")
 		if err := e.Start(addr); err != nil && err != http.ErrServerClosed {

@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/jikime/starpion/gateway/internal/activity"
-	"github.com/jikime/starpion/gateway/internal/identity"
-	"github.com/jikime/starpion/gateway/internal/skill"
-	"github.com/jikime/starpion/gateway/internal/storage"
+	"github.com/jikime/starnion/gateway/internal/activity"
+	"github.com/jikime/starnion/gateway/internal/identity"
+	"github.com/jikime/starnion/gateway/internal/skill"
+	"github.com/jikime/starnion/gateway/internal/storage"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 )
@@ -108,7 +108,7 @@ func (m *BotManager) ReloadAll() {
 
 	rows, err := m.db.QueryContext(m.rootCtx, `
 		SELECT user_id, bot_token
-		FROM user_channel_settings
+		FROM channel_settings
 		WHERE channel = 'telegram' AND enabled = TRUE AND bot_token != ''
 	`)
 	if err != nil {

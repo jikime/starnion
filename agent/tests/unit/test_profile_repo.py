@@ -1,4 +1,4 @@
-"""Unit tests for starpion_agent.db.repositories.profile module.
+"""Unit tests for starnion_agent.db.repositories.profile module.
 
 Tests cover:
 - ``upsert``: INSERT ON CONFLICT DO UPDATE with RETURNING
@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from starpion_agent.db.repositories import profile as profile_repo
+from starnion_agent.db.repositories import profile as profile_repo
 
 
 # =========================================================================

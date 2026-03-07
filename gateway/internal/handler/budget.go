@@ -77,7 +77,7 @@ func (h *BudgetHandler) GetBudget(c echo.Context) error {
 
 	var prefsRaw []byte
 	row := h.db.QueryRowContext(ctx,
-		`SELECT COALESCE(preferences, '{}'::jsonb)::text FROM profiles WHERE uuid_id = $1`, userID,
+		`SELECT COALESCE(preferences, '{}'::jsonb)::text FROM users WHERE id = $1`, userID,
 	)
 	if err := row.Scan(&prefsRaw); err == nil && len(prefsRaw) > 0 {
 		var prefs map[string]interface{}
@@ -266,20 +266,15 @@ func (h *BudgetHandler) UpdateBudget(c echo.Context) error {
 
 	// Build JSONB patch for budget key.
 	_, err := h.db.ExecContext(ctx, `
-		INSERT INTO profiles (uuid_id, preferences)
-		VALUES ($1, jsonb_build_object(
-			'budget', $2::jsonb,
-			'warning_threshold', $3::int,
-			'danger_threshold', $4::int
-		))
-		ON CONFLICT (uuid_id) DO UPDATE
-		SET preferences = profiles.preferences
+		UPDATE users
+		SET preferences = preferences
 			|| jsonb_build_object(
 				'budget', $2::jsonb,
 				'warning_threshold', $3::int,
 				'danger_threshold', $4::int
 			),
 		updated_at = NOW()
+		WHERE id = $1
 	`, userID, budgetMapToJSON(req.Budgets), req.WarningThreshold, req.DangerThreshold)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", userID).Msg("budget: update failed")

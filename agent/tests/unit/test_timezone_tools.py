@@ -1,4 +1,4 @@
-"""Unit tests for starpion_agent.skills.timezone.tools module.
+"""Unit tests for starnion_agent.skills.timezone.tools module.
 
 Tests cover:
 - ``GetWorldTimeInput`` / ``ConvertTimezoneInput``: Pydantic schemas
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from starpion_agent.skills.timezone.tools import (
+from starnion_agent.skills.timezone.tools import (
     ConvertTimezoneInput,
     GetWorldTimeInput,
     convert_timezone,

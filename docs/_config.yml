@@ -1,7 +1,7 @@
-title: StarPion
+title: StarNion
 description: "Personal AI Assistant — Self-hosted, privacy-first AI platform"
 url: "https://jikime.github.io"
-baseurl: "/starpion"
+baseurl: "/starnion"
 lang: en
 
 remote_theme: just-the-docs/just-the-docs@v0.10.0
@@ -17,7 +17,7 @@ search_enabled: true
 search_tokenizer_separator: /[\s/]+/
 
 # Footer
-footer_content: "Copyright &copy; 2025 StarPion. Released under the MIT License."
+footer_content: "Copyright &copy; 2025 StarNion. Released under the MIT License."
 
 # Plugins
 plugins:

@@ -49,11 +49,14 @@ func CheckPostgres(host string, port int) bool {
 	return pingTCP(host, port)
 }
 
-// CheckMinIO returns true if MinIO health endpoint responds at endpoint.
-// endpoint is in "host:port" form.
-func CheckMinIO(endpoint string) bool {
-	// Try the MinIO live health endpoint (available in all MinIO versions)
-	return pingHTTP("http://" + endpoint + "/minio/health/live")
+// CheckMinIO returns true if the MinIO health endpoint responds.
+// publicURL is the full base URL (e.g. "http://localhost:9000" or "https://minio.example.com").
+func CheckMinIO(publicURL string) bool {
+	if publicURL == "" {
+		return false
+	}
+	base := strings.TrimRight(publicURL, "/")
+	return pingHTTP(base + "/minio/health/live")
 }
 
 // ── Start instructions ────────────────────────────────────────────────────────
@@ -116,7 +119,7 @@ type SystemCheckResult struct {
 
 // RunSystemCheck performs the [1/5] system dependency check.
 // It blocks until PostgreSQL and MinIO are reachable.
-func RunSystemCheck(pgHost string, pgPort int, minioEndpoint string) SystemCheckResult {
+func RunSystemCheck(pgHost string, pgPort int, minioPublicURL string) SystemCheckResult {
 	res := SystemCheckResult{}
 
 	// PostgreSQL ── must be running before we proceed
@@ -133,9 +136,9 @@ func RunSystemCheck(pgHost string, pgPort int, minioEndpoint string) SystemCheck
 	res.MinIOOK = WaitForService(
 		"MinIO",
 		minioStartHint(),
-		func() bool { return CheckMinIO(minioEndpoint) },
+		func() bool { return CheckMinIO(minioPublicURL) },
 	)
-	PrintOK("MinIO", minioEndpoint+" 연결 확인")
+	PrintOK("MinIO", minioPublicURL+" 연결 확인")
 
 	// uv (Python package manager for agent)
 	res.UvOK = CheckCommand("uv")

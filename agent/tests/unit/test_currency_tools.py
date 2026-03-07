@@ -1,4 +1,4 @@
-"""Unit tests for starpion_agent.skills.currency.tools module.
+"""Unit tests for starnion_agent.skills.currency.tools module.
 
 Tests cover:
 - ``ConvertCurrencyInput`` / ``GetExchangeRateInput``: Pydantic schemas
@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from starpion_agent.skills.currency.tools import (
+from starnion_agent.skills.currency.tools import (
     ConvertCurrencyInput,
     GetExchangeRateInput,
     convert_currency,
@@ -100,7 +100,7 @@ class TestConvertCurrency:
         assert "같은 통화" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.currency.tools.httpx.AsyncClient")
+    @patch("starnion_agent.skills.currency.tools.httpx.AsyncClient")
     async def test_successful_conversion(self, mock_client_cls):
         resp = _mock_httpx_response({
             "amount": 100,
@@ -120,7 +120,7 @@ class TestConvertCurrency:
         assert "환율" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.currency.tools.httpx.AsyncClient")
+    @patch("starnion_agent.skills.currency.tools.httpx.AsyncClient")
     async def test_unknown_target_currency(self, mock_client_cls):
         resp = _mock_httpx_response({
             "amount": 100,
@@ -138,7 +138,7 @@ class TestConvertCurrency:
         assert "찾을 수 없" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.currency.tools.httpx.AsyncClient")
+    @patch("starnion_agent.skills.currency.tools.httpx.AsyncClient")
     async def test_api_404_error(self, mock_client_cls):
         resp = _mock_httpx_response({}, status_code=404)
         mock_client_cls.return_value.__aenter__ = AsyncMock(
@@ -151,7 +151,7 @@ class TestConvertCurrency:
         assert "지원하지 않는" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.currency.tools.httpx.AsyncClient")
+    @patch("starnion_agent.skills.currency.tools.httpx.AsyncClient")
     async def test_api_network_error(self, mock_client_cls):
         mock_client_cls.return_value.__aenter__ = AsyncMock(
             return_value=AsyncMock(get=AsyncMock(side_effect=Exception("timeout")))
@@ -173,7 +173,7 @@ class TestGetExchangeRate:
         assert "입력해주세요" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.currency.tools.httpx.AsyncClient")
+    @patch("starnion_agent.skills.currency.tools.httpx.AsyncClient")
     async def test_successful_rate_lookup(self, mock_client_cls):
         resp = _mock_httpx_response({
             "base": "USD",
@@ -192,7 +192,7 @@ class TestGetExchangeRate:
         assert "기준일" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.currency.tools.httpx.AsyncClient")
+    @patch("starnion_agent.skills.currency.tools.httpx.AsyncClient")
     async def test_empty_rates_response(self, mock_client_cls):
         resp = _mock_httpx_response({
             "base": "USD",
@@ -209,7 +209,7 @@ class TestGetExchangeRate:
         assert "찾을 수 없" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.currency.tools.httpx.AsyncClient")
+    @patch("starnion_agent.skills.currency.tools.httpx.AsyncClient")
     async def test_api_error(self, mock_client_cls):
         mock_client_cls.return_value.__aenter__ = AsyncMock(
             return_value=AsyncMock(get=AsyncMock(side_effect=Exception("fail")))

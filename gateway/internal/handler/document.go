@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jikime/starpion/gateway/internal/storage"
+	"github.com/jikime/starnion/gateway/internal/storage"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 )
@@ -51,7 +51,7 @@ func (h *DocumentHandler) ListDocuments(c echo.Context) error {
 
 	rows, err := h.db.QueryContext(ctx, `
 		SELECT id, title, file_type, file_url, size, uploaded_at
-		FROM user_documents
+		FROM documents
 		WHERE user_id = $1
 		ORDER BY uploaded_at DESC
 		LIMIT 100
@@ -144,7 +144,7 @@ func (h *DocumentHandler) UploadDocument(c echo.Context) error {
 
 	var id int64
 	err = h.db.QueryRowContext(ctx, `
-		INSERT INTO user_documents (user_id, title, file_type, file_url, object_key, size)
+		INSERT INTO documents (user_id, title, file_type, file_url, object_key, size)
 		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id
 	`, userID, att.Name, att.Mime, att.URL, objectKey, att.Size).Scan(&id)
 	if err != nil {
@@ -184,7 +184,7 @@ func (h *DocumentHandler) DeleteDocument(c echo.Context) error {
 	defer cancel()
 
 	res, err := h.db.ExecContext(ctx,
-		`DELETE FROM user_documents WHERE id = $1 AND user_id = $2`, id, userID)
+		`DELETE FROM documents WHERE id = $1 AND user_id = $2`, id, userID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "delete failed"})
 	}
@@ -238,7 +238,7 @@ func (h *DocumentHandler) indexDocument(docID int64, userID, fileURL, fileName s
 	log.Info().Int64("doc_id", docID).Int("status", resp.StatusCode).Msg("index document: queued")
 }
 
-// RecordDocument inserts a user_documents row for an AI-generated file.
+// RecordDocument inserts a documents row for an AI-generated file.
 // Called by chat_stream and telegram bot after uploading a document to MinIO.
 func RecordDocument(db *sql.DB, userID, url, name, mime string, size int64) {
 	if db == nil || !isDocumentMime(mime) {
@@ -251,7 +251,7 @@ func RecordDocument(db *sql.DB, userID, url, name, mime string, size int64) {
 		objectKey = parts[len(parts)-2] + "/" + parts[len(parts)-1]
 	}
 	_, err := db.ExecContext(context.Background(), `
-		INSERT INTO user_documents (user_id, title, file_type, file_url, object_key, size)
+		INSERT INTO documents (user_id, title, file_type, file_url, object_key, size)
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`, userID, name, mime, url, objectKey, size)
 	if err != nil {

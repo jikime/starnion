@@ -1,0 +1,109 @@
+"""Voice/audio processing and generation tools."""
+
+import base64
+import io
+import wave
+
+from langchain_core.messages import HumanMessage
+from langchain_core.tools import tool
+from langchain_google_genai import ChatGoogleGenerativeAI
+from pydantic import BaseModel, Field
+
+from starnion_agent.config import settings
+from starnion_agent.document.parser import fetch_file
+from starnion_agent.skills.file_context import add_pending_file
+from starnion_agent.skills.guard import skill_guard
+
+# Gemini TTS prebuilt voices.
+# See: https://ai.google.dev/gemini-api/docs/speech-generation
+GEMINI_TTS_VOICES = [
+    "Kore", "Puck", "Charon", "Fenrir",
+    "Aoede", "Leda", "Orus", "Zephyr",
+]
+
+
+class TranscribeAudioInput(BaseModel):
+    """Input schema for transcribe_audio tool."""
+
+    file_url: str = Field(description="음성 파일의 URL")
+
+
+class GenerateAudioInput(BaseModel):
+    """Input schema for generate_audio tool."""
+
+    text: str = Field(description="음성으로 변환할 텍스트")
+    voice: str = Field(
+        default="Kore",
+        description="음성 모델 (Kore, Puck, Charon, Fenrir, Aoede, Leda, Orus, Zephyr)",
+    )
+
+
+def _pcm_to_wav(pcm_data: bytes, sample_rate: int = 24000) -> bytes:
+    """Wrap raw PCM (16-bit mono) data in a WAV container."""
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)  # 16-bit
+        wf.setframerate(sample_rate)
+        wf.writeframes(pcm_data)
+    return buf.getvalue()
+
+
+@tool(args_schema=TranscribeAudioInput)
+@skill_guard("audio")
+async def transcribe_audio(file_url: str) -> str:
+    """음성 메시지를 텍스트로 변환합니다."""
+    data = await fetch_file(file_url)
+    b64_data = base64.b64encode(data).decode("utf-8")
+
+    llm = ChatGoogleGenerativeAI(
+        model=settings.gemini_model,
+        google_api_key=settings.gemini_api_key,
+    )
+
+    message = HumanMessage(
+        content=[
+            {
+                "type": "text",
+                "text": "이 음성을 한국어로 정확하게 텍스트로 변환해주세요. 변환된 텍스트만 출력하세요.",
+            },
+            {"type": "media", "mime_type": "audio/ogg", "data": b64_data},
+        ],
+    )
+
+    response = await llm.ainvoke([message])
+    return f"음성 인식 결과:\n{response.content}"
+
+
+@tool(args_schema=GenerateAudioInput)
+@skill_guard("audio")
+async def generate_audio(text: str, voice: str = "Kore") -> str:
+    """텍스트를 음성으로 변환(TTS)합니다."""
+    from google import genai
+    from google.genai import types
+
+    if voice not in GEMINI_TTS_VOICES:
+        voice = "Kore"
+
+    client = genai.Client(api_key=settings.gemini_api_key)
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash-preview-tts",
+        contents=text,
+        config=types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                        voice_name=voice,
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    pcm_data = response.candidates[0].content.parts[0].inline_data.data
+    wav_bytes = _pcm_to_wav(pcm_data)
+
+    add_pending_file(wav_bytes, "speech.wav", "audio/wav")
+    return "음성을 생성했어요."

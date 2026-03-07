@@ -1,17 +1,23 @@
 version: 2
 
-project_name: starpion
+project_name: starnion
 
 before:
   hooks:
     # Sync migration files into the CLI embed directory before build
     - sh -c "rm -rf gateway/internal/cli/migrations && cp -r docker/migrations gateway/internal/cli/migrations"
+    # Build Next.js UI in standalone mode
+    - sh -c "cd ui && NEXT_STANDALONE=1 pnpm install --frozen-lockfile && NEXT_STANDALONE=1 pnpm build"
+    # Prepare staging directory: agent source + UI standalone
+    - sh -c "rm -rf dist/staging && mkdir -p dist/staging/agent dist/staging/ui"
+    - sh -c "cp -r agent/src agent/pyproject.toml dist/staging/agent/ && (test -f agent/uv.lock && cp agent/uv.lock dist/staging/agent/ || true)"
+    - sh -c "cp -rL ui/.next/standalone/. dist/staging/ui/ && cp -r ui/.next/static dist/staging/ui/.next/static && cp -r ui/public dist/staging/ui/public"
 
 builds:
-  - id: starpion
+  - id: starnion
     dir: gateway
-    main: ./cmd/starpion
-    binary: starpion
+    main: ./cmd/starnion
+    binary: starnion
     env:
       - CGO_ENABLED=0
     goos:
@@ -22,17 +28,39 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/jikime/starpion/gateway/internal/cli.version={{.Version}}
+      - -X github.com/jikime/starnion/gateway/internal/cli.version={{.Version}}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+  - id: gateway
+    dir: gateway
+    main: ./cmd/gateway
+    binary: starnion-gateway
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
     mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
-  - id: starpion
+  - id: starnion
     builds:
-      - starpion
-    name_template: "starpion_{{ .Os }}_{{ .Arch }}"
+      - starnion
+      - gateway
+    name_template: "starnion_{{ .Os }}_{{ .Arch }}"
     format: tar.gz
     files:
-      - none*  # binary only
+      - src: dist/staging/agent/**
+        dst: agent
+        strip_parent: true
+      - src: dist/staging/ui/**
+        dst: ui
+        strip_parent: true
 
 checksum:
   name_template: "checksums.txt"
@@ -41,25 +69,25 @@ checksum:
 release:
   github:
     owner: jikime
-    name: starpion
+    name: starnion
   name_template: "v{{ .Version }}"
   header: |
-    ## StarPion v{{ .Version }}
+    ## StarNion v{{ .Version }}
 
     Personal AI Assistant — CLI release.
 
     ### 설치
     ```bash
-    curl -fsSL https://jikime.github.io/starpion/install.sh | bash
+    curl -fsSL https://jikime.github.io/starnion/install.sh | bash
     ```
 
     ### 업데이트
     ```bash
-    starpion update
+    starnion update
     ```
   footer: |
     ---
-    **Full Changelog**: https://github.com/jikime/starpion/compare/{{ .PreviousTag }}...{{ .Tag }}
+    **Full Changelog**: https://github.com/jikime/starnion/compare/{{ .PreviousTag }}...{{ .Tag }}
 
 changelog:
   use: github

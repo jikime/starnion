@@ -4,8 +4,8 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts")
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Enable standalone output for Docker builds (set DOCKER_BUILD=1 in Dockerfile)
-  output: process.env.DOCKER_BUILD ? "standalone" : undefined,
+  // Enable standalone output for Docker and release builds
+  output: (process.env.DOCKER_BUILD || process.env.NEXT_STANDALONE) ? "standalone" : undefined,
   typescript: {
     ignoreBuildErrors: true,
   },

@@ -4,9 +4,6 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,10 +12,9 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// migrations embed is optional — if the directory doesn't exist at compile time
-// (e.g. building the CLI standalone), we fall back to filesystem lookup.
+// migrations embeds init.sql (baseline) and the incremental/ subdirectory.
 //
-//go:embed migrations/*
+//go:embed migrations
 var migrationFS embed.FS
 
 // RunSetup executes the interactive 5-step setup wizard.
@@ -45,7 +41,7 @@ func RunSetup(projectRoot string) error {
 	// [1/5] SYSTEM CHECK
 	// ════════════════════════════════════════════════════════════════════════════
 	PrintSectionHeader(1, 5, "SYSTEM CHECK")
-	_ = RunSystemCheck(cfg.Database.Host, cfg.Database.Port, cfg.MinIO.Endpoint)
+	_ = RunSystemCheck(cfg.Database.Host, cfg.Database.Port, cfg.MinIO.PublicURL)
 
 	// ════════════════════════════════════════════════════════════════════════════
 	// [2/5] DATABASE
@@ -66,7 +62,7 @@ func RunSetup(projectRoot string) error {
 			Value(&dbPort),
 		huh.NewInput().
 			Title("Database").
-			Placeholder("starpion").
+			Placeholder("starnion").
 			Value(&cfg.Database.Name),
 		huh.NewInput().
 			Title("User").
@@ -89,7 +85,7 @@ func RunSetup(projectRoot string) error {
 		cfg.Database.Host = "localhost"
 	}
 	if cfg.Database.Name == "" {
-		cfg.Database.Name = "starpion"
+		cfg.Database.Name = "starnion"
 	}
 	if cfg.Database.User == "" {
 		cfg.Database.User = "postgres"
@@ -109,9 +105,19 @@ func RunSetup(projectRoot string) error {
 	PrintInfo("첫 번째 관리자 계정을 생성합니다.")
 	fmt.Println()
 
-	var adminEmail, adminPassword, adminPasswordConfirm string
+	var adminName, adminEmail, adminPassword, adminPasswordConfirm string
 	for {
 		if err := huh.NewForm(huh.NewGroup(
+			huh.NewInput().
+				Title("이름").
+				Placeholder("홍길동").
+				Value(&adminName).
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return fmt.Errorf("이름을 입력하세요")
+					}
+					return nil
+				}),
 			huh.NewInput().
 				Title("이메일").
 				Placeholder("admin@example.com").
@@ -148,12 +154,12 @@ func RunSetup(projectRoot string) error {
 		break
 	}
 
-	if err := createAdminUser(cfg, adminEmail, adminPassword); err != nil {
+	if err := createAdminUser(cfg, adminName, adminEmail, adminPassword); err != nil {
 		PrintFail("Admin", err.Error())
 		return err
 	}
 	cfg.Admin.Email = adminEmail
-	PrintOK("Admin", adminEmail+" 계정 생성 완료")
+	PrintOK("Admin", adminName+"("+adminEmail+") 계정 생성 완료")
 
 	// ════════════════════════════════════════════════════════════════════════════
 	// [4/5] MINIO (FILE STORAGE)
@@ -164,9 +170,10 @@ func RunSetup(projectRoot string) error {
 
 	if err := huh.NewForm(huh.NewGroup(
 		huh.NewInput().
-			Title("Endpoint").
-			Placeholder("localhost:9000").
-			Value(&cfg.MinIO.Endpoint),
+			Title("Public URL").
+			Description("파일을 외부에서 접근할 URL (Endpoint와 UseSSL은 자동 설정됩니다)").
+			Placeholder("http://localhost:9000").
+			Value(&cfg.MinIO.PublicURL),
 		huh.NewInput().
 			Title("Access Key").
 			Placeholder("minioadmin").
@@ -177,28 +184,22 @@ func RunSetup(projectRoot string) error {
 			Value(&cfg.MinIO.SecretKey),
 		huh.NewInput().
 			Title("Bucket").
-			Placeholder("starpion-files").
+			Placeholder("starnion-files").
 			Value(&cfg.MinIO.Bucket),
-		huh.NewInput().
-			Title("Public URL").
-			Placeholder("http://localhost:9000").
-			Value(&cfg.MinIO.PublicURL),
 	)).Run(); err != nil {
 		return fmt.Errorf("minio setup cancelled: %w", err)
 	}
 
-	if cfg.MinIO.Endpoint == "" {
-		cfg.MinIO.Endpoint = "localhost:9000"
-	}
-	if cfg.MinIO.Bucket == "" {
-		cfg.MinIO.Bucket = "starpion-files"
-	}
 	if cfg.MinIO.PublicURL == "" {
 		cfg.MinIO.PublicURL = "http://localhost:9000"
 	}
+	if cfg.MinIO.Bucket == "" {
+		cfg.MinIO.Bucket = "starnion-files"
+	}
+	cfg.MinIO.DeriveEndpoint()
 
 	// Verify MinIO reachability
-	if !CheckMinIO(cfg.MinIO.Endpoint) {
+	if !CheckMinIO(cfg.MinIO.PublicURL) {
 		PrintWarn("MinIO", "연결 실패 — 설정은 저장되지만 서비스 시작 전 MinIO를 실행하세요")
 	} else {
 		PrintOK("MinIO", "연결 확인")
@@ -232,9 +233,9 @@ func RunSetup(projectRoot string) error {
 		return fmt.Errorf("config save failed: %w", err)
 	}
 
-	// ── Write service .env files ──────────────────────────────────────────────
-	if err := WriteEnvFiles(cfg, projectRoot); err != nil {
-		PrintWarn("env", fmt.Sprintf(".env 파일 생성 실패: %v", err))
+	// ── Write ui/.env (Next.js requires env vars at build time) ──────────────
+	if err := WriteUIEnv(cfg, projectRoot); err != nil {
+		PrintWarn("env", fmt.Sprintf("ui/.env 생성 실패: %v", err))
 	}
 
 	// ── Done ──────────────────────────────────────────────────────────────────
@@ -245,7 +246,7 @@ func RunSetup(projectRoot string) error {
 	fmt.Println(sSuccess.Render(strings.Repeat("═", tw)))
 	fmt.Println()
 	PrintInfo("설정 파일: " + ConfigPath())
-	PrintInfo("시작 명령: starpion dev")
+	PrintInfo("시작 명령:  starnion dev")
 	fmt.Println()
 
 	return nil
@@ -253,7 +254,51 @@ func RunSetup(projectRoot string) error {
 
 // ── Database helpers ──────────────────────────────────────────────────────────
 
-func connectAndMigrate(cfg StarPionConfig, projectRoot string) error {
+// ensureDatabase connects to the postgres system database and creates the
+// target database if it does not already exist.
+func ensureDatabase(cfg StarNionConfig) error {
+	d := cfg.Database
+	// Build a DSN that points at the "postgres" maintenance database so we can
+	// issue CREATE DATABASE without being connected to the target DB.
+	adminDSN := fmt.Sprintf(
+		"host=%s port=%d dbname=postgres user=%s password=%s sslmode=%s",
+		d.Host, d.Port, d.User, d.Password, d.SSLMode,
+	)
+
+	admin, err := sql.Open("postgres", adminDSN)
+	if err != nil {
+		return fmt.Errorf("관리자 DB 연결 실패: %w", err)
+	}
+	defer admin.Close()
+
+	if err := admin.Ping(); err != nil {
+		return fmt.Errorf("PostgreSQL 서버 접속 실패: %w", err)
+	}
+
+	var exists bool
+	admin.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1)`, d.Name,
+	).Scan(&exists)
+
+	if exists {
+		PrintInfo(fmt.Sprintf("데이터베이스 '%s' 이미 존재합니다.", d.Name))
+		return nil
+	}
+
+	// Database names cannot be parameterised — sanitise manually.
+	if _, err := admin.Exec(fmt.Sprintf(`CREATE DATABASE "%s"`, d.Name)); err != nil {
+		return fmt.Errorf("데이터베이스 '%s' 생성 실패: %w", d.Name, err)
+	}
+	PrintOK("DB", fmt.Sprintf("데이터베이스 '%s' 생성 완료", d.Name))
+	return nil
+}
+
+func connectAndMigrate(cfg StarNionConfig, projectRoot string) error {
+	// Create the target database if it does not exist yet.
+	if err := ensureDatabase(cfg); err != nil {
+		return err
+	}
+
 	db, err := sql.Open("postgres", cfg.Database.DSN())
 	if err != nil {
 		return fmt.Errorf("DB 연결 실패: %w", err)
@@ -267,68 +312,105 @@ func connectAndMigrate(cfg StarPionConfig, projectRoot string) error {
 	return runMigrations(db, projectRoot)
 }
 
-func runMigrations(db *sql.DB, projectRoot string) error {
-	// Prefer embedded FS; fall back to filesystem relative to projectRoot.
-	migrationsDir := filepath.Join(projectRoot, "docker", "migrations")
-
-	var sqlFiles []string
-
-	if _, err := migrationFS.ReadDir("migrations"); err == nil {
-		// Use embedded migrations
-		fs.WalkDir(migrationFS, "migrations", func(path string, d fs.DirEntry, err error) error {
-			if err == nil && !d.IsDir() && strings.HasSuffix(path, ".sql") {
-				sqlFiles = append(sqlFiles, path)
-			}
-			return nil
-		})
-	} else {
-		// Fallback: read from filesystem
-		entries, err := os.ReadDir(migrationsDir)
-		if err != nil {
-			return fmt.Errorf("migrations 디렉토리를 찾을 수 없습니다: %w", err)
-		}
-		for _, e := range entries {
-			if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql") {
-				sqlFiles = append(sqlFiles, filepath.Join(migrationsDir, e.Name()))
-			}
-		}
+func runMigrations(db *sql.DB, _ string) error {
+	// Ensure the migration tracking table exists.
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+		version    TEXT        NOT NULL PRIMARY KEY,
+		applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	)`); err != nil {
+		return fmt.Errorf("schema_migrations 테이블 생성 실패: %w", err)
 	}
 
-	sort.Strings(sqlFiles)
+	// Detect fresh vs existing install by checking if the users table exists.
+	var hasUsers bool
+	db.QueryRow(`SELECT EXISTS (
+		SELECT 1 FROM information_schema.tables
+		WHERE table_schema = 'public' AND table_name = 'users'
+	)`).Scan(&hasUsers)
 
-	for _, path := range sqlFiles {
-		var content []byte
-		var err error
+	var baselineApplied bool
+	db.QueryRow(`SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = '1.0.0')`).Scan(&baselineApplied)
 
-		if strings.HasPrefix(path, "migrations/") {
-			content, err = migrationFS.ReadFile(path)
-		} else {
-			content, err = os.ReadFile(path)
+	if !hasUsers && !baselineApplied {
+		// Fresh database: apply the full baseline schema.
+		PrintInfo("신규 설치: 기본 스키마(v1.0.0)를 적용합니다...")
+		if err := applyBaseline(db); err != nil {
+			return fmt.Errorf("baseline 적용 실패: %w", err)
 		}
+		if _, err := db.Exec(`INSERT INTO schema_migrations (version) VALUES ('1.0.0') ON CONFLICT DO NOTHING`); err != nil {
+			return fmt.Errorf("schema_migrations 기록 실패: %w", err)
+		}
+		PrintOK("DB", "기본 스키마 적용 완료 (v1.0.0)")
+	} else if !baselineApplied {
+		// Existing database upgraded to the new migration system: stamp baseline as applied.
+		if _, err := db.Exec(`INSERT INTO schema_migrations (version) VALUES ('1.0.0') ON CONFLICT DO NOTHING`); err != nil {
+			return fmt.Errorf("schema_migrations 기록 실패: %w", err)
+		}
+		PrintInfo("기존 설치 감지: v1.0.0 baseline으로 마킹합니다.")
+	}
+
+	// Apply any pending incremental migrations.
+	return applyIncrementalMigrations(db)
+}
+
+func applyBaseline(db *sql.DB) error {
+	content, err := migrationFS.ReadFile("migrations/init.sql")
+	if err != nil {
+		return fmt.Errorf("migrations/init.sql을 읽을 수 없습니다: %w", err)
+	}
+	_, err = db.Exec(string(content))
+	return err
+}
+
+func applyIncrementalMigrations(db *sql.DB) error {
+	entries, err := migrationFS.ReadDir("migrations/incremental")
+	if err != nil {
+		// No incremental directory yet — nothing to do.
+		return nil
+	}
+
+	var files []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql") {
+			files = append(files, e.Name())
+		}
+	}
+	sort.Strings(files)
+
+	for _, filename := range files {
+		version := strings.TrimSuffix(filename, ".sql")
+
+		var applied bool
+		db.QueryRow(`SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = $1)`, version).Scan(&applied)
+		if applied {
+			continue
+		}
+
+		content, err := migrationFS.ReadFile("migrations/incremental/" + filename)
 		if err != nil {
-			return fmt.Errorf("마이그레이션 읽기 실패 (%s): %w", filepath.Base(path), err)
+			return fmt.Errorf("마이그레이션 읽기 실패 (%s): %w", filename, err)
 		}
 
+		PrintInfo(fmt.Sprintf("증분 마이그레이션 적용 중: %s", filename))
 		if _, err := db.Exec(string(content)); err != nil {
-			// Skip "already exists" errors — idempotent re-runs
-			if !strings.Contains(err.Error(), "already exists") {
-				return fmt.Errorf("마이그레이션 실패 (%s): %w", filepath.Base(path), err)
-			}
+			return fmt.Errorf("마이그레이션 실패 (%s): %w", filename, err)
 		}
-		PrintInfo(fmt.Sprintf("마이그레이션: %s", filepath.Base(path)))
+		if _, err := db.Exec(`INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING`, version); err != nil {
+			return fmt.Errorf("schema_migrations 기록 실패 (%s): %w", version, err)
+		}
+		PrintOK("Migration", version+" 완료")
 	}
 
 	return nil
 }
 
-func createAdminUser(cfg StarPionConfig, email, password string) error {
+func createAdminUser(cfg StarNionConfig, name, email, password string) error {
 	db, err := sql.Open("postgres", cfg.Database.DSN())
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	// Check if admin already exists
 	var count int
 	_ = db.QueryRow(`SELECT COUNT(*) FROM users WHERE email = $1`, email).Scan(&count)
 	if count > 0 {
@@ -336,21 +418,38 @@ func createAdminUser(cfg StarPionConfig, email, password string) error {
 		return nil
 	}
 
-	// bcrypt is handled by the gateway's auth layer via crypt extension or app-level
-	// Here we use pg's crypt or store plaintext to be hashed on first login.
-	// For security, use a salted hash via golang.org/x/crypto/bcrypt.
 	hash, err := bcryptHash(password)
 	if err != nil {
 		return fmt.Errorf("비밀번호 해싱 실패: %w", err)
 	}
 
-	_, err = db.Exec(`
-		INSERT INTO users (email, password, role, is_active, created_at)
-		VALUES ($1, $2, 'admin', true, NOW())
-		ON CONFLICT (email) DO NOTHING
-	`, email, hash)
+	tx, err := db.Begin()
 	if err != nil {
-		return fmt.Errorf("관리자 계정 생성 실패: %w", err)
+		return fmt.Errorf("트랜잭션 시작 실패: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	// 1) users — display_name, email, password_hash, role 삽입
+	var userID string
+	if err := tx.QueryRow(
+		`INSERT INTO users (id, display_name, email, password_hash, role)
+		 VALUES (gen_random_uuid()::TEXT, $1, $2, $3, 'admin') RETURNING id`,
+		name, email, hash,
+	).Scan(&userID); err != nil {
+		return fmt.Errorf("users 삽입 실패: %w", err)
+	}
+
+	// 2) platform_identities — credential 플랫폼 등록 (계정 연결용)
+	if _, err := tx.Exec(`
+		INSERT INTO platform_identities (user_id, platform, platform_id, display_name)
+		VALUES ($1, 'credential', $2, $3)
+		ON CONFLICT (platform, platform_id) DO NOTHING
+	`, userID, email, name); err != nil {
+		return fmt.Errorf("platform_identities 삽입 실패: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("트랜잭션 커밋 실패: %w", err)
 	}
 	return nil
 }

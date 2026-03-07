@@ -19,15 +19,15 @@ type CredentialUser struct {
 	UserID string
 	Email  string
 	Name   string
+	Role   string // "admin" | "user"
 }
 
 // Register creates a new credential-based user account.
-// It inserts into users, user_credentials, and platform_identities (platform="credential").
+// email and password_hash are stored directly in the users table.
 func Register(db *sql.DB, name, email, password string) (*CredentialUser, error) {
-	// Check email uniqueness first (fast path before hashing).
 	var exists bool
 	if err := db.QueryRow(
-		`SELECT EXISTS(SELECT 1 FROM user_credentials WHERE email = $1)`, email,
+		`SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`, email,
 	).Scan(&exists); err != nil {
 		return nil, fmt.Errorf("check email: %w", err)
 	}
@@ -52,21 +52,14 @@ func Register(db *sql.DB, name, email, password string) (*CredentialUser, error)
 	defer tx.Rollback()
 
 	if _, err = tx.Exec(
-		`INSERT INTO users (id, display_name, created_at, updated_at) VALUES ($1, $2, NOW(), NOW())`,
-		userID, name,
+		`INSERT INTO users (id, display_name, email, password_hash, role, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, 'user', NOW(), NOW())`,
+		userID, name, email, string(hash),
 	); err != nil {
 		return nil, fmt.Errorf("insert user: %w", err)
 	}
 
-	if _, err = tx.Exec(
-		`INSERT INTO user_credentials (user_id, email, password_hash, created_at, updated_at)
-		 VALUES ($1, $2, $3, NOW(), NOW())`,
-		userID, email, string(hash),
-	); err != nil {
-		return nil, fmt.Errorf("insert credentials: %w", err)
-	}
-
-	// Register as "credential" platform so account linking works uniformly.
+	// Register as "credential" platform for account linking.
 	if _, err = tx.Exec(
 		`INSERT INTO platform_identities (user_id, platform, platform_id, display_name, last_active_at, created_at)
 		 VALUES ($1, 'credential', $2, $3, NOW(), NOW())`,
@@ -84,13 +77,12 @@ func Register(db *sql.DB, name, email, password string) (*CredentialUser, error)
 
 // Login verifies email/password and returns user info on success.
 func Login(db *sql.DB, email, password string) (*CredentialUser, error) {
-	var userID, hash, name string
+	var userID, hash, name, role string
 	err := db.QueryRow(`
-		SELECT uc.user_id, uc.password_hash, COALESCE(u.display_name, '')
-		FROM user_credentials uc
-		JOIN users u ON u.id = uc.user_id
-		WHERE uc.email = $1
-	`, email).Scan(&userID, &hash, &name)
+		SELECT id, password_hash, COALESCE(display_name, ''), role
+		FROM users
+		WHERE email = $1
+	`, email).Scan(&userID, &hash, &name, &role)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrInvalidCreds
@@ -103,13 +95,12 @@ func Login(db *sql.DB, email, password string) (*CredentialUser, error) {
 		return nil, ErrInvalidCreds
 	}
 
-	// Update last active (non-blocking).
 	go db.Exec(
 		`UPDATE platform_identities SET last_active_at = NOW() WHERE user_id = $1 AND platform = 'credential'`,
 		userID,
 	)
 
-	return &CredentialUser{UserID: userID, Email: email, Name: name}, nil
+	return &CredentialUser{UserID: userID, Email: email, Name: name, Role: role}, nil
 }
 
 // newUUID generates a random UUID v4.

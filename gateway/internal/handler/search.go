@@ -54,7 +54,7 @@ func (h *SearchHandler) ListSearches(c echo.Context) error {
 
 	rows, err := h.db.QueryContext(ctx, `
 		SELECT id, query, result, created_at
-		FROM user_searches
+		FROM searches
 		WHERE user_id = $1
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
@@ -94,7 +94,7 @@ func (h *SearchHandler) SaveSearch(c echo.Context) error {
 
 	var id int64
 	err := h.db.QueryRowContext(ctx, `
-		INSERT INTO user_searches (user_id, query, result)
+		INSERT INTO searches (user_id, query, result)
 		VALUES ($1, $2, $3)
 		RETURNING id
 	`, req.UserID, req.Query, req.Result).Scan(&id)
@@ -184,7 +184,7 @@ func (h *SearchHandler) DeleteSearch(c echo.Context) error {
 	defer cancel()
 
 	res, err := h.db.ExecContext(ctx,
-		`DELETE FROM user_searches WHERE id = $1 AND user_id = $2`, id, userID)
+		`DELETE FROM searches WHERE id = $1 AND user_id = $2`, id, userID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "delete failed"})
 	}

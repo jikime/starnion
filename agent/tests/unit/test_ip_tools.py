@@ -1,4 +1,4 @@
-"""Unit tests for starpion_agent.skills.ip.tools module.
+"""Unit tests for starnion_agent.skills.ip.tools module.
 
 Tests cover:
 - ``LookupIpInput``: Pydantic schema
@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from starpion_agent.skills.ip.tools import LookupIpInput, lookup_ip
+from starnion_agent.skills.ip.tools import LookupIpInput, lookup_ip
 
 
 # =========================================================================
@@ -55,7 +55,7 @@ class TestLookupIpSuccess:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("starpion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
+        with patch("starnion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
             result = await lookup_ip.ainvoke({"ip": "8.8.8.8"})
 
         assert "8.8.8.8" in result
@@ -87,7 +87,7 @@ class TestLookupIpSuccess:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("starpion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
+        with patch("starnion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
             result = await lookup_ip.ainvoke({"ip": "1.1.1.1"})
 
         assert "Australia" in result
@@ -123,7 +123,7 @@ class TestLookupIpDomain:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("starpion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
+        with patch("starnion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
             result = await lookup_ip.ainvoke({"ip": "google.com"})
 
         assert "United States" in result
@@ -165,7 +165,7 @@ class TestLookupIpPublic:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("starpion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
+        with patch("starnion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
             result = await lookup_ip.ainvoke({"ip": ""})
 
         assert "203.0.113.1" in result
@@ -185,7 +185,7 @@ class TestLookupIpErrors:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("starpion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
+        with patch("starnion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
             result = await lookup_ip.ainvoke({"ip": "8.8.8.8"})
 
         assert "느려요" in result or "다시 시도" in result
@@ -204,7 +204,7 @@ class TestLookupIpErrors:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("starpion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
+        with patch("starnion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
             result = await lookup_ip.ainvoke({"ip": "8.8.8.8"})
 
         assert "접속할 수 없" in result
@@ -223,7 +223,7 @@ class TestLookupIpErrors:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("starpion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
+        with patch("starnion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
             result = await lookup_ip.ainvoke({"ip": "invalid"})
 
         assert "실패" in result
@@ -236,7 +236,7 @@ class TestLookupIpErrors:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("starpion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
+        with patch("starnion_agent.skills.ip.tools.httpx.AsyncClient", return_value=mock_client):
             result = await lookup_ip.ainvoke({"ip": ""})
 
         assert "공인 IP" in result or "조회할 수 없" in result

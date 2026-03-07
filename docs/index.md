@@ -1,32 +1,32 @@
 ---
 layout: home
-title: StarPion
+title: StarNion
 nav_order: 1
 ---
 
-# ✦ StarPion
+# ✦ StarNion
 
 **Personal AI Assistant** — Self-hosted, privacy-first AI platform that runs on your own infrastructure.
 {: .fs-6 .fw-300 }
 
 [Get Started](getting-started){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
-[View on GitHub](https://github.com/jikime/starpion){: .btn .fs-5 .mb-4 .mb-md-0 }
+[View on GitHub](https://github.com/jikime/starnion){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
 
 ## Quick Install
 
 ```bash
-curl -fsSL https://jikime.github.io/starpion/install.sh | bash
+curl -fsSL https://jikime.github.io/starnion/install.sh | bash
 ```
 
 Supports **macOS** (Apple Silicon & Intel) and **Linux** (amd64 & arm64).
 
 ---
 
-## What is StarPion?
+## What is StarNion?
 
-StarPion is a self-hosted AI assistant platform that puts you in control of your data and AI interactions.
+StarNion is a self-hosted AI assistant platform that puts you in control of your data and AI interactions.
 
 | Feature | Description |
 |---------|-------------|
@@ -42,7 +42,7 @@ StarPion is a self-hosted AI assistant platform that puts you in control of your
 
 ```
 ┌─────────────────────────────────────────────┐
-│                  StarPion                    │
+│                  StarNion                    │
 │                                             │
 │  ┌──────┐    ┌─────────┐    ┌───────────┐  │
 │  │  UI  │───▶│ Gateway │───▶│   Agent   │  │
@@ -65,13 +65,13 @@ StarPion is a self-hosted AI assistant platform that puts you in control of your
 
 ## Getting Started
 
-1. [Install](install) the `starpion` CLI
-2. Run `starpion setup` — interactive configuration wizard
-3. Run `starpion dev` (native) or `starpion docker up` (Docker)
+1. [Install](install) the `starnion` CLI
+2. Run `starnion setup` — interactive configuration wizard
+3. Run `starnion dev` (native) or `starnion docker up` (Docker)
 
 ---
 
 ## Community & Support
 
-- **Issues**: [github.com/jikime/starpion/issues](https://github.com/jikime/starpion/issues)
-- **Releases**: [github.com/jikime/starpion/releases](https://github.com/jikime/starpion/releases)
+- **Issues**: [github.com/jikime/starnion/issues](https://github.com/jikime/starnion/issues)
+- **Releases**: [github.com/jikime/starnion/releases](https://github.com/jikime/starnion/releases)

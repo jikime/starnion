@@ -345,8 +345,8 @@ func (h *StatisticsHandler) GetInsights(c echo.Context) error {
 		),
 		budget AS (
 			SELECT key AS category, value::int AS limit
-			FROM profiles, jsonb_each_text(COALESCE(preferences->'budget', '{}'::jsonb))
-			WHERE uuid_id = $1
+			FROM users, jsonb_each_text(COALESCE(preferences->'budget', '{}'::jsonb))
+			WHERE id = $1
 		)
 		SELECT s.category, s.total, b.limit
 		FROM spent s JOIN budget b ON s.category = b.category

@@ -10,7 +10,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/jikime/starpion/gateway/internal/logbuf"
+	"github.com/jikime/starnion/gateway/internal/logbuf"
 )
 
 // LogsHandler serves log entries via REST and SSE.

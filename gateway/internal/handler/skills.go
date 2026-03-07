@@ -6,7 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 
-	"github.com/jikime/starpion/gateway/internal/skill"
+	"github.com/jikime/starnion/gateway/internal/skill"
 )
 
 // SkillHandler exposes skill management as REST endpoints.

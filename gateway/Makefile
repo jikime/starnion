@@ -1,25 +1,30 @@
-.PHONY: all starpion gateway sync-migrations docker-build docker-up docker-down docker-logs docker-ps clean
+.PHONY: all starnion gateway sync-migrations docker-build docker-up docker-down docker-logs docker-ps clean
 
 DOCKER_DIR := ../docker
 COMPOSE    := docker compose -f $(DOCKER_DIR)/docker-compose.yml
 
-# Build the starpion CLI binary (output to project root)
-starpion: sync-migrations
-	go build -o ../starpion ./cmd/starpion
+# Build the starnion CLI binary (output to project root)
+starnion: sync-migrations
+	go build -o ../starnion ./cmd/starnion
 
 # Build the gateway server
 gateway:
 	go build -o ../bin/gateway ./cmd/gateway
 
-# Sync migration SQL files from docker/migrations into the CLI embed directory
+# Sync migration files into the CLI embed directory:
+#   migrations/init.sql        — v1.0.0 baseline (applied on fresh installs)
+#   migrations/incremental/    — post-v1.0.0 incremental migrations
 sync-migrations:
 	@echo "Syncing migrations..."
 	@rm -rf internal/cli/migrations
-	@cp -r ../docker/migrations internal/cli/migrations
-	@echo "Synced $$(ls internal/cli/migrations/*.sql 2>/dev/null | wc -l | tr -d ' ') migration files"
+	@mkdir -p internal/cli/migrations/incremental
+	@cp ../docker/init.sql internal/cli/migrations/init.sql
+	@cp ../docker/migrations/incremental/*.sql internal/cli/migrations/incremental/ 2>/dev/null || true
+	@cp ../docker/migrations/incremental/README.md internal/cli/migrations/incremental/ 2>/dev/null || true
+	@echo "Synced baseline (init.sql) + $$(ls internal/cli/migrations/incremental/*.sql 2>/dev/null | wc -l | tr -d ' ') incremental migrations"
 
 # Build everything
-all: sync-migrations starpion gateway
+all: sync-migrations starnion gateway
 
 # ── Docker targets ────────────────────────────────────────────────────────────
 
@@ -73,6 +78,6 @@ release:
 
 # Remove build artifacts
 clean:
-	@rm -f ../starpion ../bin/gateway
+	@rm -f ../starnion ../bin/gateway
 	@rm -rf internal/cli/migrations
 	@echo "Cleaned"

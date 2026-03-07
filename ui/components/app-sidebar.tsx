@@ -137,14 +137,14 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border h-14">
         <Link href="/" className="flex items-center gap-2 px-4 py-1">
           <NextImage
-            src="/brand_logo.webp"
-            alt="StarPion"
+            src="/starnion_logo.webp"
+            alt="StarNion"
             width={36}
             height={36}
-            className="rounded-md object-contain"
+            className="object-contain"
             priority
           />
-          <span className="text-lg font-semibold">StarPion</span>
+          <span className="text-2xl font-semibold leading-none translate-y-0.5">StarNion</span>
         </Link>
       </SidebarHeader>
       <SidebarContent>

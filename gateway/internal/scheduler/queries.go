@@ -23,9 +23,9 @@ type budgetUser struct {
 // Post-migration: join platform_identities to get Telegram chatID.
 func getBudgetUsers(ctx context.Context, db *sql.DB) ([]budgetUser, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT p.uuid_id, pi.platform_id, p.preferences
-		FROM profiles p
-		JOIN platform_identities pi ON pi.user_id = p.uuid_id AND pi.platform = 'telegram'
+		SELECT p.id, pi.platform_id, p.preferences
+		FROM users p
+		JOIN platform_identities pi ON pi.user_id = p.id AND pi.platform = 'telegram'
 		WHERE p.preferences->'budget' IS NOT NULL
 		  AND jsonb_typeof(p.preferences->'budget') = 'object'
 		  AND (p.preferences->'budget')::text != '{}'
@@ -140,15 +140,15 @@ func getUsersWithRecordsToday(ctx context.Context, db *sql.DB) ([]activeUser, er
 // Post-migration: join platform_identities to get Telegram chatID.
 func getInactiveUsers(ctx context.Context, db *sql.DB) ([]activeUser, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT p.uuid_id, pi.platform_id
-		FROM profiles p
-		JOIN platform_identities pi ON pi.user_id = p.uuid_id AND pi.platform = 'telegram'
+		SELECT p.id, pi.platform_id
+		FROM users p
+		JOIN platform_identities pi ON pi.user_id = p.id AND pi.platform = 'telegram'
 		WHERE EXISTS (
-			SELECT 1 FROM finances f WHERE f.user_id = p.uuid_id
+			SELECT 1 FROM finances f WHERE f.user_id = p.id
 		)
 		AND NOT EXISTS (
 			SELECT 1 FROM finances f
-			WHERE f.user_id = p.uuid_id
+			WHERE f.user_id = p.id
 			  AND f.created_at >= NOW() - INTERVAL '3 days'
 		)
 	`)
@@ -178,11 +178,10 @@ func getUsersWithRecordsThisMonth(ctx context.Context, db *sql.DB) ([]activeUser
 }
 
 // getUserPreferences returns the preferences JSONB for a user.
-// userID is the internal UUID (profiles.uuid_id post-migration).
 func getUserPreferences(ctx context.Context, db *sql.DB, userID string) (map[string]any, error) {
 	var prefsJSON sql.NullString
 	err := db.QueryRowContext(ctx,
-		`SELECT preferences FROM profiles WHERE uuid_id = $1`,
+		`SELECT preferences FROM users WHERE id = $1`,
 		userID,
 	).Scan(&prefsJSON)
 	if err != nil {

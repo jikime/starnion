@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	starpionv1 "github.com/jikime/starpion/gateway/gen/starpion/v1"
-	"github.com/jikime/starpion/gateway/internal/storage"
+	starnionv1 "github.com/jikime/starnion/gateway/gen/starnion/v1"
+	"github.com/jikime/starnion/gateway/internal/storage"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -20,7 +20,7 @@ import (
 // Stream protocol: SSE where each event carries a UIMessageChunk JSON payload.
 // Reference: https://sdk.vercel.ai/docs/ai-sdk-ui/stream-protocol (v6 format)
 type ChatStreamHandler struct {
-	grpcClient starpionv1.AgentServiceClient
+	grpcClient starnionv1.AgentServiceClient
 	db         *sql.DB        // may be nil
 	minio      *storage.MinIO // may be nil
 }
@@ -28,7 +28,7 @@ type ChatStreamHandler struct {
 // NewChatStreamHandler creates a new ChatStreamHandler.
 func NewChatStreamHandler(conn *grpc.ClientConn, db *sql.DB, minio *storage.MinIO) *ChatStreamHandler {
 	return &ChatStreamHandler{
-		grpcClient: starpionv1.NewAgentServiceClient(conn),
+		grpcClient: starnionv1.NewAgentServiceClient(conn),
 		db:         db,
 		minio:      minio,
 	}
@@ -100,7 +100,7 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 	// Map attached files to gRPC FileInput.
 	// The first file is sent as FileInput; additional files are appended as text annotations.
 	// Also record user-uploaded images to the gallery immediately.
-	var fileInput *starpionv1.FileInput
+	var fileInput *starnionv1.FileInput
 	message := req.Message
 	for i, f := range req.Files {
 		fileType := "document"
@@ -112,7 +112,7 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 			fileType = "audio"
 		}
 		if i == 0 {
-			fileInput = &starpionv1.FileInput{
+			fileInput = &starnionv1.FileInput{
 				FileType: fileType,
 				FileUrl:  f.URL,
 				FileName: f.Name,
@@ -122,7 +122,7 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 		}
 	}
 
-	stream, err := h.grpcClient.ChatStream(ctx, &starpionv1.ChatRequest{
+	stream, err := h.grpcClient.ChatStream(ctx, &starnionv1.ChatRequest{
 		UserId:   req.UserID,
 		Message:  message,
 		ThreadId: req.ThreadID,
@@ -177,7 +177,7 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 		}
 
 		switch resp.Type {
-		case starpionv1.ResponseType_TEXT:
+		case starnionv1.ResponseType_TEXT:
 			if !textStarted {
 				sseEvent(map[string]string{"type": "text-start", "id": textPartID})
 				textStarted = true
@@ -185,7 +185,7 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 			assistantBuf.WriteString(resp.Content)
 			sseEvent(map[string]any{"type": "text-delta", "id": textPartID, "delta": resp.Content})
 
-		case starpionv1.ResponseType_TOOL_CALL:
+		case starnionv1.ResponseType_TOOL_CALL:
 			log.Info().Str("tool", resp.ToolName).Str("user_id", req.UserID).Msg("chat_stream: tool call")
 			// Emit a transient status indicator so the user can see tool activity.
 			// Deliberately NOT added to assistantBuf so it is not persisted.
@@ -196,11 +196,11 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 			toolNote := fmt.Sprintf("\n🔧 `%s` 실행 중...\n", resp.ToolName)
 			sseEvent(map[string]any{"type": "text-delta", "id": textPartID, "delta": toolNote})
 
-		case starpionv1.ResponseType_TOOL_RESULT:
+		case starnionv1.ResponseType_TOOL_RESULT:
 			log.Info().Str("tool", resp.ToolName).Str("user_id", req.UserID).Msg("chat_stream: tool result")
 			// Tool result is processed; the model's text response follows.
 
-		case starpionv1.ResponseType_FILE:
+		case starnionv1.ResponseType_FILE:
 			if h.minio != nil && len(resp.FileData) > 0 {
 				att, uploadErr := h.minio.Upload(context.Background(), resp.FileName, resp.FileMime, resp.FileData)
 				if uploadErr != nil {
@@ -245,13 +245,13 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 				sseEvent(map[string]any{"type": "text-delta", "id": textPartID, "delta": note})
 			}
 
-		case starpionv1.ResponseType_ERROR:
+		case starnionv1.ResponseType_ERROR:
 			sseEvent(map[string]string{"type": "error", "errorText": resp.Content})
 			fmt.Fprintf(w, "data: [DONE]\n\n")
 			flusher.Flush()
 			return nil
 
-		case starpionv1.ResponseType_STREAM_END:
+		case starnionv1.ResponseType_STREAM_END:
 			finish("stop")
 			return nil
 		}
@@ -278,14 +278,14 @@ func (h *ChatStreamHandler) persistAssistant(ctx context.Context, conversationID
 	}
 }
 
-// updateImageAnalysis backfills the analysis column on a user_images row identified
+// updateImageAnalysis backfills the analysis column on a images row identified
 // by (user_id, url). Called after streaming when the LLM response is the analysis text.
 func (h *ChatStreamHandler) updateImageAnalysis(ctx context.Context, userID, url, analysis string) {
 	if h.db == nil || userID == "" || url == "" || analysis == "" {
 		return
 	}
 	_, err := h.db.ExecContext(ctx, `
-		UPDATE user_images SET analysis = $1, type = 'analyzed'
+		UPDATE images SET analysis = $1, type = 'analyzed'
 		WHERE user_id = $2 AND url = $3
 	`, analysis, userID, url)
 	if err != nil {

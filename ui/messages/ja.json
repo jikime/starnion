@@ -746,7 +746,7 @@
     }
   },
   "dashboard": {
-    "greeting": "こんにちは！StarPion",
+    "greeting": "こんにちは！StarNion",
     "title": "ダッシュボード",
     "subtitle": "今日の財務と目標の状況を一目で確認",
     "refresh": "更新",

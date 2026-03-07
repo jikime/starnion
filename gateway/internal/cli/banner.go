@@ -7,159 +7,48 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// STARPION block-letter title (Unicode box-drawing, one column per char).
+// STARNION block-letter title (S-T-A-R-N-I-O-N, Unicode box-drawing).
 var titleLines = []string{
-	`███████╗████████╗ █████╗ ██████╗ ██████╗ ██╗ ██████╗ ███╗   ██╗`,
-	`██╔════╝╚══██╔══╝██╔══██╗██╔══██╗██╔══██╗██║██╔═══██╗████╗  ██║`,
-	`███████╗   ██║   ███████║██████╔╝██████╔╝██║██║   ██║██╔██╗ ██║`,
-	`╚════██║   ██║   ██╔══██║██╔══██╗██╔═══╝ ██║██║   ██║██║╚██╗██║`,
-	`███████║   ██║   ██║  ██║██║  ██║██║     ██║╚██████╔╝██║ ╚████║`,
-	`╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝`,
+	`███████╗████████╗ █████╗ ██████╗ ███╗   ██╗██╗ ██████╗ ███╗   ██╗`,
+	`██╔════╝╚══██╔══╝██╔══██╗██╔══██╗████╗  ██║██║██╔═══██╗████╗  ██║`,
+	`███████╗   ██║   ███████║██████╔╝██╔██╗ ██║██║██║   ██║██╔██╗ ██║`,
+	`╚════██║   ██║   ██╔══██║██╔══██╗██║╚██╗██║██║██║   ██║██║╚██╗██║`,
+	`███████║   ██║   ██║  ██║██║  ██║██║ ╚████║██║╚██████╔╝██║ ╚████║`,
+	`╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝`,
 }
 
-// scorpionRaw is the top-down ASCII art of a scorpion.
-// Lines need not be equal length — padLines() normalises them.
-const scorpionRaw = `
-       /\           /\
-  ____/  \_________/  \____
- ( >>   \___________/   << )
-  \    /             \    /
-   \  /  (o)     (o)  \  /
-    \/     \_____/     \/
-    /\       | |       /\
-   /  \      | |      /  \
-  / /\ \_____|_|_____/ /\ \
- / /  \               /  \ \
-/_/    \             /    \_\
-        \___________/
-              | |
-              | |
-             / \
-            /   \
-           / ~~~ \
-          / ~~~~~ \
-         *    V    *`
 
-// padLines splits raw ASCII art by newlines, removes leading blank lines,
-// measures the true visual width of each line (via lipgloss.Width which
-// uses go-runewidth internally), and pads every line with trailing spaces
-// so they are all exactly the same visual width.
-// This guarantees that any lipgloss border wrapping the result stays intact.
-func padLines(raw string) []string {
-	all := strings.Split(raw, "\n")
-
-	// strip leading/trailing blank lines
-	start, end := 0, len(all)-1
-	for start <= end && strings.TrimSpace(all[start]) == "" {
-		start++
-	}
-	for end >= start && strings.TrimSpace(all[end]) == "" {
-		end--
-	}
-	lines := all[start : end+1]
-
-	// find maximum visual width
-	maxW := 0
-	for _, l := range lines {
-		if w := lipgloss.Width(l); w > maxW {
-			maxW = w
-		}
-	}
-
-	// pad each line to maxW
-	result := make([]string, len(lines))
-	for i, l := range lines {
-		pad := maxW - lipgloss.Width(l)
-		if pad < 0 {
-			pad = 0
-		}
-		result[i] = l + strings.Repeat(" ", pad)
-	}
-	return result
-}
-
-// colorScorpion applies the Antares Night palette to the padded scorpion lines.
-// Claws and body: crimson → antares gradient toward the tail.
-func colorScorpion(lines []string) []string {
-	total := len(lines)
-	colored := make([]string, total)
-	for i, l := range lines {
-		ratio := float64(i) / float64(total)
-		switch {
-		case ratio < 0.3:
-			colored[i] = sCrimson.Render(l)
-		case ratio < 0.7:
-			// mid-body mix
-			colored[i] = sAntares.Render(l)
-		default:
-			// tail → stinger: bright antares / gold tip
-			if i == total-1 {
-				colored[i] = sGold.Render(l)
-			} else {
-				colored[i] = sAntares.Render(l)
-			}
-		}
-	}
-	return colored
-}
-
-// bannerBox wraps content in a double-border box sized exactly to content width.
-// Because we padded all content lines first, lipgloss sees consistent widths
-// and draws the border without gaps or overflows.
-func bannerBox(content string) string {
-	return lipgloss.NewStyle().
-		Border(lipgloss.DoubleBorder()).
-		BorderForeground(lipgloss.Color(colorIndigo)).
-		Padding(0, 2).
-		Render(content)
-}
-
-// PrintBanner prints the full StarPion startup banner:
+// PrintBanner prints the full StarNion startup banner:
 //
-//	[ STARPION block title  ]
-//	[ double-border box:    ]
-//	[   scorpion ASCII art  ]
-//	[   version & tagline   ]
+//	            ✦           ← star above the "I" in STARNION
+//	  STARNION block title  (centred)
+//	  Personal AI Assistant •  vX.X.X  (centred)
 func PrintBanner(version string) {
 	tw := termWidth()
 
-	// ── Title (gold block letters, outside the box) ───────────────────────────
 	titleWidth := lipgloss.Width(titleLines[0])
 	if tw >= titleWidth+4 {
-		// centre-align: pad left by (tw - titleWidth) / 2
-		pad := strings.Repeat(" ", max((tw-titleWidth)/2, 0))
+		titlePad := max((tw-titleWidth)/2, 0)
+		padStr := strings.Repeat(" ", titlePad)
+
+		// ── Star above the "I" in STARNION ───────────────────────────────────
+		// STARN prefix visual width = 43  (S:8 + T:9 + sp:1 + A:6 + sp:1 + R:7 + sp:1 + N:10)
+		// I block width = 3  →  I centre offset from title start = 43 + 1 = 44
+		const iCenterOffset = 44
+		fmt.Println(strings.Repeat(" ", titlePad+iCenterOffset) + sGold.Render("✦"))
+
+		// ── Title (gold block letters, centred) ───────────────────────────────
 		for _, l := range titleLines {
-			fmt.Println(pad + sGold.Render(l))
+			fmt.Println(padStr + sGold.Render(l))
 		}
 	} else {
 		// terminal too narrow — plain text fallback
-		fmt.Println(sGold.Render("  S T A R P I O N"))
+		fmt.Println(sGold.Render("  S T A R N I O N"))
 	}
 
-	// ── Scorpion + tagline inside bordered box ────────────────────────────────
-	scorpionPadded := padLines(scorpionRaw)
-	scorpionColored := colorScorpion(scorpionPadded)
-	scorpionStr := strings.Join(scorpionColored, "\n")
-
-	innerWidth := lipgloss.Width(scorpionPadded[0])
-
-	// tagline centred to match scorpion width
+	// ── Tagline (centred on terminal) ────────────────────────────────────────
 	taglineText := fmt.Sprintf("Personal AI Assistant  •  v%s", version)
-	tagPad := max((innerWidth-lipgloss.Width(taglineText))/2, 0)
-	tagline := strings.Repeat(" ", tagPad) + sNebula.Render(taglineText)
-
-	starLine := centreInWidth(sGold.Render("✦ ✦ ✦"), innerWidth)
-
-	boxContent := scorpionStr + "\n\n" + starLine + "\n" + tagline
-
-	box := bannerBox(boxContent)
-
-	// centre the box on the terminal
-	boxW := lipgloss.Width(box)
-	boxPad := strings.Repeat(" ", max((tw-boxW)/2, 0))
-	for _, l := range strings.Split(box, "\n") {
-		fmt.Println(boxPad + l)
-	}
+	fmt.Println(centreInWidth(sNebula.Render(taglineText), tw))
 	fmt.Println()
 }
 

@@ -9,7 +9,7 @@
 ```
 사용자(Telegram) ─→ 개인 봇 토큰 ─→ BotManager ─→ Gateway gRPC ─→ AI Agent
                                           │
-                                     user_channel_settings (DB)
+                                     channel_settings (DB)
 ```
 
 - **BotManager**: 사용자별 봇 고루틴을 pool로 관리. 서버 재시작 시 `ReloadAll()`로 자동 복구.
@@ -20,11 +20,11 @@
 
 ## 데이터베이스 스키마
 
-### `user_channel_settings`
+### `channel_settings`
 사용자별 채널 설정 (봇 토큰, 활성화 여부, 정책).
 
 ```sql
-CREATE TABLE user_channel_settings (
+CREATE TABLE channel_settings (
     user_id      TEXT        NOT NULL,
     channel      TEXT        NOT NULL,  -- 'telegram' | 'discord' | ...
     bot_token    TEXT        NOT NULL DEFAULT '',

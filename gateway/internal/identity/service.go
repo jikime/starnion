@@ -240,8 +240,8 @@ func (s *Service) UseLinkCode(code, newPlatform, newPlatformID, displayName stri
 // MergeAndLink는 크레덴셜 웹 계정(fromUserID)을 기존 플랫폼 계정에 병합합니다.
 // 링크 코드는 대상 계정(예: 텔레그램 사용자)이 생성한 것이어야 합니다.
 // 병합 후:
+//   - fromUserID의 email/password_hash가 toUserID로 이전됩니다 (toUserID에 없을 때만).
 //   - fromUserID의 platform_identities 레코드가 toUserID로 이동합니다.
-//   - fromUserID의 user_credentials 레코드가 toUserID로 이동합니다.
 //   - fromUserID의 google_tokens 레코드가 toUserID로 이전됩니다 (FK 없어 명시적 처리).
 //   - fromUserID의 users 레코드가 삭제됩니다 (관련 데이터 CASCADE 삭제).
 //   - 링크 코드가 소비됩니다 (일회용).
@@ -278,17 +278,21 @@ func (s *Service) MergeAndLink(fromUserID, code string) (string, error) {
 		return "", fmt.Errorf("cannot link account to itself")
 	}
 
-	// 2. user_credentials 이동 (fromUserID → toUserID)
-	// toUserID에 이미 크레덴셜이 있으면 UPDATE를 건너뜀.
-	// fromUserID의 크레덴셜은 step 5 users DELETE CASCADE로 자동 삭제됨.
+	// 2. email/password_hash 이전 (fromUserID → toUserID)
+	// toUserID에 이미 email이 있으면 건너뜀.
 	_, err = tx.Exec(`
-		UPDATE user_credentials
-		SET user_id = $1
-		WHERE user_id = $2
-		  AND NOT EXISTS (SELECT 1 FROM user_credentials WHERE user_id = $1)
+		UPDATE users AS t
+		SET email         = f.email,
+		    password_hash = f.password_hash,
+		    updated_at    = NOW()
+		FROM users AS f
+		WHERE t.id = $1
+		  AND f.id = $2
+		  AND f.email IS NOT NULL
+		  AND t.email IS NULL
 	`, toUserID, fromUserID)
 	if err != nil {
-		return "", fmt.Errorf("migrate user credentials: %w", err)
+		return "", fmt.Errorf("migrate credentials: %w", err)
 	}
 
 	// 3. platform_identities 복사 (fromUserID → toUserID)
@@ -380,8 +384,8 @@ func (s *Service) GetNotificationPlatform(userID string) (platform, platformID s
 	var pref sql.NullString
 	err = s.db.QueryRow(`
 		SELECT preferences->>'notification_platform'
-		FROM profiles
-		WHERE uuid_id = $1
+		FROM users
+		WHERE id = $1
 	`, userID).Scan(&pref)
 	if err == nil && pref.Valid && pref.String != "" {
 		var pid string

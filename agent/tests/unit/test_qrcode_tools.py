@@ -1,4 +1,4 @@
-"""Unit tests for starpion_agent.skills.qrcode.tools module.
+"""Unit tests for starnion_agent.skills.qrcode.tools module.
 
 Tests cover:
 - ``GenerateQrcodeInput``: Pydantic input schema
@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from starpion_agent.skills.qrcode.tools import (
+from starnion_agent.skills.qrcode.tools import (
     GenerateQrcodeInput,
     generate_qrcode,
 )
@@ -66,7 +66,7 @@ class TestGenerateQrcode:
         assert "사이여야" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.qrcode.tools.add_pending_file")
+    @patch("starnion_agent.skills.qrcode.tools.add_pending_file")
     async def test_successful_generation(self, mock_add_file):
         result = await generate_qrcode.ainvoke(
             {"content": "https://example.com"}
@@ -80,7 +80,7 @@ class TestGenerateQrcode:
         assert len(call_args[0][0]) > 0
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.qrcode.tools.add_pending_file")
+    @patch("starnion_agent.skills.qrcode.tools.add_pending_file")
     async def test_custom_size(self, mock_add_file):
         result = await generate_qrcode.ainvoke(
             {"content": "test", "size": 5}
@@ -89,7 +89,7 @@ class TestGenerateQrcode:
         mock_add_file.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.qrcode.tools.add_pending_file")
+    @patch("starnion_agent.skills.qrcode.tools.add_pending_file")
     async def test_url_content(self, mock_add_file):
         result = await generate_qrcode.ainvoke(
             {"content": "https://example.com/path?q=test"}
@@ -97,7 +97,7 @@ class TestGenerateQrcode:
         assert "생성했어요" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.qrcode.tools.qrcode_lib")
+    @patch("starnion_agent.skills.qrcode.tools.qrcode_lib")
     async def test_library_error(self, mock_qr_lib):
         mock_qr_lib.QRCode.side_effect = Exception("QR error")
         result = await generate_qrcode.ainvoke({"content": "hello"})
@@ -106,13 +106,13 @@ class TestGenerateQrcode:
     @pytest.mark.asyncio
     async def test_boundary_size_min(self):
         """size=1 should be valid."""
-        with patch("starpion_agent.skills.qrcode.tools.add_pending_file"):
+        with patch("starnion_agent.skills.qrcode.tools.add_pending_file"):
             result = await generate_qrcode.ainvoke({"content": "x", "size": 1})
         assert "생성했어요" in result
 
     @pytest.mark.asyncio
     async def test_boundary_size_max(self):
         """size=40 should be valid."""
-        with patch("starpion_agent.skills.qrcode.tools.add_pending_file"):
+        with patch("starnion_agent.skills.qrcode.tools.add_pending_file"):
             result = await generate_qrcode.ainvoke({"content": "x", "size": 40})
         assert "생성했어요" in result

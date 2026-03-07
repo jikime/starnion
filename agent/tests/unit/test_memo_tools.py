@@ -1,4 +1,4 @@
-"""Unit tests for starpion_agent.skills.memo.tools module.
+"""Unit tests for starnion_agent.skills.memo.tools module.
 
 Tests cover:
 - ``SaveMemoInput`` / ``ListMemosInput`` / ``DeleteMemoInput``: Pydantic schemas
@@ -15,8 +15,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from starpion_agent.context import set_current_user
-from starpion_agent.skills.memo.tools import (
+from starnion_agent.context import set_current_user
+from starnion_agent.skills.memo.tools import (
     DeleteMemoInput,
     ListMemosInput,
     SaveMemoInput,
@@ -91,8 +91,8 @@ class TestSaveMemo:
         assert "너무 길어" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.memo.tools.knowledge_repo")
-    @patch("starpion_agent.skills.memo.tools.get_pool")
+    @patch("starnion_agent.skills.memo.tools.knowledge_repo")
+    @patch("starnion_agent.skills.memo.tools.get_pool")
     async def test_max_memos(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -104,8 +104,8 @@ class TestSaveMemo:
         assert "최대" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.memo.tools.knowledge_repo")
-    @patch("starpion_agent.skills.memo.tools.get_pool")
+    @patch("starnion_agent.skills.memo.tools.knowledge_repo")
+    @patch("starnion_agent.skills.memo.tools.get_pool")
     async def test_successful_save(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -122,8 +122,8 @@ class TestSaveMemo:
         mock_repo.upsert.assert_awaited_once()
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.memo.tools.knowledge_repo")
-    @patch("starpion_agent.skills.memo.tools.get_pool")
+    @patch("starnion_agent.skills.memo.tools.knowledge_repo")
+    @patch("starnion_agent.skills.memo.tools.get_pool")
     async def test_no_title_uses_content(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -146,8 +146,8 @@ class TestListMemos:
         assert "사용자 정보" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.memo.tools.knowledge_repo")
-    @patch("starpion_agent.skills.memo.tools.get_pool")
+    @patch("starnion_agent.skills.memo.tools.knowledge_repo")
+    @patch("starnion_agent.skills.memo.tools.get_pool")
     async def test_no_memos(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -157,8 +157,8 @@ class TestListMemos:
         assert "없어요" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.memo.tools.knowledge_repo")
-    @patch("starpion_agent.skills.memo.tools.get_pool")
+    @patch("starnion_agent.skills.memo.tools.knowledge_repo")
+    @patch("starnion_agent.skills.memo.tools.get_pool")
     async def test_list_all(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -186,8 +186,8 @@ class TestListMemos:
         assert "회의록" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.memo.tools.knowledge_repo")
-    @patch("starpion_agent.skills.memo.tools.get_pool")
+    @patch("starnion_agent.skills.memo.tools.knowledge_repo")
+    @patch("starnion_agent.skills.memo.tools.get_pool")
     async def test_filter_by_tag(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -215,8 +215,8 @@ class TestListMemos:
         assert "개인메모" not in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.memo.tools.knowledge_repo")
-    @patch("starpion_agent.skills.memo.tools.get_pool")
+    @patch("starnion_agent.skills.memo.tools.knowledge_repo")
+    @patch("starnion_agent.skills.memo.tools.get_pool")
     async def test_tag_not_found(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -247,8 +247,8 @@ class TestDeleteMemo:
         assert "사용자 정보" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.memo.tools.knowledge_repo")
-    @patch("starpion_agent.skills.memo.tools.get_pool")
+    @patch("starnion_agent.skills.memo.tools.knowledge_repo")
+    @patch("starnion_agent.skills.memo.tools.get_pool")
     async def test_not_found(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -258,8 +258,8 @@ class TestDeleteMemo:
         assert "찾을 수 없" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.memo.tools.knowledge_repo")
-    @patch("starpion_agent.skills.memo.tools.get_pool")
+    @patch("starnion_agent.skills.memo.tools.knowledge_repo")
+    @patch("starnion_agent.skills.memo.tools.get_pool")
     async def test_successful_deletion(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool

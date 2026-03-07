@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	githubRepo   = "jikime/starpion"
-	installShURL = "https://jikime.github.io/starpion/install.sh"
+	githubRepo   = "jikime/starnion"
+	installShURL = "https://jikime.github.io/starnion/install.sh"
 )
 
 // githubRelease is the minimal subset of the GitHub releases API response.
@@ -32,7 +32,7 @@ func newUpdateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "최신 버전으로 업데이트",
-		Long:  "GitHub Releases에서 최신 starpion 바이너리를 다운로드하여 업데이트합니다.",
+		Long:  "GitHub Releases에서 최신 starnion 바이너리를 다운로드하여 업데이트합니다.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runUpdate(checkOnly)
 		},
@@ -70,7 +70,7 @@ func runUpdate(checkOnly bool) error {
 
 	if checkOnly {
 		fmt.Println()
-		PrintHint("업데이트 명령: " + sStar.Render("starpion update"))
+		PrintHint("업데이트 명령: " + sStar.Render("starnion update"))
 		return nil
 	}
 
@@ -106,7 +106,7 @@ func runUpdate(checkOnly bool) error {
 	bashCmd.Stdout = os.Stdout
 	bashCmd.Stderr = os.Stderr
 	bashCmd.Env = append(os.Environ(),
-		"STARPION_VERSION="+latest,
+		"STARNION_VERSION="+latest,
 		"NO_PROMPT=1",
 	)
 
@@ -116,7 +116,7 @@ func runUpdate(checkOnly bool) error {
 	}
 
 	fmt.Println()
-	PrintOK("업데이트", fmt.Sprintf("StarPion v%s 설치 완료", latest))
+	PrintOK("업데이트", fmt.Sprintf("StarNion v%s 설치 완료", latest))
 	PrintHint("변경사항: " + release.HTMLURL)
 	return nil
 }
@@ -130,7 +130,7 @@ func fetchLatestRelease() (*githubRelease, error) {
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "starpion-cli/"+version)
+	req.Header.Set("User-Agent", "starnion-cli/"+version)
 
 	resp, err := client.Do(req)
 	if err != nil {

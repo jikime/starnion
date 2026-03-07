@@ -11,9 +11,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// StarPionConfig is the single source of truth for all service configuration.
-// Stored at ~/.config/starpion/config.yaml (permissions 0600).
-type StarPionConfig struct {
+// StarNionConfig is the single source of truth for all service configuration.
+// Stored at ~/.starnion/starnion.yaml (permissions 0600).
+// Gateway and Agent read from this file — no per-service .env files
+// except ui/.env which is auto-generated for Next.js.
+type StarNionConfig struct {
 	Version  string         `yaml:"version"`
 	Database DatabaseConfig `yaml:"database"`
 	Admin    AdminConfig    `yaml:"admin"`
@@ -21,6 +23,8 @@ type StarPionConfig struct {
 	Gateway  GatewayConfig  `yaml:"gateway"`
 	UI       UIConfig       `yaml:"ui"`
 	Auth     AuthConfig     `yaml:"auth"`
+	Log      LogConfig      `yaml:"log"`
+	CORS     CORSConfig     `yaml:"cors"`
 }
 
 type DatabaseConfig struct {
@@ -37,18 +41,43 @@ type AdminConfig struct {
 }
 
 type MinIOConfig struct {
-	Endpoint  string `yaml:"endpoint"`
+	Endpoint  string `yaml:"endpoint"`   // host:port — auto-derived from PublicURL if empty
 	AccessKey string `yaml:"access_key"`
 	SecretKey string `yaml:"secret_key"`
 	Bucket    string `yaml:"bucket"`
-	PublicURL string `yaml:"public_url"`
-	UseSSL    bool   `yaml:"use_ssl"`
+	PublicURL string `yaml:"public_url"` // full URL shown to browser (e.g. http://localhost:9000)
+	UseSSL    bool   `yaml:"use_ssl"`    // auto-derived from PublicURL scheme if not set explicitly
+}
+
+// DeriveEndpoint fills Endpoint and UseSSL from PublicURL when they are not
+// explicitly configured (e.g. after setup wizard or on first load).
+func (m *MinIOConfig) DeriveEndpoint() {
+	if m.PublicURL == "" || m.Endpoint != "" {
+		return
+	}
+	u := m.PublicURL
+	// Strip scheme.
+	host := u
+	if after, ok := strings.CutPrefix(u, "https://"); ok {
+		host = after
+		m.UseSSL = true
+	} else if after, ok := strings.CutPrefix(u, "http://"); ok {
+		host = after
+		m.UseSSL = false
+	}
+	// Strip any trailing path.
+	if idx := strings.IndexByte(host, '/'); idx != -1 {
+		host = host[:idx]
+	}
+	m.Endpoint = host
 }
 
 type GatewayConfig struct {
-	URL      string `yaml:"url"`
-	Port     int    `yaml:"port"`
-	GRPCPort int    `yaml:"grpc_port"`
+	Host      string `yaml:"host"`       // bind address (e.g. "0.0.0.0")
+	URL       string `yaml:"url"`        // public URL (e.g. "http://localhost:8080")
+	Port      int    `yaml:"port"`
+	GRPCPort  int    `yaml:"grpc_port"`
+	AgentHost string `yaml:"agent_host"` // gRPC agent host (e.g. "localhost")
 }
 
 type UIConfig struct {
@@ -60,41 +89,61 @@ type AuthConfig struct {
 	AuthSecret string `yaml:"auth_secret"`
 }
 
+type LogConfig struct {
+	Level  string `yaml:"level"`  // debug | info | warn | error
+	Format string `yaml:"format"` // console | json
+}
+
+type CORSConfig struct {
+	AllowedOrigins []string `yaml:"allowed_origins"`
+	AllowedMethods []string `yaml:"allowed_methods"`
+	AllowedHeaders []string `yaml:"allowed_headers"`
+}
+
 // DefaultConfig returns a config with sensible defaults.
-func DefaultConfig() StarPionConfig {
-	return StarPionConfig{
+func DefaultConfig() StarNionConfig {
+	return StarNionConfig{
 		Version: "1.0.0",
 		Database: DatabaseConfig{
 			Host:    "localhost",
 			Port:    5432,
-			Name:    "starpion",
+			Name:    "starnion",
 			User:    "postgres",
 			SSLMode: "disable",
 		},
 		MinIO: MinIOConfig{
-			Endpoint:  "localhost:9000",
-			Bucket:    "starpion-files",
+			Bucket:    "starnion-files",
 			PublicURL: "http://localhost:9000",
-			UseSSL:    false,
 		},
 		Gateway: GatewayConfig{
-			URL:      "http://localhost:8080",
-			Port:     8080,
-			GRPCPort: 50051,
+			Host:      "0.0.0.0",
+			URL:       "http://localhost:8080",
+			Port:      8080,
+			GRPCPort:  50051,
+			AgentHost: "localhost",
 		},
 		UI: UIConfig{Port: 3000},
+		Log: LogConfig{
+			Level:  "info",
+			Format: "console",
+		},
+		CORS: CORSConfig{
+			AllowedOrigins: []string{"http://localhost:3000"},
+			AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{"Authorization", "Content-Type"},
+		},
 	}
 }
 
-// ConfigDir returns ~/.config/starpion.
+// ConfigDir returns ~/.starnion.
 func ConfigDir() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "starpion")
+	return filepath.Join(home, ".starnion")
 }
 
-// ConfigPath returns the full path to config.yaml.
+// ConfigPath returns the full path to starnion.yaml.
 func ConfigPath() string {
-	return filepath.Join(ConfigDir(), "config.yaml")
+	return filepath.Join(ConfigDir(), "starnion.yaml")
 }
 
 // ConfigExists reports whether the config file has been created.
@@ -103,8 +152,8 @@ func ConfigExists() bool {
 	return err == nil
 }
 
-// LoadConfig reads and parses config.yaml. Returns DefaultConfig if not found.
-func LoadConfig() (StarPionConfig, error) {
+// LoadConfig reads and parses starnion.yaml. Returns DefaultConfig if not found.
+func LoadConfig() (StarNionConfig, error) {
 	cfg := DefaultConfig()
 	data, err := os.ReadFile(ConfigPath())
 	if os.IsNotExist(err) {
@@ -116,11 +165,12 @@ func LoadConfig() (StarPionConfig, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("parse config: %w", err)
 	}
+	cfg.MinIO.DeriveEndpoint()
 	return cfg, nil
 }
 
-// SaveConfig writes cfg to ~/.config/starpion/config.yaml with mode 0600.
-func SaveConfig(cfg StarPionConfig) error {
+// SaveConfig writes cfg to ~/.starnion/starnion.yaml with mode 0600.
+func SaveConfig(cfg StarNionConfig) error {
 	dir := ConfigDir()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
@@ -155,7 +205,7 @@ func randomSecret(bytes int) string {
 }
 
 // EnsureSecrets auto-generates JWT and Auth secrets if they are empty.
-func EnsureSecrets(cfg *StarPionConfig) bool {
+func EnsureSecrets(cfg *StarNionConfig) bool {
 	changed := false
 	if cfg.Auth.JWTSecret == "" {
 		cfg.Auth.JWTSecret = randomSecret(32)
@@ -170,12 +220,12 @@ func EnsureSecrets(cfg *StarPionConfig) bool {
 
 // WriteDockerEnv generates docker/.env for Docker Compose from the config.
 // This is the single source of truth that docker-compose.yml reads via ${VAR} interpolation.
-func WriteDockerEnv(cfg StarPionConfig, dockerDir string) error {
+func WriteDockerEnv(cfg StarNionConfig, dockerDir string) error {
 	db := cfg.Database
 	gw := cfg.Gateway
 
-	content := fmt.Sprintf(`# StarPion Docker Environment — auto-generated by starpion docker setup
-# Edit ~/.config/starpion/config.yaml and re-run 'starpion docker setup' to regenerate.
+	content := fmt.Sprintf(`# StarNion Docker Environment — auto-generated by starnion docker setup
+# Edit ~/.starnion/starnion.yaml and re-run 'starnion docker setup' to regenerate.
 
 # Secrets
 POSTGRES_PASSWORD=%s
@@ -225,69 +275,25 @@ NEXTAUTH_URL=http://localhost:%d
 	return os.WriteFile(path, []byte(content), 0o600)
 }
 
-// WriteEnvFiles generates per-service .env files from the config.
-// Each service only sees the variables it needs.
-func WriteEnvFiles(cfg StarPionConfig, projectRoot string) error {
-	db := cfg.Database
-
-	// ── gateway/.env ─────────────────────────────────────────────────────────
-	gatewayEnv := fmt.Sprintf(`# Auto-generated by starpion setup — do not edit manually.
-DATABASE_URL=%s
-JWT_SECRET=%s
-GRPC_PORT=%d
-GRPC_AGENT_HOST=localhost:%d
-GOOGLE_REDIRECT_URI=%s/auth/google/callback
-MINIO_ENDPOINT=%s
-MINIO_ACCESS_KEY=%s
-MINIO_SECRET_KEY=%s
-MINIO_BUCKET=%s
-MINIO_PUBLIC_URL=%s
-`,
-		db.DatabaseURL(),
-		cfg.Auth.JWTSecret,
-		cfg.Gateway.GRPCPort,
-		cfg.Gateway.GRPCPort,
-		cfg.Gateway.URL,
-		cfg.MinIO.Endpoint,
-		cfg.MinIO.AccessKey,
-		cfg.MinIO.SecretKey,
-		cfg.MinIO.Bucket,
-		cfg.MinIO.PublicURL,
-	)
-
-	// ── agent/.env ───────────────────────────────────────────────────────────
-	agentEnv := fmt.Sprintf(`# Auto-generated by starpion setup — do not edit manually.
-DATABASE_URL=%s
-GRPC_PORT=%d
-`,
-		db.DatabaseURL(),
-		cfg.Gateway.GRPCPort,
-	)
-
-	// ── ui/.env ──────────────────────────────────────────────────────────────
-	uiEnv := fmt.Sprintf(`# Auto-generated by starpion setup — do not edit manually.
+// WriteUIEnv generates ui/.env from the config.
+// Next.js requires environment variables at build/dev time, so this is the
+// only per-service file still generated. Gateway and Agent read
+// ~/.starnion/starnion.yaml directly.
+func WriteUIEnv(cfg StarNionConfig, projectRoot string) error {
+	uiEnv := fmt.Sprintf(`# Auto-generated by starnion setup — do not edit manually.
+# Gateway and Agent read ~/.starnion/starnion.yaml directly.
 AUTH_SECRET=%s
-GATEWAY_WS_URL=%s
-GATEWAY_API_URL=%s
 API_URL=%s
 JWT_SECRET=%s
 `,
 		cfg.Auth.AuthSecret,
-		strings.Replace(cfg.Gateway.URL, "http://", "ws://", 1),
-		cfg.Gateway.URL,
 		cfg.Gateway.URL,
 		cfg.Auth.JWTSecret,
 	)
 
-	files := map[string]string{
-		filepath.Join(projectRoot, "gateway", ".env"): gatewayEnv,
-		filepath.Join(projectRoot, "agent", ".env"):   agentEnv,
-		filepath.Join(projectRoot, "ui", ".env"):      uiEnv,
-	}
-	for path, content := range files {
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-			return fmt.Errorf("write %s: %w", path, err)
-		}
+	path := filepath.Join(projectRoot, "ui", ".env")
+	if err := os.WriteFile(path, []byte(uiEnv), 0o600); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
 }

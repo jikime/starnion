@@ -1,4 +1,4 @@
-"""Unit tests for starpion_agent.skills.unitconv.tools module.
+"""Unit tests for starnion_agent.skills.unitconv.tools module.
 
 Tests cover:
 - ``ConvertUnitInput``: Pydantic schema
@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from starpion_agent.skills.unitconv.tools import ConvertUnitInput, convert_unit
+from starnion_agent.skills.unitconv.tools import ConvertUnitInput, convert_unit
 
 
 # =========================================================================

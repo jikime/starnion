@@ -1,4 +1,4 @@
-"""Unit tests for starpion_agent.skills.reminder.tools module.
+"""Unit tests for starnion_agent.skills.reminder.tools module.
 
 Tests cover:
 - ``SetReminderInput`` / ``ListRemindersInput`` / ``DeleteReminderInput``: Pydantic schemas
@@ -16,8 +16,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from starpion_agent.context import set_current_user
-from starpion_agent.skills.reminder.tools import (
+from starnion_agent.context import set_current_user
+from starnion_agent.skills.reminder.tools import (
     DeleteReminderInput,
     ListRemindersInput,
     SetReminderInput,
@@ -116,8 +116,8 @@ class TestSetReminder:
         assert "과거 시간" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.reminder.tools.knowledge_repo")
-    @patch("starpion_agent.skills.reminder.tools.get_pool")
+    @patch("starnion_agent.skills.reminder.tools.knowledge_repo")
+    @patch("starnion_agent.skills.reminder.tools.get_pool")
     async def test_max_reminders(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -135,8 +135,8 @@ class TestSetReminder:
         assert "최대" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.reminder.tools.knowledge_repo")
-    @patch("starpion_agent.skills.reminder.tools.get_pool")
+    @patch("starnion_agent.skills.reminder.tools.knowledge_repo")
+    @patch("starnion_agent.skills.reminder.tools.get_pool")
     async def test_successful_creation(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -154,8 +154,8 @@ class TestSetReminder:
         mock_repo.upsert.assert_awaited_once()
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.reminder.tools.knowledge_repo")
-    @patch("starpion_agent.skills.reminder.tools.get_pool")
+    @patch("starnion_agent.skills.reminder.tools.knowledge_repo")
+    @patch("starnion_agent.skills.reminder.tools.get_pool")
     async def test_no_title_uses_message(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -180,8 +180,8 @@ class TestListReminders:
         assert "사용자 정보" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.reminder.tools.knowledge_repo")
-    @patch("starpion_agent.skills.reminder.tools.get_pool")
+    @patch("starnion_agent.skills.reminder.tools.knowledge_repo")
+    @patch("starnion_agent.skills.reminder.tools.get_pool")
     async def test_no_reminders(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -191,8 +191,8 @@ class TestListReminders:
         assert "없어요" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.reminder.tools.knowledge_repo")
-    @patch("starpion_agent.skills.reminder.tools.get_pool")
+    @patch("starnion_agent.skills.reminder.tools.knowledge_repo")
+    @patch("starnion_agent.skills.reminder.tools.get_pool")
     async def test_list_active_only(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -220,8 +220,8 @@ class TestListReminders:
         assert "지난알림" not in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.reminder.tools.knowledge_repo")
-    @patch("starpion_agent.skills.reminder.tools.get_pool")
+    @patch("starnion_agent.skills.reminder.tools.knowledge_repo")
+    @patch("starnion_agent.skills.reminder.tools.get_pool")
     async def test_list_include_done(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -260,8 +260,8 @@ class TestDeleteReminder:
         assert "사용자 정보" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.reminder.tools.knowledge_repo")
-    @patch("starpion_agent.skills.reminder.tools.get_pool")
+    @patch("starnion_agent.skills.reminder.tools.knowledge_repo")
+    @patch("starnion_agent.skills.reminder.tools.get_pool")
     async def test_not_found(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -271,8 +271,8 @@ class TestDeleteReminder:
         assert "찾을 수 없" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.reminder.tools.knowledge_repo")
-    @patch("starpion_agent.skills.reminder.tools.get_pool")
+    @patch("starnion_agent.skills.reminder.tools.knowledge_repo")
+    @patch("starnion_agent.skills.reminder.tools.get_pool")
     async def test_already_cancelled(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
@@ -287,8 +287,8 @@ class TestDeleteReminder:
         assert "이미" in result
 
     @pytest.mark.asyncio
-    @patch("starpion_agent.skills.reminder.tools.knowledge_repo")
-    @patch("starpion_agent.skills.reminder.tools.get_pool")
+    @patch("starnion_agent.skills.reminder.tools.knowledge_repo")
+    @patch("starnion_agent.skills.reminder.tools.get_pool")
     async def test_successful_deletion(self, mock_get_pool, mock_repo):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool

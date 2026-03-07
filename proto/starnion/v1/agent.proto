@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package starnion.v1;
+
+option go_package = "github.com/jikime/starnion/gateway/gen/starnion/v1;starnionv1";
+
+// AgentService handles communication between Gateway and Agent.
+service AgentService {
+  // Chat processes a user message and returns the agent response.
+  rpc Chat(ChatRequest) returns (ChatResponse);
+  // ChatStream returns agent responses as a token stream.
+  rpc ChatStream(ChatRequest) returns (stream ChatResponse);
+  // GenerateReport produces a periodic summary report for a user.
+  rpc GenerateReport(ReportRequest) returns (ReportResponse);
+  // GetHistory returns prior messages for a conversation thread.
+  rpc GetHistory(HistoryRequest) returns (HistoryResponse);
+}
+
+message ChatRequest {
+  string user_id = 1;
+  string message = 2;
+  string model = 3;
+  // Optional file input for multimodal processing.
+  FileInput file = 4;
+  // Optional conversation thread ID; defaults to user_id when empty.
+  string thread_id = 5;
+}
+
+message ChatResponse {
+  string content = 1;
+  ResponseType type = 2;
+  // Tool call information (when type = TOOL_CALL).
+  string tool_name = 3;
+  string tool_result = 4;
+  // File response fields (when type = FILE).
+  bytes file_data = 5;
+  string file_name = 6;
+  string file_mime = 7;
+}
+
+enum ResponseType {
+  RESPONSE_TYPE_UNSPECIFIED = 0;
+  TEXT = 1;
+  TOOL_CALL = 2;
+  TOOL_RESULT = 3;
+  ERROR = 4;
+  STREAM_END = 5;
+  FILE = 6;
+}
+
+message FileInput {
+  string file_type = 1;   // "image", "document", "audio"
+  string file_url = 2;    // Storage URL (avoids 4MB gRPC limit)
+  string file_name = 3;
+}
+
+message HistoryRequest {
+  string thread_id = 1;
+}
+
+message HistoryMessage {
+  string role = 1;    // "user" or "assistant"
+  string content = 2;
+}
+
+message HistoryResponse {
+  repeated HistoryMessage messages = 1;
+}
+
+message ReportRequest {
+  string user_id = 1;
+  string report_type = 2; // "weekly", "monthly"
+}
+
+message ReportResponse {
+  string content = 1;
+  string report_type = 2;
+}

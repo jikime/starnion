@@ -1,4 +1,4 @@
-// Package cli provides the StarPion command-line interface.
+// Package cli provides the StarNion command-line interface.
 package cli
 
 import (

@@ -1218,7 +1218,7 @@ async def send_weekly_report():
 
 ```sql
 -- 사용자가 업로드한 문서 자체 정보
-CREATE TABLE user_documents (
+CREATE TABLE documents (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id TEXT REFERENCES profiles(telegram_id),
   file_name TEXT,
@@ -1229,7 +1229,7 @@ CREATE TABLE user_documents (
 -- 문서의 내용을 쪼개어 벡터로 저장 (실제 검색 대상)
 CREATE TABLE document_sections (
   id BIGSERIAL PRIMARY KEY,
-  doc_id UUID REFERENCES user_documents(id) ON DELETE CASCADE,
+  doc_id UUID REFERENCES documents(id) ON DELETE CASCADE,
   user_id TEXT,
   content TEXT, -- 쪼개진 텍스트 조각
   embedding vector(1536), -- 벡터 데이터

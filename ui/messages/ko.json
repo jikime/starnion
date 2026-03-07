@@ -746,7 +746,7 @@
     }
   },
   "dashboard": {
-    "greeting": "안녕하세요! StarPion",
+    "greeting": "안녕하세요! StarNion",
     "title": "대시보드",
     "subtitle": "오늘의 재정 및 목표 현황을 한눈에 확인하세요",
     "refresh": "새로고침",

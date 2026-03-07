@@ -61,7 +61,7 @@ func (h *ImageHandler) ListImages(c echo.Context) error {
 
 	query := `
 		SELECT id, url, name, mime, size, source, type, COALESCE(prompt,''), COALESCE(analysis,''), created_at
-		FROM user_images
+		FROM images
 		WHERE user_id = $1`
 	args := []any{userID}
 	argIdx := 2
@@ -116,7 +116,7 @@ func (h *ImageHandler) DeleteImage(c echo.Context) error {
 	defer cancel()
 
 	res, err := h.db.ExecContext(ctx,
-		`DELETE FROM user_images WHERE id = $1 AND user_id = $2`, id, userID)
+		`DELETE FROM images WHERE id = $1 AND user_id = $2`, id, userID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "delete failed"})
 	}
@@ -139,7 +139,7 @@ func imageTypeFromFileName(name string) string {
 	return "generated"
 }
 
-// RecordImage inserts a user_images row. Called by chat_stream and hub after uploading an image.
+// RecordImage inserts a images row. Called by chat_stream and hub after uploading an image.
 func RecordImage(db *sql.DB, userID, url, name, mime string, size int64, source, imgType, prompt string) {
 	if db == nil {
 		return
@@ -149,7 +149,7 @@ func RecordImage(db *sql.DB, userID, url, name, mime string, size int64, source,
 		return
 	}
 	_, err := db.ExecContext(context.Background(), `
-		INSERT INTO user_images (user_id, url, name, mime, size, source, type, prompt)
+		INSERT INTO images (user_id, url, name, mime, size, source, type, prompt)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`, userID, url, name, mime, size, source, imgType, prompt)
 	if err != nil {

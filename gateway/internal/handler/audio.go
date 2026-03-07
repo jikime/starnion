@@ -63,7 +63,7 @@ func (h *AudioHandler) ListAudios(c echo.Context) error {
 	query := `
 		SELECT id, url, name, mime, size, duration, source, type,
 		       COALESCE(transcript,''), COALESCE(prompt,''), created_at
-		FROM user_audios
+		FROM audios
 		WHERE user_id = $1`
 	args := []any{userID}
 	argIdx := 2
@@ -136,7 +136,7 @@ func (h *AudioHandler) SaveAudio(c echo.Context) error {
 
 	var id int64
 	err := h.db.QueryRowContext(ctx, `
-		INSERT INTO user_audios (user_id, url, name, mime, size, duration, source, type, prompt)
+		INSERT INTO audios (user_id, url, name, mime, size, duration, source, type, prompt)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id
 	`, req.UserID, req.URL, req.Name, req.Mime, req.Size, req.Duration, req.Source, req.Type, req.Prompt).Scan(&id)
@@ -170,7 +170,7 @@ func (h *AudioHandler) UpdateTranscript(c echo.Context) error {
 	defer cancel()
 
 	res, err := h.db.ExecContext(ctx,
-		`UPDATE user_audios SET transcript = $1 WHERE id = $2 AND user_id = $3`,
+		`UPDATE audios SET transcript = $1 WHERE id = $2 AND user_id = $3`,
 		body.Transcript, id, userID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "update failed"})
@@ -196,7 +196,7 @@ func (h *AudioHandler) DeleteAudio(c echo.Context) error {
 	defer cancel()
 
 	res, err := h.db.ExecContext(ctx,
-		`DELETE FROM user_audios WHERE id = $1 AND user_id = $2`, id, userID)
+		`DELETE FROM audios WHERE id = $1 AND user_id = $2`, id, userID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "delete failed"})
 	}
@@ -206,7 +206,7 @@ func (h *AudioHandler) DeleteAudio(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "deleted"})
 }
 
-// RecordAudio inserts a user_audios row. Called after MinIO upload.
+// RecordAudio inserts a audios row. Called after MinIO upload.
 // audioType: 'uploaded' | 'recorded' | 'generated'
 func RecordAudio(db *sql.DB, userID, url, name, mime string, size int64, duration int, source, audioType, transcript, prompt string) {
 	if db == nil {
@@ -216,7 +216,7 @@ func RecordAudio(db *sql.DB, userID, url, name, mime string, size int64, duratio
 		return
 	}
 	_, err := db.ExecContext(context.Background(), `
-		INSERT INTO user_audios (user_id, url, name, mime, size, duration, source, type, transcript, prompt)
+		INSERT INTO audios (user_id, url, name, mime, size, duration, source, type, transcript, prompt)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`, userID, url, name, mime, size, duration, source, audioType, transcript, prompt)
 	if err != nil {

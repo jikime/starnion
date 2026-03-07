@@ -1,40 +1,91 @@
-# STARPION
+# STARNION
 
-> **"당신의 은하를 항해하는 가장 영리한 성좌."**
-> *Navigating your cosmos, the smartest constellation.*
+![StarNion Banner](ui/public/brand_banner.webp)
+
+> **"Your Stellar Companion in Every Task."**
+> *모든 작업의 빛나는 동반자*
 
 ---
 
 ## Brand Identity
 
+StarNion은 밤하늘의 북극성처럼 사용자의 복잡한 작업 흐름 속에서 명확한 길을 제시하는 **AI 네비게이터**입니다.
+
 ### Symbol
 
-![Starpion Brand](ui/public/brand_logo.webp)
+![StarNion Logo](ui/public/starnion_logo.webp)
 
-기계적 전갈 + 독침 끝의 별 + 성좌 데이터 노드로 구성된 Starpion의 공식 엠블럼.
-
-| 요소 | 의미 |
-|------|------|
-| **Scorpion Body** | 탄탄한 기술력과 보안 (pgvector / 보안 레이어) |
-| **Stinger Star** | 방대한 데이터 속에서 길을 찾는 통찰력(하이브리드 검색)과 목표를 타격하는 정밀한 실행 (MCP / Skills) |
-| **Constellation** | 사용자의 파편화된 삶과 기억을 유기적으로 연결하는 지능망 |
+중심의 4각 별(Star)과 이를 부드럽게 감싸는 궤도(Orbit)로 구성된 StarNion의 공식 심볼.
+궤도는 'Nion'의 'n'을 형상화하면서 동시에 끊이지 않는 연결성을 상징합니다.
 
 ---
 
-## Core Values — S.T.A.R.
+## Brand Essence
+
+| 항목 | 내용 |
+|------|------|
+| **Slogan** | "Your Stellar Companion in Every Task." |
+| **Mission** | 사용자에게 단순한 답변을 넘어, 목표에 도달하는 최적의 경로(Context)를 제안한다 |
+
+---
+
+## Core Values — C.O.R.E.
 
 | 가치 | 설명 |
 |------|------|
-| **S — SYNC (동기화)** | 사용자의 모든 기기, 스케줄, 취향을 완벽하게 동기화합니다 |
-| **T — TARGET (정밀 타격)** | 사용자의 의도를 독침처럼 정확히 파악하여 필요한 액션(Skill)을 즉시 수행합니다 |
-| **A — AUTONOMY (자율성)** | 사용자가 명령하기 전에 먼저 상황을 분석하고(Self-Refining) 최적의 제안을 합니다 |
-| **R — RELIANCE (신뢰)** | 전갈의 갑주처럼 사용자의 민감한 개인 정보를 안전하게 수호합니다 |
+| **C — Connectivity (연결)** | 사용자의 모든 작업, 기기, 정보를 유기적으로 연결합니다 |
+| **O — Optimization (최적화)** | 복잡한 작업 흐름 속에서 최적의 경로와 해답을 제시합니다 |
+| **R — Reliability (신뢰)** | 일관되고 정확한 응답으로 사용자의 신뢰를 구축합니다 |
+| **E — Enlightenment (통찰)** | 데이터 속에서 숨겨진 인사이트를 발견하여 사용자를 밝힙니다 |
+
+---
+
+## Character — 니온(Nion)
+
+<p align="center">
+  <img src="ui/public/nion_character.png" alt="Nion Character" width="260"/>
+</p>
+
+StarNion의 공식 AI 캐릭터 **니온(Nion)**은 차가운 기계가 아닌, 든든하고 위트 있는 조력자입니다.
+
+### 이름의 의미 — 세 가지 층위
+
+#### 1. Stellar Companion (별의 동반자)
+> 어원: **Star** + **Companion**
+
+밤하늘의 북극성처럼 사용자의 모든 작업에서 길을 밝혀주는 가장 든든한 AI 조력자. 해맑은 미소는 사용자와 함께 성장하는 친근한 파트너임을 상징합니다.
+
+#### 2. Always 'On' (언제나 깨어있는 지능)
+> 어원: **N** + **On**
+
+사용자가 필요로 하는 순간, 언제 어디서든 즉시 응답하는 Always-On AI. 캐릭터 전체에서 내뿜는 빛은 끊임없이 가동되는 지능과 혁신적인 에너지를 시각화합니다.
+
+#### 3. Core of Connectivity (연결의 핵심)
+> 디자인: 가슴의 로고 + 동심원 궤도(Layer)
+
+복잡한 데이터 레이어들을 분석하여 가장 최적화된 해답을 찾아내는 지능형 연결의 중심. 가슴의 로고는 니온의 심장이자 모든 정보가 연결되는 핵심점입니다.
+
+### 성격
+
+- **Tone**: Friendly & Professional — 친근하지만 선을 지키는 전문적인 말투
+- **Proactive**: 사용자가 막히는 부분을 먼저 감지하여 선제적으로 도움을 제안
+- **Empathetic**: 차가운 인공지능이 아닌, 사용자와 함께 성장하는 파트너
+
+---
+
+## Visual System
+
+| 항목 | 내용 |
+|------|------|
+| **Stellar Blue** | `#1E3A8A` — 무한한 가능성과 신뢰의 우주색 |
+| **Nova Yellow** | `#FDE047` — 명확한 해답과 에너지를 상징하는 포인트 컬러 |
+| **Typography** | Montserrat / Pretendard (산세리프 계열, 현대적 IT 브랜드 이미지) |
 
 ---
 
 ## Overview
 
-Starpion은 Hyper-Personalized AI Agent 플랫폼입니다. 웹 UI, Telegram 등 멀티 채널에서 자연어 가계부, 일기, 목표 관리, 메모, 메모리/RAG 검색, 멀티모달 입력, 예산 관리, 프로액티브 알림을 제공합니다.
+Starnion은 Hyper-Personalized AI Agent 플랫폼입니다. 웹 UI, Telegram 등 멀티 채널에서 자연어 가계부, 일기, 목표 관리, 메모, 메모리/RAG 검색, 멀티모달 입력, 예산 관리, 프로액티브 알림을 제공합니다.
 
 ### Core Features
 
@@ -131,7 +182,7 @@ Web UI (Next.js)  /  Telegram
 ## Project Structure
 
 ```
-starpion/
+starnion/
 ├── ui/                             # Next.js Web UI
 │   ├── app/
 │   │   ├── (dashboard)/            # Dashboard pages
@@ -147,7 +198,7 @@ starpion/
 │   │   └── api/                    # Next.js API routes (proxy)
 │   └── components/                 # UI components
 ├── agent/                          # Python Agent Service
-│   └── src/starpion_agent/
+│   └── src/starnion_agent/
 │       ├── graph/agent.py          # LangGraph ReAct agent
 │       ├── grpc/server.py          # gRPC server
 │       ├── tools/                  # Agent tools
@@ -161,7 +212,7 @@ starpion/
 │       ├── scheduler/              # Cron scheduler
 │       ├── identity/               # Platform identity service
 │       └── storage/                # MinIO file storage
-├── proto/starpion/v1/              # gRPC service definition
+├── proto/starnion/v1/              # gRPC service definition
 └── docker/
     ├── docker-compose.yml          # Full stack orchestration
     ├── init.sql                    # Database schema + pgvector
@@ -190,7 +241,7 @@ cp .env.example .env
 cd docker && docker compose up -d postgres minio
 
 # 3. Start Agent (Python gRPC server)
-cd agent && uv run python -m starpion_agent
+cd agent && uv run python -m starnion_agent
 # → gRPC server starting on [::]:50051
 
 # 4. Start Gateway (Go HTTP + Telegram)

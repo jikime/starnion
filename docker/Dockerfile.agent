@@ -11,4 +11,4 @@ COPY src/ src/
 
 EXPOSE 50051
 
-CMD ["uv", "run", "python", "-m", "starpion_agent"]
+CMD ["uv", "run", "python", "-m", "starnion_agent"]
