@@ -1,5 +1,5 @@
-title: StarNion
-description: "Personal AI Assistant — Self-hosted, privacy-first AI platform"
+title: Starnion Docs
+description: "Personal AI Agent Platform — Self-hosted, privacy-first"
 url: "https://jikime.github.io"
 baseurl: "/starnion"
 lang: en
@@ -17,7 +17,18 @@ search_enabled: true
 search_tokenizer_separator: /[\s/]+/
 
 # Footer
-footer_content: "Copyright &copy; 2025 StarNion. Released under the MIT License."
+footer_content: "Copyright &copy; 2025 Starnion. All rights reserved."
+
+# Language switcher links in header
+nav_external_links:
+  - title: 🇰🇷 한국어
+    url: ko/
+  - title: 🇺🇸 English
+    url: en/
+  - title: 🇨🇳 中文
+    url: zh/
+  - title: 🇯🇵 日本語
+    url: ja/
 
 # Plugins
 plugins:
@@ -31,3 +42,6 @@ exclude:
   - Gemfile
   - Gemfile.lock
   - node_modules
+  - "dev/"
+  - deploy.md
+  - local-test-deploy.md

@@ -287,6 +287,26 @@ curl -X POST http://localhost:8080/api/v1/chat \
 
 ---
 
+## Documentation
+
+| Language | Link |
+|----------|------|
+| 🇰🇷 한국어 | [docs/ko/](docs/ko/) |
+| 🇺🇸 English | [docs/en/](docs/en/) |
+| 🇨🇳 中文 | [docs/zh/](docs/zh/) |
+| 🇯🇵 日本語 | [docs/ja/](docs/ja/) |
+
+### Quick Links
+
+| | 한국어 | English | 中文 | 日本語 |
+|-|--------|---------|------|--------|
+| Getting Started | [시작하기](docs/ko/getting-started/introduction.md) | [Introduction](docs/en/getting-started/introduction.md) | [简介](docs/zh/getting-started/introduction.md) | [はじめに](docs/ja/getting-started/introduction.md) |
+| Quick Start | [빠른 시작](docs/ko/getting-started/quickstart.md) | [Quick Start](docs/en/getting-started/quickstart.md) | [快速开始](docs/zh/getting-started/quickstart.md) | [クイックスタート](docs/ja/getting-started/quickstart.md) |
+| Installation | [설치 가이드](docs/ko/getting-started/installation.md) | [Installation](docs/en/getting-started/installation.md) | [安装指南](docs/zh/getting-started/installation.md) | [インストール](docs/ja/getting-started/installation.md) |
+| Architecture | [아키텍처](docs/ko/architecture/overview.md) | [Architecture](docs/en/architecture/overview.md) | [架构](docs/zh/architecture/overview.md) | [アーキテクチャ](docs/ja/architecture/overview.md) |
+
+---
+
 ## License
 
 Private project. All rights reserved.
