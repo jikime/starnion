@@ -42,6 +42,7 @@ exclude:
   - Gemfile
   - Gemfile.lock
   - node_modules
+  - vendor
   - "dev/"
   - deploy.md
   - local-test-deploy.md
