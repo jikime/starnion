@@ -25,8 +25,15 @@ async def google_auth() -> str:
     if not user_id:
         return "사용자 정보를 확인할 수 없어요."
 
-    if not settings.google_client_id or not settings.google_client_secret:
-        return "구글 연동 설정이 되어 있지 않아요. 관리자에게 문의해주세요."
+    if not settings.google.client_id or not settings.google.client_secret:
+        return (
+            "구글 연동 설정이 되어 있지 않아요. "
+            "~/.starnion/starnion.yaml 에 아래 내용을 추가한 후 에이전트를 재시작해주세요:\n\n"
+            "google:\n"
+            "  client_id: YOUR_CLIENT_ID\n"
+            "  client_secret: YOUR_CLIENT_SECRET\n"
+            "  redirect_uri: YOUR_REDIRECT_URI"
+        )
 
     # Use a server-side redirect endpoint to avoid Telegram Markdown
     # underscore-stripping that corrupts OAuth parameter names
@@ -69,6 +76,12 @@ class CalendarListInput(BaseModel):
     """Input schema for google_calendar_list."""
 
     max_results: int = Field(default=10, description="최대 조회 건수")
+
+
+class CalendarDeleteInput(BaseModel):
+    """Input schema for google_calendar_delete."""
+
+    event_id: str = Field(description="삭제할 일정 ID (google_calendar_list 에서 확인)")
 
 
 @tool(args_schema=CalendarCreateInput)
@@ -127,8 +140,32 @@ async def google_calendar_list(max_results: int = 10) -> str:
     lines = []
     for e in events:
         start = e["start"].get("dateTime", e["start"].get("date", ""))
-        lines.append(f"- {start}: {e.get('summary', '(제목 없음)')}")
+        lines.append(
+            f"- {start}: {e.get('summary', '(제목 없음)')} (ID: {e.get('id', 'N/A')})"
+        )
     return "예정된 일정:\n" + "\n".join(lines)
+
+
+@tool(args_schema=CalendarDeleteInput)
+@skill_guard("google")
+async def google_calendar_delete(event_id: str) -> str:
+    """구글 캘린더의 일정을 삭제합니다. event_id는 google_calendar_list 로 확인하세요."""
+    user_id = get_current_user()
+    if not user_id:
+        return "사용자 정보를 확인할 수 없어요."
+
+    service = await get_google_service(user_id, "calendar", "v3")
+    if service is None:
+        return NOT_LINKED_MSG
+
+    try:
+        service.events().delete(calendarId="primary", eventId=event_id).execute()
+        return f"일정(ID: {event_id})을 삭제했어요."
+    except Exception as e:
+        err = str(e)
+        if "404" in err:
+            return f"일정을 찾을 수 없어요. (ID: {event_id})"
+        return f"일정 삭제 중 오류가 발생했어요: {err}"
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +258,18 @@ class TasksListInput(BaseModel):
     max_results: int = Field(default=20, description="최대 조회 건수")
 
 
+class TasksCompleteInput(BaseModel):
+    """Input schema for google_tasks_complete."""
+
+    task_id: str = Field(description="완료 처리할 할 일 ID (google_tasks_list 에서 확인)")
+
+
+class TasksDeleteInput(BaseModel):
+    """Input schema for google_tasks_delete."""
+
+    task_id: str = Field(description="삭제할 할 일 ID (google_tasks_list 에서 확인)")
+
+
 @tool(args_schema=TasksCreateInput)
 @skill_guard("google")
 async def google_tasks_create(
@@ -268,8 +317,57 @@ async def google_tasks_list(max_results: int = 20) -> str:
     lines = []
     for t in items:
         status = "✅" if t.get("status") == "completed" else "⬜"
-        lines.append(f"{status} {t.get('title', '(제목 없음)')}")
+        lines.append(f"{status} {t.get('title', '(제목 없음)')} (ID: {t.get('id', 'N/A')})")
     return "할 일 목록:\n" + "\n".join(lines)
+
+
+@tool(args_schema=TasksCompleteInput)
+@skill_guard("google")
+async def google_tasks_complete(task_id: str) -> str:
+    """구글 Tasks의 할 일을 완료 처리합니다. task_id는 google_tasks_list 로 확인하세요."""
+    user_id = get_current_user()
+    if not user_id:
+        return "사용자 정보를 확인할 수 없어요."
+
+    service = await get_google_service(user_id, "tasks", "v1")
+    if service is None:
+        return NOT_LINKED_MSG
+
+    try:
+        task = service.tasks().get(tasklist="@default", task=task_id).execute()
+        task["status"] = "completed"
+        service.tasks().update(tasklist="@default", task=task_id, body=task).execute()
+        return f"할 일 '{task.get('title', task_id)}'을 완료 처리했어요."
+    except Exception as e:
+        err = str(e)
+        if "404" in err:
+            return f"할 일을 찾을 수 없어요. (ID: {task_id})"
+        return f"완료 처리 중 오류가 발생했어요: {err}"
+
+
+@tool(args_schema=TasksDeleteInput)
+@skill_guard("google")
+async def google_tasks_delete(task_id: str) -> str:
+    """구글 Tasks의 할 일을 삭제합니다. task_id는 google_tasks_list 로 확인하세요."""
+    user_id = get_current_user()
+    if not user_id:
+        return "사용자 정보를 확인할 수 없어요."
+
+    service = await get_google_service(user_id, "tasks", "v1")
+    if service is None:
+        return NOT_LINKED_MSG
+
+    try:
+        # 삭제 전 제목 조회
+        task = service.tasks().get(tasklist="@default", task=task_id).execute()
+        title = task.get("title", task_id)
+        service.tasks().delete(tasklist="@default", task=task_id).execute()
+        return f"할 일 '{title}'을 삭제했어요."
+    except Exception as e:
+        err = str(e)
+        if "404" in err:
+            return f"할 일을 찾을 수 없어요. (ID: {task_id})"
+        return f"삭제 중 오류가 발생했어요: {err}"
 
 
 # ---------------------------------------------------------------------------

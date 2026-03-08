@@ -52,9 +52,9 @@ export function RecentAlerts() {
               <div
                 className={cn(
                   "mt-0.5 rounded-full p-1.5",
-                  alert.type === "warning" && "bg-warning/10 text-warning",
+                  alert.type === "warning" && "bg-amber-500/10 text-amber-500",
                   alert.type === "info" && "bg-primary/10 text-primary",
-                  alert.type === "success" && "bg-success/10 text-success",
+                  alert.type === "success" && "bg-emerald-500/10 text-emerald-500",
                   alert.type === "insight" && "bg-accent text-accent-foreground"
                 )}
               >

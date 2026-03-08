@@ -65,7 +65,7 @@ func (s *Scheduler) runBudgetWarningRule() {
 		}
 
 		message := "⚠️ 예산 알림\n\n" + strings.Join(alerts, "\n\n")
-		if err := s.sendTemplateNotification(u.userID, u.chatID, u.preferences, message); err != nil {
+		if err := s.sendTemplateNotification(u.userID, u.chatID, u.preferences, message, "budget_warning"); err != nil {
 			log.Error().Err(err).Str("user_id", u.userID).Msg("budget warning: send failed")
 		}
 	}
@@ -136,7 +136,7 @@ func (s *Scheduler) runInactiveReminderRule() {
 			continue
 		}
 		prefs := s.loadPreferences(u.userID)
-		if err := s.sendTemplateNotification(u.userID, u.chatID, prefs, message); err != nil {
+		if err := s.sendTemplateNotification(u.userID, u.chatID, prefs, message, "inactive_reminder"); err != nil {
 			log.Error().Err(err).Str("user_id", u.userID).Msg("inactive reminder: send failed")
 		}
 	}
@@ -279,7 +279,7 @@ func (s *Scheduler) runSpendingAnomalyRule() {
 		)
 
 		prefs := s.loadPreferences(u.userID)
-		if err := s.sendTemplateNotification(u.userID, u.chatID, prefs, message); err != nil {
+		if err := s.sendTemplateNotification(u.userID, u.chatID, prefs, message, "spending_anomaly"); err != nil {
 			log.Error().Err(err).Str("user_id", u.userID).Msg("spending anomaly: send failed")
 		}
 	}
@@ -429,8 +429,9 @@ func (s *Scheduler) runGoalStatusRule() {
 
 // --- Helpers ---
 
-// sendTemplateNotification sends a pre-formatted message with fatigue checks.
-func (s *Scheduler) sendTemplateNotification(userID string, chatID int64, preferences map[string]any, message string) error {
+// sendTemplateNotification sends a pre-formatted message with fatigue checks
+// and persists the notification to the notifications table.
+func (s *Scheduler) sendTemplateNotification(userID string, chatID int64, preferences map[string]any, message string, notifType string) error {
 	if !s.fatigue.canNotify(userID, preferences) {
 		return nil
 	}
@@ -440,11 +441,13 @@ func (s *Scheduler) sendTemplateNotification(userID string, chatID int64, prefer
 	}
 
 	s.fatigue.recordNotification(userID)
-	log.Info().Str("user_id", userID).Msg("proactive template notification sent")
+	s.saveNotification(userID, notifType, message)
+	log.Info().Str("user_id", userID).Str("type", notifType).Msg("proactive template notification sent")
 	return nil
 }
 
-// sendGeneratedNotification calls gRPC to generate a report, then sends it with fatigue checks.
+// sendGeneratedNotification calls gRPC to generate a report, then sends it with fatigue checks
+// and persists the notification to the notifications table.
 func (s *Scheduler) sendGeneratedNotification(user activeUser, reportType string) error {
 	prefs := s.loadPreferences(user.userID)
 	if !s.fatigue.canNotify(user.userID, prefs) {
@@ -472,8 +475,24 @@ func (s *Scheduler) sendGeneratedNotification(user activeUser, reportType string
 	}
 
 	s.fatigue.recordNotification(user.userID)
+	s.saveNotification(user.userID, reportType, resp.Content)
 	log.Info().Str("user_id", user.userID).Str("type", reportType).Msg("proactive generated notification sent")
 	return nil
+}
+
+// saveNotification persists a notification to the notifications table.
+func (s *Scheduler) saveNotification(userID, notifType, message string) {
+	if s.db == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO notifications (user_id, type, message) VALUES ($1, $2, $3)`,
+		userID, notifType, message,
+	); err != nil {
+		log.Error().Err(err).Str("user_id", userID).Str("type", notifType).Msg("failed to save notification")
+	}
 }
 
 // loadPreferences is a convenience wrapper for getUserPreferences.
@@ -563,7 +582,7 @@ func (s *Scheduler) runDdayNotificationRule() {
 
 		message := "📅 디데이 알림\n\n" + strings.Join(lines, "\n")
 		prefs := s.loadPreferences(n.userID)
-		if err := s.sendTemplateNotification(n.userID, n.chatID, prefs, message); err != nil {
+		if err := s.sendTemplateNotification(n.userID, n.chatID, prefs, message, "dday"); err != nil {
 			log.Error().Err(err).Str("user_id", n.userID).Msg("dday notification: send failed")
 		}
 	}

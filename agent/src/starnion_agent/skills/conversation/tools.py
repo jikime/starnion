@@ -15,6 +15,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from starnion_agent.config import settings
 from starnion_agent.db.pool import get_pool
+from starnion_agent.skills.gemini_key import get_gemini_api_key
 from starnion_agent.db.repositories import daily_log as daily_log_repo
 from starnion_agent.db.repositories import knowledge as knowledge_repo
 
@@ -52,9 +53,13 @@ async def analyze_conversation(user_id: str) -> str:
     logs_text = _build_logs_summary(today_logs, now)
 
     # 3. Call LLM for structured analysis.
+    api_key = await get_gemini_api_key(user_id)
+    if not api_key:
+        return "Gemini API 키가 설정되지 않아 대화 분석을 건너뜁니다."
+
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
+        google_api_key=api_key,
     )
 
     prompt = _build_conversation_analysis_prompt(logs_text)

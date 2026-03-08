@@ -40,8 +40,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
 } from "@/components/ui/sidebar"
+import type React from "react"
 
 const mainNavItems = [
   { key: "dashboard", icon: LayoutDashboard, href: "/" },
@@ -128,19 +128,19 @@ function NavGroup({
   )
 }
 
-export function AppSidebar() {
+export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const tGroups = useTranslations("groups")
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader className="border-b border-sidebar-border h-14">
         <Link href="/" className="flex items-center gap-2 px-4 py-1">
           <NextImage
-            src="/starnion_logo.webp"
+            src="/starnion_mascot.png"
             alt="StarNion"
-            width={36}
-            height={36}
+            width={40}
+            height={40}
             className="object-contain"
             priority
           />
@@ -157,7 +157,6 @@ export function AppSidebar() {
         <NavGroup label={tGroups("monitoring")} items={monitoringNavItems} pathname={pathname} />
         <NavGroup label={tGroups("settings")} items={settingsNavItems} pathname={pathname} />
       </SidebarContent>
-      <SidebarRail />
     </Sidebar>
   )
 }

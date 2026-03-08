@@ -11,10 +11,10 @@ const data = [
 ]
 
 const COLORS = [
-  "oklch(0.44 0.18 285)",
-  "oklch(0.55 0.15 285)",
-  "oklch(0.65 0.12 285)",
-  "oklch(0.75 0.08 285)",
+  "#f97316", // 식비 — orange
+  "#3b6de0", // 교통 — brand primary blue
+  "#a855f7", // 쇼핑 — violet
+  "#6b7280", // 기타 — gray
 ]
 
 export function CategoryChart() {

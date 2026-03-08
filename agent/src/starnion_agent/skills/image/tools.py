@@ -14,6 +14,7 @@ from starnion_agent.db.pool import get_pool
 from starnion_agent.db.repositories import image_db as image_db_repo
 from starnion_agent.document.parser import fetch_file
 from starnion_agent.skills.file_context import add_pending_file
+from starnion_agent.skills.gemini_key import get_gemini_api_key, no_key_message
 from starnion_agent.skills.guard import skill_guard
 
 logger = logging.getLogger(__name__)
@@ -68,11 +69,15 @@ async def analyze_image(
     file_url: str, user_query: str = "이 이미지를 분석해주세요.",
 ) -> str:
     """이미지를 분석합니다. 영수증, 사진, 스크린샷 등을 인식하고 내용을 설명합니다."""
+    api_key = await get_gemini_api_key()
+    if not api_key:
+        return no_key_message()
+
     user_id = get_current_user()
 
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
+        google_api_key=api_key,
     )
 
     message = HumanMessage(
@@ -112,13 +117,17 @@ async def analyze_image(
 @skill_guard("image")
 async def generate_image(prompt: str, aspect_ratio: str = "1:1") -> str:
     """요청한 설명으로 이미지를 생성합니다."""
+    api_key = await get_gemini_api_key()
+    if not api_key:
+        return no_key_message()
+
     from google import genai
     from google.genai import types
 
     if aspect_ratio not in _VALID_ASPECT_RATIOS:
         aspect_ratio = "1:1"
 
-    client = genai.Client(api_key=settings.gemini_api_key)
+    client = genai.Client(api_key=api_key)
 
     response = client.models.generate_content(
         model=_IMAGE_MODEL,
@@ -141,6 +150,10 @@ async def generate_image(prompt: str, aspect_ratio: str = "1:1") -> str:
 @skill_guard("image")
 async def edit_image(file_url: str, prompt: str) -> str:
     """첨부된 이미지를 요청에 따라 편집합니다. 배경 변경, 스타일 변환, 객체 추가/제거 등."""
+    api_key = await get_gemini_api_key()
+    if not api_key:
+        return no_key_message()
+
     from google import genai
     from google.genai import types
     from PIL import Image
@@ -148,7 +161,7 @@ async def edit_image(file_url: str, prompt: str) -> str:
     image_data = await fetch_file(file_url)
     image = Image.open(BytesIO(image_data))
 
-    client = genai.Client(api_key=settings.gemini_api_key)
+    client = genai.Client(api_key=api_key)
 
     response = client.models.generate_content(
         model=_IMAGE_MODEL,

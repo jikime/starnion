@@ -267,7 +267,7 @@ export default function DiaryPage() {
                   hasEntry: {
                     fontWeight: "bold",
                     textDecoration: "underline",
-                    textDecorationColor: "oklch(0.44 0.18 285)",
+                    textDecorationColor: "var(--primary)",
                   },
                 }}
                 className="rounded-md"

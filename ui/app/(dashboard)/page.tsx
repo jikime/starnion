@@ -261,13 +261,13 @@ function MonthlyChartCard({ data }: { data: MonthlyStat[] }) {
               labelFormatter={(l) => `${l}월`}
               contentStyle={{
                 fontSize: 12, borderRadius: 8,
-                border: "1px solid hsl(var(--border))",
-                background: "hsl(var(--background))",
-                color: "hsl(var(--foreground))",
+                border: "1px solid var(--border)",
+                background: "var(--background)",
+                color: "var(--foreground)",
               }}
             />
-            <Bar dataKey="income" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} name="income" />
-            <Bar dataKey="expense" fill="hsl(var(--muted-foreground) / 0.3)" radius={[3, 3, 0, 0]} name="expense" />
+            <Bar dataKey="income" fill="#3b6de0" radius={[3, 3, 0, 0]} name="income" />
+            <Bar dataKey="expense" fill="#ef4444" radius={[3, 3, 0, 0]} name="expense" />
           </BarChart>
         </ResponsiveContainer>
       )}

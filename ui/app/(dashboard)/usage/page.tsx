@@ -98,7 +98,7 @@ const PROVIDER_COLORS: Record<string, string> = {
   gemini:    "#4285F4",
   anthropic: "#D97706",
   openai:    "#10A37F",
-  unknown:   "#6366f1",
+  unknown:   "#3b6de0",
 }
 
 const PIE_COLORS = ["#10b981", "#ef4444"]
@@ -409,7 +409,7 @@ export default function UsagePage() {
                           formatter={(v: number) => [fmtTokens(v)]}
                         />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Line type="monotone" dataKey="input_tokens"  name={t("inputTokens")}  stroke="#6366f1" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="input_tokens"  name={t("inputTokens")}  stroke="#3b6de0" strokeWidth={2} dot={false} />
                         <Line type="monotone" dataKey="output_tokens" name={t("outputTokens")} stroke="#f59e0b" strokeWidth={2} dot={false} />
                         <Line type="monotone" dataKey="cached_tokens" name={t("cachedTokens")} stroke="#10b981" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
                       </LineChart>
@@ -454,8 +454,8 @@ export default function UsagePage() {
                       <AreaChart data={daily} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="costGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
+                            <stop offset="5%"  stopColor="#3b6de0" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#3b6de0" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -465,7 +465,7 @@ export default function UsagePage() {
                           contentStyle={{ fontSize: 12 }}
                           formatter={(v: number) => [`$${v.toFixed(6)}`, t("cost")]}
                         />
-                        <Area type="monotone" dataKey="cost_usd" stroke="#7c3aed" strokeWidth={2} fill="url(#costGrad)" dot={false} />
+                        <Area type="monotone" dataKey="cost_usd" stroke="#3b6de0" strokeWidth={2} fill="url(#costGrad)" dot={false} />
                       </AreaChart>
                     </ResponsiveContainer>
                   )}

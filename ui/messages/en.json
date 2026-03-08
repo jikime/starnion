@@ -696,7 +696,7 @@
   },
   "integrations": {
     "title": "Integrations",
-    "subtitle": "Connect external services so Jiki can work on your behalf.",
+    "subtitle": "Connect external services so Nion can work on your behalf.",
     "connected": "Connected",
     "disconnected": "Not Connected",
     "disconnect": "Disconnect",
@@ -714,7 +714,7 @@
     "providerUnlinked": "{name} disconnected.",
     "dialogTitle": "{name} Integration",
     "google": {
-      "description": "Control Calendar, Gmail, Drive, Docs, and Tasks directly from Jiki.",
+      "description": "Control Calendar, Gmail, Drive, Docs, and Tasks directly from Nion.",
       "cap1": "Google Calendar view/create",
       "cap2": "Gmail read/send",
       "cap3": "Google Drive file upload",
@@ -729,7 +729,7 @@
       "keyHint": "Create in Notion Settings → Integrations → New API Integration."
     },
     "github": {
-      "description": "View and manage repositories, issues, and PRs from Jiki.",
+      "description": "View and manage repositories, issues, and PRs from Nion.",
       "cap1": "View repositories",
       "cap2": "Read/create issues",
       "cap3": "View PRs",
@@ -737,12 +737,30 @@
       "keyHint": "Create in GitHub Settings → Developer settings → Personal access tokens."
     },
     "tavily": {
-      "description": "Connect real-time web search to Jiki for the latest news, fact-checking, and live data.",
+      "description": "Connect real-time web search to Nion for the latest news, fact-checking, and live data.",
       "cap1": "Real-time web search",
       "cap2": "Latest news",
       "cap3": "Fact checking",
       "cap4": "Web page content extraction",
       "keyHint": "Get your API key at app.tavily.com."
+    },
+    "naver_search": {
+      "description": "Connect the Naver Search API to search blogs, news, Q&A, shopping, images and more.",
+      "cap1": "Blog · News · Cafe search",
+      "cap2": "Knowledge iN · Encyclopedia search",
+      "cap3": "Image · Shopping search",
+      "cap4": "Local · Web · Academic search",
+      "keyHint": "Register an application at developers.naver.com to get your Client ID and Client Secret.",
+      "clientIdLabel": "Client ID",
+      "clientSecretLabel": "Client Secret"
+    },
+    "gemini": {
+      "description": "Powers image, video & audio processing as well as text summarization, translation, and report generation.",
+      "cap1": "Image generation, editing & analysis / Video analysis",
+      "cap2": "Speech recognition (STT) / Text-to-speech (TTS)",
+      "cap3": "Text summarization & translation",
+      "cap4": "Reports, goals, patterns & conversation analysis (background)",
+      "keyHint": "Get your API key from Google AI Studio (aistudio.google.com/apikey)."
     }
   },
   "dashboard": {
@@ -791,7 +809,7 @@
   },
   "channels": {
     "title": "Channels",
-    "subtitle": "Connect external messaging channels to chat with Jiki from anywhere.",
+    "subtitle": "Connect external messaging channels to chat with Nion from anywhere.",
     "loading": "Loading...",
     "statusRunning": "Running",
     "statusConfigured": "Configured",

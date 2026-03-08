@@ -696,7 +696,7 @@
   },
   "integrations": {
     "title": "連携",
-    "subtitle": "外部サービスを連携して Jiki が代わりに作業できます。",
+    "subtitle": "外部サービスを連携して Nion が代わりに作業できます。",
     "connected": "接続済み",
     "disconnected": "未接続",
     "disconnect": "切断",
@@ -714,7 +714,7 @@
     "providerUnlinked": "{name} の連携が解除されました。",
     "dialogTitle": "{name} 連携",
     "google": {
-      "description": "Jiki から Calendar、Gmail、Drive、Docs、Tasks を直接操作できます。",
+      "description": "Nion から Calendar、Gmail、Drive、Docs、Tasks を直接操作できます。",
       "cap1": "Google Calendar 閲覧/作成",
       "cap2": "Gmail 読み取り/送信",
       "cap3": "Google Drive ファイルアップロード",
@@ -729,7 +729,7 @@
       "keyHint": "Notion 設定 → 連携 → 新しい API 連携で作成できます。"
     },
     "github": {
-      "description": "Jiki からリポジトリ、Issue、PR を閲覧・管理します。",
+      "description": "Nion からリポジトリ、Issue、PR を閲覧・管理します。",
       "cap1": "リポジトリ閲覧",
       "cap2": "Issue 読み取り/作成",
       "cap3": "PR 閲覧",
@@ -737,12 +737,30 @@
       "keyHint": "GitHub 設定 → Developer settings → Personal access tokens で作成できます。"
     },
     "tavily": {
-      "description": "リアルタイム Web 検索を Jiki に接続します。最新ニュース、ファクトチェック、リアルタイムデータ検索が可能になります。",
+      "description": "リアルタイム Web 検索を Nion に接続します。最新ニュース、ファクトチェック、リアルタイムデータ検索が可能になります。",
       "cap1": "リアルタイム Web 検索",
       "cap2": "最新ニュース",
       "cap3": "ファクトチェック",
       "cap4": "Web ページコンテンツ抽出",
       "keyHint": "app.tavily.com で API キーを取得できます。"
+    },
+    "naver_search": {
+      "description": "Naver検索APIを接続します。ブログ、ニュース、知識iN、ショッピング、画像など多様な検索が可能です。",
+      "cap1": "ブログ・ニュース・カフェ検索",
+      "cap2": "知識iN・百科事典検索",
+      "cap3": "画像・ショッピング検索",
+      "cap4": "地域・Webドキュメント・専門資料検索",
+      "keyHint": "developers.naver.comでアプリケーションを登録してClient IDとClient Secretを取得してください。",
+      "clientIdLabel": "Client ID",
+      "clientSecretLabel": "Client Secret"
+    },
+    "gemini": {
+      "description": "画像・映像・音声処理に加え、テキスト要約・翻訳・レポート生成にGemini APIを使用します。",
+      "cap1": "画像生成・編集・分析 / 動画分析",
+      "cap2": "音声認識 (STT) / 音声合成 (TTS)",
+      "cap3": "テキスト要約・翻訳",
+      "cap4": "レポート・目標・パターン・会話分析（バックグラウンド）",
+      "keyHint": "Google AI Studio(aistudio.google.com/apikey)でAPIキーを取得してください。"
     }
   },
   "dashboard": {
@@ -791,7 +809,7 @@
   },
   "channels": {
     "title": "チャンネル",
-    "subtitle": "外部メッセージングチャンネルを接続して、どこからでもJikiと会話しましょう。",
+    "subtitle": "外部メッセージングチャンネルを接続して、どこからでもNionと会話しましょう。",
     "loading": "読み込み中...",
     "statusRunning": "実行中",
     "statusConfigured": "設定済み",

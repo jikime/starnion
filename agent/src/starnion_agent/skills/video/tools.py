@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from starnion_agent.config import settings
 from starnion_agent.document.parser import fetch_file
 from starnion_agent.skills.file_context import add_pending_file
+from starnion_agent.skills.gemini_key import get_gemini_api_key, no_key_message
 from starnion_agent.skills.guard import skill_guard
 
 logger = logging.getLogger(__name__)
@@ -39,12 +40,16 @@ async def analyze_video(
     file_url: str, user_query: str = "이 비디오를 분석해주세요.",
 ) -> str:
     """비디오를 분석합니다. 내용 요약, 장면 설명, 텍스트 추출 등을 수행합니다."""
+    api_key = await get_gemini_api_key()
+    if not api_key:
+        return no_key_message()
+
     data = await fetch_file(file_url)
     encoded = base64.b64encode(data).decode("utf-8")
 
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
+        google_api_key=api_key,
     )
 
     message = HumanMessage(
@@ -62,6 +67,10 @@ async def analyze_video(
 @skill_guard("video")
 async def generate_video(prompt: str, frames: int = 5) -> str:
     """요청한 설명으로 이미지 슬라이드쇼 영상을 생성합니다."""
+    api_key = await get_gemini_api_key()
+    if not api_key:
+        return no_key_message()
+
     import subprocess
     import tempfile
     from pathlib import Path
@@ -69,7 +78,7 @@ async def generate_video(prompt: str, frames: int = 5) -> str:
     from google import genai
     from google.genai import types
 
-    client = genai.Client(api_key=settings.gemini_api_key)
+    client = genai.Client(api_key=api_key)
     frames = max(1, min(frames, 10))
 
     # Generate frames using Imagen 3.

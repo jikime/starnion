@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
@@ -13,12 +12,13 @@ import (
 
 // IntegrationHandler provides REST endpoints for managing external service integrations.
 type IntegrationHandler struct {
-	db *sql.DB
+	db        *sql.DB
+	googleCfg GoogleOAuthConfig
 }
 
 // NewIntegrationHandler creates a new IntegrationHandler.
-func NewIntegrationHandler(db *sql.DB) *IntegrationHandler {
-	return &IntegrationHandler{db: db}
+func NewIntegrationHandler(db *sql.DB, cfg GoogleOAuthConfig) *IntegrationHandler {
+	return &IntegrationHandler{db: db, googleCfg: cfg}
 }
 
 // integrationStatus represents the connection state of a single provider.
@@ -77,6 +77,20 @@ func (h *IntegrationHandler) Status(c echo.Context) error {
 	).Scan(&tavilyKey)
 	result["tavily"] = integrationStatus{Connected: err == nil && tavilyKey != ""}
 
+	// ── Naver Search ─────────────────────────────────────────────────────────
+	var naverKey string
+	err = h.db.QueryRowContext(c.Request().Context(),
+		`SELECT api_key FROM integration_keys WHERE user_id = $1 AND provider = 'naver_search'`, userID,
+	).Scan(&naverKey)
+	result["naver_search"] = integrationStatus{Connected: err == nil && naverKey != ""}
+
+	// ── Gemini ───────────────────────────────────────────────────────────────
+	var geminiKey string
+	err = h.db.QueryRowContext(c.Request().Context(),
+		`SELECT api_key FROM integration_keys WHERE user_id = $1 AND provider = 'gemini'`, userID,
+	).Scan(&geminiKey)
+	result["gemini"] = integrationStatus{Connected: err == nil && geminiKey != ""}
+
 	return c.JSON(http.StatusOK, result)
 }
 
@@ -130,11 +144,13 @@ func (h *IntegrationHandler) GoogleAuthURL(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
 	}
 
-	clientID := os.Getenv("GOOGLE_CLIENT_ID")
-	redirectURI := os.Getenv("GOOGLE_REDIRECT_URI")
+	clientID := h.googleCfg.ClientID
+	redirectURI := h.googleCfg.RedirectURI
 
 	if clientID == "" || redirectURI == "" {
-		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "Google OAuth not configured"})
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{
+			"error": "Google OAuth not configured — run: starnion config google",
+		})
 	}
 
 	scopes := []string{
@@ -224,6 +240,90 @@ func (h *IntegrationHandler) NotionDisconnect(c echo.Context) error {
 	)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", userID).Msg("integrations: notion disconnect failed")
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "disconnect failed"})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "disconnected"})
+}
+
+// NaverSearchConnect saves (or updates) a Naver Search API client credentials for the user.
+// PUT /api/v1/integrations/naver_search  Body: { "user_id": "...", "api_key": "client_id:client_secret" }
+func (h *IntegrationHandler) NaverSearchConnect(c echo.Context) error {
+	var req struct {
+		UserID string `json:"user_id"`
+		APIKey string `json:"api_key"` // stored as "client_id:client_secret"
+	}
+	if err := c.Bind(&req); err != nil || req.UserID == "" || req.APIKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and api_key required"})
+	}
+
+	_, err := h.db.ExecContext(c.Request().Context(),
+		`INSERT INTO integration_keys (user_id, provider, api_key)
+		 VALUES ($1, 'naver_search', $2)
+		 ON CONFLICT (user_id, provider) DO UPDATE SET api_key = EXCLUDED.api_key, updated_at = NOW()`,
+		req.UserID, req.APIKey,
+	)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", req.UserID).Msg("integrations: naver_search connect failed")
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "save failed"})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "connected"})
+}
+
+// NaverSearchDisconnect removes the Naver Search credentials for the user.
+// DELETE /api/v1/integrations/naver_search?user_id=...
+func (h *IntegrationHandler) NaverSearchDisconnect(c echo.Context) error {
+	userID := c.QueryParam("user_id")
+	if userID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	}
+
+	_, err := h.db.ExecContext(c.Request().Context(),
+		`DELETE FROM integration_keys WHERE user_id = $1 AND provider = 'naver_search'`, userID,
+	)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("integrations: naver_search disconnect failed")
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "disconnect failed"})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "disconnected"})
+}
+
+// GeminiConnect saves (or updates) a Gemini API key for the user.
+// PUT /api/v1/integrations/gemini  Body: { "user_id": "...", "api_key": "..." }
+func (h *IntegrationHandler) GeminiConnect(c echo.Context) error {
+	var req struct {
+		UserID string `json:"user_id"`
+		APIKey string `json:"api_key"`
+	}
+	if err := c.Bind(&req); err != nil || req.UserID == "" || req.APIKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and api_key required"})
+	}
+
+	_, err := h.db.ExecContext(c.Request().Context(),
+		`INSERT INTO integration_keys (user_id, provider, api_key)
+		 VALUES ($1, 'gemini', $2)
+		 ON CONFLICT (user_id, provider) DO UPDATE SET api_key = EXCLUDED.api_key, updated_at = NOW()`,
+		req.UserID, req.APIKey,
+	)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", req.UserID).Msg("integrations: gemini connect failed")
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "save failed"})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "connected"})
+}
+
+// GeminiDisconnect removes the Gemini API key for the user.
+// DELETE /api/v1/integrations/gemini?user_id=...
+func (h *IntegrationHandler) GeminiDisconnect(c echo.Context) error {
+	userID := c.QueryParam("user_id")
+	if userID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	}
+
+	_, err := h.db.ExecContext(c.Request().Context(),
+		`DELETE FROM integration_keys WHERE user_id = $1 AND provider = 'gemini'`, userID,
+	)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("integrations: gemini disconnect failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "disconnect failed"})
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "disconnected"})

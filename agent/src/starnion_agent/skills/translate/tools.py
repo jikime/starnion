@@ -8,6 +8,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 from starnion_agent.config import settings
+from starnion_agent.skills.gemini_key import get_gemini_api_key, no_key_message
 from starnion_agent.skills.guard import skill_guard
 
 logger = logging.getLogger(__name__)
@@ -67,8 +68,9 @@ async def translate_text(
     source_lang: str = "auto",
 ) -> str:
     """텍스트를 지정된 언어로 번역합니다. 한국어, 영어, 일본어, 중국어 등 7개 언어를 지원합니다."""
-    if not settings.gemini_api_key:
-        return "Gemini API 키가 설정되지 않았어요. 관리자에게 문의해 주세요."
+    api_key = await get_gemini_api_key()
+    if not api_key:
+        return no_key_message()
 
     if not text or not text.strip():
         return "번역할 텍스트를 입력해 주세요."
@@ -85,7 +87,7 @@ async def translate_text(
     try:
         llm = ChatGoogleGenerativeAI(
             model=settings.gemini_model,
-            google_api_key=settings.gemini_api_key,
+            google_api_key=api_key,
         )
         response = await llm.ainvoke([HumanMessage(content=prompt)])
         return response.content

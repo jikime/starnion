@@ -502,6 +502,22 @@ CREATE INDEX IF NOT EXISTS usage_logs_created_at_idx ON usage_logs (created_at D
 CREATE INDEX IF NOT EXISTS usage_logs_user_date_idx  ON usage_logs (user_id, created_at DESC);
 
 -- =============================================================
+-- NOTIFICATIONS
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type        TEXT        NOT NULL,   -- budget_warning, dday, inactive_reminder, spending_anomaly, daily_summary, monthly_closing, pattern_insight, goal_status, weekly
+    message     TEXT        NOT NULL,
+    read        BOOLEAN     NOT NULL DEFAULT false,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id    ON notifications (user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications (user_id, created_at DESC);
+
+-- =============================================================
 -- FUNCTIONS
 -- =============================================================
 

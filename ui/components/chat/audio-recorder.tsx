@@ -53,8 +53,8 @@ export function AudioRecorder({ onAttach, onCancel }: AudioRecorderProps) {
     const style = getComputedStyle(document.documentElement)
     const fg      = style.getPropertyValue("--foreground").trim()
     const primary = style.getPropertyValue("--primary").trim()
-    const waveColor     = fg      ? `hsl(${fg} / 0.25)` : "rgba(0,0,0,0.25)"
-    const progressColor = primary ? `hsl(${primary})`   : "#6366f1"
+    const waveColor     = fg      ? `color-mix(in srgb, ${fg} 25%, transparent)` : "rgba(0,0,0,0.25)"
+    const progressColor = primary || "#3b6de0"
 
     // Shared base config for both instances.
     const baseConfig = {

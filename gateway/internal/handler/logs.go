@@ -15,12 +15,13 @@ import (
 
 // LogsHandler serves log entries via REST and SSE.
 type LogsHandler struct {
-	buf *logbuf.Buffer
+	buf          *logbuf.Buffer
+	agentBaseURL string // e.g. "http://agent:8082"
 }
 
 // NewLogsHandler creates a new LogsHandler.
-func NewLogsHandler(buf *logbuf.Buffer) *LogsHandler {
-	return &LogsHandler{buf: buf}
+func NewLogsHandler(buf *logbuf.Buffer, agentBaseURL string) *LogsHandler {
+	return &LogsHandler{buf: buf, agentBaseURL: agentBaseURL}
 }
 
 // List returns recent log entries as JSON.
@@ -132,7 +133,11 @@ func (h *LogsHandler) Stream(c echo.Context) error {
 // AgentLogsProxy fetches logs from the Python agent HTTP server and returns them.
 // GET /api/v1/logs/agent?limit=200&level=...&search=...
 func (h *LogsHandler) AgentLogsProxy(c echo.Context) error {
-	agentLogURL := "http://localhost:8082/logs"
+	base := h.agentBaseURL
+	if base == "" {
+		base = "http://localhost:8082"
+	}
+	agentLogURL := base + "/logs"
 
 	// Forward query params.
 	if q := c.QueryString(); q != "" {

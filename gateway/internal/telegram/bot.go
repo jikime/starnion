@@ -539,6 +539,19 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 		statusMsgID = sent.MessageID
 	}
 
+	// editWithHTML edits an existing message using HTML-converted markdown.
+	// Falls back to plain text if Telegram rejects the HTML (e.g. partial markdown during streaming).
+	editWithHTML := func(msgID int, rawMD string) {
+		final := markdownToTelegramHTML(rawMD)
+		edit := tgbotapi.NewEditMessageText(chatID, msgID, final)
+		edit.ParseMode = "HTML"
+		if _, editErr := b.api.Send(edit); editErr != nil {
+			edit.ParseMode = ""
+			edit.Text = rawMD
+			b.api.Send(edit) // best-effort plain fallback
+		}
+	}
+
 	for {
 		resp, err := stream.Recv()
 		if err == io.EOF {
@@ -553,8 +566,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 			// If we already sent a partial message, complete it with error note.
 			if sentMsgID != 0 {
 				accumulated.WriteString("\n\n_(stream interrupted)_")
-				edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, accumulated.String())
-				b.api.Send(edit)
+				editWithHTML(sentMsgID, accumulated.String())
 				b.setReaction(chatID, messageID, "😢")
 				return nil
 			}
@@ -571,12 +583,21 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 					// Reuse status message as the response message.
 					sentMsgID = statusMsgID
 					statusMsgID = 0
-					edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, accumulated.String())
-					b.api.Send(edit) // best-effort
+					editWithHTML(sentMsgID, accumulated.String())
 				} else {
-					sent, sendErr := b.api.Send(tgbotapi.NewMessage(chatID, accumulated.String()))
+					// No status message: send as new message with HTML.
+					final := markdownToTelegramHTML(accumulated.String())
+					msg := tgbotapi.NewMessage(chatID, final)
+					msg.ParseMode = "HTML"
+					sent, sendErr := b.api.Send(msg)
 					if sendErr != nil {
-						return fmt.Errorf("send initial: %w", sendErr)
+						// HTML failed: retry as plain text.
+						msg.ParseMode = ""
+						msg.Text = accumulated.String()
+						sent, sendErr = b.api.Send(msg)
+						if sendErr != nil {
+							return fmt.Errorf("send initial: %w", sendErr)
+						}
 					}
 					sentMsgID = sent.MessageID
 				}
@@ -587,8 +608,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 
 			// Throttled edit: respect Telegram rate limits.
 			if time.Since(lastEdit) >= editInterval && accumulated.Len() > lastLen {
-				edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, accumulated.String())
-				b.api.Send(edit) // best-effort
+				editWithHTML(sentMsgID, accumulated.String())
 				lastEdit = time.Now()
 				lastLen = accumulated.Len()
 			}
@@ -604,17 +624,11 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 				deleteMsg := tgbotapi.NewDeleteMessage(chatID, statusMsgID)
 				b.api.Request(deleteMsg)
 			}
-			// Final edit with HTML formatting (converted from Markdown).
-			if sentMsgID != 0 && accumulated.Len() > lastLen {
-				final := markdownToTelegramHTML(accumulated.String())
-				edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, final)
-				edit.ParseMode = "HTML"
-				if _, editErr := b.api.Send(edit); editErr != nil {
-					// HTML parse failure → retry as plain text.
-					edit.ParseMode = ""
-					edit.Text = accumulated.String()
-					b.api.Send(edit)
-				}
+			// Final edit: always apply HTML formatting regardless of lastLen.
+			// (Intermediate edits may have sent plain text; this ensures the
+			//  finished message is always rendered with proper HTML markup.)
+			if sentMsgID != 0 && accumulated.Len() > 0 {
+				editWithHTML(sentMsgID, accumulated.String())
 			} else if sentMsgID == 0 && accumulated.Len() > 0 {
 				// No edits were sent yet, send accumulated text as new message.
 				if err := b.SendMessage(chatID, accumulated.String()); err != nil {
@@ -644,8 +658,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 				b.SendMessage(chatID, errText)
 			} else {
 				accumulated.WriteString("\n\n" + errText)
-				edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, accumulated.String())
-				b.api.Send(edit)
+				editWithHTML(sentMsgID, accumulated.String())
 			}
 			b.setReaction(chatID, messageID, "😢")
 			return nil
@@ -688,15 +701,8 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 		deleteMsg := tgbotapi.NewDeleteMessage(chatID, statusMsgID)
 		b.api.Request(deleteMsg)
 	}
-	if sentMsgID != 0 && accumulated.Len() > lastLen {
-		final := markdownToTelegramHTML(accumulated.String())
-		edit := tgbotapi.NewEditMessageText(chatID, sentMsgID, final)
-		edit.ParseMode = "HTML"
-		if _, editErr := b.api.Send(edit); editErr != nil {
-			edit.ParseMode = ""
-			edit.Text = accumulated.String()
-			b.api.Send(edit)
-		}
+	if sentMsgID != 0 && accumulated.Len() > 0 {
+		editWithHTML(sentMsgID, accumulated.String())
 	} else if sentMsgID == 0 && accumulated.Len() > 0 {
 		b.SendMessage(chatID, accumulated.String())
 	}

@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from starnion_agent.config import settings
 from starnion_agent.context import get_current_user
 from starnion_agent.db.pool import get_pool
+from starnion_agent.skills.gemini_key import get_gemini_api_key
 from starnion_agent.db.repositories import finance as finance_repo
 from starnion_agent.db.repositories import goal_db as goal_db_repo
 from starnion_agent.db.repositories import profile as profile_repo
@@ -301,9 +302,13 @@ async def evaluate_goals(user_id: str) -> str:
 
     data_summary = _build_evaluation_data(active_goals, monthly, daily_totals, budget, now)
 
+    api_key = await get_gemini_api_key(user_id)
+    if not api_key:
+        return "Gemini API 키가 설정되지 않아 목표 평가를 건너뜁니다."
+
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
+        google_api_key=api_key,
     )
 
     prompt = _build_evaluation_prompt(data_summary)
@@ -358,9 +363,13 @@ async def generate_goal_status(user_id: str) -> str:
         budget = preferences.get("budget", {})
         persona_id = preferences.get("persona", DEFAULT_PERSONA)
 
+    api_key = await get_gemini_api_key(user_id)
+    if not api_key:
+        return ""
+
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
+        google_api_key=api_key,
     )
 
     prompt = _build_status_prompt(active_goals, monthly, budget, now, persona_id)

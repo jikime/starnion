@@ -17,7 +17,7 @@ import (
 //go:embed migrations
 var migrationFS embed.FS
 
-// RunSetup executes the interactive 5-step setup wizard.
+// RunSetup executes the interactive 7-step setup wizard.
 func RunSetup(projectRoot string) error {
 	PrintBanner("1.0.0")
 
@@ -38,15 +38,15 @@ func RunSetup(projectRoot string) error {
 	cfg := DefaultConfig()
 
 	// ════════════════════════════════════════════════════════════════════════════
-	// [1/5] SYSTEM CHECK
+	// [1/6] SYSTEM CHECK
 	// ════════════════════════════════════════════════════════════════════════════
-	PrintSectionHeader(1, 5, "SYSTEM CHECK")
+	PrintSectionHeader(1, 7, "SYSTEM CHECK")
 	_ = RunSystemCheck(cfg.Database.Host, cfg.Database.Port, cfg.MinIO.PublicURL)
 
 	// ════════════════════════════════════════════════════════════════════════════
-	// [2/5] DATABASE
+	// [2/6] DATABASE
 	// ════════════════════════════════════════════════════════════════════════════
-	PrintSectionHeader(2, 5, "DATABASE")
+	PrintSectionHeader(2, 7, "DATABASE")
 	PrintInfo("PostgreSQL 접속 정보를 입력해주세요.")
 	fmt.Println()
 
@@ -99,9 +99,9 @@ func RunSetup(projectRoot string) error {
 	PrintOK("Database", "연결 성공 및 마이그레이션 완료")
 
 	// ════════════════════════════════════════════════════════════════════════════
-	// [3/5] ADMIN ACCOUNT
+	// [3/6] ADMIN ACCOUNT
 	// ════════════════════════════════════════════════════════════════════════════
-	PrintSectionHeader(3, 5, "ADMIN ACCOUNT")
+	PrintSectionHeader(3, 7, "ADMIN ACCOUNT")
 	PrintInfo("첫 번째 관리자 계정을 생성합니다.")
 	fmt.Println()
 
@@ -162,9 +162,9 @@ func RunSetup(projectRoot string) error {
 	PrintOK("Admin", adminName+"("+adminEmail+") 계정 생성 완료")
 
 	// ════════════════════════════════════════════════════════════════════════════
-	// [4/5] MINIO (FILE STORAGE)
+	// [4/6] MINIO (FILE STORAGE)
 	// ════════════════════════════════════════════════════════════════════════════
-	PrintSectionHeader(4, 5, "FILE STORAGE (MinIO)")
+	PrintSectionHeader(4, 7, "FILE STORAGE (MinIO)")
 	PrintInfo("이미지 및 파일 저장소 정보를 입력해주세요.")
 	fmt.Println()
 
@@ -206,9 +206,9 @@ func RunSetup(projectRoot string) error {
 	}
 
 	// ════════════════════════════════════════════════════════════════════════════
-	// [5/5] SERVICE URLs
+	// [5/6] SERVICE URLs
 	// ════════════════════════════════════════════════════════════════════════════
-	PrintSectionHeader(5, 5, "SERVICE URLs")
+	PrintSectionHeader(5, 7, "SERVICE URLs")
 	PrintInfo("서비스 URL을 설정합니다. 로컬 개발이면 그대로 Enter를 누르세요.")
 	fmt.Println()
 
@@ -223,6 +223,98 @@ func RunSetup(projectRoot string) error {
 
 	if cfg.Gateway.URL == "" {
 		cfg.Gateway.URL = "http://localhost:8080"
+	}
+
+	// ════════════════════════════════════════════════════════════════════════════
+	// [6/6] GOOGLE OAUTH (선택)
+	// ════════════════════════════════════════════════════════════════════════════
+	PrintSectionHeader(6, 7, "GOOGLE OAUTH (선택)")
+	PrintInfo("Google Calendar / Gmail / Drive 연동을 위한 OAuth2 앱 자격증명입니다.")
+	PrintInfo("건너뛰려면 모든 항목을 비워두고 Enter를 누르세요.")
+	PrintInfo("나중에 설정하려면: starnion config google")
+	fmt.Println()
+
+	if err := huh.NewForm(huh.NewGroup(
+		huh.NewInput().
+			Title("Google Client ID").
+			Placeholder("123456789-xxx.apps.googleusercontent.com  (없으면 Enter)").
+			Value(&cfg.Google.ClientID),
+		huh.NewInput().
+			Title("Google Client Secret").
+			EchoMode(huh.EchoModePassword).
+			Placeholder("GOCSPX-...  (없으면 Enter)").
+			Value(&cfg.Google.ClientSecret),
+	)).Run(); err != nil {
+		return fmt.Errorf("google setup cancelled: %w", err)
+	}
+
+	// Redirect URI는 Gateway URL에서 자동 생성 (입력값 없을 때)
+	if cfg.Google.ClientID != "" && cfg.Google.RedirectURI == "" {
+		cfg.Google.RedirectURI = cfg.Gateway.URL + "/auth/google/callback"
+	}
+
+	if cfg.Google.ClientID != "" {
+		PrintOK("Google OAuth", "자격증명 설정 완료 (redirect URI: "+cfg.Google.RedirectURI+")")
+	} else {
+		PrintWarn("Google OAuth", "건너뜀 — 나중에 'starnion config google'로 설정 가능")
+	}
+
+	// ════════════════════════════════════════════════════════════════════════════
+	// [7/7] EMBEDDING ENGINE (선택)
+	// ════════════════════════════════════════════════════════════════════════════
+	PrintSectionHeader(7, 7, "EMBEDDING ENGINE (선택)")
+	PrintInfo("검색 기록·문서 벡터 저장에 사용되는 서버 공용 임베딩 엔진입니다.")
+	PrintInfo("⚠  모든 사용자가 동일한 모델을 공유합니다. 설정 후 변경 시 DB 재색인 필요.")
+	PrintInfo("건너뛰려면 Enter. 나중에 설정: starnion config embedding")
+	fmt.Println()
+
+	var embeddingProvider string
+	if err := huh.NewForm(huh.NewGroup(
+		huh.NewSelect[string]().
+			Title("임베딩 프로바이더").
+			Description("OpenAI 권장 (이미 OpenAI 키가 있다면 추가 비용 거의 없음)").
+			Options(
+				huh.NewOption("OpenAI — text-embedding-3-small (권장, $0.02/1M tokens)", "openai"),
+				huh.NewOption("Gemini — gemini-embedding-001 (무료 1,500 req/일)", "gemini"),
+				huh.NewOption("건너뜀", "skip"),
+			).
+			Value(&embeddingProvider),
+	)).Run(); err != nil {
+		return fmt.Errorf("embedding setup cancelled: %w", err)
+	}
+
+	if embeddingProvider != "skip" && embeddingProvider != "" {
+		var embeddingAPIKey string
+		keyPlaceholder := map[string]string{
+			"openai": "sk-...",
+			"gemini": "AIzaSy...",
+		}[embeddingProvider]
+
+		if err := huh.NewForm(huh.NewGroup(
+			huh.NewInput().
+				Title("API Key").
+				EchoMode(huh.EchoModePassword).
+				Placeholder(keyPlaceholder).
+				Value(&embeddingAPIKey),
+		)).Run(); err != nil {
+			return fmt.Errorf("embedding api key cancelled: %w", err)
+		}
+
+		if embeddingAPIKey != "" {
+			cfg.Embedding.Provider = embeddingProvider
+			cfg.Embedding.APIKey = embeddingAPIKey
+			if embeddingProvider == "openai" {
+				cfg.Embedding.Model = "text-embedding-3-small"
+			} else {
+				cfg.Embedding.Model = "gemini-embedding-001"
+			}
+			cfg.Embedding.Dimensions = 768
+			PrintOK("Embedding", embeddingProvider+" / "+cfg.Embedding.Model+" (768 dims)")
+		} else {
+			PrintWarn("Embedding", "API Key 없음 — 건너뜁니다")
+		}
+	} else {
+		PrintWarn("Embedding", "건너뜀 — 검색 기록 벡터 저장이 비활성화됩니다")
 	}
 
 	// ── Auto-generate secrets ─────────────────────────────────────────────────
@@ -270,10 +362,228 @@ func RunSetup(projectRoot string) error {
 		"Settings → Channels → 사용할 채널(Telegram 등)의 봇 토큰 입력 후 활성화")
 	step("6", "계정 연결 (선택)",
 		"텔레그램에서 /link 명령을 보내면 웹 계정과 텔레그램 계정이 연결됩니다")
+	step("7", "Google 연동 (선택)",
+		"starnion config google → Google Cloud Console OAuth 앱의 Client ID / Secret 입력")
+	step("8", "임베딩 엔진 (선택)",
+		"starnion config embedding → OpenAI(권장) 또는 Gemini 중 선택 후 API Key 입력")
 
 	fmt.Println(sNebula.Render(strings.Repeat("─", tw)))
 	fmt.Printf("  %s  %s\n\n", sSuccess.Render("▶"), sBold.Render("starnion dev"))
 
+	return nil
+}
+
+// RunConfigGoogle runs an interactive wizard to set (or update) Google OAuth2
+// credentials in ~/.starnion/starnion.yaml.
+func RunConfigGoogle() error {
+	PrintBanner("1.0.0")
+	PrintSectionHeader(0, 0, "GOOGLE OAUTH 설정")
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		return fmt.Errorf("설정 파일 로드 실패: %w", err)
+	}
+
+	// Show current state
+	if cfg.Google.ClientID != "" {
+		PrintInfo("현재 Client ID: " + cfg.Google.ClientID[:min(len(cfg.Google.ClientID), 20)] + "...")
+		PrintInfo("현재 Redirect URI: " + cfg.Google.RedirectURI)
+	} else {
+		PrintWarn("Google OAuth", "현재 미설정 상태입니다.")
+	}
+	fmt.Println()
+	PrintInfo("Google Cloud Console → APIs & Services → 사용자 인증 정보 → OAuth 2.0 클라이언트 ID에서 발급받으세요.")
+	PrintInfo("승인된 리디렉션 URI에 아래 주소를 추가해야 합니다:")
+	PrintInfo("  " + cfg.Gateway.URL + "/auth/google/callback")
+	fmt.Println()
+
+	var clientID, clientSecret string
+
+	if err := huh.NewForm(huh.NewGroup(
+		huh.NewInput().
+			Title("Google Client ID").
+			Placeholder("123456789-xxx.apps.googleusercontent.com").
+			Value(&clientID),
+		huh.NewInput().
+			Title("Google Client Secret").
+			EchoMode(huh.EchoModePassword).
+			Placeholder("GOCSPX-...").
+			Value(&clientSecret),
+	)).Run(); err != nil {
+		return fmt.Errorf("cancelled: %w", err)
+	}
+
+	if clientID == "" && clientSecret == "" {
+		PrintInfo("변경 사항 없이 종료합니다.")
+		return nil
+	}
+
+	if clientID != "" {
+		cfg.Google.ClientID = clientID
+	}
+	if clientSecret != "" {
+		cfg.Google.ClientSecret = clientSecret
+	}
+	// Redirect URI는 Gateway URL 기반으로 자동 설정
+	cfg.Google.RedirectURI = cfg.Gateway.URL + "/auth/google/callback"
+
+	if err := SaveConfig(cfg); err != nil {
+		return fmt.Errorf("설정 저장 실패: %w", err)
+	}
+
+	fmt.Println()
+	PrintOK("Google OAuth", "설정이 저장되었습니다.")
+	PrintInfo("Redirect URI: " + cfg.Google.RedirectURI)
+	PrintWarn("재시작", "변경 사항을 적용하려면 starnion gateway를 재시작하세요.")
+	fmt.Println()
+	return nil
+}
+
+// RunConfigGemini runs an interactive wizard to set (or update) the default
+// Gemini model used for image generation, vision analysis, and audio processing.
+// API keys are registered per-user via the web UI (설정 → 연동 → Gemini).
+func RunConfigGemini() error {
+	PrintBanner("1.0.0")
+	PrintSectionHeader(0, 0, "GEMINI 모델 설정")
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		return fmt.Errorf("설정 파일 로드 실패: %w", err)
+	}
+
+	PrintInfo("현재 모델: " + cfg.Gemini.Model)
+	fmt.Println()
+	PrintInfo("Gemini API 키는 사용자별로 웹 UI에서 등록합니다.")
+	PrintInfo("(설정 → 연동 → Gemini)")
+	fmt.Println()
+
+	model := cfg.Gemini.Model
+	if model == "" {
+		model = "gemini-2.5-pro"
+	}
+
+	if err := huh.NewForm(huh.NewGroup(
+		huh.NewInput().
+			Title("모델 (기본값: gemini-2.5-pro)").
+			Placeholder("gemini-2.5-pro").
+			Value(&model),
+	)).Run(); err != nil {
+		return fmt.Errorf("cancelled: %w", err)
+	}
+
+	if model == cfg.Gemini.Model {
+		PrintInfo("변경 사항 없이 종료합니다.")
+		return nil
+	}
+
+	if model != "" {
+		cfg.Gemini.Model = model
+	}
+
+	if err := SaveConfig(cfg); err != nil {
+		return fmt.Errorf("설정 저장 실패: %w", err)
+	}
+
+	fmt.Println()
+	PrintOK("Gemini 모델", "설정이 저장되었습니다.")
+	PrintWarn("재시작", "변경 사항을 적용하려면 starnion agent를 재시작하세요.")
+	fmt.Println()
+	return nil
+}
+
+// RunConfigEmbedding runs an interactive wizard to set (or update) the embedding
+// engine configuration in ~/.starnion/starnion.yaml.
+func RunConfigEmbedding() error {
+	PrintBanner("1.0.0")
+	PrintSectionHeader(0, 0, "EMBEDDING ENGINE 설정")
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		return fmt.Errorf("설정 파일 로드 실패: %w", err)
+	}
+
+	// Show current state
+	if cfg.Embedding.APIKey != "" {
+		PrintOK("Embedding", fmt.Sprintf("현재: %s / %s (%d dims)",
+			cfg.Embedding.Provider, cfg.Embedding.Model, cfg.Embedding.Dimensions))
+	} else {
+		PrintWarn("Embedding", "현재 미설정 — 검색 기록 벡터 저장이 비활성화됩니다.")
+	}
+	fmt.Println()
+	PrintInfo("⚠  모든 사용자가 동일한 임베딩 모델을 공유합니다.")
+	PrintInfo("   설정 변경 시 기존 DB 벡터를 전부 재생성해야 합니다.")
+	fmt.Println()
+
+	var provider string
+	if err := huh.NewForm(huh.NewGroup(
+		huh.NewSelect[string]().
+			Title("임베딩 프로바이더").
+			Options(
+				huh.NewOption("OpenAI — text-embedding-3-small (권장)", "openai"),
+				huh.NewOption("Gemini — gemini-embedding-001 (무료 1,500 req/일)", "gemini"),
+			).
+			Value(&provider),
+	)).Run(); err != nil {
+		return fmt.Errorf("cancelled: %w", err)
+	}
+
+	keyPlaceholder := map[string]string{
+		"openai": "sk-...",
+		"gemini": "AIzaSy...",
+	}[provider]
+
+	var apiKey string
+	if err := huh.NewForm(huh.NewGroup(
+		huh.NewInput().
+			Title("API Key").
+			EchoMode(huh.EchoModePassword).
+			Placeholder(keyPlaceholder).
+			Value(&apiKey),
+	)).Run(); err != nil {
+		return fmt.Errorf("cancelled: %w", err)
+	}
+
+	if apiKey == "" {
+		PrintInfo("변경 사항 없이 종료합니다.")
+		return nil
+	}
+
+	// Warn if changing provider with existing data
+	if cfg.Embedding.APIKey != "" && cfg.Embedding.Provider != provider {
+		PrintWarn("경고", fmt.Sprintf(
+			"프로바이더를 %s → %s 로 변경하면 기존 벡터 데이터가 무효화됩니다.",
+			cfg.Embedding.Provider, provider,
+		))
+		var confirm bool
+		_ = huh.NewForm(huh.NewGroup(
+			huh.NewConfirm().
+				Title("계속하시겠습니까?").
+				Value(&confirm),
+		)).Run()
+		if !confirm {
+			PrintInfo("취소됩니다.")
+			return nil
+		}
+	}
+
+	cfg.Embedding.Provider = provider
+	cfg.Embedding.APIKey = apiKey
+	cfg.Embedding.Dimensions = 768
+	if provider == "openai" {
+		cfg.Embedding.Model = "text-embedding-3-small"
+	} else {
+		cfg.Embedding.Model = "gemini-embedding-001"
+	}
+
+	if err := SaveConfig(cfg); err != nil {
+		return fmt.Errorf("설정 저장 실패: %w", err)
+	}
+
+	fmt.Println()
+	PrintOK("Embedding", fmt.Sprintf("%s / %s (%d dims) 저장 완료",
+		cfg.Embedding.Provider, cfg.Embedding.Model, cfg.Embedding.Dimensions))
+	PrintWarn("재시작", "변경 사항을 적용하려면 starnion agent를 재시작하세요.")
+	fmt.Println()
 	return nil
 }
 

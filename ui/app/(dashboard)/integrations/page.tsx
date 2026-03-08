@@ -30,6 +30,8 @@ interface AllStatus {
   notion?: IntegrationStatus
   github?: IntegrationStatus
   tavily?: IntegrationStatus
+  naver_search?: IntegrationStatus
+  gemini?: IntegrationStatus
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -87,6 +89,30 @@ function IntegrationsPageInner() {
       keyPlaceholder: "tvly-xxxxxxxxxxxxxxxxxxxxxxxx",
       keyHint: t("tavily.keyHint"),
     },
+    {
+      id: "naver_search" as const,
+      name: "네이버 검색",
+      logo: "🟢",
+      color: "bg-green-50 dark:bg-green-950",
+      border: "border-green-200 dark:border-green-800",
+      description: t("naver_search.description"),
+      capabilities: [t("naver_search.cap1"), t("naver_search.cap2"), t("naver_search.cap3"), t("naver_search.cap4")],
+      authType: "naver" as const,
+      keyHint: t("naver_search.keyHint"),
+    },
+    {
+      id: "gemini" as const,
+      name: "Gemini",
+      logo: "✨",
+      color: "bg-violet-50 dark:bg-violet-950",
+      border: "border-violet-200 dark:border-violet-800",
+      description: t("gemini.description"),
+      capabilities: [t("gemini.cap1"), t("gemini.cap2"), t("gemini.cap3"), t("gemini.cap4")],
+      authType: "apikey" as const,
+      keyLabel: "Gemini API Key",
+      keyPlaceholder: "AIzaSy...",
+      keyHint: t("gemini.keyHint"),
+    },
   ], [t])
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<AllStatus>({})
@@ -95,9 +121,13 @@ function IntegrationsPageInner() {
 
   // API key dialog state
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [dialogProvider, setDialogProvider] = useState<"notion" | "github" | "tavily" | null>(null)
+  const [dialogProvider, setDialogProvider] = useState<"notion" | "github" | "tavily" | "naver_search" | "gemini" | null>(null)
   const [apiKeyInput, setApiKeyInput] = useState("")
   const [apiKeyError, setApiKeyError] = useState("")
+
+  // Naver Search — two-field dialog
+  const [naverClientId, setNaverClientId] = useState("")
+  const [naverClientSecret, setNaverClientSecret] = useState("")
 
   // Toast-like notification
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null)
@@ -155,15 +185,43 @@ function IntegrationsPageInner() {
     }
   }
 
-  const openApiKeyDialog = (provider: "notion" | "github" | "tavily") => {
+  const openApiKeyDialog = (provider: "notion" | "github" | "tavily" | "naver_search" | "gemini") => {
     setDialogProvider(provider)
     setApiKeyInput("")
     setApiKeyError("")
+    setNaverClientId("")
+    setNaverClientSecret("")
     setDialogOpen(true)
   }
 
   const submitApiKey = async () => {
     if (!dialogProvider) return
+
+    // Naver Search uses two separate fields
+    if (dialogProvider === "naver_search") {
+      if (!naverClientId.trim() || !naverClientSecret.trim()) {
+        setApiKeyError(t("apiKeyRequired")); return
+      }
+      setBusy("naver_search")
+      setDialogOpen(false)
+      try {
+        const res = await fetch("/api/integrations/naver_search", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ client_id: naverClientId.trim(), client_secret: naverClientSecret.trim() }),
+        })
+        if (res.ok) {
+          setStatus((s) => ({ ...s, naver_search: { connected: true } }))
+          showToast(t("providerConnected", { name: "네이버 검색" }))
+        } else {
+          showToast(t("saveFailed"), "error")
+        }
+      } finally {
+        setBusy(null)
+      }
+      return
+    }
+
     if (!apiKeyInput.trim()) { setApiKeyError(t("apiKeyRequired")); return }
     setBusy(dialogProvider)
     setDialogOpen(false)
@@ -175,7 +233,7 @@ function IntegrationsPageInner() {
       })
       if (res.ok) {
         setStatus((s) => ({ ...s, [dialogProvider]: { connected: true } }))
-        const name = dialogProvider === "notion" ? "Notion" : dialogProvider === "github" ? "GitHub" : "Tavily"
+        const name = dialogProvider === "notion" ? "Notion" : dialogProvider === "github" ? "GitHub" : dialogProvider === "gemini" ? "Gemini" : "Tavily"
         showToast(t("providerConnected", { name }))
       } else {
         showToast(t("saveFailed"), "error")
@@ -185,14 +243,16 @@ function IntegrationsPageInner() {
     }
   }
 
-  const disconnect = async (provider: "notion" | "github" | "tavily") => {
+  const disconnect = async (provider: "notion" | "github" | "tavily" | "naver_search" | "gemini") => {
     setBusy(provider)
     try {
       const res = await fetch(`/api/integrations/${provider}`, { method: "DELETE" })
       if (res.ok) {
         setStatus((s) => ({ ...s, [provider]: { connected: false } }))
-        const name = provider === "notion" ? "Notion" : provider === "github" ? "GitHub" : "Tavily"
-        showToast(t("providerUnlinked", { name }))
+        const nameMap: Record<string, string> = {
+          notion: "Notion", github: "GitHub", tavily: "Tavily", naver_search: "네이버 검색", gemini: "Gemini"
+        }
+        showToast(t("providerUnlinked", { name: nameMap[provider] }))
       } else {
         showToast(t("disconnectFailed"), "error")
       }
@@ -284,7 +344,7 @@ function IntegrationsPageInner() {
                         onClick={() =>
                           integration.id === "google"
                             ? disconnectGoogle()
-                            : disconnect(integration.id as "notion" | "github" | "tavily")
+                            : disconnect(integration.id as "notion" | "github" | "tavily" | "naver_search" | "gemini")
                         }
                       >
                         {isBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Unlink className="size-3.5" />}
@@ -298,7 +358,7 @@ function IntegrationsPageInner() {
                         onClick={() =>
                           integration.id === "google"
                             ? connectGoogle()
-                            : openApiKeyDialog(integration.id as "notion" | "github" | "tavily")
+                            : openApiKeyDialog(integration.id as "notion" | "github" | "tavily" | "naver_search" | "gemini")
                         }
                       >
                         {isBusy ? (
@@ -327,18 +387,45 @@ function IntegrationsPageInner() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="apikey">{dialogIntegration?.keyLabel}</Label>
-              <Input
-                id="apikey"
-                type="password"
-                placeholder={dialogIntegration?.keyPlaceholder}
-                value={apiKeyInput}
-                onChange={(e) => { setApiKeyInput(e.target.value); setApiKeyError("") }}
-                onKeyDown={(e) => { if (e.key === "Enter") submitApiKey() }}
-              />
-              {apiKeyError && <p className="text-xs text-destructive">{apiKeyError}</p>}
-            </div>
+            {dialogProvider === "naver_search" ? (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="naver-client-id">{t("naver_search.clientIdLabel")}</Label>
+                  <Input
+                    id="naver-client-id"
+                    type="text"
+                    placeholder="XXXXXXXXXXXXXXXXXXXXXXXX"
+                    value={naverClientId}
+                    onChange={(e) => { setNaverClientId(e.target.value); setApiKeyError("") }}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="naver-client-secret">{t("naver_search.clientSecretLabel")}</Label>
+                  <Input
+                    id="naver-client-secret"
+                    type="password"
+                    placeholder="XXXXXXXXXX"
+                    value={naverClientSecret}
+                    onChange={(e) => { setNaverClientSecret(e.target.value); setApiKeyError("") }}
+                    onKeyDown={(e) => { if (e.key === "Enter") submitApiKey() }}
+                  />
+                </div>
+                {apiKeyError && <p className="text-xs text-destructive">{apiKeyError}</p>}
+              </>
+            ) : (
+              <div className="space-y-1.5">
+                <Label htmlFor="apikey">{dialogIntegration?.keyLabel}</Label>
+                <Input
+                  id="apikey"
+                  type="password"
+                  placeholder={dialogIntegration?.keyPlaceholder}
+                  value={apiKeyInput}
+                  onChange={(e) => { setApiKeyInput(e.target.value); setApiKeyError("") }}
+                  onKeyDown={(e) => { if (e.key === "Enter") submitApiKey() }}
+                />
+                {apiKeyError && <p className="text-xs text-destructive">{apiKeyError}</p>}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>{t("cancel")}</Button>

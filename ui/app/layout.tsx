@@ -5,13 +5,15 @@ import { SessionProvider } from 'next-auth/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale, getMessages } from 'next-intl/server'
 import { ThemeProvider } from '@/components/theme-provider'
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import { AppSidebar } from '@/components/app-sidebar'
 import './globals.css'
 
 const pretendard = localFont({
   src: '../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2',
   display: 'swap',
   weight: '45 920',
-  variable: '--font-sans',
+  variable: '--font-pretendard',
 });
 
 export const metadata: Metadata = {
@@ -38,7 +40,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#6d28d9',
+  themeColor: '#3b6de0',
   width: 'device-width',
   initialScale: 1,
 }
@@ -53,11 +55,24 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning>
-      <body className={`${pretendard.variable} font-sans antialiased`}>
+      <body className={`${pretendard.variable} font-pretendard antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <NextIntlClientProvider locale={locale} messages={messages}>
             <SessionProvider>
-              {children}
+              <SidebarProvider
+                className="h-screen overflow-hidden"
+                style={
+                  {
+                    "--sidebar-width": "calc(var(--spacing) * 64)",
+                    "--header-height": "calc(var(--spacing) * 14)",
+                  } as React.CSSProperties
+                }
+              >
+                <AppSidebar variant="inset" />
+                <SidebarInset className="flex flex-col overflow-hidden">
+                  {children}
+                </SidebarInset>
+              </SidebarProvider>
             </SessionProvider>
           </NextIntlClientProvider>
         </ThemeProvider>

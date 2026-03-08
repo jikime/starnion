@@ -126,7 +126,7 @@ export default function SearchPage() {
 
   const [history, setHistory] = useState<SavedSearch[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
-  const [showHistory, setShowHistory] = useState(false)
+  const [showHistory, setShowHistory] = useState(true)
 
   const abortRef = useRef<AbortController | null>(null)
 
@@ -227,7 +227,6 @@ export default function SearchPage() {
     setError("")
     setSaved(true)
     setStatus("done")
-    setShowHistory(false)
   }
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────

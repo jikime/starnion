@@ -112,11 +112,12 @@ async def _persist_search(user_id: str, query: str, result: str) -> None:
     """Insert search result into searches and generate its embedding.
 
     Runs as a fire-and-forget background task so it does not block the tool response.
+    Embedding is skipped gracefully when Gemini API key is not configured.
     """
     print(f"[persist_search] START user={user_id!r} query={query!r}", flush=True)
     try:
         from starnion_agent.db.repositories import user_search_db
-        from starnion_agent.embedding.service import embed_text
+        from starnion_agent.embedding.service import EmbeddingUnavailableError, embed_text
 
         pool = get_pool()
         # 1. Insert the search row.
@@ -139,11 +140,19 @@ async def _persist_search(user_id: str, query: str, result: str) -> None:
         print(f"[persist_search] INSERT ok search_id={search_id} user={user_id}", flush=True)
 
         # 2. Embed query + first 500 chars of result and store vector.
-        text_to_embed = f"{query}\n{result[:500]}"
-        embedding = await embed_text(text_to_embed)
-        await user_search_db.update_embedding(pool, user_id, search_id, embedding)
+        try:
+            text_to_embed = f"{query}\n{result[:500]}"
+            embedding = await embed_text(text_to_embed)
+            await user_search_db.update_embedding(pool, user_id, search_id, embedding)
+            logger.info("persist_search: saved search_id=%d with embedding for user=%s", search_id, user_id)
+        except EmbeddingUnavailableError:
+            # Gemini API key not configured — search is saved but without vector.
+            logger.info(
+                "persist_search: search_id=%d saved without embedding (Gemini key not set). "
+                "Run: starnion config gemini",
+                search_id,
+            )
 
-        logger.info("persist_search: saved search_id=%d for user=%s", search_id, user_id)
         print(f"[persist_search] DONE search_id={search_id} user={user_id}", flush=True)
 
     except Exception as exc:
@@ -211,7 +220,7 @@ async def web_fetch(url: str, max_length: int = 8000) -> str:
         async with httpx.AsyncClient(
             timeout=30,
             follow_redirects=True,
-            headers={"User-Agent": "JikiBot/1.0"},
+            headers={"User-Agent": "NionBot/1.0"},
         ) as client:
             response = await client.get(url)
             response.raise_for_status()

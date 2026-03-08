@@ -1,4 +1,4 @@
-import { auth } from "@/auth"
+import { auth } from "@/lib/auth"
 import { SignJWT } from "jose"
 import { NextResponse } from "next/server"
 

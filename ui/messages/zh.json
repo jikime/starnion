@@ -696,7 +696,7 @@
   },
   "integrations": {
     "title": "集成",
-    "subtitle": "连接外部服务，让 Jiki 代您处理任务。",
+    "subtitle": "连接外部服务，让 Nion 代您处理任务。",
     "connected": "已连接",
     "disconnected": "未连接",
     "disconnect": "断开",
@@ -714,7 +714,7 @@
     "providerUnlinked": "{name} 已断开连接。",
     "dialogTitle": "{name} 集成",
     "google": {
-      "description": "直接从 Jiki 控制 Calendar、Gmail、Drive、Docs 和 Tasks。",
+      "description": "直接从 Nion 控制 Calendar、Gmail、Drive、Docs 和 Tasks。",
       "cap1": "Google Calendar 查看/创建",
       "cap2": "Gmail 阅读/发送",
       "cap3": "Google Drive 文件上传",
@@ -729,7 +729,7 @@
       "keyHint": "在 Notion 设置 → 集成 → 新建 API 集成中创建。"
     },
     "github": {
-      "description": "从 Jiki 查看和管理仓库、Issue 和 PR。",
+      "description": "从 Nion 查看和管理仓库、Issue 和 PR。",
       "cap1": "查看仓库",
       "cap2": "读取/创建 Issue",
       "cap3": "查看 PR",
@@ -737,12 +737,30 @@
       "keyHint": "在 GitHub 设置 → Developer settings → Personal access tokens 中创建。"
     },
     "tavily": {
-      "description": "将实时网络搜索连接到 Jiki，获取最新新闻、事实核查和实时数据。",
+      "description": "将实时网络搜索连接到 Nion，获取最新新闻、事实核查和实时数据。",
       "cap1": "实时网络搜索",
       "cap2": "最新新闻",
       "cap3": "事实核查",
       "cap4": "网页内容提取",
       "keyHint": "在 app.tavily.com 获取 API 密钥。"
+    },
+    "naver_search": {
+      "description": "连接Naver搜索API，支持博客、新闻、知识iN、购物、图片等多种搜索。",
+      "cap1": "博客·新闻·咖啡厅搜索",
+      "cap2": "知识iN·百科全书搜索",
+      "cap3": "图片·购物搜索",
+      "cap4": "地区·网页·专业资料搜索",
+      "keyHint": "请在developers.naver.com注册应用程序，获取Client ID和Client Secret。",
+      "clientIdLabel": "Client ID",
+      "clientSecretLabel": "Client Secret"
+    },
+    "gemini": {
+      "description": "使用 Gemini API 处理图像、视频、音频，并支持文本摘要、翻译和报告生成。",
+      "cap1": "图像生成·编辑·分析 / 视频分析",
+      "cap2": "语音识别 (STT) / 文字转语音 (TTS)",
+      "cap3": "文本摘要与翻译",
+      "cap4": "报告·目标·模式·对话分析（后台）",
+      "keyHint": "从 Google AI Studio (aistudio.google.com/apikey) 获取 API 密钥。"
     }
   },
   "dashboard": {
@@ -791,7 +809,7 @@
   },
   "channels": {
     "title": "频道",
-    "subtitle": "连接外部消息频道，随时随地与Jiki对话。",
+    "subtitle": "连接外部消息频道，随时随地与Nion对话。",
     "loading": "加载中...",
     "statusRunning": "运行中",
     "statusConfigured": "已配置",

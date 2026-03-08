@@ -23,8 +23,37 @@ type StarNionConfig struct {
 	Gateway  GatewayConfig  `yaml:"gateway"`
 	UI       UIConfig       `yaml:"ui"`
 	Auth     AuthConfig     `yaml:"auth"`
-	Log      LogConfig      `yaml:"log"`
+	Google    GoogleConfig    `yaml:"google"`
+	Gemini    GeminiConfig    `yaml:"gemini"`
+	Embedding EmbeddingConfig `yaml:"embedding"`
+	Log       LogConfig       `yaml:"log"`
 	CORS     CORSConfig     `yaml:"cors"`
+}
+
+// GeminiConfig holds the server-level Gemini model configuration.
+// API keys are stored per-user in integration_keys (provider='gemini').
+// Set the model via: starnion config gemini
+type GeminiConfig struct {
+	Model string `yaml:"model"` // e.g. "gemini-2.5-pro"
+}
+
+// GoogleConfig holds server-level Google OAuth2 credentials.
+// These are registered once in Google Cloud Console and shared by all users.
+// Per-user tokens (access_token, refresh_token) are stored in the google_tokens DB table.
+type GoogleConfig struct {
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
+	RedirectURI  string `yaml:"redirect_uri"`
+}
+
+// EmbeddingConfig holds the server-level embedding configuration.
+// All user data (searches, documents, memories) is embedded with this single model.
+// WARNING: Changing the provider/model after initial setup requires re-indexing all DB vectors.
+type EmbeddingConfig struct {
+	Provider   string `yaml:"provider"`    // "openai" | "gemini"
+	APIKey     string `yaml:"api_key"`
+	Model      string `yaml:"model"`       // e.g. "text-embedding-3-small" or "gemini-embedding-001"
+	Dimensions int    `yaml:"dimensions"`  // must match pgvector column (768)
 }
 
 type DatabaseConfig struct {
@@ -123,6 +152,11 @@ func DefaultConfig() StarNionConfig {
 			AgentHost: "localhost",
 		},
 		UI: UIConfig{Port: 3000},
+		Embedding: EmbeddingConfig{
+			Provider:   "openai",
+			Model:      "text-embedding-3-small",
+			Dimensions: 768,
+		},
 		Log: LogConfig{
 			Level:  "info",
 			Format: "console",
@@ -253,6 +287,17 @@ GRPC_PORT=%d
 # UI
 UI_PORT=%d
 NEXTAUTH_URL=http://localhost:%d
+
+# Google OAuth2 (optional — leave empty to disable Google integration)
+GOOGLE_CLIENT_ID=%s
+GOOGLE_CLIENT_SECRET=%s
+GOOGLE_REDIRECT_URI=%s
+
+# Embedding (server-wide — all vectors must use the same model)
+EMBEDDING_PROVIDER=%s
+EMBEDDING_API_KEY=%s
+EMBEDDING_MODEL=%s
+EMBEDDING_DIMENSIONS=%d
 `,
 		db.Password,
 		cfg.MinIO.SecretKey,
@@ -269,6 +314,13 @@ NEXTAUTH_URL=http://localhost:%d
 		gw.GRPCPort,
 		cfg.UI.Port,
 		cfg.UI.Port,
+		cfg.Google.ClientID,
+		cfg.Google.ClientSecret,
+		cfg.Google.RedirectURI,
+		cfg.Embedding.Provider,
+		cfg.Embedding.APIKey,
+		cfg.Embedding.Model,
+		cfg.Embedding.Dimensions,
 	)
 
 	path := filepath.Join(dockerDir, ".env")

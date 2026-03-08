@@ -50,7 +50,7 @@ export function DashboardStats() {
                 <TrendingUp className="size-3 text-destructive" />
               )}
               {stat.trend === "down" && (
-                <TrendingDown className="size-3 text-success" />
+                <TrendingDown className="size-3 text-emerald-500" />
               )}
               {stat.description}
             </p>

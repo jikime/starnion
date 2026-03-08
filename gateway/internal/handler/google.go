@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -16,14 +15,23 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// GoogleOAuthConfig holds the server-level Google OAuth2 credentials.
+// These are set once by the administrator and shared by all users.
+type GoogleOAuthConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURI  string
+}
+
 // GoogleCallbackHandler handles the OAuth2 callback from Google.
 type GoogleCallbackHandler struct {
-	db *sql.DB
+	db         *sql.DB
+	googleCfg  GoogleOAuthConfig
 }
 
 // NewGoogleCallbackHandler creates a new Google OAuth callback handler.
-func NewGoogleCallbackHandler(db *sql.DB) *GoogleCallbackHandler {
-	return &GoogleCallbackHandler{db: db}
+func NewGoogleCallbackHandler(db *sql.DB, cfg GoogleOAuthConfig) *GoogleCallbackHandler {
+	return &GoogleCallbackHandler{db: db, googleCfg: cfg}
 }
 
 // tokenResponse represents the Google OAuth2 token exchange response.
@@ -63,13 +71,15 @@ func (h *GoogleCallbackHandler) Callback(c echo.Context) error {
 	}
 
 	// Exchange code for tokens.
-	clientID := os.Getenv("GOOGLE_CLIENT_ID")
-	clientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
-	redirectURI := os.Getenv("GOOGLE_REDIRECT_URI")
+	clientID := h.googleCfg.ClientID
+	clientSecret := h.googleCfg.ClientSecret
+	redirectURI := h.googleCfg.RedirectURI
 
 	if clientID == "" || clientSecret == "" {
 		log.Error().Msg("Google OAuth credentials not configured")
-		return c.HTML(http.StatusInternalServerError, "<h2>서버 설정 오류</h2>")
+		return c.HTML(http.StatusInternalServerError,
+			"<h2>서버 설정 오류</h2><p>관리자에게 Google OAuth 설정을 요청하세요.<br>"+
+				"<code>starnion config google</code></p>")
 	}
 
 	tokenReq := fmt.Sprintf(
@@ -146,12 +156,12 @@ func (h *GoogleCallbackHandler) TelegramOAuthStart(c echo.Context) error {
 		return c.HTML(http.StatusBadRequest, "<h2>uid 파라미터가 필요해요.</h2>")
 	}
 
-	clientID := os.Getenv("GOOGLE_CLIENT_ID")
-	clientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
-	redirectURI := os.Getenv("GOOGLE_REDIRECT_URI")
+	clientID := h.googleCfg.ClientID
+	redirectURI := h.googleCfg.RedirectURI
 
-	if clientID == "" || clientSecret == "" {
-		return c.HTML(http.StatusInternalServerError, "<h2>구글 설정이 올바르지 않아요.</h2>")
+	if clientID == "" {
+		return c.HTML(http.StatusInternalServerError,
+			"<h2>구글 설정이 올바르지 않아요.</h2><p>관리자에게 문의하세요.</p>")
 	}
 
 	scopes := []string{

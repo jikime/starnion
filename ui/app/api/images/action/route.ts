@@ -9,7 +9,7 @@
  *   message  : string  (prompt or query)
  *   file     : File?   (for edit/analyze)
  */
-import { auth } from "@/auth"
+import { auth } from "@/lib/auth"
 import { NextRequest, NextResponse } from "next/server"
 
 import { gatewayFetch } from "@/lib/gateway"

@@ -16,6 +16,7 @@ from starnion_agent.document.generator import (
     generate_pptx,
     generate_txt,
     generate_xlsx,
+    parse_xlsx_content,
 )
 from starnion_agent.document.parser import extract_text, fetch_file
 from starnion_agent.skills.file_context import add_pending_file
@@ -125,13 +126,7 @@ async def generate_document(
         elif fmt == "pptx":
             data = generate_pptx(title, content)
         elif fmt == "xlsx":
-            # Parse simple table: first line = headers, rest = rows.
-            lines = [line for line in content.strip().split("\n") if line.strip()]
-            if lines:
-                headers = [h.strip() for h in lines[0].split(",")]
-                rows = [[c.strip() for c in line.split(",")] for line in lines[1:]]
-            else:
-                headers, rows = ["내용"], [[content]]
+            headers, rows = parse_xlsx_content(content)
             data = generate_xlsx(headers, rows)
         elif fmt == "md":
             data = generate_md(title, content)

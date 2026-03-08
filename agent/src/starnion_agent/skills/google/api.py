@@ -31,8 +31,8 @@ async def get_google_service(
         token=token["access_token"],
         refresh_token=token["refresh_token"],
         token_uri=token.get("token_uri", "https://oauth2.googleapis.com/token"),
-        client_id=settings.google_client_id,
-        client_secret=settings.google_client_secret,
+        client_id=settings.google.client_id,
+        client_secret=settings.google.client_secret,
     )
 
     return build(service_name, version, credentials=creds)

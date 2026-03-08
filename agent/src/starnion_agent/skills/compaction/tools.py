@@ -15,6 +15,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from starnion_agent.config import settings
 from starnion_agent.db.pool import get_pool
+from starnion_agent.skills.gemini_key import get_gemini_api_key
 from starnion_agent.db.repositories import daily_log as daily_log_repo
 from starnion_agent.db.repositories import knowledge as knowledge_repo
 from starnion_agent.embedding.service import embed_text
@@ -62,9 +63,13 @@ async def compact_memory(user_id: str) -> str:
         return "주별 그룹이 없습니다."
 
     # 3. Summarize each week and collect results.
+    api_key = await get_gemini_api_key(user_id)
+    if not api_key:
+        return "Gemini API 키가 설정되지 않아 메모리 압축을 건너뜁니다."
+
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
+        google_api_key=api_key,
     )
 
     summaries: list[tuple[str, str, list[int]]] = []  # (key, summary_json, log_ids)

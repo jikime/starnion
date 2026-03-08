@@ -20,7 +20,7 @@ from starnion_agent.db.repositories import skill as skill_repo
 from starnion_agent.db.repositories import provider as provider_repo
 from starnion_agent.db.repositories import usage as usage_repo
 from starnion_agent.pricing import calculate_cost, get_provider
-from starnion_agent.persona import DEFAULT_PERSONA, build_system_prompt
+from starnion_agent.persona import DEFAULT_PERSONA, _NAME_TO_ID, build_system_prompt, get_persona
 from starnion_agent.skills.audio.tools import generate_audio, transcribe_audio
 from starnion_agent.skills.budget.tools import get_budget_status, set_budget
 from starnion_agent.skills.diary.tools import save_daily_log, save_diary_entry
@@ -38,6 +38,7 @@ from starnion_agent.skills.google.tools import (
     google_auth,
     google_calendar_create,
     google_calendar_list,
+    google_calendar_delete,
     google_disconnect,
     google_docs_create,
     google_docs_read,
@@ -47,6 +48,8 @@ from starnion_agent.skills.google.tools import (
     google_mail_send,
     google_tasks_create,
     google_tasks_list,
+    google_tasks_complete,
+    google_tasks_delete,
 )
 from starnion_agent.skills.registry import SKILLS
 from starnion_agent.skills.schedule.tools import (
@@ -84,6 +87,24 @@ from starnion_agent.skills.notion.tools import (
     notion_search,
 )
 from starnion_agent.skills.websearch.tools import web_fetch, web_search
+from starnion_agent.skills.naver_search.tools import naver_search
+from starnion_agent.skills.browser.tools import (
+    browser_open_screenshot,
+    browser_navigate,
+    browser_snapshot,
+    browser_screenshot,
+    browser_click,
+    browser_type,
+    browser_press,
+    browser_select,
+    browser_scroll,
+    browser_evaluate,
+    browser_wait_for,
+    browser_wait_ms,
+    browser_get_text,
+    browser_current_url,
+    browser_close,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -119,10 +140,13 @@ ALL_TOOLS = [
     google_disconnect,
     google_calendar_create,
     google_calendar_list,
+    google_calendar_delete,
     google_docs_create,
     google_docs_read,
     google_tasks_create,
     google_tasks_list,
+    google_tasks_complete,
+    google_tasks_delete,
     google_drive_upload,
     google_drive_list,
     google_mail_send,
@@ -161,6 +185,23 @@ ALL_TOOLS = [
     convert_color,
     get_horoscope,
     lookup_ip,
+    naver_search,
+    # browser
+    browser_open_screenshot,
+    browser_navigate,
+    browser_snapshot,
+    browser_screenshot,
+    browser_click,
+    browser_type,
+    browser_press,
+    browser_select,
+    browser_scroll,
+    browser_evaluate,
+    browser_wait_for,
+    browser_wait_ms,
+    browser_get_text,
+    browser_current_url,
+    browser_close,
 ]
 
 # LLM instance cache: (provider, model, key_hash) → LLM object.
@@ -250,6 +291,15 @@ async def _get_enabled_context(
         persona_name = persona_row.get("persona_name", "")
         custom_system_prompt = persona_row.get("system_prompt") or None
 
+        # Map DB Korean display name → PERSONAS key (e.g. "친한 친구" → "buddy").
+        # For built-in personas, use the Python-controlled tone from PERSONAS dict
+        # so that tone strength is always under our control (not old DB text).
+        resolved_id = _NAME_TO_ID.get(persona_name, "")
+        if resolved_id:
+            persona_id = resolved_id
+            custom_system_prompt = None  # Use Python built-in tone (always up-to-date)
+        # else: truly custom persona → keep custom_system_prompt from DB
+
         if prov and model and api_key:
             llm_override = _make_llm(prov, model, api_key, base_url)
             logger.info(
@@ -294,7 +344,7 @@ def _build_prompt(
     if catalog_text:
         prompt_text += "\n\n" + catalog_text
 
-    # OpenClaw: tell LLM which tools are available.
+    # Tell LLM which tools are available.
     if enabled_tool_names:
         prompt_text += f"\n\n## 사용 가능한 도구\n{', '.join(enabled_tool_names)}"
         prompt_text += "\n위 목록에 없는 도구는 절대 호출하지 마세요."
@@ -302,6 +352,14 @@ def _build_prompt(
     # Level 2: Full instructions (tool usage guidelines).
     if instructions_text:
         prompt_text += "\n\n" + instructions_text
+
+    # Repeat persona tone at the END for recency effect —
+    # long tool instructions can cause the LLM to "forget" early style rules.
+    p = get_persona(persona_id)
+    prompt_text += (
+        f"\n\n[최종 확인 — 페르소나 '{p['name']}']\n"
+        f"{p['tone'].split(chr(10))[0]}"  # first line (the most critical rule)
+    )
 
     return prompt_text
 
@@ -360,10 +418,8 @@ async def _agent_node(state: MessagesState) -> dict:
     # Dynamic tool binding: LLM only sees enabled tools.
     if enabled_tool_names:
         enabled_tools = [t for t in ALL_TOOLS if t.name in set(enabled_tool_names)]
-        logger.info("[Tools] user=%s | enabled=%s", user_id, enabled_tool_names)
     else:
         enabled_tools = ALL_TOOLS
-        logger.info("[Tools] user=%s | no skill context, binding ALL_TOOLS", user_id)
 
     bound_model = active_llm.bind_tools(enabled_tools)
 

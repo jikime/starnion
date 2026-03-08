@@ -18,6 +18,12 @@ from starnion_agent.db.pool import get_pool
 from starnion_agent.db.repositories import knowledge as knowledge_repo
 from starnion_agent.skills.guard import skill_guard
 
+# on_conflict values accepted by create_schedule
+ON_CONFLICT_ASK = "ask"        # default — detect & return conflict info
+ON_CONFLICT_ADD = "add"        # proceed and add anyway
+ON_CONFLICT_REPLACE = "replace"  # cancel conflicting schedule(s) then add
+ON_CONFLICT_CANCEL = "cancel"  # do nothing
+
 logger = logging.getLogger(__name__)
 
 SCHEDULE_KEY_PREFIX = "schedule:"
@@ -93,6 +99,16 @@ class CreateScheduleInput(BaseModel):
         default="",
         description="커스텀 알림 메시지 (custom_reminder 전용)",
     )
+    on_conflict: str = Field(
+        default=ON_CONFLICT_ASK,
+        description=(
+            "중복 일정 발견 시 처리 방법. "
+            "'ask'(기본값): 중복 안내 후 사용자 선택 요청, "
+            "'add': 중복 무시하고 그냥 추가, "
+            "'replace': 기존 중복 일정 취소 후 새 일정 등록, "
+            "'cancel': 등록 취소"
+        ),
+    )
 
 
 class ListSchedulesInput(BaseModel):
@@ -123,6 +139,7 @@ async def create_schedule(
     day_of_week: str = "",
     date: str = "",
     message: str = "",
+    on_conflict: str = ON_CONFLICT_ASK,
 ) -> str:
     """알림 스케줄을 생성합니다. 1회 또는 반복 알림을 예약할 수 있습니다."""
     user_id = get_current_user()
@@ -160,20 +177,67 @@ async def create_schedule(
     if report_type == "custom_reminder" and not message:
         return "커스텀 알림은 메시지가 필요해요."
 
-    pool = get_pool()
+    # on_conflict='cancel' → 사용자가 등록 안 하기로 선택
+    if on_conflict == ON_CONFLICT_CANCEL:
+        return "일정 등록을 취소했어요."
 
+    pool = get_pool()
     existing = await knowledge_repo.get_by_key_prefix(pool, user_id, SCHEDULE_KEY_PREFIX)
-    active_count = sum(
-        1
+    active_entries = [
+        (e, _parse_json(e["value"]))
         for e in existing
         if _parse_json(e["value"]).get("status") == "active"
-    )
+    ]
+
+    active_count = len(active_entries)
     if active_count >= MAX_ACTIVE_SCHEDULES:
         return (
             f"활성 스케줄은 최대 {MAX_ACTIVE_SCHEDULES}개까지 설정할 수 있어요. "
             "기존 스케줄을 취소한 후 다시 시도해 주세요."
         )
 
+    # ── 중복 감지 ──────────────────────────────────────────────────────────
+    conflicts = _find_conflicts(
+        active_entries, schedule_type, hour, minute, day_of_week, date
+    )
+
+    if conflicts and on_conflict == ON_CONFLICT_ASK:
+        # 중복 정보를 LLM에 전달 → LLM이 사용자에게 안내 후 선택 요청
+        conflict_lines = ["[CONFLICT_DETECTED]"]
+        for _, data in conflicts:
+            sched = data.get("schedule", {})
+            t_str = f"{sched.get('hour', 0):02d}:{sched.get('minute', 0):02d}"
+            c_type = data.get("type", "")
+            if c_type == "recurring":
+                dow = sched.get("day_of_week", "")
+                when = f"매주 {DAY_NAMES_KO.get(dow, dow)} {t_str}" if dow else f"매일 {t_str}"
+            else:
+                when = f"{sched.get('date', '')} {t_str}"
+            type_ko = REPORT_TYPE_NAMES_KO.get(data.get("report_type", ""), data.get("report_type", ""))
+            conflict_lines.append(f"- '{data.get('title', '')}' ({type_ko}, {when})")
+        conflict_lines.append(
+            "\n사용자에게 위 중복 일정을 안내하고 다음 중 선택하도록 물어보세요:\n"
+            "1) 그냥 추가 (on_conflict='add')\n"
+            "2) 기존 일정 취소 후 새 일정 등록 (on_conflict='replace')\n"
+            "3) 등록 취소 (on_conflict='cancel')"
+        )
+        return "\n".join(conflict_lines)
+
+    if conflicts and on_conflict == ON_CONFLICT_REPLACE:
+        # 충돌하는 기존 일정을 모두 취소
+        for entry, data in conflicts:
+            data["status"] = "cancelled"
+            key = entry["key"]
+            await knowledge_repo.delete_by_key(pool, user_id, key)
+            await knowledge_repo.upsert(
+                pool,
+                user_id=user_id,
+                key=key,
+                value=json.dumps(data, ensure_ascii=False),
+                source="user_chat",
+            )
+
+    # ── 새 스케줄 등록 ─────────────────────────────────────────────────────
     schedule_id = uuid.uuid4().hex[:8]
     now = datetime.now()
 
@@ -219,6 +283,9 @@ async def create_schedule(
         f"유형: {type_name}",
         f"발송: {when_str} (KST)",
     ]
+    if on_conflict == ON_CONFLICT_REPLACE and conflicts:
+        cancelled_titles = [d.get("title", "") for _, d in conflicts]
+        lines.append(f"(기존 일정 취소됨: {', '.join(cancelled_titles)})")
     if message:
         lines.append(f"메시지: {message[:50]}{'...' if len(message) > 50 else ''}")
 
@@ -332,3 +399,73 @@ def _parse_json(value: str) -> dict:
         return json.loads(value)
     except (json.JSONDecodeError, TypeError):
         return {}
+
+
+def _find_conflicts(
+    active_entries: list[tuple],
+    schedule_type: str,
+    hour: int,
+    minute: int,
+    day_of_week: str,
+    date: str,
+) -> list[tuple]:
+    """Return active schedule entries that overlap with the proposed schedule.
+
+    Conflict rules (all require same hour:minute):
+    - one_time  vs one_time:  same date
+    - recurring vs recurring: same day_of_week, or either is daily (empty dow)
+    - one_time  vs recurring: recurring is daily, or recurring dow matches
+                              the weekday of the one_time date
+    """
+    conflicts = []
+    new_time = (hour, minute)
+
+    for entry, data in active_entries:
+        sched = data.get("schedule", {})
+        ex_hour = sched.get("hour", -1)
+        ex_minute = sched.get("minute", -1)
+
+        # Must be the same time slot
+        if (ex_hour, ex_minute) != new_time:
+            continue
+
+        ex_type = data.get("type", "")
+        ex_dow = sched.get("day_of_week", "")
+        ex_date = sched.get("date", "")
+
+        if schedule_type == "one_time" and ex_type == "one_time":
+            if ex_date == date:
+                conflicts.append((entry, data))
+
+        elif schedule_type == "recurring" and ex_type == "recurring":
+            # Both daily, or same specific weekday, or one is daily vs specific
+            if not day_of_week or not ex_dow or day_of_week == ex_dow:
+                conflicts.append((entry, data))
+
+        elif schedule_type == "one_time" and ex_type == "recurring":
+            # Existing recurring fires on the same weekday as the new one_time date
+            if not ex_dow:  # daily recurring
+                conflicts.append((entry, data))
+            else:
+                try:
+                    dt = datetime.strptime(date, "%Y-%m-%d")
+                    weekday_name = dt.strftime("%A").lower()  # e.g. 'monday'
+                    if ex_dow == weekday_name:
+                        conflicts.append((entry, data))
+                except ValueError:
+                    pass
+
+        elif schedule_type == "recurring" and ex_type == "one_time":
+            # New recurring fires on the same weekday as the existing one_time date
+            if not day_of_week:  # daily recurring
+                conflicts.append((entry, data))
+            else:
+                try:
+                    dt = datetime.strptime(ex_date, "%Y-%m-%d")
+                    weekday_name = dt.strftime("%A").lower()
+                    if day_of_week == weekday_name:
+                        conflicts.append((entry, data))
+                except ValueError:
+                    pass
+
+    return conflicts

@@ -5,55 +5,60 @@ PERSONAS = {
         "name": "기본 비서",
         "emoji": "\U0001f916",
         "tone": (
-            "존댓말을 사용하되 딱딱하지 않게 (예: '~했어요', '~할게요')\n"
-            "간결하고 핵심적인 정보 제공\n"
-            "적절한 맥락 정보 추가 (누적 금액, 비율 등)\n"
-            "과거 대화 맥락이 있으면 자연스럽게 활용"
+            "존댓말을 사용하세요 (예: '~했어요', '~할게요')\n"
+            "간결하고 핵심적인 정보를 제공하세요\n"
+            "적절한 맥락 정보를 추가하세요 (누적 금액, 비율 등)\n"
+            "과거 대화 맥락이 있으면 자연스럽게 활용하세요"
         ),
     },
     "finance": {
         "name": "금융 전문가",
         "emoji": "\U0001f4ca",
         "tone": (
-            "격식체를 사용합니다 (예: '~입니다', '~됩니다')\n"
-            "전문 용어를 활용하되 이해하기 쉽게 설명합니다\n"
-            "데이터와 수치를 중심으로 분석적으로 응답합니다\n"
-            "재무 지표와 트렌드 분석을 포함합니다"
+            "격식체를 사용하세요 (예: '~입니다', '~됩니다')\n"
+            "전문 용어를 활용하되 이해하기 쉽게 설명하세요\n"
+            "데이터와 수치를 중심으로 분석적으로 응답하세요\n"
+            "재무 지표와 트렌드 분석을 포함하세요"
         ),
     },
     "buddy": {
         "name": "친한 친구",
         "emoji": "\U0001f60a",
         "tone": (
-            "반말을 사용합니다 (예: '~했어', '~할게', '~거든')\n"
-            "이모지를 자주 사용합니다\n"
-            "친근하고 재미있는 표현을 씁니다\n"
-            "친구처럼 편하게 톡하는 느낌으로 대화합니다"
+            "반드시 반말만 사용하세요. 존댓말(~요, ~습니다, ~세요, ~어요)은 절대 금지입니다.\n"
+            "올바른 예시: '~했어', '~할게', '~거든', '~이야', '~해줄게', '~어때?', '~인 것 같아'\n"
+            "이모지를 자주 사용하세요 😊\n"
+            "친근하고 재미있는 표현을 쓰세요\n"
+            "친구처럼 편하게 대화하는 느낌으로 응답하세요"
         ),
     },
     "coach": {
         "name": "재정 코치",
         "emoji": "\U0001f4aa",
         "tone": (
-            "격려하는 톤을 사용합니다 (예: '~해봐요!', '~할 수 있어요!')\n"
-            "목표 달성을 독려하며 긍정적인 피드백을 줍니다\n"
-            "칭찬과 응원을 아끼지 않습니다\n"
-            "구체적인 실천 방법을 제안합니다"
+            "격려하는 톤을 사용하세요 (예: '~해봐요!', '~할 수 있어요!')\n"
+            "목표 달성을 독려하며 긍정적인 피드백을 주세요\n"
+            "칭찬과 응원을 아끼지 마세요\n"
+            "구체적인 실천 방법을 제안하세요"
         ),
     },
     "analyst": {
         "name": "데이터 분석가",
         "emoji": "\U0001f50d",
         "tone": (
-            "객관적이고 간결하게 응답합니다\n"
-            "수치, 퍼센트, 추세를 강조합니다\n"
-            "감정적 표현을 최소화하고 팩트 위주로 전달합니다\n"
-            "비교 분석과 통계적 관점을 제공합니다"
+            "객관적이고 간결하게 응답하세요\n"
+            "수치, 퍼센트, 추세를 강조하세요\n"
+            "감정적 표현을 최소화하고 팩트 위주로 전달하세요\n"
+            "비교 분석과 통계적 관점을 제공하세요"
         ),
     },
 }
 
 DEFAULT_PERSONA = "assistant"
+
+# Reverse mapping: DB에 저장된 한국어 이름 → PERSONAS 키
+# (DB personas.name 컬럼은 한국어 표시명을 저장함)
+_NAME_TO_ID: dict[str, str] = {p["name"]: pid for pid, p in PERSONAS.items()}
 
 # Base prompt without the response style section.
 # The response style is injected dynamically based on the user's persona.
@@ -84,12 +89,21 @@ def get_tone_instruction(persona_id: str) -> str:
 def build_system_prompt(persona_id: str, custom_prompt: str | None = None) -> str:
     """Build full system prompt.
 
-    If ``custom_prompt`` is provided (user-defined persona system prompt),
-    it is appended after the base identity block.  Otherwise the built-in
-    tone for ``persona_id`` is used as the response-style section.
+    Persona tone is always wrapped in an emphatic block so the LLM
+    cannot ignore it.  ``custom_prompt`` (user-defined DB text) is used
+    as the tone content when provided; otherwise the built-in tone is used.
     """
-    if custom_prompt and custom_prompt.strip():
-        return BASE_PROMPT + "\n\n" + custom_prompt.strip()
-
     p = get_persona(persona_id)
-    return BASE_PROMPT + f"\n\n응답 스타일 ({p['name']}):\n{p['tone']}"
+
+    # Determine tone content: custom DB text takes priority over built-in tone.
+    tone_content = custom_prompt.strip() if (custom_prompt and custom_prompt.strip()) else p["tone"]
+
+    # Wrap in a prominent, emphatic section — placed immediately after the
+    # identity block so it is seen before all tool instructions.
+    tone_block = (
+        f"\n\n## 페르소나 응답 규칙 [최우선 — 절대 어기지 마세요]\n"
+        f"현재 페르소나: **{p['name']}**\n\n"
+        f"{tone_content}"
+    )
+
+    return BASE_PROMPT + tone_block

@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from starnion_agent.config import settings
 from starnion_agent.document.parser import fetch_file
 from starnion_agent.skills.file_context import add_pending_file
+from starnion_agent.skills.gemini_key import get_gemini_api_key, no_key_message
 from starnion_agent.skills.guard import skill_guard
 
 # Gemini TTS prebuilt voices.
@@ -53,12 +54,16 @@ def _pcm_to_wav(pcm_data: bytes, sample_rate: int = 24000) -> bytes:
 @skill_guard("audio")
 async def transcribe_audio(file_url: str) -> str:
     """음성 메시지를 텍스트로 변환합니다."""
+    api_key = await get_gemini_api_key()
+    if not api_key:
+        return no_key_message()
+
     data = await fetch_file(file_url)
     b64_data = base64.b64encode(data).decode("utf-8")
 
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
+        google_api_key=api_key,
     )
 
     message = HumanMessage(
@@ -79,13 +84,17 @@ async def transcribe_audio(file_url: str) -> str:
 @skill_guard("audio")
 async def generate_audio(text: str, voice: str = "Kore") -> str:
     """텍스트를 음성으로 변환(TTS)합니다."""
+    api_key = await get_gemini_api_key()
+    if not api_key:
+        return no_key_message()
+
     from google import genai
     from google.genai import types
 
     if voice not in GEMINI_TTS_VOICES:
         voice = "Kore"
 
-    client = genai.Client(api_key=settings.gemini_api_key)
+    client = genai.Client(api_key=api_key)
 
     response = client.models.generate_content(
         model="gemini-2.5-flash-preview-tts",

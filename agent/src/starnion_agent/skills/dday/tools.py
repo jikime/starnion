@@ -55,6 +55,24 @@ def _calc_dday(target: date) -> str:
     return f"D+{abs(delta)}"
 
 
+def _effective_date(target: date, recurring: bool) -> date:
+    """For recurring D-Days, return the upcoming occurrence in the current or next year."""
+    if not recurring:
+        return target
+    today = date.today()
+    try:
+        this_year = target.replace(year=today.year)
+    except ValueError:
+        # Feb 29 on a non-leap year → use Mar 1
+        this_year = date(today.year, 3, 1)
+    if this_year < today:
+        try:
+            return target.replace(year=today.year + 1)
+        except ValueError:
+            return date(today.year + 1, 3, 1)
+    return this_year
+
+
 @tool(args_schema=SetDdayInput)
 @skill_guard("dday")
 async def set_dday(
@@ -129,21 +147,24 @@ async def list_ddays(include_past: bool = False) -> str:
         if isinstance(target_dt, str):
             target_dt = datetime.strptime(target_dt, "%Y-%m-%d").date()
 
-        # Filter past D-days (keep recurring ones even if past).
-        if not include_past and target_dt < date.today():
-            if not dday.get("recurring"):
-                continue
+        is_recurring = bool(dday.get("recurring"))
+        # For recurring items advance to the upcoming occurrence.
+        display_dt = _effective_date(target_dt, is_recurring)
 
-        dday_str = _calc_dday(target_dt)
-        recurring_label = " 🔄" if dday.get("recurring") else ""
+        # Filter past D-days (recurring ones are always kept after year-advance).
+        if not include_past and display_dt < date.today() and not is_recurring:
+            continue
+
+        dday_str = _calc_dday(display_dt)
+        recurring_label = " 🔄" if is_recurring else ""
         icon = dday.get("icon", "📆")
 
         line = f"{icon} {dday['title']}{recurring_label} — {dday_str} (ID: {dday['id']})"
-        line += f"\n  날짜: {target_dt}"
+        line += f"\n  날짜: {display_dt}"
         if dday.get("description"):
             line += f"\n  {dday['description']}"
 
-        items.append((target_dt, line))
+        items.append((display_dt, line))
 
     if not items:
         return "활성 디데이가 없어요."

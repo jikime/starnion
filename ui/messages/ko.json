@@ -696,7 +696,7 @@
   },
   "integrations": {
     "title": "연동",
-    "subtitle": "외부 서비스를 연결하면 Jiki가 대신 작업을 수행할 수 있어요.",
+    "subtitle": "외부 서비스를 연결하면 Nion가 대신 작업을 수행할 수 있어요.",
     "connected": "연결됨",
     "disconnected": "미연결",
     "disconnect": "해제",
@@ -714,7 +714,7 @@
     "providerUnlinked": "{name} 연동이 해제됐어요.",
     "dialogTitle": "{name} 연동",
     "google": {
-      "description": "캘린더, Gmail, Drive, Docs, Tasks를 Jiki에서 직접 제어합니다.",
+      "description": "캘린더, Gmail, Drive, Docs, Tasks를 Nion에서 직접 제어합니다.",
       "cap1": "Google Calendar 조회/생성",
       "cap2": "Gmail 읽기/발송",
       "cap3": "Google Drive 파일 업로드",
@@ -729,7 +729,7 @@
       "keyHint": "Notion 설정 → 연동 → 새 API 통합에서 생성할 수 있습니다."
     },
     "github": {
-      "description": "레포지토리, 이슈, PR을 Jiki에서 조회하고 관리합니다.",
+      "description": "레포지토리, 이슈, PR을 Nion에서 조회하고 관리합니다.",
       "cap1": "레포지토리 조회",
       "cap2": "이슈 읽기/생성",
       "cap3": "PR 조회",
@@ -737,12 +737,30 @@
       "keyHint": "GitHub 설정 → Developer settings → Personal access tokens에서 생성할 수 있습니다."
     },
     "tavily": {
-      "description": "실시간 웹 검색 기능을 Jiki에 연결합니다. 최신 뉴스, 사실 확인, 실시간 데이터 검색이 가능해집니다.",
+      "description": "실시간 웹 검색 기능을 Nion에 연결합니다. 최신 뉴스, 사실 확인, 실시간 데이터 검색이 가능해집니다.",
       "cap1": "실시간 웹 검색",
       "cap2": "최신 뉴스 조회",
       "cap3": "사실 확인",
       "cap4": "웹 페이지 내용 추출",
       "keyHint": "app.tavily.com에서 API 키를 발급받을 수 있습니다."
+    },
+    "naver_search": {
+      "description": "네이버 검색 API를 연결합니다. 블로그, 뉴스, 지식iN, 쇼핑, 이미지 등 다양한 검색이 가능합니다.",
+      "cap1": "블로그·뉴스·카페 검색",
+      "cap2": "지식iN·백과사전 검색",
+      "cap3": "이미지·쇼핑 검색",
+      "cap4": "지역·웹문서·전문자료 검색",
+      "keyHint": "네이버 개발자 센터(developers.naver.com)에서 애플리케이션을 등록하고 Client ID와 Client Secret을 발급받으세요.",
+      "clientIdLabel": "Client ID",
+      "clientSecretLabel": "Client Secret"
+    },
+    "gemini": {
+      "description": "이미지·영상·음성 처리부터 텍스트 요약·번역·리포트 생성까지 Gemini API를 사용합니다.",
+      "cap1": "이미지 생성·편집·분석 / 영상 분석",
+      "cap2": "음성 인식 (STT) / 음성 생성 (TTS)",
+      "cap3": "텍스트 요약 및 번역",
+      "cap4": "리포트·목표·패턴·대화 분석 (백그라운드)",
+      "keyHint": "Google AI Studio(aistudio.google.com/apikey)에서 API 키를 발급받으세요."
     }
   },
   "dashboard": {

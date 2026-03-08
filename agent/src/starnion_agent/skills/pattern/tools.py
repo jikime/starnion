@@ -14,6 +14,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from starnion_agent.config import settings
 from starnion_agent.db.pool import get_pool
+from starnion_agent.skills.gemini_key import get_gemini_api_key
 from starnion_agent.db.repositories import daily_log as daily_log_repo
 from starnion_agent.db.repositories import finance as finance_repo
 from starnion_agent.db.repositories import knowledge as knowledge_repo
@@ -76,9 +77,13 @@ async def analyze_patterns(user_id: str) -> str:
     )
 
     # 5. Call LLM for structured pattern detection.
+    api_key = await get_gemini_api_key(user_id)
+    if not api_key:
+        return "Gemini API 키가 설정되지 않아 패턴 분석을 건너뜁니다."
+
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
+        google_api_key=api_key,
     )
 
     prompt = _build_analysis_prompt(data_summary)
@@ -144,9 +149,13 @@ async def generate_pattern_insight(user_id: str) -> str:
         persona_id = preferences.get("persona", DEFAULT_PERSONA)
 
     # 3. Build prompt and generate insight.
+    api_key = await get_gemini_api_key(user_id)
+    if not api_key:
+        return ""
+
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
+        google_api_key=api_key,
     )
 
     prompt = _build_insight_prompt(patterns, today_records, monthly, budget, now, persona_id)

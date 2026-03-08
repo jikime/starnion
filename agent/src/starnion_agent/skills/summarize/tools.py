@@ -10,6 +10,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 from starnion_agent.config import settings
+from starnion_agent.skills.gemini_key import get_gemini_api_key, no_key_message
 from starnion_agent.skills.guard import skill_guard
 
 logger = logging.getLogger(__name__)
@@ -102,7 +103,7 @@ async def _fetch_url_text(url: str) -> str:
         async with httpx.AsyncClient(
             timeout=30,
             follow_redirects=True,
-            headers={"User-Agent": "JikiBot/1.0"},
+            headers={"User-Agent": "NionBot/1.0"},
         ) as client:
             response = await client.get(url)
             response.raise_for_status()
@@ -141,11 +142,11 @@ async def _fetch_url_text(url: str) -> str:
     return text
 
 
-async def _call_gemini(prompt: str) -> str:
+async def _call_gemini(prompt: str, api_key: str) -> str:
     """Call Gemini LLM and return the response content."""
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
+        google_api_key=api_key,
     )
     response = await llm.ainvoke([HumanMessage(content=prompt)])
     return response.content
@@ -158,8 +159,9 @@ async def _call_gemini(prompt: str) -> str:
 @skill_guard("summarize")
 async def summarize_url(url: str, style: str = "concise") -> str:
     """URL 웹페이지의 내용을 AI로 요약합니다. 기사, 블로그, 문서 등의 핵심 내용을 빠르게 파악할 때 사용합니다."""
-    if not settings.gemini_api_key:
-        return "요약 기능을 사용하려면 Gemini API 키가 필요해요."
+    api_key = await get_gemini_api_key()
+    if not api_key:
+        return no_key_message()
 
     if not url.startswith(("http://", "https://")):
         return "올바른 URL을 입력해주세요. (http:// 또는 https://로 시작)"
@@ -177,7 +179,7 @@ async def summarize_url(url: str, style: str = "concise") -> str:
 
     prompt = _build_summary_prompt(text, style)
     try:
-        return await _call_gemini(prompt)
+        return await _call_gemini(prompt, api_key)
     except Exception:
         logger.debug("summarize_url LLM call failed", exc_info=True)
         return "요약 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."
@@ -187,8 +189,9 @@ async def summarize_url(url: str, style: str = "concise") -> str:
 @skill_guard("summarize")
 async def summarize_text(text: str, style: str = "concise") -> str:
     """주어진 텍스트를 AI로 요약합니다. 긴 글, 문서 내용, 다른 도구의 결과를 간단히 정리할 때 사용합니다."""
-    if not settings.gemini_api_key:
-        return "요약 기능을 사용하려면 Gemini API 키가 필요해요."
+    api_key = await get_gemini_api_key()
+    if not api_key:
+        return no_key_message()
 
     if not text or not text.strip():
         return "요약할 텍스트를 입력해주세요."
@@ -198,7 +201,7 @@ async def summarize_text(text: str, style: str = "concise") -> str:
 
     prompt = _build_summary_prompt(text, style)
     try:
-        return await _call_gemini(prompt)
+        return await _call_gemini(prompt, api_key)
     except Exception:
         logger.debug("summarize_text LLM call failed", exc_info=True)
         return "요약 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."

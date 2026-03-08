@@ -30,6 +30,7 @@ func NewRootCmd() *cobra.Command {
 
 	root.AddCommand(
 		newSetupCmd(),
+		newConfigCmd(),
 		newGatewayCmd(),
 		newAgentCmd(),
 		newUICmd(),
@@ -41,6 +42,54 @@ func NewRootCmd() *cobra.Command {
 	)
 
 	return root
+}
+
+// ── config ────────────────────────────────────────────────────────────────────
+
+func newConfigCmd() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "config",
+		Short: "서비스 설정 관리",
+	}
+	c.AddCommand(newConfigGoogleCmd())
+	c.AddCommand(newConfigEmbeddingCmd())
+	c.AddCommand(newConfigGeminiCmd())
+	return c
+}
+
+func newConfigGeminiCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "gemini",
+		Short: "Gemini API 키 설정 (이미지 생성, 비전, 오디오)",
+		Long: "이미지 생성·분석, 오디오 처리, 리포트 생성에 사용되는 서버 공용 Gemini API 키를 설정합니다.\n" +
+			"Google AI Studio (https://aistudio.google.com/apikey) 에서 발급받으세요.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunConfigGemini()
+		},
+	}
+}
+
+func newConfigGoogleCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "google",
+		Short: "Google OAuth2 자격증명 설정",
+		Long:  "Google Calendar / Gmail / Drive 연동에 필요한 OAuth2 Client ID와 Secret을 설정합니다.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunConfigGoogle()
+		},
+	}
+}
+
+func newConfigEmbeddingCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "embedding",
+		Short: "임베딩 엔진 설정 (OpenAI 또는 Gemini)",
+		Long: "검색 기록·문서 벡터 저장에 사용되는 서버 공용 임베딩 엔진을 설정합니다.\n" +
+			"⚠  모든 사용자가 동일한 모델을 공유합니다. 변경 시 DB 재색인 필요.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunConfigEmbedding()
+		},
+	}
 }
 
 // ── setup ─────────────────────────────────────────────────────────────────────

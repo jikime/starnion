@@ -12,7 +12,7 @@
  *   file_mime : string
  *   message   : string   (text for TTS; optional extra instruction for STT)
  */
-import { auth } from "@/auth"
+import { auth } from "@/lib/auth"
 import { NextRequest, NextResponse } from "next/server"
 
 import { gatewayFetch } from "@/lib/gateway"

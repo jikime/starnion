@@ -304,14 +304,42 @@ type ddayNotifItem struct {
 
 // getDdayUsersForNotification returns users who have D-Days falling on
 // alert thresholds (D-30, D-7, D-3, D-1, D-Day) for today.
+// For recurring D-Days the effective date is advanced to the current or next
+// year so that annual events (birthdays, anniversaries, etc.) keep notifying.
 func getDdayUsersForNotification(ctx context.Context, db *sql.DB) ([]ddayNotification, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT d.user_id, pi.platform_id, d.title, d.icon,
-		       (d.target_date - CURRENT_DATE) AS days_diff
-		FROM ddays d
-		JOIN platform_identities pi ON pi.user_id = d.user_id AND pi.platform = 'telegram'
-		WHERE (d.target_date - CURRENT_DATE) IN (30, 7, 3, 1, 0)
-		ORDER BY d.user_id, days_diff ASC
+		WITH effective AS (
+			SELECT
+				d.user_id,
+				d.title,
+				d.icon,
+				CASE
+					WHEN d.recurring THEN
+						-- Build the date using this year's month/day.
+						-- If it has already passed, advance to next year.
+						MAKE_DATE(
+							EXTRACT(YEAR FROM CURRENT_DATE)::int +
+							CASE
+								WHEN MAKE_DATE(
+									EXTRACT(YEAR FROM CURRENT_DATE)::int,
+									EXTRACT(MONTH FROM d.target_date)::int,
+									EXTRACT(DAY   FROM d.target_date)::int
+								) < CURRENT_DATE THEN 1
+								ELSE 0
+							END,
+							EXTRACT(MONTH FROM d.target_date)::int,
+							EXTRACT(DAY   FROM d.target_date)::int
+						)
+					ELSE d.target_date
+				END AS eff_date
+			FROM ddays d
+		)
+		SELECT e.user_id, pi.platform_id, e.title, e.icon,
+		       (e.eff_date - CURRENT_DATE) AS days_diff
+		FROM effective e
+		JOIN platform_identities pi ON pi.user_id = e.user_id AND pi.platform = 'telegram'
+		WHERE (e.eff_date - CURRENT_DATE) IN (30, 7, 3, 1, 0)
+		ORDER BY e.user_id, days_diff ASC
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("query dday notifications: %w", err)

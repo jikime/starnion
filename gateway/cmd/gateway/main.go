@@ -152,6 +152,7 @@ func main() {
 	e.Use(echomw.RequestID())
 	e.Use(echomw.Recover())
 	e.Use(middleware.CORSConfig(cfg.CORS.AllowedOrigins, cfg.CORS.AllowedMethods, cfg.CORS.AllowedHeaders))
+	e.Use(middleware.RequestLogger())
 
 	// Health check
 	e.GET("/healthz", func(c echo.Context) error {
@@ -345,6 +346,17 @@ func main() {
 		msgHandler := handler.NewMessageHandler(db, grpcConn)
 		api.GET("/conversations/:id/messages", msgHandler.List)
 
+		// Profile: GET/PATCH /api/v1/profile?user_id=<uuid>
+		profileHandler := handler.NewProfileHandler(db)
+		api.GET("/profile", profileHandler.Get)
+		api.PATCH("/profile", profileHandler.Update)
+
+		// Notifications: GET/PATCH /api/v1/notifications
+		notifHandler := handler.NewNotificationsHandler(db)
+		api.GET("/notifications", notifHandler.List)
+		api.GET("/notifications/unread-count", notifHandler.UnreadCount)
+		api.PATCH("/notifications/read", notifHandler.MarkRead)
+
 		// Profile persona: GET/PATCH /api/v1/profile/persona?user_id=<uuid>
 		api.GET("/profile/persona", func(c echo.Context) error {
 			userID := c.QueryParam("user_id")
@@ -393,13 +405,19 @@ func main() {
 
 	// Google OAuth2 callback.
 	if db != nil {
-		googleHandler := handler.NewGoogleCallbackHandler(db)
+		googleCfg := handler.GoogleOAuthConfig{
+			ClientID:     cfg.Google.ClientID,
+			ClientSecret: cfg.Google.ClientSecret,
+			RedirectURI:  cfg.Google.RedirectURI,
+		}
+
+		googleHandler := handler.NewGoogleCallbackHandler(db, googleCfg)
 		e.GET("/auth/google/callback", googleHandler.Callback)
 		// Telegram OAuth start: short URL with no underscores to avoid Markdown corruption.
 		e.GET("/auth/google/telegram", googleHandler.TelegramOAuthStart)
 
 		// Integration management endpoints.
-		integrationHandler := handler.NewIntegrationHandler(db)
+		integrationHandler := handler.NewIntegrationHandler(db, googleCfg)
 		api.GET("/integrations/status", integrationHandler.Status)
 		api.GET("/integrations/google/auth-url", integrationHandler.GoogleAuthURL)
 		api.DELETE("/integrations/google", integrationHandler.GoogleDisconnect)
@@ -409,6 +427,10 @@ func main() {
 		api.DELETE("/integrations/github", integrationHandler.GitHubDisconnect)
 		api.PUT("/integrations/tavily", integrationHandler.TavilyConnect)
 		api.DELETE("/integrations/tavily", integrationHandler.TavilyDisconnect)
+		api.PUT("/integrations/naver_search", integrationHandler.NaverSearchConnect)
+		api.DELETE("/integrations/naver_search", integrationHandler.NaverSearchDisconnect)
+		api.PUT("/integrations/gemini", integrationHandler.GeminiConnect)
+		api.DELETE("/integrations/gemini", integrationHandler.GeminiDisconnect)
 
 		// Skill management endpoints.
 		if skillSvc != nil {
@@ -417,8 +439,11 @@ func main() {
 			api.POST("/skills/:id/toggle", skillHandler.Toggle)
 		}
 
+		// Agent HTTP base URL — used by logs proxy, document indexer, search embedder.
+		agentHTTPURL := fmt.Sprintf("http://%s:8082", cfg.Gateway.AgentHost)
+
 		// Log streaming endpoints (no auth — accessible from admin UI).
-		logsHandler := handler.NewLogsHandler(logBuf)
+		logsHandler := handler.NewLogsHandler(logBuf, agentHTTPURL)
 		api.GET("/logs", logsHandler.List)
 		api.GET("/logs/stream", logsHandler.Stream)
 		api.GET("/logs/agent", logsHandler.AgentLogsProxy)
@@ -515,7 +540,6 @@ func main() {
 
 		// Document endpoints.
 		// The agent's log HTTP server (port 8082) also handles POST /index-document.
-		agentHTTPURL := fmt.Sprintf("http://%s:8082", cfg.Gateway.AgentHost)
 		documentHandler := handler.NewDocumentHandler(db, minioStore, agentHTTPURL)
 		api.GET("/documents", documentHandler.ListDocuments)
 		api.POST("/documents", documentHandler.UploadDocument)

@@ -67,8 +67,8 @@ function pct(a: number, b: number) {
 
 const PLATFORM_COLOR: Record<string, string> = {
   telegram: "#2AABEE",
-  web: "#6366f1",
-  webchat: "#6366f1",
+  web: "#3b6de0",
+  webchat: "#3b6de0",
 }
 
 // ─── Mini Sparkline ───────────────────────────────────────────────────────────
@@ -274,7 +274,7 @@ export default function AnalyticsPage() {
           sub={t("totalMessages")}
           value={s?.total_messages.toLocaleString() ?? 0}
           sparkData={spark7}
-          sparkColor="#6366f1"
+          sparkColor="#3b6de0"
           icon={MessageSquare}
           iconBg="bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400"
         />
@@ -355,7 +355,7 @@ export default function AnalyticsPage() {
                     {weekly.map((w, i) => (
                       <Cell
                         key={i}
-                        fill={w.count === weeklyMax ? "#6366f1" : "#c7d2fe"}
+                        fill={w.count === weeklyMax ? "#3b6de0" : "#aac4f0"}
                       />
                     ))}
                   </Bar>
@@ -380,7 +380,7 @@ export default function AnalyticsPage() {
             <div className="space-y-5">
               {platforms.map((p) => {
                 const ratio = pct(p.messages, totalPlatMsg)
-                const color = PLATFORM_COLOR[p.platform] ?? "#6366f1"
+                const color = PLATFORM_COLOR[p.platform] ?? "#3b6de0"
                 const label = p.platform === "telegram" ? t("telegram") : t("webchat")
                 return (
                   <div key={p.platform} className="space-y-2">
@@ -468,7 +468,7 @@ export default function AnalyticsPage() {
             {/* Platform quick stats */}
             <div className="space-y-1.5">
               {[
-                { label: t("webchat"), value: s?.webchat_messages ?? 0, color: "#6366f1" },
+                { label: t("webchat"), value: s?.webchat_messages ?? 0, color: "#3b6de0" },
                 { label: t("telegram"), value: s?.telegram_messages ?? 0, color: "#2AABEE" },
               ].map((item) => (
                 <div key={item.label} className="flex items-center justify-between text-sm">
@@ -485,8 +485,8 @@ export default function AnalyticsPage() {
               <AreaChart data={hourlyChart} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="hourGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#3b6de0" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#3b6de0" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="label" tick={{ fontSize: 9 }} interval={0} />
@@ -495,7 +495,7 @@ export default function AnalyticsPage() {
                 <Area
                   type="monotone"
                   dataKey="count"
-                  stroke="#6366f1"
+                  stroke="#3b6de0"
                   strokeWidth={2}
                   fill="url(#hourGrad)"
                   dot={false}
@@ -536,7 +536,7 @@ export default function AnalyticsPage() {
               <Bar dataKey="count" radius={[3, 3, 0, 0]}>
                 {daily.map((d, i) => {
                   const max = Math.max(...daily.map((x) => x.count), 1)
-                  return <Cell key={i} fill={d.count === max ? "#6366f1" : "#c7d2fe"} />
+                  return <Cell key={i} fill={d.count === max ? "#3b6de0" : "#c7d2fe"} />
                 })}
               </Bar>
             </BarChart>

@@ -7,6 +7,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from starnion_agent.config import settings
 from starnion_agent.db.pool import get_pool
+from starnion_agent.skills.gemini_key import get_gemini_api_key
 from starnion_agent.db.repositories import finance as finance_repo
 from starnion_agent.db.repositories import profile as profile_repo
 from starnion_agent.persona import DEFAULT_PERSONA, get_tone_instruction
@@ -85,9 +86,13 @@ async def generate_weekly_report(user_id: str) -> str:
 
     data_summary = "\n".join(data_lines)
 
+    api_key = await get_gemini_api_key(user_id)
+    if not api_key:
+        return "Gemini API 키가 설정되지 않아 주간 리포트를 생성할 수 없습니다."
+
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
+        google_api_key=api_key,
     )
 
     tone = get_tone_instruction(persona_id)
@@ -156,9 +161,13 @@ async def generate_daily_summary(user_id: str) -> str:
 
     data_summary = "\n".join(data_lines)
 
+    api_key = await get_gemini_api_key(user_id)
+    if not api_key:
+        return "Gemini API 키가 설정되지 않아 일간 요약을 생성할 수 없습니다."
+
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
+        google_api_key=api_key,
     )
 
     tone = get_tone_instruction(persona_id)
@@ -238,9 +247,13 @@ async def generate_monthly_closing(user_id: str) -> str:
 
     data_summary = "\n".join(data_lines)
 
+    api_key = await get_gemini_api_key(user_id)
+    if not api_key:
+        return "Gemini API 키가 설정되지 않아 월간 마감 리포트를 생성할 수 없습니다."
+
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
+        google_api_key=api_key,
     )
 
     tone = get_tone_instruction(persona_id)

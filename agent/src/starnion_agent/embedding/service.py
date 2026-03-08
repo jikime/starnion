@@ -1,63 +1,86 @@
-"""Embedding service using Google gemini-embedding-001."""
+"""Server-wide embedding service.
+
+Supports OpenAI (text-embedding-3-small, recommended) and Google Gemini (gemini-embedding-001).
+All users share the same provider/model so vectors are comparable across the system.
+
+Configure via:  starnion config embedding
+All vectors are stored at 768 dimensions to match pgvector HNSW index.
+
+When the API key is absent, EmbeddingUnavailableError is raised so callers
+can skip vector storage gracefully without crashing.
+"""
 
 import logging
-
-from google import genai
-from google.genai.types import EmbedContentConfig
 
 from starnion_agent.config import settings
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_MODEL = "gemini-embedding-001"
-EMBEDDING_DIMENSIONS = 768  # Reduced from native 3072 for pgvector HNSW compatibility.
 
-_EMBED_CONFIG = EmbedContentConfig(output_dimensionality=EMBEDDING_DIMENSIONS)
-
-# Module-level singleton initialised lazily.
-_client: genai.Client | None = None
+class EmbeddingUnavailableError(RuntimeError):
+    """Raised when the embedding API key is not configured."""
 
 
-def _get_client() -> genai.Client:
-    global _client
-    if _client is None:
-        _client = genai.Client(api_key=settings.gemini_api_key)
-    return _client
+def _check_configured() -> None:
+    if not settings.embedding.api_key:
+        raise EmbeddingUnavailableError(
+            f"Embedding API key not configured (provider: {settings.embedding.provider}). "
+            "Run: starnion config embedding"
+        )
+
+
+# ── OpenAI ────────────────────────────────────────────────────────────────────
+
+async def _embed_openai(texts: list[str]) -> list[list[float]]:
+    from openai import AsyncOpenAI  # noqa: PLC0415
+    client = AsyncOpenAI(api_key=settings.embedding.api_key)
+    resp = await client.embeddings.create(
+        model=settings.embedding.model,
+        input=texts,
+        dimensions=settings.embedding.dimensions,
+    )
+    return [item.embedding for item in resp.data]
+
+
+# ── Gemini ────────────────────────────────────────────────────────────────────
+
+async def _embed_gemini(texts: list[str]) -> list[list[float]]:
+    from google import genai  # noqa: PLC0415
+    from google.genai.types import EmbedContentConfig  # noqa: PLC0415
+    client = genai.Client(api_key=settings.embedding.api_key)
+    config = EmbedContentConfig(output_dimensionality=settings.embedding.dimensions)
+    result = client.models.embed_content(
+        model=settings.embedding.model,
+        contents=texts,
+        config=config,
+    )
+    return [list(e.values) for e in result.embeddings]
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
+
+async def embed_texts(texts: list[str]) -> list[list[float]]:
+    """Generate embedding vectors for multiple texts.
+
+    Uses the server-wide provider configured in starnion.yaml (embedding.provider).
+
+    Raises:
+        EmbeddingUnavailableError: When API key is not configured.
+    """
+    _check_configured()
+    provider = settings.embedding.provider
+    if provider == "openai":
+        return await _embed_openai(texts)
+    if provider == "gemini":
+        return await _embed_gemini(texts)
+    raise EmbeddingUnavailableError(f"Unknown embedding provider: {provider!r}")
 
 
 async def embed_text(text: str) -> list[float]:
-    """Generate an embedding vector for the given text.
+    """Generate an embedding vector for a single text.
 
-    Uses Google gemini-embedding-001 with output reduced to 768 dimensions.
-
-    Args:
-        text: The text to embed.
-
-    Returns:
-        A list of 768 floats representing the embedding.
+    Raises:
+        EmbeddingUnavailableError: When API key is not configured.
     """
-    client = _get_client()
-    result = client.models.embed_content(
-        model=EMBEDDING_MODEL,
-        contents=text,
-        config=_EMBED_CONFIG,
-    )
-    return list(result.embeddings[0].values)
-
-
-async def embed_texts(texts: list[str]) -> list[list[float]]:
-    """Generate embeddings for multiple texts in a single call.
-
-    Args:
-        texts: List of texts to embed.
-
-    Returns:
-        List of embedding vectors.
-    """
-    client = _get_client()
-    result = client.models.embed_content(
-        model=EMBEDDING_MODEL,
-        contents=texts,
-        config=_EMBED_CONFIG,
-    )
-    return [list(e.values) for e in result.embeddings]
+    results = await embed_texts([text])
+    return results[0]

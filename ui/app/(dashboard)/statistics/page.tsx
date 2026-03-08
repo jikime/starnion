@@ -95,8 +95,8 @@ interface StatsData {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CATEGORY_COLORS = [
-  "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b",
-  "#10b981", "#3b82f6", "#ef4444", "#14b8a6",
+  "#3b6de0", "#8b5cf6", "#ec4899", "#f59e0b",
+  "#10b981", "#06b6d4", "#ef4444", "#14b8a6",
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -403,8 +403,8 @@ export default function StatisticsPage() {
               <YAxis tickFormatter={(v) => `${formatKRW(v)}`} tick={{ fontSize: 11 }} width={56} />
               <Tooltip content={<CurrencyTooltip />} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="income" name={t("incomeLabel")} fill="#6366f1" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="expense" name={t("expenseLabel")} fill="#f43f5e" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="income" name={t("incomeLabel")} fill="#3b6de0" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="expense" name={t("expenseLabel")} fill="#ef4444" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}
