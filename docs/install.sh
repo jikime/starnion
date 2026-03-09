@@ -191,6 +191,24 @@ if [[ -d "$TMPDIR_WORK/ui" ]]; then
   mv "$TMPDIR_WORK/ui" "${STARNION_HOME}/ui"
 fi
 
+# Install docker/ files to ~/.starnion/docker/
+# Preserves existing .env to avoid overwriting secrets on update
+if [[ -d "$TMPDIR_WORK/docker" ]]; then
+  mkdir -p "${STARNION_HOME}/docker/migrations/incremental"
+  # Copy all docker files except .env (preserve existing secrets)
+  for f in "$TMPDIR_WORK/docker"/*; do
+    fname="$(basename "$f")"
+    if [[ "$fname" == ".env" ]]; then
+      continue  # never overwrite existing .env
+    fi
+    if [[ -d "$f" ]]; then
+      cp -r "$f" "${STARNION_HOME}/docker/${fname}"
+    else
+      cp "$f" "${STARNION_HOME}/docker/${fname}"
+    fi
+  done
+fi
+
 ok "StarNion v${VERSION} 설치 완료 → ${BINARY_DEST}"
 ok "런타임 파일 설치 완료 → ${STARNION_HOME}/"
 

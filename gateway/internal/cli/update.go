@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -29,19 +30,21 @@ type githubRelease struct {
 
 func newUpdateCmd() *cobra.Command {
 	var checkOnly bool
+	var skipDocker bool
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "최신 버전으로 업데이트",
-		Long:  "GitHub Releases에서 최신 starnion 바이너리를 다운로드하여 업데이트합니다.",
+		Long:  "GitHub Releases에서 최신 starnion 바이너리를 다운로드하여 업데이트합니다.\nDocker로 실행 중인 경우 이미지도 함께 갱신합니다.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUpdate(checkOnly)
+			return runUpdate(checkOnly, skipDocker)
 		},
 	}
 	cmd.Flags().BoolVar(&checkOnly, "check", false, "버전 확인만 하고 업데이트하지 않음")
+	cmd.Flags().BoolVar(&skipDocker, "skip-docker", false, "Docker 이미지 갱신 건너뜀")
 	return cmd
 }
 
-func runUpdate(checkOnly bool) error {
+func runUpdate(checkOnly bool, skipDocker bool) error {
 	PrintSectionHeader(0, 0, "UPDATE")
 
 	// ── Fetch latest release ───────────────────────────────────────────────
@@ -118,7 +121,70 @@ func runUpdate(checkOnly bool) error {
 	fmt.Println()
 	PrintOK("업데이트", fmt.Sprintf("StarNion v%s 설치 완료", latest))
 	PrintHint("변경사항: " + release.HTMLURL)
+
+	// ── Docker image pull (if running) ─────────────────────────────────────
+	if !skipDocker {
+		runDockerUpdate()
+	}
+
 	return nil
+}
+
+// runDockerUpdate pulls latest images and restarts if Docker services are running.
+func runDockerUpdate() {
+	dockerDir := dockerDirPath()
+	if dockerDir == "" {
+		return
+	}
+
+	// Check if any starnion containers are running
+	checkCmd := exec.Command("docker", "ps", "--filter", "name=starnion-", "--format", "{{.Names}}")
+	out, err := checkCmd.Output()
+	if err != nil || len(out) == 0 {
+		return // Docker not running or no starnion containers
+	}
+
+	PrintInfo("Docker 이미지 갱신 중...")
+	pullCmd := exec.Command("docker", "compose", "pull")
+	pullCmd.Dir = dockerDir
+	pullCmd.Stdout = os.Stdout
+	pullCmd.Stderr = os.Stderr
+	if err := pullCmd.Run(); err != nil {
+		PrintWarn("Docker", fmt.Sprintf("이미지 풀 실패: %v", err))
+		return
+	}
+
+	PrintInfo("Docker 서비스 재시작 중...")
+	upCmd := exec.Command("docker", "compose", "up", "-d", "--remove-orphans")
+	upCmd.Dir = dockerDir
+	upCmd.Stdout = os.Stdout
+	upCmd.Stderr = os.Stderr
+	if err := upCmd.Run(); err != nil {
+		PrintWarn("Docker", fmt.Sprintf("서비스 재시작 실패: %v", err))
+		return
+	}
+
+	// Run migrations after update
+	PrintInfo("DB 마이그레이션 실행 중...")
+	cfg, err := LoadConfig()
+	if err == nil {
+		if err := connectAndMigrate(cfg, projectRoot()); err != nil {
+			PrintWarn("migrate", fmt.Sprintf("마이그레이션 실패: %v", err))
+		} else {
+			PrintOK("migrate", "마이그레이션 완료")
+		}
+	}
+
+	PrintOK("Docker", "이미지 갱신 및 재시작 완료")
+}
+
+func dockerDirPath() string {
+	root := projectRoot()
+	dir := filepath.Join(root, "docker")
+	if _, err := os.Stat(filepath.Join(dir, "docker-compose.yml")); err != nil {
+		return ""
+	}
+	return dir
 }
 
 func fetchLatestRelease() (*githubRelease, error) {
