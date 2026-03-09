@@ -3,9 +3,10 @@
 # Starnion Release Script
 #
 # Usage:
-#   ./scripts/release.sh 1.2.3          # full release (tag + push)
-#   ./scripts/release.sh 1.2.3 --dry    # goreleaser snapshot (no upload)
-#   ./scripts/release.sh --pages        # deploy docs only (no release)
+#   ./scripts/release.sh 1.2.3                        # full release (tag + push)
+#   ./scripts/release.sh 1.2.3 -m "릴리즈 메시지"    # release with message
+#   ./scripts/release.sh 1.2.3 --dry                  # goreleaser snapshot (no upload)
+#   ./scripts/release.sh --pages                       # deploy docs only (no release)
 #
 # What this script does (full release):
 #   1. Validates the working tree is clean and on main
@@ -29,15 +30,18 @@ fail() { echo -e "${RED}  ✗  $*${NC}" >&2; exit 1; }
 VERSION=""
 DRY=0
 PAGES_ONLY=0
+MESSAGE=""
 
-for arg in "$@"; do
-  case "$arg" in
+while [[ $# -gt 0 ]]; do
+  case "$1" in
     --dry)        DRY=1 ;;
     --pages)      PAGES_ONLY=1 ;;
-    v*)           VERSION="${arg#v}" ;;
-    [0-9]*)       VERSION="$arg" ;;
-    *)            fail "Unknown argument: $arg" ;;
+    -m|--message) shift; MESSAGE="$1" ;;
+    v*)           VERSION="${1#v}" ;;
+    [0-9]*)       VERSION="$1" ;;
+    *)            fail "Unknown argument: $1" ;;
   esac
+  shift
 done
 
 # ─── Mode: docs only ─────────────────────────────────────────────────────────
@@ -150,6 +154,9 @@ echo -e "  릴리즈 정보:"
 echo -e "    버전:   ${CYAN}${TAG}${NC}"
 echo -e "    브랜치: ${CYAN}${BRANCH}${NC}"
 echo -e "    커밋:   ${CYAN}$(git rev-parse --short HEAD)${NC}"
+if [[ -n "$MESSAGE" ]]; then
+echo -e "    메시지: ${CYAN}${MESSAGE}${NC}"
+fi
 echo
 read -rp "  릴리즈를 진행하시겠습니까? [y/N] " confirm
 if [[ "$(echo "$confirm" | tr '[:upper:]' '[:lower:]')" != "y" ]]; then
@@ -160,7 +167,11 @@ fi
 # ─── Create and push tag ─────────────────────────────────────────────────────
 echo
 info "태그 생성 중: $TAG"
-git tag "$TAG"
+if [[ -n "$MESSAGE" ]]; then
+  git tag -a "$TAG" -m "$MESSAGE"
+else
+  git tag "$TAG"
+fi
 ok "태그 생성 완료"
 
 info "태그 push 중..."
