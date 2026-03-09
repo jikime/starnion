@@ -198,11 +198,26 @@ func newDoctorCmd() *cobra.Command {
 			}
 
 			// Tools
-			for _, tool := range []string{"uv", "pnpm", "go", "node"} {
+			// uv: check PATH and ~/.local/bin fallback
+			if CheckCommand("uv") {
+				PrintOK("uv", "설치 확인")
+			} else if uvBin() != "uv" {
+				PrintOK("uv", "설치 확인 (~/.local/bin/uv)")
+			} else {
+				PrintFail("uv", "설치되지 않음 → curl -LsSf https://astral.sh/uv/install.sh | sh")
+			}
+			// node: required for UI standalone
+			if CheckCommand("node") {
+				PrintOK("node", "설치 확인")
+			} else {
+				PrintFail("node", "설치되지 않음 → https://nodejs.org (v20+)")
+			}
+			// pnpm / go: dev mode only
+			for _, tool := range []string{"pnpm", "go"} {
 				if CheckCommand(tool) {
 					PrintOK(tool, "설치 확인")
 				} else {
-					PrintFail(tool, "설치되지 않음")
+					PrintFail(tool, "설치되지 않음 (개발 모드에서만 필요)")
 				}
 			}
 			fmt.Println()

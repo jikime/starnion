@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -18,6 +19,45 @@ import (
 func CheckCommand(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
+}
+
+// uvBin returns the path to the uv binary.
+// Checks PATH first, then ~/.local/bin/uv (uv's default install location).
+func uvBin() string {
+	if path, err := exec.LookPath("uv"); err == nil {
+		return path
+	}
+	home, _ := os.UserHomeDir()
+	candidate := filepath.Join(home, ".local", "bin", "uv")
+	if _, err := os.Stat(candidate); err == nil {
+		return candidate
+	}
+	return "uv" // fallback; will fail at runtime if truly absent
+}
+
+// ensureUV checks if uv is installed and installs it automatically if missing.
+func ensureUV() bool {
+	if CheckCommand("uv") {
+		return true
+	}
+	// Check ~/.local/bin/uv (installed but not in PATH yet)
+	home, _ := os.UserHomeDir()
+	if _, err := os.Stat(filepath.Join(home, ".local", "bin", "uv")); err == nil {
+		PrintOK("uv", "설치 확인 (~/.local/bin/uv)")
+		return true
+	}
+
+	PrintInfo("uv가 없습니다. 자동 설치 중...")
+	cmd := exec.Command("sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		PrintFail("uv", fmt.Sprintf("자동 설치 실패: %v", err))
+		PrintHint("수동 설치: curl -LsSf https://astral.sh/uv/install.sh | sh")
+		return false
+	}
+	PrintOK("uv", "자동 설치 완료")
+	return true
 }
 
 // ── Network reachability ──────────────────────────────────────────────────────
@@ -114,11 +154,13 @@ type SystemCheckResult struct {
 	PostgresOK bool
 	MinIOOK    bool
 	UvOK       bool
-	PnpmOK     bool
+	NodeOK     bool
+	PnpmOK     bool // dev mode only
 }
 
-// RunSystemCheck performs the [1/5] system dependency check.
-// It blocks until PostgreSQL and MinIO are reachable.
+// RunSystemCheck performs the [1/7] system dependency check.
+// It blocks until PostgreSQL and MinIO are reachable, and auto-installs uv if missing.
+// devMode=true also checks pnpm (needed for local source dev).
 func RunSystemCheck(pgHost string, pgPort int, minioPublicURL string) SystemCheckResult {
 	res := SystemCheckResult{}
 
@@ -140,20 +182,25 @@ func RunSystemCheck(pgHost string, pgPort int, minioPublicURL string) SystemChec
 	)
 	PrintOK("MinIO", minioPublicURL+" 연결 확인")
 
-	// uv (Python package manager for agent)
-	res.UvOK = CheckCommand("uv")
-	if res.UvOK {
-		PrintOK("uv", "설치 확인")
+	// uv ── auto-install if missing (B approach)
+	res.UvOK = ensureUV()
+
+	// node ── required for UI standalone server
+	res.NodeOK = CheckCommand("node")
+	if res.NodeOK {
+		PrintOK("node", "설치 확인")
 	} else {
-		PrintFail("uv", "설치되지 않음 → curl -LsSf https://astral.sh/uv/install.sh | sh")
+		PrintFail("node", "Node.js가 없습니다 → https://nodejs.org (v20+)")
 	}
 
-	// pnpm (Node package manager for UI)
-	res.PnpmOK = CheckCommand("pnpm")
-	if res.PnpmOK {
-		PrintOK("pnpm", "설치 확인")
-	} else {
-		PrintFail("pnpm", "설치되지 않음 → npm install -g pnpm")
+	// pnpm ── only needed for local dev (source tree)
+	if !isInstalled() {
+		res.PnpmOK = CheckCommand("pnpm")
+		if res.PnpmOK {
+			PrintOK("pnpm", "설치 확인")
+		} else {
+			PrintFail("pnpm", "설치되지 않음 → npm install -g pnpm")
+		}
 	}
 
 	return res

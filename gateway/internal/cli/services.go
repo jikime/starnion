@@ -76,7 +76,7 @@ func ensureAgentDeps(root string) error {
 	}
 
 	PrintInfo("Python 패키지 설치 중... (uv sync)")
-	cmd := exec.Command("uv", "sync")
+	cmd := exec.Command(uvBin(), "sync")
 	cmd.Dir = agentDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -158,7 +158,7 @@ func RunAgent() error {
 
 	PrintInfo("에이전트를 시작합니다...")
 	agentDir := filepath.Join(root, "agent")
-	cmd := serviceCmd(agentDir, sCrimson.Render("[agent]"), "uv", "run", "python", "-m", "starnion_agent")
+	cmd := serviceCmd(agentDir, sCrimson.Render("[agent]"), uvBin(), "run", "python", "-m", "starnion_agent")
 	return runWithSignal(cmd)
 }
 
@@ -214,7 +214,7 @@ func RunDev() error {
 		}
 		cmds = []*exec.Cmd{
 			serviceCmd(installRoot(), sAntares.Render("[gateway]"), gwBin),
-			serviceCmd(agentDir, sCrimson.Render("[agent] "), "uv", "run", "python", "-m", "starnion_agent"),
+			serviceCmd(agentDir, sCrimson.Render("[agent] "), uvBin(), "run", "python", "-m", "starnion_agent"),
 			serviceCmd(uiDir, sGold.Render("[ui]     "), "node", "server.js"),
 		}
 	} else {
@@ -230,7 +230,7 @@ func RunDev() error {
 		uiDir := filepath.Join(root, "ui")
 		cmds = []*exec.Cmd{
 			serviceCmd(gwDir, sAntares.Render("[gateway]"), "go", "run", "./cmd/gateway"),
-			serviceCmd(agentDir, sCrimson.Render("[agent] "), "uv", "run", "python", "-m", "starnion_agent"),
+			serviceCmd(agentDir, sCrimson.Render("[agent] "), uvBin(), "run", "python", "-m", "starnion_agent"),
 			serviceCmd(uiDir, sGold.Render("[ui]     "), "pnpm", "dev"),
 		}
 	}
