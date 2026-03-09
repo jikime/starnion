@@ -3,6 +3,7 @@ layout: default
 title: Quick Start (5 minutes)
 nav_order: 2
 parent: Getting Started
+grand_parent: 🇺🇸 English
 ---
 
 # Quick Start (5 minutes)

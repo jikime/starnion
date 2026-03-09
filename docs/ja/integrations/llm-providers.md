@@ -2,6 +2,7 @@
 title: LLMプロバイダー
 nav_order: 1
 parent: 連携
+grand_parent: 🇯🇵 日本語
 ---
 
 # LLMプロバイダー

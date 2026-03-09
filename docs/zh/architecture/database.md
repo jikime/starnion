@@ -2,6 +2,7 @@
 title: 数据库
 nav_order: 4
 parent: 架构
+grand_parent: 🇨🇳 中文
 ---
 
 # 数据库

@@ -2,6 +2,7 @@
 title: 메모
 nav_order: 5
 parent: 기능
+grand_parent: 🇰🇷 한국어
 ---
 
 # 메모

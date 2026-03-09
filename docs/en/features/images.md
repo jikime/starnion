@@ -2,6 +2,7 @@
 title: Images
 nav_order: 9
 parent: Features
+grand_parent: 🇺🇸 English
 ---
 
 # Images

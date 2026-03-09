@@ -1,6 +1,8 @@
 ---
-title: Documentation Home
-nav_order: 0
+title: 🇺🇸 English
+nav_order: 3
+has_children: true
+permalink: /en/
 ---
 
 # Starnion Documentation

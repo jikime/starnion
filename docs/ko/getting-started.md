@@ -3,6 +3,7 @@ title: 시작하기
 nav_order: 1
 has_children: true
 permalink: /ko/getting-started/
+parent: 🇰🇷 한국어
 ---
 
 # 시작하기

@@ -2,6 +2,7 @@
 title: Skills System
 nav_order: 1
 parent: Skills
+grand_parent: 🇺🇸 English
 ---
 
 # Skills System

@@ -2,6 +2,7 @@
 title: 音频
 nav_order: 10
 parent: 功能指南
+grand_parent: 🇨🇳 中文
 ---
 
 # 音频

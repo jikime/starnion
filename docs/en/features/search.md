@@ -2,6 +2,7 @@
 title: Search
 nav_order: 7
 parent: Features
+grand_parent: 🇺🇸 English
 ---
 
 # Search

@@ -3,6 +3,7 @@ layout: default
 title: What is Starnion?
 nav_order: 1
 parent: Getting Started
+grand_parent: 🇺🇸 English
 ---
 
 # What is Starnion?

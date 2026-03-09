@@ -2,6 +2,7 @@
 title: 家計簿 & 予算
 nav_order: 2
 parent: 機能ガイド
+grand_parent: 🇯🇵 日本語
 ---
 
 # 家計簿 & 予算

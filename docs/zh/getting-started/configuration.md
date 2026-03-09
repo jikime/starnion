@@ -3,6 +3,7 @@ layout: default
 title: 配置说明
 nav_order: 4
 parent: 快速入门
+grand_parent: 🇨🇳 中文
 ---
 
 # 配置说明

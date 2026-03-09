@@ -2,6 +2,7 @@
 title: AI 채팅
 nav_order: 1
 parent: 기능
+grand_parent: 🇰🇷 한국어
 ---
 
 # AI 채팅

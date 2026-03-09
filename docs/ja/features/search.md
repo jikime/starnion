@@ -2,6 +2,7 @@
 title: 検索
 nav_order: 7
 parent: 機能ガイド
+grand_parent: 🇯🇵 日本語
 ---
 
 # 検索

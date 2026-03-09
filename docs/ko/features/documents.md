@@ -2,6 +2,7 @@
 title: 문서 관리
 nav_order: 8
 parent: 기능
+grand_parent: 🇰🇷 한국어
 ---
 
 # 문서 관리

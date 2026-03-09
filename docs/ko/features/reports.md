@@ -2,6 +2,7 @@
 title: 리포트
 nav_order: 11
 parent: 기능
+grand_parent: 🇰🇷 한국어
 ---
 
 # 리포트

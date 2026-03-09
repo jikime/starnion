@@ -2,6 +2,7 @@
 title: 데이터베이스
 nav_order: 4
 parent: 아키텍처
+grand_parent: 🇰🇷 한국어
 ---
 
 # 데이터베이스

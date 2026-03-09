@@ -2,6 +2,7 @@
 title: 목표 관리
 nav_order: 4
 parent: 기능
+grand_parent: 🇰🇷 한국어
 ---
 
 # 목표 관리

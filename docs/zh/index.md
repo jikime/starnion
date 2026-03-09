@@ -1,6 +1,8 @@
 ---
-title: 文档首页
-nav_order: 0
+title: 🇨🇳 中文
+nav_order: 4
+has_children: true
+permalink: /zh/
 ---
 
 # Starnion 文档

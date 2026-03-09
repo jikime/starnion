@@ -2,6 +2,7 @@
 title: 文档管理
 nav_order: 8
 parent: 功能指南
+grand_parent: 🇨🇳 中文
 ---
 
 # 文档管理

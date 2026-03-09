@@ -2,6 +2,7 @@
 title: Architecture Overview
 nav_order: 1
 parent: Architecture
+grand_parent: 🇺🇸 English
 ---
 
 # Architecture Overview

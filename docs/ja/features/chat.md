@@ -2,6 +2,7 @@
 title: AIチャット
 nav_order: 1
 parent: 機能ガイド
+grand_parent: 🇯🇵 日本語
 ---
 
 # AIチャット

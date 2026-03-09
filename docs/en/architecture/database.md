@@ -2,6 +2,7 @@
 title: Database
 nav_order: 4
 parent: Architecture
+grand_parent: 🇺🇸 English
 ---
 
 # Database

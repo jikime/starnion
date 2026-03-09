@@ -2,6 +2,7 @@
 title: 일정 & 알림
 nav_order: 12
 parent: 기능
+grand_parent: 🇰🇷 한국어
 ---
 
 # 일정 & 알림

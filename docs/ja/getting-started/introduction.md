@@ -3,6 +3,7 @@ layout: default
 title: Starnionとは
 nav_order: 1
 parent: はじめに
+grand_parent: 🇯🇵 日本語
 ---
 
 # Starnionとは

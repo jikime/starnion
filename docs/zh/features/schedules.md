@@ -2,6 +2,7 @@
 title: 日程 & 提醒
 nav_order: 12
 parent: 功能指南
+grand_parent: 🇨🇳 中文
 ---
 
 # 日程 & 提醒

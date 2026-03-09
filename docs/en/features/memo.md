@@ -2,6 +2,7 @@
 title: Memo
 nav_order: 5
 parent: Features
+grand_parent: 🇺🇸 English
 ---
 
 # Memo

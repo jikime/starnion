@@ -2,6 +2,7 @@
 title: Skill List
 nav_order: 2
 parent: Skills
+grand_parent: 🇺🇸 English
 ---
 
 # Skill List

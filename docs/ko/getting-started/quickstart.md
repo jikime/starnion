@@ -3,6 +3,7 @@ layout: default
 title: 빠른 시작 (5분)
 nav_order: 2
 parent: 시작하기
+grand_parent: 🇰🇷 한국어
 ---
 
 # 빠른 시작 (5분)

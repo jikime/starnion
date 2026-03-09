@@ -2,6 +2,7 @@
 title: 스킬 목록
 nav_order: 2
 parent: 스킬
+grand_parent: 🇰🇷 한국어
 ---
 
 # 스킬 목록

@@ -2,6 +2,7 @@
 title: 오디오
 nav_order: 10
 parent: 기능
+grand_parent: 🇰🇷 한국어
 ---
 
 # 오디오

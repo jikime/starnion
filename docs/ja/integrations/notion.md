@@ -2,6 +2,7 @@
 title: Notion連携
 nav_order: 2
 parent: 連携
+grand_parent: 🇯🇵 日本語
 ---
 
 # Notion連携

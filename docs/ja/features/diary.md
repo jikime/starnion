@@ -2,6 +2,7 @@
 title: 日記
 nav_order: 3
 parent: 機能ガイド
+grand_parent: 🇯🇵 日本語
 ---
 
 # 日記

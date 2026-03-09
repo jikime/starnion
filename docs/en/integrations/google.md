@@ -2,6 +2,7 @@
 title: Google Integration
 nav_order: 1
 parent: Integrations
+grand_parent: 🇺🇸 English
 ---
 
 # Google Integration

@@ -2,6 +2,7 @@
 title: 가계부 & 예산
 nav_order: 2
 parent: 기능
+grand_parent: 🇰🇷 한국어
 ---
 
 # 가계부 & 예산

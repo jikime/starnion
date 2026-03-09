@@ -2,6 +2,7 @@
 title: データベース
 nav_order: 4
 parent: アーキテクチャ
+grand_parent: 🇯🇵 日本語
 ---
 
 # データベース

@@ -2,6 +2,7 @@
 title: 架构概述
 nav_order: 1
 parent: 架构
+grand_parent: 🇨🇳 中文
 ---
 
 # 架构概述

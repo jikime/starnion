@@ -3,6 +3,7 @@ title: 스킬
 nav_order: 5
 has_children: true
 permalink: /ko/skills/
+parent: 🇰🇷 한국어
 ---
 
 # 스킬

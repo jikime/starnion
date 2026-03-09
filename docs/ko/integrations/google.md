@@ -2,6 +2,7 @@
 title: Google 연동
 nav_order: 1
 parent: 통합
+grand_parent: 🇰🇷 한국어
 ---
 
 # Google 연동

@@ -3,6 +3,7 @@ layout: default
 title: Installation Guide
 nav_order: 3
 parent: Getting Started
+grand_parent: 🇺🇸 English
 ---
 
 # Installation Guide

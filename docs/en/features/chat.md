@@ -2,6 +2,7 @@
 title: AI Chat
 nav_order: 1
 parent: Features
+grand_parent: 🇺🇸 English
 ---
 
 # AI Chat

@@ -2,6 +2,7 @@
 title: 目標管理
 nav_order: 4
 parent: 機能ガイド
+grand_parent: 🇯🇵 日本語
 ---
 
 # 目標管理

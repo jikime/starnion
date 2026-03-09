@@ -2,6 +2,7 @@
 title: Notion Integration
 nav_order: 2
 parent: Integrations
+grand_parent: 🇺🇸 English
 ---
 
 # Notion Integration

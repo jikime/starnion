@@ -2,6 +2,7 @@
 title: Notion 연동
 nav_order: 2
 parent: 통합
+grand_parent: 🇰🇷 한국어
 ---
 
 # Notion 연동

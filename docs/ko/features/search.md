@@ -2,6 +2,7 @@
 title: 검색
 nav_order: 7
 parent: 기능
+grand_parent: 🇰🇷 한국어
 ---
 
 # 검색

@@ -3,6 +3,7 @@ layout: default
 title: Starnion이란?
 nav_order: 1
 parent: 시작하기
+grand_parent: 🇰🇷 한국어
 ---
 
 # Starnion이란?

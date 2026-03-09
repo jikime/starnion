@@ -1,6 +1,8 @@
 ---
-title: 문서 홈
-nav_order: 0
+title: 🇰🇷 한국어
+nav_order: 2
+has_children: true
+permalink: /ko/
 ---
 
 # Starnion 문서

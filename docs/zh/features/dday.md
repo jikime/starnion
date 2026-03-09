@@ -2,6 +2,7 @@
 title: 倒计时
 nav_order: 6
 parent: 功能指南
+grand_parent: 🇨🇳 中文
 ---
 
 # 倒计时

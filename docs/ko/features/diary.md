@@ -2,6 +2,7 @@
 title: 일기
 nav_order: 3
 parent: 기능
+grand_parent: 🇰🇷 한국어
 ---
 
 # 일기

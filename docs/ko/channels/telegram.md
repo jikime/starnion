@@ -2,6 +2,7 @@
 title: 텔레그램 봇
 nav_order: 1
 parent: 채널
+grand_parent: 🇰🇷 한국어
 ---
 
 # 텔레그램 봇

@@ -1,6 +1,8 @@
 ---
-title: ドキュメントホーム
-nav_order: 0
+title: 🇯🇵 日本語
+nav_order: 5
+has_children: true
+permalink: /ja/
 ---
 
 # Starnion ドキュメント

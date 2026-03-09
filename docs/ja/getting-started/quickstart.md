@@ -3,6 +3,7 @@ layout: default
 title: クイックスタート
 nav_order: 2
 parent: はじめに
+grand_parent: 🇯🇵 日本語
 ---
 
 # クイックスタート（5分）

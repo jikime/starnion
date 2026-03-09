@@ -2,6 +2,7 @@
 title: 디데이 (D-Day)
 nav_order: 6
 parent: 기능
+grand_parent: 🇰🇷 한국어
 ---
 
 # 디데이 (D-Day)

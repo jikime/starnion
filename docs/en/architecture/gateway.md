@@ -2,6 +2,7 @@
 title: Gateway (Go)
 nav_order: 2
 parent: Architecture
+grand_parent: 🇺🇸 English
 ---
 
 # Gateway (Go)

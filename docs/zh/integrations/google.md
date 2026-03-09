@@ -2,6 +2,7 @@
 title: Google 集成
 nav_order: 1
 parent: 集成
+grand_parent: 🇨🇳 中文
 ---
 
 # Google 集成

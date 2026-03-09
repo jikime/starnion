@@ -2,6 +2,7 @@
 title: 이미지
 nav_order: 9
 parent: 기능
+grand_parent: 🇰🇷 한국어
 ---
 
 # 이미지

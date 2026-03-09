@@ -3,6 +3,7 @@ title: 频道
 nav_order: 3
 has_children: true
 permalink: /zh/channels/
+parent: 🇨🇳 中文
 ---
 
 # 频道

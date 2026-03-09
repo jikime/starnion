@@ -2,6 +2,7 @@
 title: 图片
 nav_order: 9
 parent: 功能指南
+grand_parent: 🇨🇳 中文
 ---
 
 # 图片

@@ -2,6 +2,7 @@
 title: 备忘录
 nav_order: 5
 parent: 功能指南
+grand_parent: 🇨🇳 中文
 ---
 
 # 备忘录

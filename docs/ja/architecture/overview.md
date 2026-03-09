@@ -2,6 +2,7 @@
 title: アーキテクチャ概要
 nav_order: 1
 parent: アーキテクチャ
+grand_parent: 🇯🇵 日本語
 ---
 
 # アーキテクチャ概要

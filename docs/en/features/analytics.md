@@ -2,6 +2,7 @@
 title: Analytics & Usage
 nav_order: 13
 parent: Features
+grand_parent: 🇺🇸 English
 ---
 
 # Analytics & Usage

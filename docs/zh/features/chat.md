@@ -2,6 +2,7 @@
 title: AI 聊天
 nav_order: 1
 parent: 功能指南
+grand_parent: 🇨🇳 中文
 ---
 
 # AI 聊天

@@ -2,6 +2,7 @@
 title: 技能系统
 nav_order: 1
 parent: 技能系统
+grand_parent: 🇨🇳 中文
 ---
 
 # 技能系统

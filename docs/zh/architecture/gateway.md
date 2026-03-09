@@ -2,6 +2,7 @@
 title: Gateway（Go）
 nav_order: 2
 parent: 架构
+grand_parent: 🇨🇳 中文
 ---
 
 # Gateway（Go）

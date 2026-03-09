@@ -2,6 +2,7 @@
 title: 웹 채팅
 nav_order: 2
 parent: 채널
+grand_parent: 🇰🇷 한국어
 ---
 
 # 웹 채팅

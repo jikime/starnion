@@ -2,6 +2,7 @@
 title: Agent（Python）
 nav_order: 3
 parent: 架构
+grand_parent: 🇨🇳 中文
 ---
 
 # Agent（Python）

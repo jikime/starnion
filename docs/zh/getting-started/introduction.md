@@ -3,6 +3,7 @@ layout: default
 title: Starnion 简介
 nav_order: 1
 parent: 快速入门
+grand_parent: 🇨🇳 中文
 ---
 
 # 什么是 Starnion？

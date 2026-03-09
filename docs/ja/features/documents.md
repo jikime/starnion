@@ -2,6 +2,7 @@
 title: ドキュメント管理
 nav_order: 8
 parent: 機能ガイド
+grand_parent: 🇯🇵 日本語
 ---
 
 # ドキュメント管理

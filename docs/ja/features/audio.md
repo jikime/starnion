@@ -2,6 +2,7 @@
 title: 音声
 nav_order: 10
 parent: 機能ガイド
+grand_parent: 🇯🇵 日本語
 ---
 
 # 音声

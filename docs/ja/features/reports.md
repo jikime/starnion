@@ -2,6 +2,7 @@
 title: レポート
 nav_order: 11
 parent: 機能ガイド
+grand_parent: 🇯🇵 日本語
 ---
 
 # レポート

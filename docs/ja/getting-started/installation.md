@@ -3,6 +3,7 @@ layout: default
 title: インストールガイド
 nav_order: 3
 parent: はじめに
+grand_parent: 🇯🇵 日本語
 ---
 
 # インストールガイド

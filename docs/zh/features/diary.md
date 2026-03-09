@@ -2,6 +2,7 @@
 title: 日记
 nav_order: 3
 parent: 功能指南
+grand_parent: 🇨🇳 中文
 ---
 
 # 日记

@@ -2,6 +2,7 @@
 title: 记账 & 预算
 nav_order: 2
 parent: 功能指南
+grand_parent: 🇨🇳 中文
 ---
 
 # 记账 & 预算

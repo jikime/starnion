@@ -2,6 +2,7 @@
 title: Web Chat
 nav_order: 2
 parent: チャンネル
+grand_parent: 🇯🇵 日本語
 ---
 
 # Web Chat

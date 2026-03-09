@@ -2,6 +2,7 @@
 title: 报告
 nav_order: 11
 parent: 功能指南
+grand_parent: 🇨🇳 中文
 ---
 
 # 报告

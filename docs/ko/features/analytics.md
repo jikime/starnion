@@ -2,6 +2,7 @@
 title: 분석 & 사용량
 nav_order: 13
 parent: 기능
+grand_parent: 🇰🇷 한국어
 ---
 
 # 분석 & 사용량

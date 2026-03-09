@@ -3,6 +3,7 @@ layout: default
 title: 快速开始
 nav_order: 2
 parent: 快速入门
+grand_parent: 🇨🇳 中文
 ---
 
 # 快速开始（5 分钟）

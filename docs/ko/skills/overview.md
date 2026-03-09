@@ -2,6 +2,7 @@
 title: 스킬 시스템
 nav_order: 1
 parent: 스킬
+grand_parent: 🇰🇷 한국어
 ---
 
 # 스킬 시스템

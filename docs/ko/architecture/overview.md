@@ -2,6 +2,7 @@
 title: 아키텍처 개요
 nav_order: 1
 parent: 아키텍처
+grand_parent: 🇰🇷 한국어
 ---
 
 # 아키텍처 개요

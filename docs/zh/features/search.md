@@ -2,6 +2,7 @@
 title: 搜索
 nav_order: 7
 parent: 功能指南
+grand_parent: 🇨🇳 中文
 ---
 
 # 搜索

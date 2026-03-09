@@ -2,6 +2,7 @@
 title: 分析 & 使用状況
 nav_order: 13
 parent: 機能ガイド
+grand_parent: 🇯🇵 日本語
 ---
 
 # 分析 & 使用状況

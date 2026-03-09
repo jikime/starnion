@@ -2,6 +2,7 @@
 title: Goal Tracking
 nav_order: 4
 parent: Features
+grand_parent: 🇺🇸 English
 ---
 
 # Goal Tracking

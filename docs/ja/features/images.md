@@ -2,6 +2,7 @@
 title: 画像
 nav_order: 9
 parent: 機能ガイド
+grand_parent: 🇯🇵 日本語
 ---
 
 # 画像

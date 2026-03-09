@@ -3,6 +3,7 @@ layout: default
 title: 設定
 nav_order: 4
 parent: はじめに
+grand_parent: 🇯🇵 日本語
 ---
 
 # 設定

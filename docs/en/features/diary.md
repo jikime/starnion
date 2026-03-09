@@ -2,6 +2,7 @@
 title: Diary
 nav_order: 3
 parent: Features
+grand_parent: 🇺🇸 English
 ---
 
 # Diary

@@ -2,6 +2,7 @@
 title: Notion 集成
 nav_order: 2
 parent: 集成
+grand_parent: 🇨🇳 中文
 ---
 
 # Notion 集成

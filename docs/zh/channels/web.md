@@ -2,6 +2,7 @@
 title: 网页聊天
 nav_order: 2
 parent: 频道
+grand_parent: 🇨🇳 中文
 ---
 
 # 网页聊天

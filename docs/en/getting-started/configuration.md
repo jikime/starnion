@@ -3,6 +3,7 @@ layout: default
 title: Configuration
 nav_order: 4
 parent: Getting Started
+grand_parent: 🇺🇸 English
 ---
 
 # Configuration

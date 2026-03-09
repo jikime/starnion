@@ -2,6 +2,7 @@
 title: LLM 프로바이더
 nav_order: 1
 parent: 통합
+grand_parent: 🇰🇷 한국어
 ---
 
 # LLM 프로바이더

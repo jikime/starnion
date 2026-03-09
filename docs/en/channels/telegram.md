@@ -2,6 +2,7 @@
 title: Telegram Bot
 nav_order: 1
 parent: Channels
+grand_parent: 🇺🇸 English
 ---
 
 # Telegram Bot

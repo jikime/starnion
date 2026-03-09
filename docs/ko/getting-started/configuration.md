@@ -3,6 +3,7 @@ layout: default
 title: 환경 설정
 nav_order: 4
 parent: 시작하기
+grand_parent: 🇰🇷 한국어
 ---
 
 # 환경 설정

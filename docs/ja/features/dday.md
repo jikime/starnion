@@ -2,6 +2,7 @@
 title: カウントダウン
 nav_order: 6
 parent: 機能ガイド
+grand_parent: 🇯🇵 日本語
 ---
 
 # カウントダウン

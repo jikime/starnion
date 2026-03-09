@@ -2,6 +2,7 @@
 title: 目标管理
 nav_order: 4
 parent: 功能指南
+grand_parent: 🇨🇳 中文
 ---
 
 # 目标管理

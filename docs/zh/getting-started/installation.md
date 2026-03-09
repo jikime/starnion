@@ -3,6 +3,7 @@ layout: default
 title: 安装指南
 nav_order: 3
 parent: 快速入门
+grand_parent: 🇨🇳 中文
 ---
 
 # 安装指南

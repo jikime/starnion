@@ -2,6 +2,7 @@
 title: メモ
 nav_order: 5
 parent: 機能ガイド
+grand_parent: 🇯🇵 日本語
 ---
 
 # メモ

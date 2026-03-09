@@ -2,6 +2,7 @@
 title: スキルシステム
 nav_order: 1
 parent: スキルシステム
+grand_parent: 🇯🇵 日本語
 ---
 
 # スキルシステム

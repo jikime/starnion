@@ -2,6 +2,7 @@
 title: スケジュール & リマインダー
 nav_order: 12
 parent: 機能ガイド
+grand_parent: 🇯🇵 日本語
 ---
 
 # スケジュール & リマインダー

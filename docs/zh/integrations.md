@@ -3,6 +3,7 @@ title: 集成
 nav_order: 4
 has_children: true
 permalink: /zh/integrations/
+parent: 🇨🇳 中文
 ---
 
 # 集成

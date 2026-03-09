@@ -3,6 +3,7 @@ layout: default
 title: 설치 가이드
 nav_order: 3
 parent: 시작하기
+grand_parent: 🇰🇷 한국어
 ---
 
 # 설치 가이드

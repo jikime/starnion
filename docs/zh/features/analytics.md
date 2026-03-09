@@ -2,6 +2,7 @@
 title: 统计分析
 nav_order: 13
 parent: 功能指南
+grand_parent: 🇨🇳 中文
 ---
 
 # 统计分析

@@ -2,6 +2,7 @@
 title: Telegram 机器人
 nav_order: 1
 parent: 频道
+grand_parent: 🇨🇳 中文
 ---
 
 # Telegram 机器人

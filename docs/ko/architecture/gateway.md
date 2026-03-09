@@ -2,6 +2,7 @@
 title: Gateway (Go)
 nav_order: 2
 parent: 아키텍처
+grand_parent: 🇰🇷 한국어
 ---
 
 # Gateway (Go)
