@@ -45,7 +45,6 @@ grand_parent: 🇰🇷 한국어
 |-----------|-----------|-----------|
 | Docker Engine | 24+ | [docs.docker.com](https://docs.docker.com/engine/install/) |
 | Docker Compose | v2 | Docker Engine에 포함 |
-| Git | 2.x | 시스템 패키지 관리자로 설치 |
 
 #### 네이티브로 실행 (개발용)
 
@@ -164,24 +163,39 @@ sudo mv ../starnion /usr/local/bin/
 
 CLI를 설치했다면 다음 단계로 서비스를 실행합니다.
 
-### Docker로 실행
+### Docker로 실행 (권장)
+
+v1.0.2부터 `git clone` 없이 CLI만으로 Docker 실행이 가능합니다.
 
 ```bash
-# 1. 저장소 클론
-git clone https://github.com/jikime/starnion.git
-cd starnion/docker
-
-# 2. 환경 파일 복사
-cp .env.example .env
-
-# 3. .env 파일에서 시크릿 값 변경 (필수!)
-# POSTGRES_PASSWORD, MINIO_SECRET_KEY, JWT_SECRET, AUTH_SECRET
-
-# 4. 초기 설정 마법사
+# 1. 초기 설정 마법사 (DB, MinIO, API 키 등)
 starnion setup
 
-# 5. 서비스 시작
+# 2. Docker 서비스 시작 (이미지 빌드 포함)
 starnion docker up --build
+
+# 3. 이후 재시작 시
+starnion docker up -d
+```
+
+#### 프로덕션 모드
+
+```bash
+# 리소스 제한, 로그 로테이션, 포트 제한이 적용됩니다
+starnion docker up --prod -d
+```
+
+#### 주요 Docker 명령어
+
+```bash
+starnion docker up -d          # 백그라운드 시작
+starnion docker down           # 서비스 중지
+starnion docker logs -f        # 실시간 로그
+starnion docker ps             # 컨테이너 상태 확인
+starnion docker restart        # 전체 재시작
+starnion docker migrate        # DB 마이그레이션 단독 실행
+starnion docker backup         # DB + 파일 백업
+starnion docker restore --from <경로>  # 백업에서 복원
 ```
 
 ### 네이티브로 실행 (개발자용)
@@ -190,8 +204,7 @@ PostgreSQL과 MinIO가 로컬에서 이미 실행 중인 경우:
 
 ```bash
 # 1. 인프라 서비스만 Docker로 시작
-cd docker
-docker compose up -d postgres minio
+starnion docker up -d postgres minio
 
 # 2. 설정 마법사
 starnion setup
@@ -262,11 +275,17 @@ docker exec starnion-postgres pg_isready -U starnion
 ## 업데이트
 
 ```bash
-# 최신 버전으로 업데이트
+# 최신 버전으로 업데이트 (CLI + Docker 이미지 + DB 마이그레이션 자동)
 starnion update
 
+# 버전 확인만
+starnion update --check
+
+# CLI만 업데이트 (Docker 이미지 갱신 건너뜀)
+starnion update --skip-docker
+
 # 특정 버전으로 업데이트
-starnion update --version 1.2.0
+STARNION_VERSION=1.2.0 curl -fsSL https://jikime.github.io/starnion/install.sh | bash
 ```
 
 ---

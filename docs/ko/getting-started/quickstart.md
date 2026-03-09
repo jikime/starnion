@@ -1,15 +1,15 @@
 ---
 layout: default
-title: 빠른 시작 (5분)
+title: 빠른 시작 (3단계)
 nav_order: 2
 parent: 시작하기
 grand_parent: 🇰🇷 한국어
 ---
 
-# 빠른 시작 (5분)
+# 빠른 시작 (3단계)
 {: .no_toc }
 
-Docker만 있으면 5분 안에 Starnion을 실행할 수 있습니다.
+CLI 하나로 3단계 만에 Starnion을 실행할 수 있습니다.
 {: .fs-6 .fw-300 }
 
 <details open markdown="block">
@@ -29,7 +29,6 @@ Docker만 있으면 5분 안에 Starnion을 실행할 수 있습니다.
 |----------|-----------|-----------|
 | Docker Engine | 24+ | `docker --version` |
 | Docker Compose | v2 | `docker compose version` |
-| Git | 2.x | `git --version` |
 
 > **Docker Desktop 사용 중이라면** Docker Engine과 Docker Compose가 이미 포함되어 있습니다.
 
@@ -41,97 +40,32 @@ docker --version
 
 docker compose version
 # Docker Compose version v2.x.x
-
-git --version
-# git version 2.x.x
 ```
 
 ---
 
-## 5단계 빠른 시작
+## 3단계 빠른 시작
 
-### 1단계: 저장소 클론
-
-```bash
-git clone https://github.com/jikime/starnion.git
-cd starnion
-```
-
-### 2단계: 환경 파일 설정
+### 1단계: CLI 설치
 
 ```bash
-cd docker
-cp .env.example .env
-```
-
-`.env` 파일을 열어 최소한 다음 4개의 시크릿 값을 변경합니다:
-
-```bash
-# .env 파일 편집
-nano .env   # 또는 vim, code 등 원하는 에디터 사용
-```
-
-변경해야 할 핵심 값:
-
-```dotenv
-# 반드시 변경하세요!
-POSTGRES_PASSWORD=내_안전한_비밀번호_여기
-MINIO_SECRET_KEY=내_안전한_키_여기
-JWT_SECRET=최소32자_이상의_랜덤_문자열_여기
-AUTH_SECRET=최소32자_이상의_랜덤_문자열_여기
-```
-
-> **안전한 랜덤 문자열 생성:**
-> ```bash
-> # macOS / Linux
-> openssl rand -base64 32
-> ```
-
-### 3단계: 서비스 실행
-
-```bash
-# docker 디렉토리에서 실행
-docker compose up -d
-```
-
-처음 실행 시 Docker 이미지를 빌드하므로 수 분이 소요됩니다. 이후 실행은 즉시 시작됩니다.
-
-진행 상황 확인:
-
-```bash
-docker compose logs -f
-```
-
-모든 서비스가 `healthy` 상태가 되면 준비 완료입니다:
-
-```bash
-docker compose ps
-```
-
-예상 출력:
-
-```
-NAME                 STATUS
-starnion-postgres    Up (healthy)
-starnion-minio       Up (healthy)
-starnion-agent       Up
-starnion-gateway     Up
-starnion-ui          Up
-```
-
-### 4단계: 초기 설정 마법사 실행
-
-별도 터미널에서 Starnion CLI를 설치하고 초기 설정을 진행합니다:
-
-```bash
-# CLI 설치 (선택사항 — 없으면 Docker 직접 사용)
 curl -fsSL https://jikime.github.io/starnion/install.sh | bash
+```
 
-# 초기 설정 마법사 실행
+설치 스크립트가 자동으로 다음을 수행합니다:
+- `starnion` CLI → `/usr/local/bin/starnion`
+- `starnion-gateway` → `~/.starnion/bin/`
+- Python agent → `~/.starnion/agent/`
+- Next.js UI → `~/.starnion/ui/`
+- Docker 설정 파일 → `~/.starnion/docker/`
+
+### 2단계: 초기 설정 마법사
+
+```bash
 starnion setup
 ```
 
-설정 마법사가 다음 항목들을 순서대로 안내합니다:
+설정 마법사가 순서대로 안내합니다:
 
 | 단계 | 설정 항목 |
 |------|-----------|
@@ -141,20 +75,36 @@ starnion setup
 | 4 | 파일 스토리지 설정 (MinIO 버킷) |
 | 5 | 서비스 URL 설정 |
 
-> **CLI 없이 진행하려면:**
-> ```bash
-> cd docker && bash setup.sh
-> ```
+### 3단계: 서비스 시작
 
-### 5단계: 브라우저에서 접속
-
-브라우저를 열고 접속합니다:
-
-```
-http://localhost:3000
+```bash
+starnion docker up --build
 ```
 
-3단계에서 생성한 관리자 이메일과 비밀번호로 로그인하세요.
+처음 실행 시 Docker 이미지를 빌드하므로 수 분이 소요됩니다. 이후 실행은 즉시 시작됩니다.
+
+진행 상황 확인:
+
+```bash
+starnion docker logs -f
+```
+
+모든 서비스가 `healthy` 상태가 되면 준비 완료입니다:
+
+```bash
+starnion docker ps
+```
+
+예상 출력:
+
+```
+NAME                 STATUS
+starnion-postgres    Up (healthy)
+starnion-minio       Up (healthy)
+starnion-agent       Up (healthy)
+starnion-gateway     Up
+starnion-ui          Up
+```
 
 ---
 
@@ -203,26 +153,33 @@ http://localhost:3000
 
 ```bash
 # 서비스 시작
-docker compose up -d
+starnion docker up -d
 
 # 서비스 중지
-docker compose down
+starnion docker down
 
 # 로그 확인 (실시간)
-docker compose logs -f
+starnion docker logs -f
 
 # 특정 서비스 로그
-docker compose logs -f gateway
-docker compose logs -f agent
+starnion docker logs -f gateway
+starnion docker logs -f agent
 
 # 서비스 상태 확인
-docker compose ps
+starnion docker ps
 
 # 전체 재시작
-docker compose restart
+starnion docker restart
 
 # 이미지 재빌드 후 시작
-docker compose up -d --build
+starnion docker up --build
+
+# 최신 버전 업데이트
+starnion update
+
+# 백업 / 복원
+starnion docker backup
+starnion docker restore --from ~/.starnion/backups/<timestamp>
 ```
 
 ---

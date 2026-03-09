@@ -45,7 +45,6 @@ grand_parent: 🇺🇸 English
 |----------|-----------------|-------------------|
 | Docker Engine | 24+ | [docs.docker.com](https://docs.docker.com/engine/install/) |
 | Docker Compose | v2 | Included with Docker Engine |
-| Git | 2.x | Install via system package manager |
 
 #### Running Natively (For Development)
 
@@ -160,52 +159,64 @@ sudo mv ../starnion /usr/local/bin/
 
 ---
 
-## After CLI Installation: Starting Services
+## After CLI Installation: Running Services
 
-Once the CLI is installed, follow these steps to start the services.
+### Run with Docker (Recommended)
 
-### Run with Docker
+Since v1.0.2, you can run with Docker using only the CLI — no `git clone` required.
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/jikime/starnion.git
-cd starnion/docker
-
-# 2. Copy the environment file
-cp .env.example .env
-
-# 3. Change secret values in the .env file (required!)
-# POSTGRES_PASSWORD, MINIO_SECRET_KEY, JWT_SECRET, AUTH_SECRET
-
-# 4. Initial setup wizard
+# 1. Initial setup wizard (DB, MinIO, API keys, etc.)
 starnion setup
 
-# 5. Start services
+# 2. Start Docker services (includes image build)
 starnion docker up --build
+
+# 3. Subsequent starts
+starnion docker up -d
+```
+
+#### Production Mode
+
+```bash
+# Applies resource limits, log rotation, and port restrictions
+starnion docker up --prod -d
+```
+
+#### Key Docker Commands
+
+```bash
+starnion docker up -d          # Start in background
+starnion docker down           # Stop services
+starnion docker logs -f        # Live logs
+starnion docker ps             # Container status
+starnion docker restart        # Restart all
+starnion docker migrate        # Run DB migrations standalone
+starnion docker backup         # Backup DB + files
+starnion docker restore --from <path>  # Restore from backup
 ```
 
 ### Run Natively (For Developers)
 
-When PostgreSQL and MinIO are already running locally:
+If PostgreSQL and MinIO are already running locally:
 
 ```bash
-# 1. Start only infrastructure services with Docker
-cd docker
-docker compose up -d postgres minio
+# 1. Start infrastructure services via Docker only
+starnion docker up -d postgres minio
 
 # 2. Run setup wizard
 starnion setup
 
-# 3. Run the full service stack natively (gateway + agent + UI)
+# 3. Start all services natively (gateway + agent + UI)
 starnion dev
 ```
 
 Or run individual services:
 
 ```bash
-starnion gateway   # Go API server       :8080
-starnion agent     # Python AI engine    :50051
-starnion ui        # Next.js interface   :3000
+starnion gateway   # Go API server     :8080
+starnion agent     # Python AI engine  :50051
+starnion ui        # Next.js UI        :3000
 ```
 
 ---
@@ -259,14 +270,20 @@ docker exec starnion-postgres pg_isready -U starnion
 
 ---
 
-## Updating
+## Update
 
 ```bash
-# Update to the latest version
+# Update to latest version (CLI + Docker images + DB migrations automatically)
 starnion update
 
+# Check version only
+starnion update --check
+
+# Update CLI only (skip Docker image pull)
+starnion update --skip-docker
+
 # Update to a specific version
-starnion update --version 1.2.0
+STARNION_VERSION=1.2.0 curl -fsSL https://jikime.github.io/starnion/install.sh | bash
 ```
 
 ---

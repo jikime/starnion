@@ -1,15 +1,15 @@
 ---
 layout: default
-title: 快速开始
+title: 快速开始（3步）
 nav_order: 2
 parent: 快速入门
 grand_parent: 🇨🇳 中文
 ---
 
-# 快速开始（5 分钟）
+# 快速开始（3 步）
 {: .no_toc }
 
-只需 Docker，即可在 5 分钟内启动 Starnion。
+只需 CLI，3 步即可启动 Starnion。
 {: .fs-6 .fw-300 }
 
 <details open markdown="block">
@@ -29,7 +29,6 @@ grand_parent: 🇨🇳 中文
 |------|----------|----------|
 | Docker Engine | 24+ | `docker --version` |
 | Docker Compose | v2 | `docker compose version` |
-| Git | 2.x | `git --version` |
 
 > **如果您使用 Docker Desktop**，Docker Engine 和 Docker Compose 已包含在内。
 
@@ -41,93 +40,28 @@ docker --version
 
 docker compose version
 # Docker Compose version v2.x.x
-
-git --version
-# git version 2.x.x
 ```
 
 ---
 
-## 五步快速开始
+## 三步快速开始
 
-### 第 1 步：克隆仓库
-
-```bash
-git clone https://github.com/jikime/starnion.git
-cd starnion
-```
-
-### 第 2 步：配置环境文件
+### 第 1 步：安装 CLI
 
 ```bash
-cd docker
-cp .env.example .env
-```
-
-打开 `.env` 文件，至少修改以下 4 个密钥值：
-
-```bash
-# 编辑 .env 文件
-nano .env   # 或使用 vim、code 等您喜欢的编辑器
-```
-
-必须修改的关键值：
-
-```dotenv
-# 必须修改这些值！
-POSTGRES_PASSWORD=your_secure_password_here
-MINIO_SECRET_KEY=your_secure_key_here
-JWT_SECRET=random_string_of_at_least_32_characters_here
-AUTH_SECRET=random_string_of_at_least_32_characters_here
-```
-
-> **生成安全随机字符串：**
-> ```bash
-> # macOS / Linux
-> openssl rand -base64 32
-> ```
-
-### 第 3 步：启动服务
-
-```bash
-# 在 docker 目录下运行
-docker compose up -d
-```
-
-首次运行时需要几分钟来构建 Docker 镜像，之后的启动将会很快。
-
-监控启动进度：
-
-```bash
-docker compose logs -f
-```
-
-所有服务达到 `healthy` 状态后即可使用：
-
-```bash
-docker compose ps
-```
-
-预期输出：
-
-```
-NAME                 STATUS
-starnion-postgres    Up (healthy)
-starnion-minio       Up (healthy)
-starnion-agent       Up
-starnion-gateway     Up
-starnion-ui          Up
-```
-
-### 第 4 步：运行初始设置向导
-
-在另一个终端中，安装 Starnion CLI 并运行初始设置：
-
-```bash
-# 安装 CLI（可选——不安装也可以直接使用 Docker）
 curl -fsSL https://jikime.github.io/starnion/install.sh | bash
+```
 
-# 运行初始设置向导
+安装脚本自动执行以下操作：
+- `starnion` CLI → `/usr/local/bin/starnion`
+- `starnion-gateway` → `~/.starnion/bin/`
+- Python agent → `~/.starnion/agent/`
+- Next.js UI → `~/.starnion/ui/`
+- Docker 配置文件 → `~/.starnion/docker/`
+
+### 第 2 步：运行初始设置向导
+
+```bash
 starnion setup
 ```
 
@@ -141,20 +75,36 @@ starnion setup
 | 4 | 文件存储设置（MinIO 存储桶） |
 | 5 | 服务 URL 配置 |
 
-> **不使用 CLI 时：**
-> ```bash
-> cd docker && bash setup.sh
-> ```
+### 第 3 步：启动服务
 
-### 第 5 步：在浏览器中打开
-
-打开浏览器并访问：
-
-```
-http://localhost:3000
+```bash
+starnion docker up --build
 ```
 
-使用第 3 步创建的管理员邮箱和密码登录。
+首次运行时需要几分钟来构建 Docker 镜像，之后的启动将会很快。
+
+监控启动进度：
+
+```bash
+starnion docker logs -f
+```
+
+所有服务达到 `healthy` 状态后即可使用：
+
+```bash
+starnion docker ps
+```
+
+预期输出：
+
+```
+NAME                 STATUS
+starnion-postgres    Up (healthy)
+starnion-minio       Up (healthy)
+starnion-agent       Up (healthy)
+starnion-gateway     Up
+starnion-ui          Up
+```
 
 ---
 
@@ -203,26 +153,33 @@ http://localhost:3000
 
 ```bash
 # 启动服务
-docker compose up -d
+starnion docker up -d
 
 # 停止服务
-docker compose down
+starnion docker down
 
 # 查看日志（实时）
-docker compose logs -f
+starnion docker logs -f
 
 # 查看特定服务的日志
-docker compose logs -f gateway
-docker compose logs -f agent
+starnion docker logs -f gateway
+starnion docker logs -f agent
 
 # 检查服务状态
-docker compose ps
+starnion docker ps
 
 # 重启所有服务
-docker compose restart
+starnion docker restart
 
 # 重新构建镜像并启动
-docker compose up -d --build
+starnion docker up --build
+
+# 更新到最新版本
+starnion update
+
+# 备份 / 恢复
+starnion docker backup
+starnion docker restore --from ~/.starnion/backups/<timestamp>
 ```
 
 ---

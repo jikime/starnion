@@ -45,7 +45,6 @@ grand_parent: 🇨🇳 中文
 |------|----------|----------|
 | Docker Engine | 24+ | [docs.docker.com](https://docs.docker.com/engine/install/) |
 | Docker Compose | v2 | 随 Docker Engine 一起安装 |
-| Git | 2.x | 通过系统包管理器安装 |
 
 #### 原生运行（适用于开发）
 
@@ -160,43 +159,55 @@ sudo mv ../starnion /usr/local/bin/
 
 ---
 
-## 安装 CLI 后：启动服务
+## CLI 安装后：启动服务
 
-CLI 安装完成后，按以下步骤启动服务。
+### 使用 Docker 运行（推荐）
 
-### 使用 Docker 运行
+从 v1.0.2 起，只需 CLI 即可运行 Docker，无需 `git clone`。
 
 ```bash
-# 1. 克隆仓库
-git clone https://github.com/jikime/starnion.git
-cd starnion/docker
-
-# 2. 复制环境文件
-cp .env.example .env
-
-# 3. 修改 .env 文件中的密钥值（必须！）
-# POSTGRES_PASSWORD, MINIO_SECRET_KEY, JWT_SECRET, AUTH_SECRET
-
-# 4. 初始设置向导
+# 1. 初始设置向导（数据库、MinIO、API 密钥等）
 starnion setup
 
-# 5. 启动服务
+# 2. 启动 Docker 服务（包含镜像构建）
 starnion docker up --build
+
+# 3. 后续启动
+starnion docker up -d
 ```
 
-### 原生运行（适用于开发者）
-
-当 PostgreSQL 和 MinIO 已在本地运行时：
+#### 生产模式
 
 ```bash
-# 1. 仅使用 Docker 启动基础设施服务
-cd docker
-docker compose up -d postgres minio
+# 启用资源限制、日志轮转和端口限制
+starnion docker up --prod -d
+```
+
+#### 常用 Docker 命令
+
+```bash
+starnion docker up -d          # 后台启动
+starnion docker down           # 停止服务
+starnion docker logs -f        # 实时查看日志
+starnion docker ps             # 查看容器状态
+starnion docker restart        # 重启所有服务
+starnion docker migrate        # 单独执行 DB 迁移
+starnion docker backup         # 备份 DB + 文件
+starnion docker restore --from <路径>  # 从备份恢复
+```
+
+### 原生运行（开发者专用）
+
+如果 PostgreSQL 和 MinIO 已在本地运行：
+
+```bash
+# 1. 仅通过 Docker 启动基础服务
+starnion docker up -d postgres minio
 
 # 2. 运行设置向导
 starnion setup
 
-# 3. 以原生方式运行完整服务栈（gateway + agent + UI）
+# 3. 原生运行所有服务（网关 + 代理 + UI）
 starnion dev
 ```
 
@@ -262,11 +273,14 @@ docker exec starnion-postgres pg_isready -U starnion
 ## 更新
 
 ```bash
-# 更新至最新版本
+# 更新到最新版本（自动更新 CLI + Docker 镜像 + DB 迁移）
 starnion update
 
-# 更新至指定版本
-starnion update --version 1.2.0
+# 仅检查版本
+starnion update --check
+
+# 仅更新 CLI（跳过 Docker 镜像拉取）
+starnion update --skip-docker
 ```
 
 ---

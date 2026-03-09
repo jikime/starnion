@@ -1,15 +1,15 @@
 ---
 layout: default
-title: Quick Start (5 minutes)
+title: Quick Start (3 steps)
 nav_order: 2
 parent: Getting Started
 grand_parent: 🇺🇸 English
 ---
 
-# Quick Start (5 minutes)
+# Quick Start (3 steps)
 {: .no_toc }
 
-With just Docker, you can have Starnion running in under 5 minutes.
+With just the CLI, you can have Starnion running in 3 steps.
 {: .fs-6 .fw-300 }
 
 <details open markdown="block">
@@ -29,7 +29,6 @@ Before you begin, you only need these two things installed:
 |-------------|-----------------|--------------|
 | Docker Engine | 24+ | `docker --version` |
 | Docker Compose | v2 | `docker compose version` |
-| Git | 2.x | `git --version` |
 
 > **If you are using Docker Desktop**, Docker Engine and Docker Compose are already included.
 
@@ -41,97 +40,32 @@ docker --version
 
 docker compose version
 # Docker Compose version v2.x.x
-
-git --version
-# git version 2.x.x
 ```
 
 ---
 
-## 5-Step Quick Start
+## 3-Step Quick Start
 
-### Step 1: Clone the Repository
-
-```bash
-git clone https://github.com/jikime/starnion.git
-cd starnion
-```
-
-### Step 2: Configure the Environment File
+### Step 1: Install the CLI
 
 ```bash
-cd docker
-cp .env.example .env
-```
-
-Open the `.env` file and change at least the following 4 secret values:
-
-```bash
-# Edit the .env file
-nano .env   # or vim, code, or your preferred editor
-```
-
-Key values you must change:
-
-```dotenv
-# You must change these!
-POSTGRES_PASSWORD=your_secure_password_here
-MINIO_SECRET_KEY=your_secure_key_here
-JWT_SECRET=random_string_of_at_least_32_characters_here
-AUTH_SECRET=random_string_of_at_least_32_characters_here
-```
-
-> **Generate a secure random string:**
-> ```bash
-> # macOS / Linux
-> openssl rand -base64 32
-> ```
-
-### Step 3: Start the Services
-
-```bash
-# Run from the docker directory
-docker compose up -d
-```
-
-The first run will take a few minutes to build the Docker images. Subsequent starts are immediate.
-
-Monitor progress:
-
-```bash
-docker compose logs -f
-```
-
-Once all services reach a `healthy` state, you are ready:
-
-```bash
-docker compose ps
-```
-
-Expected output:
-
-```
-NAME                 STATUS
-starnion-postgres    Up (healthy)
-starnion-minio       Up (healthy)
-starnion-agent       Up
-starnion-gateway     Up
-starnion-ui          Up
-```
-
-### Step 4: Run the Initial Setup Wizard
-
-In a separate terminal, install the Starnion CLI and run the initial setup:
-
-```bash
-# Install CLI (optional — you can use Docker directly without it)
 curl -fsSL https://jikime.github.io/starnion/install.sh | bash
+```
 
-# Run the initial setup wizard
+The installation script automatically:
+- `starnion` CLI → `/usr/local/bin/starnion`
+- `starnion-gateway` → `~/.starnion/bin/`
+- Python agent → `~/.starnion/agent/`
+- Next.js UI → `~/.starnion/ui/`
+- Docker configuration files → `~/.starnion/docker/`
+
+### Step 2: Run the Initial Setup Wizard
+
+```bash
 starnion setup
 ```
 
-The setup wizard will guide you through the following steps in order:
+The setup wizard guides you through:
 
 | Step | Configuration Item |
 |------|--------------------|
@@ -141,20 +75,36 @@ The setup wizard will guide you through the following steps in order:
 | 4 | File storage setup (MinIO bucket) |
 | 5 | Service URL configuration |
 
-> **To proceed without the CLI:**
-> ```bash
-> cd docker && bash setup.sh
-> ```
+### Step 3: Start the Services
 
-### Step 5: Open in Your Browser
-
-Open your browser and navigate to:
-
-```
-http://localhost:3000
+```bash
+starnion docker up --build
 ```
 
-Log in with the admin email and password you created in Step 3.
+The first run will take a few minutes to build the Docker images. Subsequent starts are immediate.
+
+Monitor progress:
+
+```bash
+starnion docker logs -f
+```
+
+Once all services reach a `healthy` state, you are ready:
+
+```bash
+starnion docker ps
+```
+
+Expected output:
+
+```
+NAME                 STATUS
+starnion-postgres    Up (healthy)
+starnion-minio       Up (healthy)
+starnion-agent       Up (healthy)
+starnion-gateway     Up
+starnion-ui          Up
+```
 
 ---
 
@@ -203,26 +153,33 @@ What is 1 + 1?
 
 ```bash
 # Start services
-docker compose up -d
+starnion docker up -d
 
 # Stop services
-docker compose down
+starnion docker down
 
 # View logs (real-time)
-docker compose logs -f
+starnion docker logs -f
 
 # Logs for a specific service
-docker compose logs -f gateway
-docker compose logs -f agent
+starnion docker logs -f gateway
+starnion docker logs -f agent
 
 # Check service status
-docker compose ps
+starnion docker ps
 
 # Restart everything
-docker compose restart
+starnion docker restart
 
 # Rebuild images and start
-docker compose up -d --build
+starnion docker up --build
+
+# Update to latest version
+starnion update
+
+# Backup / Restore
+starnion docker backup
+starnion docker restore --from ~/.starnion/backups/<timestamp>
 ```
 
 ---

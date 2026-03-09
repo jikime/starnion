@@ -45,7 +45,6 @@ grand_parent: 🇯🇵 日本語
 |------------|--------------|-----------------|
 | Docker Engine | 24+ | [docs.docker.com](https://docs.docker.com/engine/install/) |
 | Docker Compose | v2 | Docker Engineに含まれる |
-| Git | 2.x | システムのパッケージマネージャーからインストール |
 
 #### ネイティブ実行（開発用）
 
@@ -160,43 +159,55 @@ sudo mv ../starnion /usr/local/bin/
 
 ---
 
-## CLIインストール後：サービスの起動
+## CLIインストール後：サービスの実行
 
-CLIをインストールしたら、以下の手順でサービスを起動します。
+### Dockerで実行（推奨）
 
-### Dockerで実行
+v1.0.2以降、`git clone`なしでCLIのみでDockerを実行できます。
 
 ```bash
-# 1. リポジトリをクローン
-git clone https://github.com/jikime/starnion.git
-cd starnion/docker
-
-# 2. 環境ファイルをコピー
-cp .env.example .env
-
-# 3. .envファイルのシークレット値を変更（必須！）
-# POSTGRES_PASSWORD, MINIO_SECRET_KEY, JWT_SECRET, AUTH_SECRET
-
-# 4. 初期セットアップウィザード
+# 1. 初期設定ウィザード（DB、MinIO、APIキーなど）
 starnion setup
 
-# 5. サービスの起動
+# 2. Dockerサービス起動（イメージビルド含む）
 starnion docker up --build
+
+# 3. 以降の起動
+starnion docker up -d
 ```
 
-### ネイティブ実行（開発者向け）
-
-PostgreSQLとMinIOがすでにローカルで動作している場合：
+#### プロダクションモード
 
 ```bash
-# 1. Dockerでインフラサービスのみ起動
-cd docker
-docker compose up -d postgres minio
+# リソース制限、ログローテーション、ポート制限が適用されます
+starnion docker up --prod -d
+```
 
-# 2. セットアップウィザードを実行
+#### 主なDockerコマンド
+
+```bash
+starnion docker up -d          # バックグラウンド起動
+starnion docker down           # サービス停止
+starnion docker logs -f        # リアルタイムログ
+starnion docker ps             # コンテナ状態確認
+starnion docker restart        # 全体再起動
+starnion docker migrate        # DBマイグレーション単体実行
+starnion docker backup         # DB+ファイルバックアップ
+starnion docker restore --from <パス>  # バックアップから復元
+```
+
+### ネイティブで実行（開発者向け）
+
+PostgreSQLとMinIOがすでにローカルで実行されている場合：
+
+```bash
+# 1. インフラサービスのみDockerで起動
+starnion docker up -d postgres minio
+
+# 2. セットアップウィザード
 starnion setup
 
-# 3. 全サービスをネイティブで実行（gateway + agent + UI）
+# 3. 全サービスをネイティブ実行（ゲートウェイ + エージェント + UI）
 starnion dev
 ```
 
@@ -262,11 +273,14 @@ docker exec starnion-postgres pg_isready -U starnion
 ## アップデート
 
 ```bash
-# 最新バージョンにアップデート
+# 最新バージョンに更新（CLI + Dockerイメージ + DBマイグレーション自動実行）
 starnion update
 
-# 特定バージョンにアップデート
-starnion update --version 1.2.0
+# バージョン確認のみ
+starnion update --check
+
+# CLIのみ更新（Dockerイメージ更新をスキップ）
+starnion update --skip-docker
 ```
 
 ---
