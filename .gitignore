@@ -19,7 +19,6 @@ htmlcov/
 .coverage
 
 # Go
-gateway/gen/
 gateway/gateway
 *.exe
 *.test
