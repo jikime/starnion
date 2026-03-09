@@ -9,9 +9,10 @@ before:
     # Build Next.js UI in standalone mode
     - sh -c "cd ui && NEXT_STANDALONE=1 pnpm install --frozen-lockfile && NEXT_STANDALONE=1 pnpm build"
     # Prepare staging directory: agent source + UI standalone
-    - sh -c "rm -rf dist/staging && mkdir -p dist/staging/agent dist/staging/ui"
-    - sh -c "cp -r agent/src agent/pyproject.toml dist/staging/agent/ && (test -f agent/uv.lock && cp agent/uv.lock dist/staging/agent/ || true)"
-    - sh -c "cp -rL ui/.next/standalone/. dist/staging/ui/ && cp -r ui/.next/static dist/staging/ui/.next/static && cp -r ui/public dist/staging/ui/public"
+    # Use .staging/ (not dist/) to avoid conflict with goreleaser --clean
+    - sh -c "rm -rf .staging && mkdir -p .staging/agent .staging/ui"
+    - sh -c "cp -r agent/src agent/pyproject.toml .staging/agent/ && (test -f agent/uv.lock && cp agent/uv.lock .staging/agent/ || true)"
+    - sh -c "cp -rL ui/.next/standalone/. .staging/ui/ && cp -r ui/.next/static .staging/ui/.next/static && cp -r ui/public .staging/ui/public"
 
 builds:
   - id: starnion
@@ -55,10 +56,10 @@ archives:
     name_template: "starnion_{{ .Os }}_{{ .Arch }}"
     format: tar.gz
     files:
-      - src: dist/staging/agent/**
+      - src: .staging/agent/**
         dst: agent
         strip_parent: true
-      - src: dist/staging/ui/**
+      - src: .staging/ui/**
         dst: ui
         strip_parent: true
 
