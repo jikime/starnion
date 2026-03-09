@@ -76,9 +76,15 @@ func (h *ChannelHandler) GetTelegram(c echo.Context) error {
 	}
 
 	configured := botToken != ""
+	// Use the in-memory state as the authoritative "running" signal.
+	// This prevents a state mismatch where the DB says enabled=false but the
+	// bot goroutine is still alive (e.g., during the shutdown grace period or
+	// after a crash that left a stale DB row).
+	actuallyRunning := h.mgr != nil && h.mgr.IsRunning(userID)
+	effectiveEnabled := enabled || actuallyRunning
 	status := "not-configured"
 	if configured {
-		if enabled {
+		if effectiveEnabled {
 			status = "running"
 		} else {
 			status = "configured"
@@ -105,7 +111,7 @@ func (h *ChannelHandler) GetTelegram(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, telegramStatusResponse{
 		Configured:  configured,
-		Enabled:     enabled,
+		Enabled:     effectiveEnabled,
 		Accounts:    accounts,
 		Status:      status,
 		DMPolicy:    dmPolicy,
@@ -145,6 +151,22 @@ func (h *ChannelHandler) UpdateTelegram(c echo.Context) error {
 		if req.BotToken == "" {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "botToken is required"})
 		}
+		// Reject if another user already registered the same token.
+		// One Telegram bot token can only be polled by one process at a time;
+		// allowing duplicates causes 409 Conflict errors.
+		var existingOwner string
+		err := h.db.QueryRowContext(c.Request().Context(), `
+			SELECT user_id FROM channel_settings
+			WHERE channel = 'telegram' AND bot_token = $1 AND user_id != $2
+			LIMIT 1
+		`, req.BotToken, userID).Scan(&existingOwner)
+		if err == nil {
+			// Another user already owns this token.
+			return c.JSON(http.StatusConflict, map[string]string{"error": "이 봇 토큰은 이미 다른 사용자가 등록한 토큰입니다"})
+		}
+		if err != sql.ErrNoRows {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
 		if _, err := h.db.ExecContext(c.Request().Context(), `
 			INSERT INTO channel_settings (user_id, channel, bot_token, enabled, updated_at)
 			VALUES ($1, 'telegram', $2, FALSE, $3)
@@ -183,8 +205,14 @@ func (h *ChannelHandler) UpdateTelegram(c echo.Context) error {
 		}
 		if h.mgr != nil {
 			if *req.Enabled {
-				if err := h.mgr.StartBot(c.Request().Context(), userID, token); err != nil {
-					return c.JSON(http.StatusBadRequest, map[string]string{"error": "봇 시작 실패: " + err.Error()})
+				// Skip restart if the bot is already running with the same token.
+				// ReloadAll() starts the bot on server boot; toggling the UI switch
+				// to "on" when it's already running would stop+restart it, causing
+				// a brief window where two getUpdates requests are active → 409 Conflict.
+				if !h.mgr.IsRunning(userID) {
+					if err := h.mgr.StartBot(c.Request().Context(), userID, token); err != nil {
+						return c.JSON(http.StatusBadRequest, map[string]string{"error": "봇 시작 실패: " + err.Error()})
+					}
 				}
 			} else {
 				h.mgr.StopBot(userID)

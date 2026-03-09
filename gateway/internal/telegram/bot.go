@@ -107,24 +107,60 @@ func (b *Bot) loadPolicy() (dmPolicy, groupPolicy string) {
 }
 
 // Run starts polling for Telegram updates and processing them.
-// It blocks until ctx is cancelled.
+// It blocks until ctx is cancelled, then returns promptly (within one poll cycle).
+//
+// We intentionally avoid tgbotapi.GetUpdatesChan because its internal goroutine
+// uses a hardcoded time.Sleep(3s) on errors that cannot be interrupted by context
+// cancellation.  In the worst case (poll timeout + sleep) that goroutine takes 8s
+// to exit, exceeding StopBot's 7s wait and leaving a zombie goroutine that races
+// with the next bot instance → Telegram 409 Conflict.
+//
+// Instead we drive the polling loop ourselves so that every wait point is
+// a context-aware select, guaranteeing Run() exits within one poll cycle
+// (≤ pollTimeout seconds) after ctx is cancelled.
 func (b *Bot) Run(ctx context.Context) {
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 30
-	// Do NOT set AllowedUpdates — letting Telegram send the default set
-	// avoids server-side caching issues that can suppress photo updates.
+	const pollTimeout = 5 // seconds — Telegram long-poll window
 
-	updates := b.api.GetUpdatesChan(u)
+	cfg := tgbotapi.NewUpdate(0)
+	cfg.Timeout = pollTimeout
 
 	log.Info().Msg("Telegram bot polling started")
 
 	for {
+		// Exit immediately if context was cancelled between iterations.
 		select {
 		case <-ctx.Done():
-			b.api.StopReceivingUpdates()
 			log.Info().Msg("Telegram bot stopped")
 			return
-		case update := <-updates:
+		default:
+		}
+
+		updates, err := b.api.GetUpdates(cfg)
+		if err != nil {
+			// Check for cancellation before sleeping so that StopBot is not
+			// delayed by the retry back-off.
+			select {
+			case <-ctx.Done():
+				log.Info().Msg("Telegram bot stopped")
+				return
+			default:
+			}
+			log.Warn().Err(err).Msg("telegram: GetUpdates error, retrying in 3s")
+			// Interruptible back-off: honours ctx cancellation immediately.
+			select {
+			case <-ctx.Done():
+				log.Info().Msg("Telegram bot stopped")
+				return
+			case <-time.After(3 * time.Second):
+			}
+			continue
+		}
+
+		for _, update := range updates {
+			if update.UpdateID >= cfg.Offset {
+				cfg.Offset = update.UpdateID + 1
+			}
+
 			// Log every raw update to detect which types are actually arriving.
 			log.Debug().
 				Int("update_id", update.UpdateID).

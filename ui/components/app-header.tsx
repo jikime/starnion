@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Moon, Search, Sun, Loader2, ArrowRight, BookOpen, StickyNote, FileText, Globe, Wallet, MessageCircle, Brain, Check, AlertTriangle, TrendingUp, Clock, Activity, Target } from "lucide-react"
+import { Bell, Moon, RefreshCw, Search, Sun, Loader2, ArrowRight, BookOpen, StickyNote, FileText, Globe, Wallet, MessageCircle, Brain, Check, AlertTriangle, TrendingUp, Clock, Activity, Target } from "lucide-react"
 import { signOut, useSession } from "next-auth/react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
@@ -99,6 +99,7 @@ export function AppHeader() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -277,6 +278,23 @@ export function AppHeader() {
 
       {/* Right-side actions */}
       <div className="ml-auto flex items-center gap-1">
+        {/* Refresh */}
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="새로고침"
+          disabled={refreshing}
+          onClick={() => {
+            setRefreshing(true)
+            router.refresh()
+            setTimeout(() => {
+              window.location.reload()
+            }, 100)
+          }}
+        >
+          <RefreshCw className={cn("size-5", refreshing && "animate-spin")} />
+        </Button>
+
         {/* Language switcher */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

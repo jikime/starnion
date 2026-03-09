@@ -3,6 +3,8 @@ package logbuf
 
 import (
 	"encoding/json"
+	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -104,6 +106,44 @@ func (b *Buffer) parse(p []byte) Entry {
 			}
 			entry.Source = v
 			break
+		}
+	}
+
+	// Append extra key=value fields that are not standard zerolog fields.
+	// This ensures attributes like latency, method, path, status are visible.
+	standardKeys := map[string]bool{
+		"time": true, "level": true, "message": true, "error": true,
+		"component": true, "module": true, "caller": true, "service": true,
+	}
+	// Preferred display order for common HTTP/app fields.
+	ordered := []string{"method", "path", "status", "latency", "latency_human", "remote_ip", "host", "user_agent", "bytes_in", "bytes_out"}
+	seen := map[string]bool{}
+	var extras []string
+	for _, k := range ordered {
+		if standardKeys[k] {
+			continue
+		}
+		if v, ok := m[k]; ok {
+			extras = append(extras, fmt.Sprintf("%s=%v", k, v))
+			seen[k] = true
+		}
+	}
+	// Remaining fields in alphabetical order.
+	rest := make([]string, 0, len(m))
+	for k := range m {
+		if !standardKeys[k] && !seen[k] {
+			rest = append(rest, k)
+		}
+	}
+	sort.Strings(rest)
+	for _, k := range rest {
+		extras = append(extras, fmt.Sprintf("%s=%v", k, m[k]))
+	}
+	if len(extras) > 0 {
+		if entry.Message != "" {
+			entry.Message = entry.Message + " " + strings.Join(extras, " ")
+		} else {
+			entry.Message = strings.Join(extras, " ")
 		}
 	}
 
