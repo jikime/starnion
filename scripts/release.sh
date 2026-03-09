@@ -152,7 +152,7 @@ echo -e "    브랜치: ${CYAN}${BRANCH}${NC}"
 echo -e "    커밋:   ${CYAN}$(git rev-parse --short HEAD)${NC}"
 echo
 read -rp "  릴리즈를 진행하시겠습니까? [y/N] " confirm
-if [[ "${confirm,,}" != "y" ]]; then
+if [[ "$(echo "$confirm" | tr '[:upper:]' '[:lower:]')" != "y" ]]; then
   info "취소되었습니다."
   exit 0
 fi
