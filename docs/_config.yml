@@ -19,17 +19,6 @@ search_tokenizer_separator: /[\s/]+/
 # Footer
 footer_content: "Copyright &copy; 2025 Starnion. All rights reserved."
 
-# Language switcher links in header
-nav_external_links:
-  - title: 🇰🇷 한국어
-    url: ko/
-  - title: 🇺🇸 English
-    url: en/
-  - title: 🇨🇳 中文
-    url: zh/
-  - title: 🇯🇵 日本語
-    url: ja/
-
 # Plugins
 plugins:
   - jekyll-remote-theme
