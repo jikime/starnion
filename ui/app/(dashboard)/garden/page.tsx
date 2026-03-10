@@ -106,16 +106,22 @@ const GARDEN_STYLES = `
 // ── StarField ─────────────────────────────────────────────────────────────────
 
 function StarField() {
-  const stars = useMemo(() =>
-    Array.from({ length: 100 }, (_, i) => ({
+  // Stars must only render client-side to avoid SSR/client floating-point
+  // precision mismatches in CSS style serialization (hydration error).
+  const [stars, setStars] = useState<Array<{
+    id: number; x: number; y: number; s: number; delay: number; dur: number
+  }>>([])
+
+  useEffect(() => {
+    setStars(Array.from({ length: 100 }, (_, i) => ({
       id: i,
-      x: (i * 1.13 + Math.sin(i * 2.37) * 32 + 52) % 100,
-      y: (i * 0.79 + Math.cos(i * 1.71) * 26 + 28) % 74,
+      x: parseFloat(((i * 1.13 + Math.sin(i * 2.37) * 32 + 52) % 100).toFixed(4)),
+      y: parseFloat(((i * 0.79 + Math.cos(i * 1.71) * 26 + 28) % 74).toFixed(4)),
       s: 0.45 + (i % 4) * 0.45,
       delay: (i % 7) * 0.65,
       dur: 1.8 + (i % 5) * 0.6,
-    }))
-  , [])
+    })))
+  }, [])
 
   return (
     <>
