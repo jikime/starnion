@@ -4,9 +4,9 @@ import { useEffect, useLayoutEffect, useRef, useCallback } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Badge } from "@/components/ui/badge"
-import { Wrench, Loader2, CheckCircle2 } from "lucide-react"
+import { Wrench, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { ChatMessage, FileAttachment, Segment } from "@/hooks/use-chat"
+import type { ChatMessage, FileAttachment } from "@/hooks/use-chat"
 
 interface ChatMessagesProps {
   messages: ChatMessage[]
@@ -108,63 +108,9 @@ function ThinkingBubble() {
   )
 }
 
-/** Tool call row — shows the tool name with a spinner (calling) or check (done) */
-function ToolCallRow({ seg }: { seg: Segment & { kind: "tool" } }) {
-  return (
-    <div className="flex items-center gap-1.5 py-1 text-xs text-muted-foreground">
-      {seg.state === "call" ? (
-        <Loader2 className="size-3 shrink-0 animate-spin" />
-      ) : (
-        <CheckCircle2 className="size-3 shrink-0 text-emerald-500" />
-      )}
-      <span>{seg.name}</span>
-    </div>
-  )
-}
-
-/** Assistant message body — renders ordered segments (text + tool calls) */
+/** Assistant message body — renders markdown text only */
 function AssistantBody({ message }: { message: ChatMessage }) {
-  const segs = message.segments
-
-  // Streaming message with segments: render text and tool calls in order
-  if (segs && segs.length > 0) {
-    const lastIdx = segs.length - 1
-    return (
-      <>
-        {segs.map((seg, i) => {
-          if (seg.kind === "tool") {
-            // 텍스트 답변이 나오기 시작하면 도구 행 숨김
-            if (!message.streaming || message.text.trim()) return null
-            return <ToolCallRow key={i} seg={seg} />
-          }
-          const isLast = i === lastIdx
-          return (
-            <div key={i} className="chat-prose">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  a: ({ href, children }) => (
-                    <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
-                  ),
-                }}
-              >
-                {seg.text}
-              </ReactMarkdown>
-              {isLast && message.streaming && (
-                <span className="inline-block h-3.5 w-0.5 animate-pulse bg-foreground align-middle" />
-              )}
-            </div>
-          )
-        })}
-        {/* Streaming but only tool calls so far — no text yet */}
-        {message.streaming && segs.every((s) => s.kind === "tool") && (
-          <span className="inline-block h-3.5 w-0.5 animate-pulse bg-foreground align-middle mt-1" />
-        )}
-      </>
-    )
-  }
-
-  // History message or empty streaming message — plain markdown
+  // plain markdown
   return (
     <div className="chat-prose">
       <ReactMarkdown
