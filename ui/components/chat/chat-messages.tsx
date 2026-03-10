@@ -141,6 +141,8 @@ function AssistantBody({ message }: { message: ChatMessage }) {
       <>
         {segs.map((seg, i) => {
           if (seg.kind === "tool") {
+            // 스트리밍 중에만 도구 호출 표시, 답변 완료 후 숨김
+            if (!message.streaming) return null
             return <ToolCallRow key={i} seg={seg} />
           }
           const isLast = i === lastIdx
