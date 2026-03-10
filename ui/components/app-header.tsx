@@ -95,6 +95,7 @@ export function AppHeader() {
   const [, startTransition] = useTransition()
   const { resolvedTheme, setTheme } = useTheme()
 
+  const [mounted, setMounted] = useState(false)
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -127,6 +128,8 @@ export function AppHeader() {
       }
     } catch { /* ignore */ }
   }, [])
+
+  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
     fetchNotifications()
@@ -295,8 +298,8 @@ export function AppHeader() {
           <RefreshCw className={cn("size-5", refreshing && "animate-spin")} />
         </Button>
 
-        {/* Language switcher */}
-        <DropdownMenu>
+        {/* Language switcher — mounted 이후에만 렌더링해 Radix UI ID hydration 불일치 방지 */}
+        {mounted && <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-1.5 px-2 text-muted-foreground hover:text-foreground">
               <Globe className="size-4" />
@@ -320,7 +323,7 @@ export function AppHeader() {
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu>}
 
         {/* Theme toggle */}
         <Button
@@ -335,7 +338,7 @@ export function AppHeader() {
         </Button>
 
         {/* Notifications */}
-        <DropdownMenu open={notifOpen} onOpenChange={(o) => { setNotifOpen(o); if (o) fetchNotifications() }}>
+        {mounted && <DropdownMenu open={notifOpen} onOpenChange={(o) => { setNotifOpen(o); if (o) fetchNotifications() }}>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="size-5" />
@@ -395,10 +398,10 @@ export function AppHeader() {
               </div>
             )}
           </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu>}
 
         {/* User avatar with session info */}
-        <DropdownMenu>
+        {mounted && <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">
               <Avatar className="size-8">
@@ -432,7 +435,7 @@ export function AppHeader() {
               {t("user.logout")}
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu>}
 
       </div>
     </header>

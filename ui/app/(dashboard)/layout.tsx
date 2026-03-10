@@ -1,4 +1,4 @@
-import { AppHeaderClient } from "@/components/app-header-client"
+import { AppHeader } from "@/components/app-header"
 
 export default function DashboardLayout({
   children,
@@ -7,7 +7,7 @@ export default function DashboardLayout({
 }) {
   return (
     <>
-      <AppHeaderClient />
+      <AppHeader />
       <main className="flex-1 overflow-y-auto scrollbar-hide">
         {children}
       </main>
