@@ -305,8 +305,8 @@ export function ChatMessages({
           >
             <div
               className={cn(
-                "max-w-[88%] space-y-1",
-                message.role === "user" && "items-end"
+                "space-y-1",
+                message.role === "user" ? "max-w-[88%] items-end" : "w-full"
               )}
             >
               <div
