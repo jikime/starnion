@@ -50,7 +50,7 @@ function ChatPageInner() {
   const firstMsgSent = useRef(false)
   const updateTitleRef = useRef<((id: string, title: string) => void) | null>(null)
 
-  const { messages, sendMessage, connState, isConnected, isStreaming, historyLoading, hasMore, loadingMore, loadMore } = useChat(activeThreadId)
+  const { messages, sendMessage, connState, isConnected, isStreaming, isThinking, historyLoading, hasMore, loadingMore, loadMore } = useChat(activeThreadId)
 
   // Keep URL in sync whenever the active thread changes.
   const selectThread = (id: string, platform: string) => {
@@ -152,6 +152,7 @@ function ChatPageInner() {
           loadingMore={loadingMore}
           hasMore={hasMore}
           onLoadMore={loadMore}
+          isThinking={isThinking}
         />
         <ChatInput
           onSend={(text, files) => handleSend(text, files)}

@@ -20,10 +20,21 @@ export interface FileAttachment {
   size?: number
 }
 
+/**
+ * A renderable segment within an assistant message.
+ * "text" segments contain markdown; "tool" segments represent tool calls.
+ * Ordered to match the actual agent execution sequence.
+ */
+export type Segment =
+  | { kind: "text"; text: string }
+  | { kind: "tool"; name: string; state: "call" | "result" }
+
 export interface ChatMessage {
   id: string
   role: MessageRole
   text: string
+  /** Ordered segments (text + tool calls interleaved) — set during streaming */
+  segments?: Segment[]
   toolEvents: ToolEvent[]
   files: FileAttachment[]
   streaming: boolean
@@ -41,6 +52,37 @@ function textFromUIMessage(m: UIMessage): string {
     .filter((p): p is { type: "text"; text: string } => p.type === "text")
     .map((p) => p.text)
     .join("")
+}
+
+/**
+ * Convert UIMessage parts into ordered Segments so we can render text and
+ * tool calls in the correct sequence (not as separate badge groups).
+ */
+function segmentsFromUIMessage(m: UIMessage): Segment[] {
+  const segs: Segment[] = []
+  let textAcc = ""
+
+  for (const part of m.parts) {
+    if (part.type === "text") {
+      textAcc += part.text
+    } else if (part.type === "tool-invocation") {
+      // Flush accumulated text before this tool call
+      if (textAcc) {
+        segs.push({ kind: "text", text: textAcc })
+        textAcc = ""
+      }
+      const inv = (part as { type: "tool-invocation"; toolInvocation: { toolName: string; state: string } }).toolInvocation
+      segs.push({
+        kind: "tool",
+        name: inv.toolName,
+        state: inv.state === "result" ? "result" : "call",
+      })
+    }
+    // "step-start", "file", etc. are handled elsewhere
+  }
+
+  if (textAcc) segs.push({ kind: "text", text: textAcc })
+  return segs
 }
 
 type FileMeta = { name: string; size: number }
@@ -280,6 +322,12 @@ export function useChat(activeThreadId: string | null) {
 
   const isStreaming = status === "streaming" || status === "submitted"
 
+  // "생각 중" — user sent a message but the assistant hasn't responded yet.
+  // True during "submitted" (before first token) OR when "streaming" but no
+  // assistant message has appeared yet (e.g. the model is pre-processing).
+  const hasAssistantMsg = aiMessages.some((m) => m.role === "assistant")
+  const isThinking = status === "submitted" || (status === "streaming" && !hasAssistantMsg)
+
   // During streaming: show AI SDK messages (user + streaming assistant).
   // Once done, historyMessages has the completed exchange and aiMessages is cleared.
   const streamingMessages: ChatMessage[] = isStreaming
@@ -287,6 +335,8 @@ export function useChat(activeThreadId: string | null) {
         id: m.id,
         role: m.role as MessageRole,
         text: textFromUIMessage(m),
+        // Build ordered segments so text and tool calls render in correct sequence
+        segments: m.role === "assistant" ? segmentsFromUIMessage(m) : undefined,
         toolEvents: [],
         files: filesFromUIMessage(m, fileMetaRef.current),
         streaming: m.role === "assistant",
@@ -327,6 +377,7 @@ export function useChat(activeThreadId: string | null) {
     connState,
     isConnected: !aiError,
     isStreaming,
+    isThinking,
     historyLoading,
     hasMore,
     loadingMore,
