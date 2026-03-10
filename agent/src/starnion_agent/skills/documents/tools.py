@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from starnion_agent.context import get_current_user
 from starnion_agent.db.pool import get_pool
 from starnion_agent.db.repositories import document as document_repo
-from starnion_agent.document.chunker import chunk_and_store
+from starnion_agent.document.chunker import process_and_store
 from starnion_agent.document.generator import (
     generate_docx,
     generate_md,
@@ -18,7 +18,7 @@ from starnion_agent.document.generator import (
     generate_xlsx,
     parse_xlsx_content,
 )
-from starnion_agent.document.parser import extract_text, fetch_file
+from starnion_agent.document.parser import fetch_file
 from starnion_agent.skills.file_context import add_pending_file
 from starnion_agent.skills.guard import skill_guard
 
@@ -63,10 +63,6 @@ async def parse_document(file_url: str, file_name: str = "document.pdf") -> str:
     ext = Path(file_name).suffix.lower().lstrip(".")
     if not ext:
         ext = "pdf"
-    text = extract_text(data, ext)
-
-    if not text.strip() or text.startswith("("):
-        return text if text.startswith("(") else "문서에서 텍스트를 추출할 수 없었어요."
 
     pool = get_pool()
     doc = await document_repo.create_document(
@@ -77,11 +73,16 @@ async def parse_document(file_url: str, file_name: str = "document.pdf") -> str:
         file_url=file_url,
     )
 
-    section_count = await chunk_and_store(
+    text, section_count = await process_and_store(
         user_id=user_id,
         doc_id=doc["id"],
-        text=text,
+        data=data,
+        ext=ext,
+        filename=file_name,
     )
+
+    if not text.strip() or text.startswith("("):
+        return text if text.startswith("(") else "문서에서 텍스트를 추출할 수 없었어요."
 
     # Return up to 6000 chars of document content directly so the LLM can
     # answer questions without needing a separate retrieve_memory call.

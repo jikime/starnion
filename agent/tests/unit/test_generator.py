@@ -51,19 +51,19 @@ class TestGenerateDocx:
         assert result[:2] == b"PK"
 
     def test_contains_content(self):
-        """Extracting text from generated DOCX recovers content."""
-        from starnion_agent.document.parser import extract_text_from_docx
+        """Extracting text from generated DOCX recovers content (via Docling)."""
+        from starnion_agent.document.parser import extract_text
 
         result = generate_docx("My Doc", "Hello World.\n\nSecond line.")
-        text = extract_text_from_docx(result)
+        text = extract_text(result, "docx", "my_doc.docx")
         assert "Hello World." in text
 
     def test_multiple_paragraphs(self):
         """Multiple paragraphs separated by double newlines are preserved."""
-        from starnion_agent.document.parser import extract_text_from_docx
+        from starnion_agent.document.parser import extract_text
 
         result = generate_docx("Doc", "Para 1.\n\nPara 2.\n\nPara 3.")
-        text = extract_text_from_docx(result)
+        text = extract_text(result, "docx", "doc.docx")
         assert "Para 1." in text
         assert "Para 2." in text
         assert "Para 3." in text
@@ -83,14 +83,14 @@ class TestGenerateXlsx:
         assert result[:2] == b"PK"
 
     def test_contains_data(self):
-        """Extracting text from generated XLSX recovers data."""
-        from starnion_agent.document.parser import extract_text_from_xlsx
+        """Extracting text from generated XLSX recovers data (via Docling)."""
+        from starnion_agent.document.parser import extract_text
 
         result = generate_xlsx(
             ["Name", "Score"],
             [["Alice", 95], ["Bob", 87]],
         )
-        text = extract_text_from_xlsx(result)
+        text = extract_text(result, "xlsx", "data.xlsx")
         assert "Alice" in text
         assert "95" in text
 

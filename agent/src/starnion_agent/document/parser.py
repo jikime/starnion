@@ -1,20 +1,33 @@
-"""Document parsing: extract text from various document formats."""
+"""Document parsing: extract text from various document formats.
+
+Docling is used for rich formats (PDF, DOCX, PPTX, XLSX, images).
+Plain-text formats (MD, TXT, CSV) are handled directly.
+HWP is handled via olefile (Docling does not support HWP).
+"""
+
+from __future__ import annotations
 
 import logging
-import re
-import struct
-from collections.abc import Callable
 from io import BytesIO
 
 import httpx
-from pypdf import PdfReader
 
 logger = logging.getLogger(__name__)
 
-_DOC_FALLBACK = "(DOC 파일에서 텍스트를 추출할 수 없었어요. .docx 포맷으로 변환해서 보내주세요.)"
-_XLS_FALLBACK = "(XLS 파일에서 텍스트를 추출할 수 없었어요. .xlsx 포맷으로 변환해서 보내주세요.)"
-_PPT_FALLBACK = "(PPT 파일에서 텍스트를 추출할 수 없었어요. .pptx 포맷으로 변환해서 보내주세요.)"
+# Formats handled by Docling (rich structure-aware parsing)
+DOCLING_EXTS: frozenset[str] = frozenset(
+    {"pdf", "docx", "doc", "pptx", "ppt", "xlsx", "xls", "html", "png", "jpg", "jpeg", "gif", "bmp", "tiff", "tif"}
+)
 
+# Formats handled as plain text
+PLAIN_EXTS: frozenset[str] = frozenset({"md", "markdown", "txt", "text", "csv"})
+
+_HWP_FALLBACK = "(HWP 파일에서 텍스트를 추출할 수 없었어요. 다른 포맷으로 변환해서 보내주세요.)"
+
+
+# ---------------------------------------------------------------------------
+# Network
+# ---------------------------------------------------------------------------
 
 async def fetch_file(url: str) -> bytes:
     """Download a file from *url* and return its bytes."""
@@ -24,222 +37,59 @@ async def fetch_file(url: str) -> bytes:
         return resp.content
 
 
-def extract_text_from_pdf(data: bytes) -> str:
-    """Extract text from all pages of a PDF byte-string."""
-    reader = PdfReader(BytesIO(data))
-    pages: list[str] = []
-    for page in reader.pages:
-        text = page.extract_text()
-        if text:
-            pages.append(text.strip())
-    return "\n\n".join(pages)
+# ---------------------------------------------------------------------------
+# Docling-based parsing (PDF, DOCX, PPTX, XLSX, images, …)
+# ---------------------------------------------------------------------------
+
+def _get_converter():
+    """Lazy-initialise a Docling DocumentConverter (thread-safe singleton)."""
+    global _converter  # noqa: PLW0603
+    if _converter is None:
+        from docling.document_converter import DocumentConverter
+        _converter = DocumentConverter()
+    return _converter
 
 
-def extract_text_from_docx(data: bytes) -> str:
-    """Extract text from a DOCX file."""
-    from docx import Document
-
-    doc = Document(BytesIO(data))
-    paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-    return "\n\n".join(paragraphs)
+_converter = None
 
 
-def extract_text_from_xlsx(data: bytes) -> str:
-    """Extract text from an XLSX spreadsheet (all sheets)."""
-    from openpyxl import load_workbook
+def parse_with_docling(data: bytes, filename: str):
+    """Parse *data* with Docling and return a DoclingDocument.
 
-    wb = load_workbook(BytesIO(data), read_only=True, data_only=True)
-    lines: list[str] = []
-    for ws in wb.worksheets:
-        lines.append(f"## {ws.title}")
-        for row in ws.iter_rows(values_only=True):
-            cells = [str(c) if c is not None else "" for c in row]
-            if any(cells):
-                lines.append("\t".join(cells))
-    wb.close()
-    return "\n".join(lines)
+    Args:
+        data: Raw file bytes.
+        filename: Original file name (used to detect format).
 
+    Returns:
+        docling.document_converter.ConversionResult with `.document` attribute.
 
-def extract_text_from_pptx(data: bytes) -> str:
-    """Extract text from a PPTX presentation."""
-    from pptx import Presentation
-
-    prs = Presentation(BytesIO(data))
-    slides: list[str] = []
-    for i, slide in enumerate(prs.slides, 1):
-        texts: list[str] = []
-        for shape in slide.shapes:
-            if shape.has_text_frame:
-                for paragraph in shape.text_frame.paragraphs:
-                    text = paragraph.text.strip()
-                    if text:
-                        texts.append(text)
-        if texts:
-            slides.append(f"## Slide {i}\n" + "\n".join(texts))
-    return "\n\n".join(slides)
-
-
-def extract_text_from_doc(data: bytes) -> str:
-    """Extract text from a legacy DOC (Word Binary) file.
-
-    Strategy:
-    1. Try python-docx (handles .docx files saved with .doc extension)
-    2. Try olefile + Word Binary Format FIB/piece-table parsing
-    3. Fallback with conversion guidance
+    Raises:
+        Exception: If Docling conversion fails.
     """
-    # Strategy 1: python-docx for mislabeled .docx files
-    try:
-        from docx import Document
+    from docling.datamodel.base_models import DocumentStream
 
-        doc = Document(BytesIO(data))
-        paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-        if paragraphs:
-            return "\n\n".join(paragraphs)
-    except Exception:
-        pass
-
-    # Strategy 2: olefile-based Word Binary Format parsing
-    try:
-        text = _parse_doc_binary(data)
-        if text:
-            return text
-    except Exception:
-        logger.debug("DOC binary parsing failed", exc_info=True)
-
-    return _DOC_FALLBACK
+    stream = DocumentStream(name=filename, stream=BytesIO(data))
+    converter = _get_converter()
+    result = converter.convert(stream)
+    return result.document
 
 
-def _parse_doc_binary(data: bytes) -> str | None:
-    """Parse Word Binary Format (97-2003) to extract document text.
+def docling_to_markdown(data: bytes, filename: str) -> str:
+    """Convert *data* with Docling and export as Markdown text.
 
-    Reads the FIB (File Information Block) to locate the CLX (piece table)
-    in the Table stream, then extracts text pieces (ANSI or Unicode).
-    """
-    import olefile
-
-    buf = BytesIO(data)
-    if not olefile.isOleFile(buf):
-        return None
-
-    ole = olefile.OleFileIO(buf)
-    try:
-        if not ole.exists("WordDocument"):
-            return None
-
-        ws = ole.openstream("WordDocument").read()
-
-        # Validate Word Binary magic number (0xA5EC)
-        if len(ws) < 0x60 or struct.unpack_from("<H", ws, 0)[0] != 0xA5EC:
-            return None
-
-        # Determine Table stream (bit 9 of flags → 0Table or 1Table)
-        flags = struct.unpack_from("<H", ws, 0x0A)[0]
-        tbl_name = "1Table" if (flags & 0x0200) else "0Table"
-        if not ole.exists(tbl_name):
-            return None
-
-        # Parse FIB offsets dynamically:
-        #   FibBase(32) → csw → FibRgW → cslw → FibRgLw → cbRgFcLcb → FibRgFcLcb
-        csw = struct.unpack_from("<H", ws, 0x0020)[0]
-        off = 0x0022 + csw * 2  # end of FibRgW
-        cslw = struct.unpack_from("<H", ws, off)[0]
-        off += 2 + cslw * 4  # end of FibRgLw
-        cb_fc = struct.unpack_from("<H", ws, off)[0]  # cbRgFcLcb
-        fc_start = off + 2  # start of FibRgFcLcb
-
-        # fcClx/lcbClx = pair #33 in FibRgFcLcb (MS-DOC spec §2.5.10)
-        _CLX_PAIR = 33
-        if cb_fc <= _CLX_PAIR:
-            return None
-
-        fc_clx = struct.unpack_from("<I", ws, fc_start + _CLX_PAIR * 8)[0]
-        lcb_clx = struct.unpack_from("<I", ws, fc_start + _CLX_PAIR * 8 + 4)[0]
-        if lcb_clx == 0:
-            return None
-
-        # Read CLX from Table stream
-        ts = ole.openstream(tbl_name).read()
-        if fc_clx + lcb_clx > len(ts):
-            return None
-        clx = ts[fc_clx : fc_clx + lcb_clx]
-
-        # Skip PRC entries (type 0x01) to reach Pcdt (type 0x02)
-        pos = 0
-        while pos < len(clx) and clx[pos] == 0x01:
-            cb_prc = struct.unpack_from("<H", clx, pos + 1)[0]
-            pos += 3 + cb_prc
-        if pos >= len(clx) or clx[pos] != 0x02:
-            return None
-
-        lcb_pcdt = struct.unpack_from("<I", clx, pos + 1)[0]
-        pcd = clx[pos + 5 : pos + 5 + lcb_pcdt]
-
-        # Parse PlcPcd: (n+1) CPs (4 bytes each) + n PCDs (8 bytes each)
-        n = (lcb_pcdt - 4) // 12
-        if n <= 0:
-            return None
-
-        parts: list[str] = []
-        for i in range(n):
-            cp0 = struct.unpack_from("<I", pcd, i * 4)[0]
-            cp1 = struct.unpack_from("<I", pcd, (i + 1) * 4)[0]
-            pcd_off = (n + 1) * 4 + i * 8
-            if pcd_off + 8 > len(pcd):
-                break
-
-            fc_val = struct.unpack_from("<I", pcd, pcd_off + 2)[0]
-            is_ansi = bool(fc_val & 0x40000000)
-            fc_real = fc_val & 0x3FFFFFFF
-            count = cp1 - cp0
-            if count <= 0:
-                continue
-
-            try:
-                if is_ansi:
-                    start = fc_real // 2
-                    chunk = ws[start : start + count]
-                    # CP949 for Korean, falls back gracefully for Western text
-                    parts.append(chunk.decode("cp949", errors="replace"))
-                else:
-                    chunk = ws[fc_real : fc_real + count * 2]
-                    parts.append(chunk.decode("utf-16-le", errors="replace"))
-            except (IndexError, struct.error):
-                continue
-
-        if not parts:
-            return None
-
-        text = "".join(parts)
-        text = text.replace("\r\n", "\n").replace("\r", "\n")
-        text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
-        return text.strip() or None
-    finally:
-        ole.close()
-
-
-def extract_text_from_xls(data: bytes) -> str:
-    """Extract text from a legacy XLS file.
-
-    Tries openpyxl first (for mislabeled .xlsx), then returns fallback.
+    Falls back to error message on failure.
     """
     try:
-        return extract_text_from_xlsx(data)
-    except Exception:
-        pass
-    return _XLS_FALLBACK
+        doc = parse_with_docling(data, filename)
+        return doc.export_to_markdown()
+    except Exception as exc:
+        logger.warning("Docling conversion failed for %s: %s", filename, exc)
+        return f"(문서 변환 실패: {exc})"
 
 
-def extract_text_from_ppt(data: bytes) -> str:
-    """Extract text from a legacy PPT file.
-
-    Tries python-pptx first (for mislabeled .pptx), then returns fallback.
-    """
-    try:
-        return extract_text_from_pptx(data)
-    except Exception:
-        pass
-    return _PPT_FALLBACK
-
+# ---------------------------------------------------------------------------
+# HWP (legacy Korean word processor — Docling does not support this)
+# ---------------------------------------------------------------------------
 
 def extract_text_from_hwp(data: bytes) -> str:
     """Extract text from a HWP file (best-effort via olefile)."""
@@ -256,48 +106,61 @@ def extract_text_from_hwp(data: bytes) -> str:
         return "(HWP 파일에서 텍스트를 추출할 수 없었어요. PrvText 스트림이 없습니다.)"
     except Exception:
         logger.debug("HWP extraction failed", exc_info=True)
-        return "(HWP 파일 처리 중 오류가 발생했어요. 다른 포맷으로 변환해서 보내주세요.)"
+        return _HWP_FALLBACK
 
 
-def extract_text_from_md(data: bytes) -> str:
-    """Extract text from a Markdown file."""
+# ---------------------------------------------------------------------------
+# Plain text formats
+# ---------------------------------------------------------------------------
+
+def extract_text_from_plain(data: bytes) -> str:
+    """Decode bytes as UTF-8 text."""
     return data.decode("utf-8", errors="replace").strip()
 
 
-def extract_text_from_txt(data: bytes) -> str:
-    """Extract text from a plain text file."""
-    return data.decode("utf-8", errors="replace").strip()
+# ---------------------------------------------------------------------------
+# Unified entry point
+# ---------------------------------------------------------------------------
 
+def extract_text(data: bytes, ext: str, filename: str | None = None) -> str:
+    """Extract text from *data* and return as a plain string.
 
-# Extension → extractor mapping.
-_EXTRACTORS: dict[str, Callable[[bytes], str]] = {
-    "pdf": extract_text_from_pdf,
-    "docx": extract_text_from_docx,
-    "doc": extract_text_from_doc,
-    "xlsx": extract_text_from_xlsx,
-    "xls": extract_text_from_xls,
-    "pptx": extract_text_from_pptx,
-    "ppt": extract_text_from_ppt,
-    "hwp": extract_text_from_hwp,
-    "md": extract_text_from_md,
-    "markdown": extract_text_from_md,
-    "txt": extract_text_from_txt,
-    "text": extract_text_from_txt,
-    "csv": extract_text_from_txt,
-}
-
-
-def extract_text(data: bytes, ext: str) -> str:
-    """Route to the appropriate extractor based on file extension.
+    For Docling-supported formats, returns Markdown-formatted text which
+    preserves tables, headings, and document structure.
 
     Args:
         data: Raw file bytes.
-        ext: File extension without dot (e.g. "pdf", "docx").
+        ext:  File extension without dot (e.g. "pdf", "docx").
+        filename: Original file name — used by Docling for format detection.
+                  Defaults to "document.<ext>" when not provided.
 
     Returns:
-        Extracted text or an error message.
+        Extracted text, or an error message starting with "(".
     """
-    extractor = _EXTRACTORS.get(ext.lower())
-    if extractor is None:
-        return f"(지원하지 않는 파일 형식이에요: .{ext})"
-    return extractor(data)
+    ext = ext.lower()
+    fname = filename or f"document.{ext}"
+
+    if ext in DOCLING_EXTS:
+        return docling_to_markdown(data, fname)
+    if ext == "hwp":
+        return extract_text_from_hwp(data)
+    if ext in PLAIN_EXTS:
+        return extract_text_from_plain(data)
+
+    return f"(지원하지 않는 파일 형식이에요: .{ext})"
+
+
+def get_docling_document(data: bytes, ext: str, filename: str | None = None):
+    """Return a DoclingDocument for Docling-supported formats, or None.
+
+    Use this when you want structure-aware chunking via HierarchicalChunker.
+    """
+    ext = ext.lower()
+    if ext not in DOCLING_EXTS:
+        return None
+    fname = filename or f"document.{ext}"
+    try:
+        return parse_with_docling(data, fname)
+    except Exception as exc:
+        logger.warning("get_docling_document failed for %s: %s", fname, exc)
+        return None

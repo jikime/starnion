@@ -17,6 +17,7 @@ dependencies = [
     "grpcio>=1.70",
     "grpcio-tools>=1.70",
     "google-genai>=1.0",
+    "docling>=2.0",
     "pypdf>=5.0",
     "pillow>=11.0",
     "httpx>=0.28",
