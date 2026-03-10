@@ -20,16 +20,22 @@ interface GardenData {
   isRaining: boolean
   goals: Goal[]
   incomeStars: number
+  income: number
   meteorCount: number
 }
 
 // ── Sky palettes ──────────────────────────────────────────────────────────────
 
 const PALETTES = {
-  매우좋음: { from: "#0a1628", to: "#1a4a8a", accent: "#60a5fa", nebula: "#3b82f6" },
-  좋음:    { from: "#0f1b3d", to: "#1e3a6b", accent: "#818cf8", nebula: "#6366f1" },
+  // 활기 (energetic/vibrant) → 골드/앰버 하늘
+  매우좋음: { from: "#1a1200", to: "#5a3a00", accent: "#fbbf24", nebula: "#f59e0b" },
+  // 맑음 (clear/pleasant) → 스텔라 블루
+  좋음:    { from: "#0f1b3d", to: "#1e3a6b", accent: "#60a5fa", nebula: "#3b82f6" },
+  // 보통 (neutral) → 인디고/퍼플
   보통:    { from: "#0f1230", to: "#2d1b69", accent: "#a78bfa", nebula: "#7c3aed" },
+  // 우울 (gloomy) → 다크 퍼플
   나쁨:    { from: "#080820", to: "#1a0f3c", accent: "#7c3aed", nebula: "#5b21b6" },
+  // 매우 우울 → 칠흑 남색
   매우나쁨: { from: "#050514", to: "#0a0820", accent: "#5b21b6", nebula: "#4c1d95" },
 } as const
 
@@ -101,6 +107,22 @@ const GARDEN_STYLES = `
   from { transform: rotate(0deg)   translateX(52px) rotate(0deg); }
   to   { transform: rotate(360deg) translateX(52px) rotate(-360deg); }
 }
+@keyframes gdn-star-fall {
+  0%   { transform: translateY(-20px) scale(0.4) rotate(0deg);   opacity: 0; }
+  15%  { opacity: 1; }
+  80%  { opacity: 0.9; }
+  100% { transform: translateY(60px)  scale(1.1) rotate(180deg); opacity: 0; }
+}
+@keyframes gdn-star-land {
+  0%   { transform: scale(0) rotate(-30deg); opacity: 0; }
+  40%  { transform: scale(1.4) rotate(10deg); opacity: 1; }
+  70%  { transform: scale(0.9) rotate(-5deg); opacity: 1; }
+  100% { transform: scale(1)   rotate(0deg);  opacity: 0.85; }
+}
+@keyframes gdn-wither-droop {
+  0%, 100% { transform: rotate(-2deg) translateY(0); }
+  50%       { transform: rotate(-6deg) translateY(4px); }
+}
 `
 
 // ── StarField ─────────────────────────────────────────────────────────────────
@@ -140,6 +162,69 @@ function StarField() {
   )
 }
 
+// ── Income Stars (falling) ────────────────────────────────────────────────────
+
+function IncomeFallingStars({ income }: { income: number }) {
+  // Render 0–6 falling stars based on income amount
+  const count = Math.min(6, Math.max(0, Math.floor(income / 300_000)))
+  const [stars, setStars] = useState<Array<{
+    id: number; x: number; size: number; delay: number; dur: number; landX: number; landY: number
+  }>>([])
+
+  useEffect(() => {
+    if (!count) { setStars([]); return }
+    setStars(Array.from({ length: count }, (_, i) => ({
+      id: i,
+      // Spread across 20–80% width, avoid cloud area (right side)
+      x: parseFloat((20 + (i * 9.3 + Math.sin(i * 1.8) * 15) % 55).toFixed(2)),
+      size: 7 + (i % 3) * 3,
+      delay: parseFloat((i * 1.4).toFixed(1)),
+      dur: parseFloat((2.8 + (i % 3) * 0.5).toFixed(1)),
+      // Landing position (near bottom, scattered)
+      landX: parseFloat((15 + (i * 11.7 + Math.cos(i * 2.1) * 20) % 65).toFixed(2)),
+      landY: parseFloat((72 + (i % 3) * 5).toFixed(2)),
+    })))
+  }, [count])
+
+  if (!stars.length) return null
+
+  return (
+    <>
+      {stars.map(s => (
+        <div key={s.id} className="absolute pointer-events-none" style={{ zIndex: 7 }}>
+          {/* Falling trail */}
+          <div style={{
+            position: "absolute",
+            left: `${s.x}%`,
+            top: "5%",
+            animation: `gdn-star-fall ${s.dur}s ${s.delay}s ease-in infinite`,
+          }}>
+            <svg width={s.size * 2} height={s.size * 2} viewBox="-12 -12 24 24"
+              style={{ overflow: "visible" }}>
+              <polygon points={starPolygon(0, 0, s.size * 0.8, 5)}
+                fill="#fbbf24" opacity="0.9" />
+              <polygon points={starPolygon(0, 0, s.size * 1.3, 5)}
+                fill="#fbbf24" opacity="0.18" />
+            </svg>
+          </div>
+          {/* Landing sparkle */}
+          <div style={{
+            position: "absolute",
+            left: `${s.landX}%`,
+            top: `${s.landY}%`,
+            animation: `gdn-star-land ${s.dur}s ${s.delay + s.dur * 0.8}s ease-out infinite`,
+          }}>
+            <svg width="16" height="16" viewBox="-8 -8 16 16" style={{ overflow: "visible" }}>
+              <polygon points={starPolygon(0, 0, 5, 5)} fill="#fef08a" opacity="0.95" />
+              <circle cx="0" cy="0" r="8" fill="#fbbf24" opacity="0.15" />
+            </svg>
+          </div>
+        </div>
+      ))}
+    </>
+  )
+}
+
 // ── Meteors ───────────────────────────────────────────────────────────────────
 
 function Meteors({ count }: { count: number }) {
@@ -174,24 +259,49 @@ function AssetTree({
   accent: string
   onClick: () => void
 }) {
+  // Wither state: < 30% → withering, < 15% → severely withered
+  const isWithering = savingsRate < 30
+  const isSevere = savingsRate < 15
+
   const scale = 0.5 + Math.min(savingsRate, 100) / 100 * 0.58
-  const alpha = Math.max(0.38, Math.min(1, savingsRate / 85))
+  const alpha = Math.max(0.35, Math.min(1, savingsRate / 80))
+
+  // Branch color shifts grey/brown when withering
+  const branchColor = isWithering
+    ? (isSevere ? "#6b5a4e" : "#8a7060")
+    : accent
+  const branchMidColor = isWithering ? "#a89080" : "#c4b5fd"
+  const branchEndColor = isWithering ? "#9a8070" : "#e879f9"
+
+  // Withered branches droop downward (end points pulled down)
+  const branches = isWithering
+    ? [
+        { d: "M200,272 C178,248 130,220 110,175 C96,140 112,118 150,125", delay: "0s" },
+        { d: "M200,272 C222,248 270,220 290,177 C304,142 290,120 252,128", delay: "0.9s" },
+        { d: "M200,272 C200,248 192,200 196,155 C198,125 208,108 200,100", delay: "1.8s" },
+        { d: "M200,272 C172,268 148,262 128,248 C110,236 106,218 118,205", delay: "2.7s" },
+        { d: "M200,272 C228,268 252,262 272,248 C290,236 294,218 282,205", delay: "3.6s" },
+      ]
+    : [
+        { d: "M200,272 C178,232 116,192 92,136 C74,94 106,66 154,80", delay: "0s" },
+        { d: "M200,272 C222,232 284,192 308,138 C326,96 294,68 246,82", delay: "0.9s" },
+        { d: "M200,272 C200,232 186,172 194,108 C198,68 216,50 200,38", delay: "1.8s" },
+        { d: "M200,272 C164,262 130,246 106,218 C82,192 78,158 97,140", delay: "2.7s" },
+        { d: "M200,272 C236,262 270,246 294,218 C318,192 322,158 303,140", delay: "3.6s" },
+      ]
 
   const fruitPositions = [
     [200, 76], [148, 110], [260, 96], [174, 150], [232, 136],
   ].slice(0, Math.max(0, incomeStars)) as [number, number][]
 
-  const branches = [
-    { d: "M200,272 C178,232 116,192 92,136 C74,94 106,66 154,80", delay: "0s" },
-    { d: "M200,272 C222,232 284,192 308,138 C326,96 294,68 246,82", delay: "0.9s" },
-    { d: "M200,272 C200,232 186,172 194,108 C198,68 216,50 200,38", delay: "1.8s" },
-    { d: "M200,272 C164,262 130,246 106,218 C82,192 78,158 97,140", delay: "2.7s" },
-    { d: "M200,272 C236,262 270,246 294,218 C318,192 322,158 303,140", delay: "3.6s" },
-  ]
-
-  const sparkles = [
+  const sparkles = isWithering ? [] : [
     [150, 170], [252, 172], [200, 116], [120, 188], [280, 190], [178, 132], [224, 128],
   ] as [number, number][]
+
+  // Tip positions change with withered branches
+  const tipPositions = isWithering
+    ? [[150, 125], [252, 128], [200, 100], [118, 205], [282, 205]]
+    : [[154, 80], [246, 82], [200, 38], [97, 140], [303, 140]]
 
   return (
     <div
@@ -201,7 +311,9 @@ function AssetTree({
         left: "50%", bottom: "13%",
         transform: "translateX(-50%)",
         zIndex: 10,
-        filter: "drop-shadow(0 0 32px " + accent + "55)",
+        filter: isWithering
+          ? "drop-shadow(0 0 16px #6b504488) saturate(0.4)"
+          : `drop-shadow(0 0 32px ${accent}55)`,
       }}
       title="터치하여 예산 현황 보기"
     >
@@ -220,37 +332,43 @@ function AssetTree({
             <feComposite in="b" in2="SourceGraphic" operator="over" />
           </filter>
           <linearGradient id="gdn-branch" x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor={accent} stopOpacity="0.95" />
-            <stop offset="50%" stopColor="#c4b5fd" stopOpacity="0.6" />
-            <stop offset="100%" stopColor="#e879f9" stopOpacity="0.25" />
+            <stop offset="0%" stopColor={branchColor} stopOpacity="0.95" />
+            <stop offset="50%" stopColor={branchMidColor} stopOpacity="0.6" />
+            <stop offset="100%" stopColor={branchEndColor} stopOpacity="0.25" />
           </linearGradient>
           <radialGradient id="gdn-orb" cx="50%" cy="38%" r="62%">
-            <stop offset="0%" stopColor="white" stopOpacity="0.95" />
-            <stop offset="30%" stopColor={accent} stopOpacity="0.88" />
-            <stop offset="70%" stopColor={accent} stopOpacity="0.3" />
-            <stop offset="100%" stopColor={accent} stopOpacity="0.04" />
+            <stop offset="0%" stopColor="white" stopOpacity={isWithering ? "0.6" : "0.95"} />
+            <stop offset="30%" stopColor={isWithering ? "#9a8070" : accent} stopOpacity="0.88" />
+            <stop offset="70%" stopColor={isWithering ? "#6b5040" : accent} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={isWithering ? "#3a2a20" : accent} stopOpacity="0.04" />
           </radialGradient>
         </defs>
 
         <g
           transform={`translate(200,280) scale(${scale}) translate(-200,-280)`}
-          style={{ opacity: alpha }}
+          style={{
+            opacity: alpha,
+            animation: isWithering ? "gdn-wither-droop 5s ease-in-out infinite" : undefined,
+            transformOrigin: "200px 272px",
+          }}
         >
-          {/* Wide aura glow */}
-          <ellipse cx="200" cy="190" rx="92" ry="115" fill={accent} opacity="0.055" />
-          <ellipse cx="200" cy="190" rx="60" ry="78" fill={accent} opacity="0.06" />
+          {/* Aura — dims when withering */}
+          <ellipse cx="200" cy="190" rx="92" ry="115" fill={branchColor}
+            opacity={isWithering ? "0.03" : "0.055"} />
+          <ellipse cx="200" cy="190" rx="60" ry="78" fill={branchColor}
+            opacity={isWithering ? "0.04" : "0.06"} />
 
-          {/* Branch shadow halos */}
+          {/* Branch halos */}
           {branches.map(({ d }, i) => (
-            <path key={`halo-${i}`} d={d} fill="none" stroke={accent}
+            <path key={`halo-${i}`} d={d} fill="none" stroke={branchColor}
               strokeWidth={i < 3 ? 14 : 11} strokeOpacity="0.07" strokeLinecap="round" />
           ))}
           {branches.map(({ d }, i) => (
-            <path key={`mid-${i}`} d={d} fill="none" stroke={accent}
+            <path key={`mid-${i}`} d={d} fill="none" stroke={branchColor}
               strokeWidth={i < 3 ? 7 : 5} strokeOpacity="0.13" strokeLinecap="round" />
           ))}
 
-          {/* Animated energy flows */}
+          {/* Animated energy flows (slow/dim when withering) */}
           {branches.map(({ d, delay }, i) => (
             <path
               key={`flow-${i}`}
@@ -262,60 +380,60 @@ function AssetTree({
               filter="url(#gdn-glow-md)"
               style={{
                 strokeDasharray: 700,
-                animation: `gdn-flow 5.2s ${delay} ease-in-out infinite`,
+                animation: `gdn-flow ${isWithering ? "9s" : "5.2s"} ${delay} ease-in-out infinite`,
+                opacity: isWithering ? 0.5 : 1,
               }}
             />
           ))}
 
           {/* Branch tip glows */}
-          {[
-            [154, 80], [246, 82], [200, 38], [97, 140], [303, 140],
-          ].map(([cx, cy], i) => (
-            <circle key={`tip-${i}`} cx={cx} cy={cy} r={5} fill={accent}
-              filter="url(#gdn-glow-sm)" opacity={0.7}
+          {tipPositions.map(([cx, cy], i) => (
+            <circle key={`tip-${i}`} cx={cx} cy={cy} r={isWithering ? 3 : 5}
+              fill={branchColor} filter="url(#gdn-glow-sm)"
+              opacity={isWithering ? 0.35 : 0.7}
               style={{ animation: `gdn-twinkle ${2 + i * 0.4}s ${i * 0.7}s ease-in-out infinite alternate` }} />
           ))}
 
-          {/* Sparkles along branches */}
+          {/* Sparkles (hidden when withering) */}
           {sparkles.map(([cx, cy], i) => (
             <circle key={`sp-${i}`} cx={cx} cy={cy} r={2.0} fill="white"
               style={{ animation: `gdn-twinkle ${1.4 + (i % 4) * 0.5}s ${i * 0.55}s ease-in-out infinite alternate` }} />
           ))}
 
-          {/* Star fruits (income) */}
+          {/* Star fruits on tree (from budget achievement) */}
           {fruitPositions.map(([px, py], i) => (
             <g key={`fruit-${i}`} filter="url(#gdn-glow-sm)">
-              <polygon
-                points={starPolygon(px, py, 9.5, 5)}
-                fill="#fbbf24"
-                style={{ animation: `gdn-float ${2.4 + i * 0.35}s ${i * 0.55}s ease-in-out infinite` }}
-              />
-              {/* Star outer glow */}
-              <polygon
-                points={starPolygon(px, py, 13, 5)}
-                fill="#fbbf24"
-                opacity="0.2"
-              />
+              <polygon points={starPolygon(px, py, 9.5, 5)} fill="#fbbf24"
+                style={{ animation: `gdn-float ${2.4 + i * 0.35}s ${i * 0.55}s ease-in-out infinite` }} />
+              <polygon points={starPolygon(px, py, 13, 5)} fill="#fbbf24" opacity="0.2" />
             </g>
           ))}
 
-          {/* Central orb — outer glow ring */}
-          <circle cx="200" cy="258" r="48" fill={accent} opacity="0.1" filter="url(#gdn-glow-lg)" />
-          <circle cx="200" cy="258" r="38" fill={accent} opacity="0.15" />
-
-          {/* Central orb — body */}
+          {/* Central orb */}
+          <circle cx="200" cy="258" r="48" fill={isWithering ? "#6b5040" : accent}
+            opacity={isWithering ? "0.06" : "0.1"} filter="url(#gdn-glow-lg)" />
+          <circle cx="200" cy="258" r="38" fill={isWithering ? "#6b5040" : accent}
+            opacity={isWithering ? "0.08" : "0.15"} />
           <circle cx="200" cy="258" r="30" fill="url(#gdn-orb)" filter="url(#gdn-glow-lg)"
             style={{ animation: "gdn-orb-pulse 3.5s ease-in-out infinite" }} />
-
-          {/* Orb rings */}
-          <circle cx="200" cy="258" r="22" fill="none" stroke={accent} strokeWidth="1.2" strokeOpacity="0.55" />
-          <circle cx="200" cy="258" r="15" fill="none" stroke="white" strokeWidth="0.7" strokeOpacity="0.28" />
-
-          {/* ₩ symbol */}
+          <circle cx="200" cy="258" r="22" fill="none"
+            stroke={isWithering ? "#9a8070" : accent} strokeWidth="1.2" strokeOpacity="0.55" />
+          <circle cx="200" cy="258" r="15" fill="none"
+            stroke="white" strokeWidth="0.7" strokeOpacity="0.28" />
           <text x="200" y="264" textAnchor="middle" fontSize="16" fontWeight="bold"
-            fill="white" opacity="0.95" style={{ fontFamily: "system-ui, sans-serif" }}>₩</text>
+            fill={isWithering ? "#d4b896" : "white"}
+            opacity={isWithering ? "0.65" : "0.95"}
+            style={{ fontFamily: "system-ui, sans-serif" }}>₩</text>
         </g>
       </svg>
+
+      {/* Wither warning */}
+      {isWithering && (
+        <div className="absolute left-1/2 -translate-x-1/2 -bottom-6 whitespace-nowrap text-[10px] text-center"
+          style={{ color: isSevere ? "#f87171" : "#fb923c" }}>
+          {isSevere ? "🥀 나무가 시들고 있어요" : "🍂 나무가 힘을 잃고 있어요"}
+        </div>
+      )}
     </div>
   )
 }
@@ -710,6 +828,7 @@ export default function GardenPage() {
       overBudgetCategories: overCategories,
       isRaining: overCategories.length > 0,
       goals: goals.slice(0, 4),
+      income,
       incomeStars: Math.min(5, Math.max(0, Math.floor(income / 500_000))),
       meteorCount,
     })
@@ -743,6 +862,9 @@ export default function GardenPage() {
 
       {/* Stars */}
       <StarField />
+
+      {/* Income falling stars */}
+      {data && <IncomeFallingStars income={data.income} />}
 
       {/* Meteors */}
       {data && <Meteors count={data.meteorCount} />}
