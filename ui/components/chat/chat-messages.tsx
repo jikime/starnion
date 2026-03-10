@@ -3,9 +3,8 @@
 import { useEffect, useLayoutEffect, useRef, useCallback } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Bot, User, Wrench, Loader2, CheckCircle2 } from "lucide-react"
+import { Wrench, Loader2, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ChatMessage, FileAttachment, Segment } from "@/hooks/use-chat"
 
@@ -90,27 +89,20 @@ function FilePreview({ file }: { file: FileAttachment }) {
 /** Animated "생각 중..." bubble shown before the first token arrives */
 function ThinkingBubble() {
   return (
-    <div className="flex gap-3">
-      <Avatar className="size-8 shrink-0">
-        <AvatarFallback className="bg-primary text-primary-foreground">
-          <Bot className="size-4" />
-        </AvatarFallback>
-      </Avatar>
-      <div className="rounded-2xl rounded-tl-sm bg-muted/50 px-4 py-3">
-        <div className="flex items-center gap-1.5">
-          <span
-            className="size-2 rounded-full bg-muted-foreground/60 animate-bounce"
-            style={{ animationDelay: "0ms" }}
-          />
-          <span
-            className="size-2 rounded-full bg-muted-foreground/60 animate-bounce"
-            style={{ animationDelay: "150ms" }}
-          />
-          <span
-            className="size-2 rounded-full bg-muted-foreground/60 animate-bounce"
-            style={{ animationDelay: "300ms" }}
-          />
-        </div>
+    <div className="rounded-2xl rounded-tl-sm bg-muted/50 px-4 py-3 w-fit">
+      <div className="flex items-center gap-1.5">
+        <span
+          className="size-2 rounded-full bg-muted-foreground/60 animate-bounce"
+          style={{ animationDelay: "0ms" }}
+        />
+        <span
+          className="size-2 rounded-full bg-muted-foreground/60 animate-bounce"
+          style={{ animationDelay: "150ms" }}
+        />
+        <span
+          className="size-2 rounded-full bg-muted-foreground/60 animate-bounce"
+          style={{ animationDelay: "300ms" }}
+        />
       </div>
     </div>
   )
@@ -279,7 +271,7 @@ export function ChatMessages({
       onScroll={handleScroll}
       className="flex-1 overflow-y-auto px-4 py-4"
     >
-      <div ref={innerRef} className="mx-auto max-w-2xl space-y-6">
+      <div ref={innerRef} className="mx-auto max-w-5xl space-y-6">
         {/* Top sentinel — triggers loadMore when scrolled into view */}
         <div ref={topSentinelRef} />
 
@@ -307,29 +299,13 @@ export function ChatMessages({
           <div
             key={message.id}
             className={cn(
-              "flex gap-3",
+              "flex",
               message.role === "user" && "flex-row-reverse"
             )}
           >
-            <Avatar className="size-8 shrink-0">
-              <AvatarFallback
-                className={cn(
-                  message.role === "assistant"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
-                )}
-              >
-                {message.role === "assistant" ? (
-                  <Bot className="size-4" />
-                ) : (
-                  <User className="size-4" />
-                )}
-              </AvatarFallback>
-            </Avatar>
-
             <div
               className={cn(
-                "max-w-[80%] space-y-1",
+                "max-w-[88%] space-y-1",
                 message.role === "user" && "items-end"
               )}
             >
