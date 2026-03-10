@@ -19,7 +19,6 @@ interface GardenData {
   overBudgetCategories: string[]
   isRaining: boolean
   goals: Goal[]
-  incomeStars: number
   income: number
   meteorCount: number
 }
@@ -252,16 +251,19 @@ function Meteors({ count }: { count: number }) {
 // ── Asset Tree ────────────────────────────────────────────────────────────────
 
 function AssetTree({
-  savingsRate, incomeStars, accent, onClick,
+  savingsRate, accent, onClick,
 }: {
   savingsRate: number
-  incomeStars: number
   accent: string
   onClick: () => void
 }) {
   // Wither state: < 30% → withering, < 15% → severely withered
   const isWithering = savingsRate < 30
   const isSevere = savingsRate < 15
+
+  // Fruit count based on budget achievement rate (savingsRate)
+  // 0-19% → 0, 20-39% → 1, 40-59% → 2, 60-79% → 3, 80-89% → 4, 90-100% → 5
+  const fruitCount = isWithering ? 0 : Math.min(5, Math.floor(savingsRate / 20))
 
   const scale = 0.5 + Math.min(savingsRate, 100) / 100 * 0.58
   const alpha = Math.max(0.35, Math.min(1, savingsRate / 80))
@@ -292,7 +294,7 @@ function AssetTree({
 
   const fruitPositions = [
     [200, 76], [148, 110], [260, 96], [174, 150], [232, 136],
-  ].slice(0, Math.max(0, incomeStars)) as [number, number][]
+  ].slice(0, fruitCount) as [number, number][]
 
   const sparkles = isWithering ? [] : [
     [150, 170], [252, 172], [200, 116], [120, 188], [280, 190], [178, 132], [224, 128],
@@ -777,7 +779,7 @@ export default function GardenPage() {
 
     const [budgetRes, goalsRes, diaryRes, summaryRes, ddayRes] = await Promise.allSettled([
       fetch("/api/budget"),
-      fetch("/api/goals?status=in_progress"),
+      fetch("/api/goals?status=completed"),
       fetch("/api/diary?limit=1"),
       fetch("/api/finance/summary"),
       fetch("/api/dday"),
@@ -829,7 +831,6 @@ export default function GardenPage() {
       isRaining: overCategories.length > 0,
       goals: goals.slice(0, 4),
       income,
-      incomeStars: Math.min(5, Math.max(0, Math.floor(income / 500_000))),
       meteorCount,
     })
     setLoading(false)
@@ -887,7 +888,6 @@ export default function GardenPage() {
       {data && (
         <AssetTree
           savingsRate={data.savingsRate}
-          incomeStars={data.incomeStars}
           accent={palette.accent}
           onClick={() => setShowPopup(true)}
         />
