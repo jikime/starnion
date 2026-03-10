@@ -214,27 +214,33 @@ async def search_similar(
     # Normalise to date for entry_date comparison.
     d_from = date_from.date() if isinstance(date_from, datetime) else date_from
     d_to = date_to.date() if isinstance(date_to, datetime) else date_to
+
+    where: list[str] = [
+        "user_id = %s",
+        "embedding IS NOT NULL",
+        "1 - (embedding <=> %s::vector) > %s",
+    ]
+    params: list[Any] = [query_embedding, user_id, query_embedding, threshold]
+    if d_from is not None:
+        where.append("entry_date >= %s")
+        params.append(d_from)
+    if d_to is not None:
+        where.append("entry_date <= %s")
+        params.append(d_to)
+    params.append(top_k)
+
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cur:
             await cur.execute(
-                """
+                f"""
                 SELECT id, title, content, mood, entry_date, created_at,
                        1 - (embedding <=> %s::vector) AS similarity
                 FROM diary_entries
-                WHERE user_id = %s
-                  AND embedding IS NOT NULL
-                  AND 1 - (embedding <=> %s::vector) > %s
-                  AND (%s::date IS NULL OR entry_date >= %s::date)
-                  AND (%s::date IS NULL OR entry_date <= %s::date)
+                WHERE {" AND ".join(where)}
                 ORDER BY similarity DESC
                 LIMIT %s
                 """,
-                (
-                    query_embedding, user_id, query_embedding, threshold,
-                    d_from, d_from,
-                    d_to, d_to,
-                    top_k,
-                ),
+                params,
             )
             rows = await cur.fetchall()
             return [dict(r) for r in rows]
@@ -288,26 +294,32 @@ async def search_fulltext(
     """
     d_from = date_from.date() if isinstance(date_from, datetime) else date_from
     d_to = date_to.date() if isinstance(date_to, datetime) else date_to
+
+    where: list[str] = [
+        "user_id = %s",
+        "content_tsv @@ plainto_tsquery('simple', %s)",
+    ]
+    params: list[Any] = [query_text, user_id, query_text]
+    if d_from is not None:
+        where.append("entry_date >= %s")
+        params.append(d_from)
+    if d_to is not None:
+        where.append("entry_date <= %s")
+        params.append(d_to)
+    params.append(top_k)
+
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cur:
             await cur.execute(
-                """
+                f"""
                 SELECT id, title, content, mood, entry_date, created_at,
                        ts_rank(content_tsv, plainto_tsquery('simple', %s)) AS rank
                 FROM diary_entries
-                WHERE user_id = %s
-                  AND content_tsv @@ plainto_tsquery('simple', %s)
-                  AND (%s::date IS NULL OR entry_date >= %s::date)
-                  AND (%s::date IS NULL OR entry_date <= %s::date)
+                WHERE {" AND ".join(where)}
                 ORDER BY rank DESC
                 LIMIT %s
                 """,
-                (
-                    query_text, user_id, query_text,
-                    d_from, d_from,
-                    d_to, d_to,
-                    top_k,
-                ),
+                params,
             )
             rows = await cur.fetchall()
             return [dict(r) for r in rows]

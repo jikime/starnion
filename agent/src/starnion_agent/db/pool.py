@@ -17,10 +17,15 @@ async def init_pool(conninfo: str) -> AsyncConnectionPool[Any]:
         The opened AsyncConnectionPool instance.
     """
     global pool
+    # min_size=5  : covers background tasks (cron, pattern analysis) without contention.
+    # max_size=20 : retriever issues 13 parallel queries per call; supports ~3 concurrent
+    #               users before queuing begins.
+    # timeout=10  : surface pool exhaustion quickly rather than blocking indefinitely.
     p = AsyncConnectionPool(
         conninfo=conninfo,
-        min_size=2,
-        max_size=10,
+        min_size=5,
+        max_size=20,
+        timeout=10.0,
         open=False,
     )
     await p.open()

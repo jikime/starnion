@@ -75,8 +75,9 @@ CREATE TABLE IF NOT EXISTS finances (
     description TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_finances_user_id    ON finances(user_id);
-CREATE INDEX IF NOT EXISTS idx_finances_created_at ON finances(created_at);
+CREATE INDEX IF NOT EXISTS idx_finances_user_id      ON finances(user_id);
+CREATE INDEX IF NOT EXISTS idx_finances_created_at   ON finances(created_at);
+CREATE INDEX IF NOT EXISTS idx_finances_user_created ON finances(user_id, created_at DESC);
 
 -- =============================================================
 -- DAILY LOGS  (vector + full-text hybrid RAG)
@@ -91,7 +92,8 @@ CREATE TABLE IF NOT EXISTS daily_logs (
     content_tsv tsvector,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_daily_logs_user_id ON daily_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_daily_logs_user_id      ON daily_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_daily_logs_user_created ON daily_logs(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_daily_logs_embedding ON daily_logs
     USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 CREATE INDEX IF NOT EXISTS idx_daily_logs_content_tsv
@@ -127,6 +129,8 @@ CREATE INDEX IF NOT EXISTS idx_document_sections_embedding ON document_sections
     USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 CREATE INDEX IF NOT EXISTS idx_document_sections_content_tsv
     ON document_sections USING gin(content_tsv);
+CREATE INDEX IF NOT EXISTS idx_document_sections_document_id
+    ON document_sections(document_id);
 
 -- =============================================================
 -- IMAGES
@@ -199,7 +203,8 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
     content_tsv tsvector,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_knowledge_base_user_id ON knowledge_base(user_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_base_user_id  ON knowledge_base(user_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_base_user_key ON knowledge_base(user_id, key);
 CREATE INDEX IF NOT EXISTS idx_knowledge_base_embedding ON knowledge_base
     USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 CREATE INDEX IF NOT EXISTS idx_knowledge_base_content_tsv
@@ -438,7 +443,8 @@ CREATE TABLE IF NOT EXISTS memos (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_memos_user_id ON memos(user_id);
+CREATE INDEX IF NOT EXISTS idx_memos_user_id          ON memos(user_id);
+CREATE INDEX IF NOT EXISTS idx_memos_user_tag_created ON memos(user_id, tag, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_memos_embedding ON memos
     USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 CREATE INDEX IF NOT EXISTS idx_memos_content_tsv ON memos USING gin(content_tsv);

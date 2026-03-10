@@ -175,27 +175,32 @@ async def search_similar(
     Returns:
         List of dicts with id, title, content, tag, created_at, similarity.
     """
+    where: list[str] = [
+        "user_id = %s",
+        "embedding IS NOT NULL",
+        "1 - (embedding <=> %s::vector) > %s",
+    ]
+    params: list[Any] = [query_embedding, user_id, query_embedding, threshold]
+    if date_from is not None:
+        where.append("created_at >= %s")
+        params.append(date_from)
+    if date_to is not None:
+        where.append("created_at <= %s")
+        params.append(date_to)
+    params.append(top_k)
+
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cur:
             await cur.execute(
-                """
+                f"""
                 SELECT id, title, content, tag, created_at,
                        1 - (embedding <=> %s::vector) AS similarity
                 FROM memos
-                WHERE user_id = %s
-                  AND embedding IS NOT NULL
-                  AND 1 - (embedding <=> %s::vector) > %s
-                  AND (%s::timestamptz IS NULL OR created_at >= %s::timestamptz)
-                  AND (%s::timestamptz IS NULL OR created_at <= %s::timestamptz)
+                WHERE {" AND ".join(where)}
                 ORDER BY similarity DESC
                 LIMIT %s
                 """,
-                (
-                    query_embedding, user_id, query_embedding, threshold,
-                    date_from, date_from,
-                    date_to, date_to,
-                    top_k,
-                ),
+                params,
             )
             rows = await cur.fetchall()
             return [dict(r) for r in rows]
@@ -218,26 +223,31 @@ async def search_fulltext(
     Returns:
         List of dicts with id, title, content, tag, created_at, rank.
     """
+    where: list[str] = [
+        "user_id = %s",
+        "content_tsv @@ plainto_tsquery('simple', %s)",
+    ]
+    params: list[Any] = [query_text, user_id, query_text]
+    if date_from is not None:
+        where.append("created_at >= %s")
+        params.append(date_from)
+    if date_to is not None:
+        where.append("created_at <= %s")
+        params.append(date_to)
+    params.append(top_k)
+
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cur:
             await cur.execute(
-                """
+                f"""
                 SELECT id, title, content, tag, created_at,
                        ts_rank(content_tsv, plainto_tsquery('simple', %s)) AS rank
                 FROM memos
-                WHERE user_id = %s
-                  AND content_tsv @@ plainto_tsquery('simple', %s)
-                  AND (%s::timestamptz IS NULL OR created_at >= %s::timestamptz)
-                  AND (%s::timestamptz IS NULL OR created_at <= %s::timestamptz)
+                WHERE {" AND ".join(where)}
                 ORDER BY rank DESC
                 LIMIT %s
                 """,
-                (
-                    query_text, user_id, query_text,
-                    date_from, date_from,
-                    date_to, date_to,
-                    top_k,
-                ),
+                params,
             )
             rows = await cur.fetchall()
             return [dict(r) for r in rows]
