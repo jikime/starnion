@@ -47,6 +47,8 @@ async def search_similar(
     query_embedding: list[float],
     top_k: int = 5,
     threshold: float = 0.3,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Find daily logs similar to the query embedding.
 
@@ -56,6 +58,8 @@ async def search_similar(
         query_embedding: The query vector (768 dims).
         top_k: Maximum results to return.
         threshold: Minimum cosine similarity threshold.
+        date_from: Optional start datetime filter (inclusive).
+        date_to: Optional end datetime filter (inclusive).
 
     Returns:
         List of dicts with id, content, similarity, created_at.
@@ -70,10 +74,17 @@ async def search_similar(
                 WHERE user_id = %s
                   AND embedding IS NOT NULL
                   AND 1 - (embedding <=> %s::vector) > %s
+                  AND (%s::timestamptz IS NULL OR created_at >= %s::timestamptz)
+                  AND (%s::timestamptz IS NULL OR created_at <= %s::timestamptz)
                 ORDER BY similarity DESC
                 LIMIT %s
                 """,
-                (query_embedding, user_id, query_embedding, threshold, top_k),
+                (
+                    query_embedding, user_id, query_embedding, threshold,
+                    date_from, date_from,
+                    date_to, date_to,
+                    top_k,
+                ),
             )
             rows = await cur.fetchall()
             return [dict(r) for r in rows]
@@ -84,6 +95,8 @@ async def search_fulltext(
     user_id: str,
     query_text: str,
     top_k: int = 5,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Find daily logs matching the query via full-text search.
 
@@ -92,6 +105,8 @@ async def search_fulltext(
         user_id: Filter by user.
         query_text: Raw search text (converted to tsquery internally).
         top_k: Maximum results to return.
+        date_from: Optional start datetime filter (inclusive).
+        date_to: Optional end datetime filter (inclusive).
 
     Returns:
         List of dicts with id, content, rank, created_at.
@@ -105,10 +120,17 @@ async def search_fulltext(
                 FROM daily_logs
                 WHERE user_id = %s
                   AND content_tsv @@ plainto_tsquery('simple', %s)
+                  AND (%s::timestamptz IS NULL OR created_at >= %s::timestamptz)
+                  AND (%s::timestamptz IS NULL OR created_at <= %s::timestamptz)
                 ORDER BY rank DESC
                 LIMIT %s
                 """,
-                (query_text, user_id, query_text, top_k),
+                (
+                    query_text, user_id, query_text,
+                    date_from, date_from,
+                    date_to, date_to,
+                    top_k,
+                ),
             )
             rows = await cur.fetchall()
             return [dict(r) for r in rows]

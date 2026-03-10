@@ -1,5 +1,6 @@
 """Memo repository using the dedicated memos table."""
 
+from datetime import datetime
 from typing import Any
 
 from psycopg.rows import dict_row
@@ -162,8 +163,14 @@ async def search_similar(
     query_embedding: list[float],
     top_k: int = 5,
     threshold: float = 0.3,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Find memos similar to the query embedding.
+
+    Args:
+        date_from: Optional start datetime filter on created_at (inclusive).
+        date_to: Optional end datetime filter on created_at (inclusive).
 
     Returns:
         List of dicts with id, title, content, tag, created_at, similarity.
@@ -178,10 +185,17 @@ async def search_similar(
                 WHERE user_id = %s
                   AND embedding IS NOT NULL
                   AND 1 - (embedding <=> %s::vector) > %s
+                  AND (%s::timestamptz IS NULL OR created_at >= %s::timestamptz)
+                  AND (%s::timestamptz IS NULL OR created_at <= %s::timestamptz)
                 ORDER BY similarity DESC
                 LIMIT %s
                 """,
-                (query_embedding, user_id, query_embedding, threshold, top_k),
+                (
+                    query_embedding, user_id, query_embedding, threshold,
+                    date_from, date_from,
+                    date_to, date_to,
+                    top_k,
+                ),
             )
             rows = await cur.fetchall()
             return [dict(r) for r in rows]
@@ -192,8 +206,14 @@ async def search_fulltext(
     user_id: str,
     query_text: str,
     top_k: int = 5,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Find memos matching the query via full-text search.
+
+    Args:
+        date_from: Optional start datetime filter on created_at (inclusive).
+        date_to: Optional end datetime filter on created_at (inclusive).
 
     Returns:
         List of dicts with id, title, content, tag, created_at, rank.
@@ -207,10 +227,17 @@ async def search_fulltext(
                 FROM memos
                 WHERE user_id = %s
                   AND content_tsv @@ plainto_tsquery('simple', %s)
+                  AND (%s::timestamptz IS NULL OR created_at >= %s::timestamptz)
+                  AND (%s::timestamptz IS NULL OR created_at <= %s::timestamptz)
                 ORDER BY rank DESC
                 LIMIT %s
                 """,
-                (query_text, user_id, query_text, top_k),
+                (
+                    query_text, user_id, query_text,
+                    date_from, date_from,
+                    date_to, date_to,
+                    top_k,
+                ),
             )
             rows = await cur.fetchall()
             return [dict(r) for r in rows]

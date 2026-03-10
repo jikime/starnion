@@ -1,6 +1,6 @@
 """Diary entry repository with vector embeddings and full-text search."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from psycopg.rows import dict_row
@@ -198,13 +198,22 @@ async def search_similar(
     query_embedding: list[float],
     top_k: int = 5,
     threshold: float = 0.3,
+    date_from: date | datetime | None = None,
+    date_to: date | datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Find diary entries similar to the query embedding.
+
+    Args:
+        date_from: Optional start date filter on entry_date (inclusive).
+        date_to: Optional end date filter on entry_date (inclusive).
 
     Returns:
         List of dicts with id, title, content, mood, entry_date,
         created_at, similarity.
     """
+    # Normalise to date for entry_date comparison.
+    d_from = date_from.date() if isinstance(date_from, datetime) else date_from
+    d_to = date_to.date() if isinstance(date_to, datetime) else date_to
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cur:
             await cur.execute(
@@ -215,10 +224,17 @@ async def search_similar(
                 WHERE user_id = %s
                   AND embedding IS NOT NULL
                   AND 1 - (embedding <=> %s::vector) > %s
+                  AND (%s::date IS NULL OR entry_date >= %s::date)
+                  AND (%s::date IS NULL OR entry_date <= %s::date)
                 ORDER BY similarity DESC
                 LIMIT %s
                 """,
-                (query_embedding, user_id, query_embedding, threshold, top_k),
+                (
+                    query_embedding, user_id, query_embedding, threshold,
+                    d_from, d_from,
+                    d_to, d_to,
+                    top_k,
+                ),
             )
             rows = await cur.fetchall()
             return [dict(r) for r in rows]
@@ -257,13 +273,21 @@ async def search_fulltext(
     user_id: str,
     query_text: str,
     top_k: int = 5,
+    date_from: date | datetime | None = None,
+    date_to: date | datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Find diary entries matching the query via full-text search.
+
+    Args:
+        date_from: Optional start date filter on entry_date (inclusive).
+        date_to: Optional end date filter on entry_date (inclusive).
 
     Returns:
         List of dicts with id, title, content, mood, entry_date,
         created_at, rank.
     """
+    d_from = date_from.date() if isinstance(date_from, datetime) else date_from
+    d_to = date_to.date() if isinstance(date_to, datetime) else date_to
     async with pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cur:
             await cur.execute(
@@ -273,10 +297,17 @@ async def search_fulltext(
                 FROM diary_entries
                 WHERE user_id = %s
                   AND content_tsv @@ plainto_tsquery('simple', %s)
+                  AND (%s::date IS NULL OR entry_date >= %s::date)
+                  AND (%s::date IS NULL OR entry_date <= %s::date)
                 ORDER BY rank DESC
                 LIMIT %s
                 """,
-                (query_text, user_id, query_text, top_k),
+                (
+                    query_text, user_id, query_text,
+                    d_from, d_from,
+                    d_to, d_to,
+                    top_k,
+                ),
             )
             rows = await cur.fetchall()
             return [dict(r) for r in rows]

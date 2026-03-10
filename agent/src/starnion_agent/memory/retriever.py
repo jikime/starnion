@@ -7,6 +7,7 @@ full-text search, then merges results via Reciprocal Rank Fusion (RRF).
 
 import asyncio
 import logging
+from datetime import datetime
 from typing import Any
 
 from starnion_agent.db.pool import get_pool
@@ -80,10 +81,12 @@ async def search(
     user_id: str,
     top_k: int = 5,
     threshold: float = 0.3,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Search across all memory layers using hybrid vector + full-text search.
 
-    Runs 11 queries in parallel (5 vector + 5 full-text + 1 finance),
+    Runs 13 queries in parallel (6 vector + 6 full-text + 1 finance),
     merges per-source results via RRF, tags sources, and returns the
     top_k results.
 
@@ -92,6 +95,8 @@ async def search(
         user_id: Filter results to this user.
         top_k: Maximum total results to return.
         threshold: Minimum cosine similarity for vector search.
+        date_from: Optional start datetime to restrict temporal sources.
+        date_to: Optional end datetime to restrict temporal sources.
 
     Returns:
         Merged and ranked list of memory entries.
@@ -117,20 +122,32 @@ async def search(
     ) = await asyncio.gather(
         daily_log_repo.search_similar(
             pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
+            date_from=date_from, date_to=date_to,
         ),
-        daily_log_repo.search_fulltext(pool, user_id, query, top_k=top_k),
+        daily_log_repo.search_fulltext(
+            pool, user_id, query, top_k=top_k,
+            date_from=date_from, date_to=date_to,
+        ),
         knowledge_repo.search_similar(
             pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
         ),
         knowledge_repo.search_fulltext(pool, user_id, query, top_k=top_k),
         diary_entry_repo.search_similar(
             pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
+            date_from=date_from, date_to=date_to,
         ),
-        diary_entry_repo.search_fulltext(pool, user_id, query, top_k=top_k),
+        diary_entry_repo.search_fulltext(
+            pool, user_id, query, top_k=top_k,
+            date_from=date_from, date_to=date_to,
+        ),
         memo_db_repo.search_similar(
             pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
+            date_from=date_from, date_to=date_to,
         ),
-        memo_db_repo.search_fulltext(pool, user_id, query, top_k=top_k),
+        memo_db_repo.search_fulltext(
+            pool, user_id, query, top_k=top_k,
+            date_from=date_from, date_to=date_to,
+        ),
         document_repo.search_by_user(
             pool, user_id, query_embedding, top_k=top_k, threshold=threshold,
         ),

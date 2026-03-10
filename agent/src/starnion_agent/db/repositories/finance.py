@@ -280,6 +280,54 @@ async def list_by_date_range(
             return [dict(r) for r in rows]
 
 
+async def get_period_summary(
+    pool: AsyncConnectionPool[Any],
+    user_id: str,
+    date_from: datetime,
+    date_to: datetime,
+) -> dict[str, Any]:
+    """Get a spending summary for an arbitrary date range.
+
+    Returns total spending, daily average, and category breakdown so that
+    two non-overlapping periods can be compared by the caller.
+
+    Args:
+        pool: The async connection pool.
+        user_id: Telegram user ID.
+        date_from: Range start (inclusive).
+        date_to: Range end (inclusive — end-of-day semantics applied internally).
+
+    Returns:
+        Dict with keys: total (int), daily_avg (float), days (int),
+        categories (list of {category, total}).
+    """
+    days = max(1, (date_to - date_from).days + 1)
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                """
+                SELECT category, COALESCE(SUM(ABS(amount)), 0) AS total
+                FROM finances
+                WHERE user_id = %s
+                  AND created_at >= %s
+                  AND created_at < %s + INTERVAL '1 day'
+                GROUP BY category
+                ORDER BY total DESC
+                """,
+                (user_id, date_from, date_to),
+            )
+            rows = await cur.fetchall()
+
+    categories = [dict(r) for r in rows]
+    total = sum(r["total"] for r in categories)
+    return {
+        "total": total,
+        "daily_avg": round(total / days, 0),
+        "days": days,
+        "categories": categories,
+    }
+
+
 def _month_range(month: str) -> tuple[datetime, datetime]:
     """Compute the start (inclusive) and end (exclusive) of a month.
 

@@ -84,7 +84,7 @@ SKILLS: dict[str, SkillDef] = {
         emoji="🧠",
         description="과거 대화 및 문서 시맨틱 검색, 날짜별 일기·지출 타임라인 조회",
         category="core",
-        tools=["retrieve_memory", "get_time_travel_insight", "search_by_tags"],
+        tools=["retrieve_memory", "get_time_travel_insight", "search_by_tags", "compare_periods"],
         sort_order=6,
     ),
     "pattern": SkillDef(

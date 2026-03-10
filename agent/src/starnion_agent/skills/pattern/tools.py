@@ -4,10 +4,11 @@ Analyzes user spending and behavior patterns via LLM, stores results in
 knowledge_base, and generates personalized insight notifications.
 """
 
+import asyncio
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -45,13 +46,20 @@ async def analyze_patterns(user_id: str) -> str:
     pool = get_pool()
 
     # 1. Collect spending data.
-    daily_totals = await finance_repo.get_daily_totals(pool, user_id, days=30)
-    weekday_spending = await finance_repo.get_weekday_spending(pool, user_id, days=60)
-    recent_records = await finance_repo.get_recent(pool, user_id, limit=100)
-
     now = datetime.now()
+    daily_totals, weekday_spending, recent_records = await asyncio.gather(
+        finance_repo.get_daily_totals(pool, user_id, days=30),
+        finance_repo.get_weekday_spending(pool, user_id, days=60),
+        finance_repo.get_recent(pool, user_id, limit=100),
+    )
+
     month = now.strftime("%Y-%m")
     monthly = await finance_repo.get_monthly_summary(pool, user_id=user_id, month=month)
+
+    # 1b. Collect year-ago comparison (same 30-day window, 1 year back).
+    yoy_from = (now - timedelta(days=365 + 30)).replace(hour=0, minute=0, second=0)
+    yoy_to = (now - timedelta(days=365)).replace(hour=23, minute=59, second=59)
+    yoy_summary = await finance_repo.get_period_summary(pool, user_id, yoy_from, yoy_to)
 
     # 2. Collect sentiment data from daily_logs.
     recent_logs = await daily_log_repo.get_recent(pool, user_id, limit=30)
@@ -73,7 +81,7 @@ async def analyze_patterns(user_id: str) -> str:
     # 4. Build data summary for LLM.
     data_summary = _build_analysis_data(
         daily_totals, weekday_spending, recent_records, monthly, recent_logs,
-        conversation_insights,
+        conversation_insights, yoy_summary,
     )
 
     # 5. Call LLM for structured pattern detection.
@@ -173,6 +181,7 @@ def _build_analysis_data(
     monthly: list[dict],
     recent_logs: list[dict],
     conversation_insights: list[dict] | None = None,
+    yoy_summary: dict | None = None,
 ) -> str:
     """Build a text summary of user data for the LLM pattern analysis prompt."""
     lines: list[str] = []
@@ -233,6 +242,13 @@ def _build_analysis_data(
             except (json.JSONDecodeError, KeyError):
                 continue
 
+    # Year-over-year comparison (same 30-day window, 1 year ago).
+    if yoy_summary and yoy_summary.get("total", 0) > 0:
+        lines.append("\n[1년 전 동기간 지출 (30일 기준)]")
+        lines.append(f"  총 지출: {yoy_summary['total']:,}원  |  일 평균: {int(yoy_summary['daily_avg']):,}원")
+        for c in yoy_summary.get("categories", [])[:5]:
+            lines.append(f"  - {c['category']}: {c['total']:,}원")
+
     return "\n".join(lines)
 
 
@@ -246,7 +262,7 @@ def _build_analysis_prompt(data_summary: str) -> str:
         "{\n"
         '  "patterns": [\n'
         "    {\n"
-        '      "type": "day_of_week_spending | recurring_payment | spending_velocity | emotional_trend",\n'
+        '      "type": "day_of_week_spending | recurring_payment | spending_velocity | emotional_trend | temporal_comparison",\n'
         '      "description": "사용자에게 보낼 한국어 설명 (1-2문장)",\n'
         '      "trigger": {\n'
         '        "day_of_week": "monday|tuesday|wednesday|thursday|friday|saturday|sunday (해당 시)",\n'
@@ -264,7 +280,9 @@ def _build_analysis_prompt(data_summary: str) -> str:
         "1. day_of_week_spending: 특정 요일에 반복되는 지출 패턴 (예: 금요일 외식)\n"
         "2. recurring_payment: 매월 특정 기간에 반복되는 결제 (예: 월초 구독료)\n"
         "3. spending_velocity: 최근 지출 속도가 평소 대비 크게 다름 (trigger.always=true)\n"
-        "4. emotional_trend: 감정/스트레스 패턴 변화 (일기 데이터 기반, trigger.always=true)\n\n"
+        "4. emotional_trend: 감정/스트레스 패턴 변화 (일기 데이터 기반, trigger.always=true)\n"
+        "5. temporal_comparison: 1년 전 동기간 대비 현재 지출 패턴 유사성/차이 "
+        "(1년 전 데이터 있을 때만, trigger.always=true)\n\n"
         "규칙:\n"
         "- confidence가 0.6 미만인 패턴은 제외\n"
         "- 최대 5개 패턴까지만 반환\n"
