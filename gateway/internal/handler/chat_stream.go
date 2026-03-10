@@ -187,14 +187,6 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 
 		case starnionv1.ResponseType_TOOL_CALL:
 			log.Info().Str("tool", resp.ToolName).Str("user_id", req.UserID).Msg("chat_stream: tool call")
-			// Emit a transient status indicator so the user can see tool activity.
-			// Deliberately NOT added to assistantBuf so it is not persisted.
-			if !textStarted {
-				sseEvent(map[string]string{"type": "text-start", "id": textPartID})
-				textStarted = true
-			}
-			toolNote := fmt.Sprintf("\n🔧 `%s` 실행 중...\n", resp.ToolName)
-			sseEvent(map[string]any{"type": "text-delta", "id": textPartID, "delta": toolNote})
 
 		case starnionv1.ResponseType_TOOL_RESULT:
 			log.Info().Str("tool", resp.ToolName).Str("user_id", req.UserID).Msg("chat_stream: tool result")
