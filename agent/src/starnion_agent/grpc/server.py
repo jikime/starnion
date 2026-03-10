@@ -85,7 +85,19 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
             })
             return HumanMessage(content=content)
 
-        # Non-image files: append as text annotation.
+        if file_input.file_type == "audio":
+            # Audio files: inject an explicit STT instruction so the LLM
+            # reliably calls transcribe_audio first before processing intent.
+            audio_tag = (
+                f"[🎤 음성 파일 첨부됨 — file_url: {file_input.file_url}]\n"
+                "음성 파일이 첨부되어 있습니다. "
+                "반드시 transcribe_audio(file_url=위 URL) 도구를 먼저 호출해 텍스트로 변환한 후, "
+                "변환된 내용을 바탕으로 이후 요청을 처리하세요."
+            )
+            combined = f"{audio_tag}\n{message}" if message else audio_tag
+            return ("human", combined)
+
+        # Other non-image files: append as text annotation.
         file_text = (
             f"[파일 첨부: type={file_input.file_type}, "
             f"name={file_input.file_name}, "

@@ -119,7 +119,7 @@ class Settings:
 
         gem = raw.get("gemini", {})
         gemini = GeminiConfig(
-            model=gem.get("model", "gemini-2.5-pro"),
+            model=gem.get("model") or "gemini-2.5-pro",
         )
 
         return cls(
