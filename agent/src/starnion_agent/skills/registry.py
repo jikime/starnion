@@ -131,7 +131,7 @@ SKILLS: dict[str, SkillDef] = {
         emoji="📄",
         description="문서 파싱(PDF/DOCX/XLSX/PPTX/HWP/MD/TXT) 및 생성",
         category="media",
-        tools=["parse_document", "generate_document"],
+        tools=["parse_document", "generate_document", "check_document_status"],
         sort_order=11,
     ),
     "audio": SkillDef(

@@ -182,3 +182,19 @@ A. Yes — simply mention the sheet name in your question. For example: "Tell me
 
 **Q. Are my uploaded documents stored securely?**
 A. All documents are stored in encrypted MinIO storage and are accessible only by you.
+
+---
+
+## Document Parsing Engine
+
+Starting with Starnion v1.2.0, **Docling** (IBM open-source, MIT license) is used as the document parsing engine.
+Compared to the previous simple text extraction approach, the following improvements have been made:
+
+| Improvement | Before | After |
+|------------|--------|-------|
+| PDF tables | Text extracted only | Table structure preserved |
+| Heading structure | Ignored | Section-level chunking |
+| PPTX layout | Text listed sequentially | Slide structure recognized |
+| Search quality | Simple character splitting | Semantic chunking |
+
+Image files (PNG, JPG, GIF, BMP, TIFF) can also have text extracted via OCR.

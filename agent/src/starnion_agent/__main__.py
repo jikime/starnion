@@ -129,6 +129,12 @@ async def main() -> None:
     # Register the search embedding callback so POST /embed-search works.
     set_embed_search_callback(_embed_search)
 
+    # Start the background document processing queue.
+    # Large files (>= 500 KB) enqueued by parse_document are processed here
+    # so that the gRPC handler can return immediately without timing out.
+    from starnion_agent.document.queue import document_queue
+    await document_queue.start()
+
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
 
@@ -154,6 +160,7 @@ async def main() -> None:
 
     await close_checkpointer()
     await close_pool()
+    await document_queue.stop()
     logger.info("Agent shutdown complete")
 
 

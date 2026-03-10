@@ -22,12 +22,22 @@ from starnion_agent.document.parser import fetch_file
 from starnion_agent.skills.file_context import add_pending_file
 from starnion_agent.skills.guard import skill_guard
 
+# Files larger than this threshold are offloaded to the background queue so
+# that the gRPC handler can return immediately instead of timing out.
+_SYNC_SIZE_LIMIT = 500 * 1024  # 500 KB
+
 
 class ParseDocumentInput(BaseModel):
     """Input schema for parse_document tool."""
 
     file_url: str = Field(description="문서 파일의 URL")
     file_name: str = Field(default="document.pdf", description="원본 파일명")
+
+
+class CheckDocumentStatusInput(BaseModel):
+    """Input schema for check_document_status tool."""
+
+    task_id: str = Field(description="parse_document에서 반환된 처리 ID")
 
 
 class GenerateDocumentInput(BaseModel):
@@ -54,7 +64,12 @@ _MIME_TYPES = {
 @tool(args_schema=ParseDocumentInput)
 @skill_guard("documents")
 async def parse_document(file_url: str, file_name: str = "document.pdf") -> str:
-    """문서를 처리합니다. 텍스트를 추출하고 벡터 DB에 저장하여 나중에 검색할 수 있게 합니다. PDF, DOCX, XLSX, PPTX, HWP, MD, TXT를 지원합니다."""
+    """문서를 처리합니다. 텍스트를 추출하고 벡터 DB에 저장하여 나중에 검색할 수 있게 합니다. PDF, DOCX, XLSX, PPTX, HWP, MD, TXT를 지원합니다.
+
+    500 KB 미만의 소형 파일은 즉시 처리됩니다.
+    500 KB 이상의 대용량 파일(예: 100페이지 PDF)은 백그라운드 대기열에 등록되며,
+    반환된 처리 ID로 check_document_status를 호출해 진행 상황을 확인할 수 있습니다.
+    """
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요."
@@ -73,6 +88,26 @@ async def parse_document(file_url: str, file_name: str = "document.pdf") -> str:
         file_url=file_url,
     )
 
+    # Large files are offloaded to the background queue to prevent the gRPC
+    # handler from blocking (and timing out) during Docling + embedding.
+    if len(data) >= _SYNC_SIZE_LIMIT:
+        from starnion_agent.document.queue import document_queue
+
+        task_id = document_queue.enqueue(
+            user_id=user_id,
+            doc_id=doc["id"],
+            data=data,
+            ext=ext,
+            filename=file_name,
+        )
+        return (
+            f"'{file_name}' 문서가 백그라운드 처리 대기열에 등록되었어요 "
+            f"(크기: {len(data):,} bytes).\n"
+            f"처리 ID: `{task_id}`\n"
+            f"`check_document_status('{task_id}')` 로 진행 상황을 확인하세요."
+        )
+
+    # Small file: process synchronously and return content inline.
     text, section_count = await process_and_store(
         user_id=user_id,
         doc_id=doc["id"],
@@ -103,6 +138,30 @@ async def parse_document(file_url: str, file_name: str = "document.pdf") -> str:
         f"문서 '{file_name}' 처리 완료 (총 {len(text):,}자 / {section_count}개 섹션으로 벡터 DB 저장)\n\n"
         f"=== 문서 내용 ===\n{content_block}{note}"
     )
+
+
+@tool(args_schema=CheckDocumentStatusInput)
+@skill_guard("documents")
+async def check_document_status(task_id: str) -> str:
+    """문서 백그라운드 처리 상태를 확인합니다.
+
+    parse_document가 대용량 파일(500 KB 이상)을 백그라운드 대기열에 등록한 경우,
+    반환된 처리 ID로 이 도구를 호출하여 진행 상황을 확인하세요.
+    """
+    from starnion_agent.document.queue import document_queue
+
+    task = document_queue.get_status(task_id)
+    if task is None:
+        return f"처리 ID '{task_id}'를 찾을 수 없어요."
+
+    status_map = {
+        "pending": "대기 중 (처리 시작 전)",
+        "processing": "처리 중 (Docling 파싱 + 임베딩)",
+        "done": f"완료 ({task.section_count}개 섹션 저장됨)",
+        "error": f"오류: {task.error}",
+    }
+    label = status_map.get(task.status, task.status)
+    return f"문서 '{task.filename}' 처리 상태: {label}"
 
 
 @tool(args_schema=GenerateDocumentInput)

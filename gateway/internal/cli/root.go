@@ -34,6 +34,8 @@ func NewRootCmd() *cobra.Command {
 		newLogoutCmd(),
 		newWhoAmICmd(),
 		newChatCmd(),
+		newAskCmd(),
+		newUsersCmd(),
 		newConfigCmd(),
 		newGatewayCmd(),
 		newAgentCmd(),
@@ -42,6 +44,7 @@ func NewRootCmd() *cobra.Command {
 		newDockerCmd(),
 		newUpdateCmd(),
 		newDoctorCmd(),
+		newDBCmd(),
 		newVersionCmd(),
 	)
 
