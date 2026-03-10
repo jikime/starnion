@@ -106,7 +106,7 @@ function ChatPageInner() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)]">
+    <div className="flex h-full overflow-hidden">
       {sidebarOpen && (
         <ChatSidebar
           activeThreadId={activeThreadId}
