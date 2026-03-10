@@ -7,9 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"gopkg.in/yaml.v3"
 )
 
@@ -18,27 +16,18 @@ import (
 // Gateway and Agent read from this file — no per-service .env files
 // except ui/.env which is auto-generated for Next.js.
 type StarNionConfig struct {
-	Version  string         `yaml:"version"`
-	Database DatabaseConfig `yaml:"database"`
-	Admin    AdminConfig    `yaml:"admin"`
-	MinIO    MinIOConfig    `yaml:"minio"`
-	Gateway  GatewayConfig  `yaml:"gateway"`
-	UI       UIConfig       `yaml:"ui"`
-	Auth     AuthConfig     `yaml:"auth"`
-	CLI      CLIConfig      `yaml:"cli"`
+	Version   string          `yaml:"version"`
+	Database  DatabaseConfig  `yaml:"database"`
+	Admin     AdminConfig     `yaml:"admin"`
+	MinIO     MinIOConfig     `yaml:"minio"`
+	Gateway   GatewayConfig   `yaml:"gateway"`
+	UI        UIConfig        `yaml:"ui"`
+	Auth      AuthConfig      `yaml:"auth"`
 	Google    GoogleConfig    `yaml:"google"`
 	Gemini    GeminiConfig    `yaml:"gemini"`
 	Embedding EmbeddingConfig `yaml:"embedding"`
 	Log       LogConfig       `yaml:"log"`
-	CORS     CORSConfig     `yaml:"cors"`
-}
-
-// CLIConfig holds the local CLI user identity and JWT token.
-// Populated once during 'starnion setup' and refreshed via 'starnion auth refresh'.
-type CLIConfig struct {
-	UserID         string    `yaml:"user_id"`          // admin user UUID
-	Token          string    `yaml:"token"`            // JWT Bearer token
-	TokenExpiresAt time.Time `yaml:"token_expires_at"` // UTC expiry time
+	CORS      CORSConfig      `yaml:"cors"`
 }
 
 // GeminiConfig holds the server-level Gemini model configuration.
@@ -247,36 +236,6 @@ func randomSecret(bytes int) string {
 	b := make([]byte, bytes)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
-}
-
-// cliJWTClaims mirrors auth.jwtClaims exactly so the gateway ValidateToken
-// can parse CLI-issued tokens without any structural difference.
-type cliJWTClaims struct {
-	jwt.RegisteredClaims
-	Platform string `json:"plat,omitempty"`
-}
-
-// IssueCLIToken creates a signed HS256 JWT for the local CLI user.
-// Uses the identical claims structure as auth.Service.IssueToken so the
-// gateway middleware validates CLI tokens the same way as web tokens.
-// TTL: 30 days. Returns the signed token string and its expiry time.
-func IssueCLIToken(userID, jwtSecret string) (string, time.Time, error) {
-	now := time.Now().UTC()
-	exp := now.Add(30 * 24 * time.Hour)
-	claims := cliJWTClaims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   userID,
-			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(exp),
-		},
-		Platform: "cli",
-	}
-	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := t.SignedString([]byte(jwtSecret))
-	if err != nil {
-		return "", time.Time{}, fmt.Errorf("JWT 서명 실패: %w", err)
-	}
-	return signed, exp, nil
 }
 
 // EnsureSecrets auto-generates JWT and Auth secrets if they are empty.

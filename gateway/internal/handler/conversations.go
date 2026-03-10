@@ -67,11 +67,12 @@ func (h *ConversationHandler) List(c echo.Context) error {
 }
 
 // Create creates a new conversation for a user.
-// POST /api/v1/conversations  Body: { "user_id": "...", "title": "..." }
+// POST /api/v1/conversations  Body: { "user_id": "...", "title": "...", "platform": "..." }
 func (h *ConversationHandler) Create(c echo.Context) error {
 	var req struct {
-		UserID string `json:"user_id"`
-		Title  string `json:"title"`
+		UserID   string `json:"user_id"`
+		Title    string `json:"title"`
+		Platform string `json:"platform"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
@@ -82,14 +83,17 @@ func (h *ConversationHandler) Create(c echo.Context) error {
 	if req.Title == "" {
 		req.Title = "새 대화"
 	}
+	if req.Platform == "" {
+		req.Platform = "web"
+	}
 
 	newID := uuid.New().String()
 	var row conversationRow
 	err := h.db.QueryRowContext(c.Request().Context(), `
-		INSERT INTO conversations (id, user_id, title, thread_id)
-		VALUES ($1::uuid, $2, $3, $4)
+		INSERT INTO conversations (id, user_id, title, thread_id, platform)
+		VALUES ($1::uuid, $2, $3, $4, $5)
 		RETURNING id, title, platform, created_at, updated_at
-	`, newID, req.UserID, req.Title, newID).Scan(&row.ID, &row.Title, &row.Platform, &row.CreatedAt, &row.UpdatedAt)
+	`, newID, req.UserID, req.Title, newID, req.Platform).Scan(&row.ID, &row.Title, &row.Platform, &row.CreatedAt, &row.UpdatedAt)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", req.UserID).Msg("conversations: create failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "create failed"})

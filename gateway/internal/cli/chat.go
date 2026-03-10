@@ -26,57 +26,26 @@ func newChatCmd() *cobra.Command {
 	}
 }
 
-// newAuthCmd returns the 'starnion auth' command group.
-func newAuthCmd() *cobra.Command {
-	c := &cobra.Command{
-		Use:   "auth",
-		Short: "CLI 인증 관리",
-	}
-	c.AddCommand(newAuthRefreshCmd())
-	return c
-}
-
-func newAuthRefreshCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "refresh",
-		Short: "CLI 토큰 갱신 (30일 연장)",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runAuthRefresh()
-		},
-	}
-}
 
 // ── chat REPL ─────────────────────────────────────────────────────────────────
 
 func runChat() error {
-	cfg, err := LoadConfig()
+	gatewayURL, token, userID, err := ResolveCLICredentials()
 	if err != nil {
-		return fmt.Errorf("설정 파일 로드 실패: %w", err)
+		PrintFail("인증", err.Error())
+		return err
 	}
 
-	// Validate CLI credentials
-	if cfg.CLI.UserID == "" || cfg.CLI.Token == "" {
-		PrintFail("CLI", "CLI 인증 정보가 없습니다.")
-		PrintHint("'starnion setup'을 먼저 실행하거나 'starnion auth refresh'로 토큰을 발급하세요.")
-		return fmt.Errorf("cli credentials not configured")
-	}
-
-	// Token expiry checks
-	if !cfg.CLI.TokenExpiresAt.IsZero() {
-		if time.Now().After(cfg.CLI.TokenExpiresAt) {
+	// Token expiry warning (user config only).
+	if u, e := LoadUserConfig(); e == nil && !u.TokenExpiresAt.IsZero() {
+		if time.Now().After(u.TokenExpiresAt) {
 			PrintFail("토큰", "CLI 토큰이 만료되었습니다.")
-			PrintHint("'starnion auth refresh'로 토큰을 갱신하세요.")
+			PrintHint("'starnion login'으로 다시 로그인하세요.")
 			return fmt.Errorf("cli token expired")
 		}
-		daysLeft := int(time.Until(cfg.CLI.TokenExpiresAt).Hours() / 24)
-		if daysLeft <= 7 {
-			PrintWarn("토큰", fmt.Sprintf("CLI 토큰이 %d일 후 만료됩니다. 곧 'starnion auth refresh'를 실행하세요.", daysLeft))
+		if daysLeft := int(time.Until(u.TokenExpiresAt).Hours() / 24); daysLeft <= 7 {
+			PrintWarn("토큰", fmt.Sprintf("CLI 토큰이 %d일 후 만료됩니다. 'starnion login'으로 갱신하세요.", daysLeft))
 		}
-	}
-
-	gatewayURL := cfg.Gateway.URL
-	if gatewayURL == "" {
-		gatewayURL = "http://localhost:8080"
 	}
 
 	PrintBanner(version)
@@ -84,6 +53,12 @@ func runChat() error {
 	PrintInfo("StarNion AI와 대화합니다.")
 	PrintHint("종료: 'exit' 또는 Ctrl+C  |  Gateway: " + gatewayURL)
 	fmt.Println()
+
+	// Create a new conversation so messages are persisted and visible in web chat.
+	threadID, err := createConversation(gatewayURL, token, userID)
+	if err != nil {
+		PrintWarn("대화", fmt.Sprintf("대화 세션 생성 실패 (메시지가 저장되지 않을 수 있음): %v", err))
+	}
 
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
@@ -104,7 +79,7 @@ func runChat() error {
 		}
 
 		fmt.Print(sNebula.Render("  ★ ") + sBold.Render("StarNion") + " › ")
-		if err := streamChat(gatewayURL, cfg.CLI.Token, cfg.CLI.UserID, input); err != nil {
+		if err := streamChat(gatewayURL, token, userID, threadID, input); err != nil {
 			fmt.Println()
 			PrintFail("오류", err.Error())
 		}
@@ -113,13 +88,52 @@ func runChat() error {
 	return nil
 }
 
+// createConversation calls POST /api/v1/conversations and returns the conversation ID (= thread_id).
+func createConversation(gatewayURL, token, userID string) (string, error) {
+	title := "CLI - " + time.Now().Format("2006-01-02 15:04")
+	body, _ := json.Marshal(map[string]string{
+		"user_id":  userID,
+		"title":    title,
+		"platform": "cli",
+	})
+
+	req, err := http.NewRequest(http.MethodPost, gatewayURL+"/api/v1/conversations", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("gateway 연결 실패: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("대화 생성 실패: %s", resp.Status)
+	}
+
+	var result struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("응답 파싱 실패: %w", err)
+	}
+	return result.ID, nil
+}
+
 // streamChat POSTs to the gateway SSE endpoint and prints text-delta events
 // to stdout as they arrive, giving a real-time streaming feel.
-func streamChat(gatewayURL, token, userID, message string) error {
-	body, _ := json.Marshal(map[string]string{
+func streamChat(gatewayURL, token, userID, threadID, message string) error {
+	payload := map[string]string{
 		"user_id": userID,
 		"message": message,
-	})
+	}
+	if threadID != "" {
+		payload["thread_id"] = threadID
+	}
+	body, _ := json.Marshal(payload)
 
 	req, err := http.NewRequest(http.MethodPost, gatewayURL+"/api/v1/chat/stream", bytes.NewReader(body))
 	if err != nil {
@@ -185,39 +199,3 @@ func streamChat(gatewayURL, token, userID, message string) error {
 	return nil
 }
 
-// ── auth refresh ──────────────────────────────────────────────────────────────
-
-func runAuthRefresh() error {
-	PrintSectionHeader(0, 0, "AUTH REFRESH")
-
-	cfg, err := LoadConfig()
-	if err != nil {
-		return fmt.Errorf("설정 파일 로드 실패: %w", err)
-	}
-
-	if cfg.CLI.UserID == "" {
-		PrintFail("auth", "CLI user_id가 없습니다. 'starnion setup'을 먼저 실행하세요.")
-		return fmt.Errorf("not configured")
-	}
-	if cfg.Auth.JWTSecret == "" {
-		PrintFail("auth", "JWT secret이 없습니다. 'starnion setup'을 먼저 실행하세요.")
-		return fmt.Errorf("jwt secret missing")
-	}
-
-	token, expiresAt, err := IssueCLIToken(cfg.CLI.UserID, cfg.Auth.JWTSecret)
-	if err != nil {
-		return fmt.Errorf("토큰 발급 실패: %w", err)
-	}
-
-	cfg.CLI.Token = token
-	cfg.CLI.TokenExpiresAt = expiresAt
-
-	if err := SaveConfig(cfg); err != nil {
-		return fmt.Errorf("설정 저장 실패: %w", err)
-	}
-
-	PrintOK("auth", fmt.Sprintf("CLI 토큰 갱신 완료 (만료: %s)", expiresAt.Format("2006-01-02")))
-	PrintInfo("user_id: " + cfg.CLI.UserID)
-	fmt.Println()
-	return nil
-}

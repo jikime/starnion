@@ -32,6 +32,7 @@ const PLATFORM_META: Record<string, { icon: string; label: string }> = {
   telegram: { icon: "📱", label: "텔레그램" },
   discord:  { icon: "🎮", label: "디스코드" },
   slack:    { icon: "💬", label: "슬랙" },
+  cli:      { icon: "💻", label: "CLI" },
 }
 
 export function ChatSidebar({

@@ -30,8 +30,10 @@ func NewRootCmd() *cobra.Command {
 
 	root.AddCommand(
 		newSetupCmd(),
+		newLoginCmd(),
+		newLogoutCmd(),
+		newWhoAmICmd(),
 		newChatCmd(),
-		newAuthCmd(),
 		newConfigCmd(),
 		newGatewayCmd(),
 		newAgentCmd(),

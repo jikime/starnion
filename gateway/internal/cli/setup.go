@@ -161,24 +161,6 @@ func RunSetup(projectRoot string) error {
 	cfg.Admin.Email = adminEmail
 	PrintOK("Admin", adminName+"("+adminEmail+") 계정 생성 완료")
 
-	// ── CLI token ─────────────────────────────────────────────────────────────
-	// Fetch the admin user UUID and issue a 30-day JWT so 'starnion chat' works
-	// without a separate login step.
-	if adminUserID, err := fetchUserID(cfg, adminEmail); err == nil && adminUserID != "" {
-		if token, expiresAt, err := IssueCLIToken(adminUserID, cfg.Auth.JWTSecret); err == nil {
-			cfg.CLI = CLIConfig{
-				UserID:         adminUserID,
-				Token:          token,
-				TokenExpiresAt: expiresAt,
-			}
-			PrintOK("CLI", fmt.Sprintf("로컬 CLI 토큰 발급 완료 (만료: %s)", expiresAt.Format("2006-01-02")))
-		} else {
-			PrintWarn("CLI", fmt.Sprintf("토큰 발급 실패: %v", err))
-		}
-	} else {
-		PrintWarn("CLI", "admin user_id 조회 실패 — 'starnion auth refresh'로 나중에 갱신하세요")
-	}
-
 	// ════════════════════════════════════════════════════════════════════════════
 	// [4/6] MINIO (FILE STORAGE)
 	// ════════════════════════════════════════════════════════════════════════════
