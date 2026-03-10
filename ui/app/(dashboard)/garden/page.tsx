@@ -56,8 +56,6 @@ function starPolygon(cx: number, cy: number, outerR: number, n = 5): string {
 }
 
 function shortKRW(n: number) {
-  if (Math.abs(n) >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억`
-  if (Math.abs(n) >= 10_000) return `${Math.round(n / 10_000)}만`
   return n.toLocaleString("ko-KR")
 }
 
