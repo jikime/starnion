@@ -95,7 +95,12 @@ function ChatPageInner() {
 
   // Auto-select only when there is no conversation in the URL yet.
   const handleSidebarLoad = (convs: Conversation[]) => {
-    if (activeThreadId) return // already selected — don't override
+    if (activeThreadId) {
+      // URL에 id가 이미 있으면 해당 대화의 platform을 확인해 readonly 설정
+      const current = convs.find((c) => c.id === activeThreadId)
+      if (current) setIsReadonly(current.platform !== "web")
+      return
+    }
     const firstWeb = convs.find((c) => c.platform === "web")
     if (firstWeb) selectThread(firstWeb.id, firstWeb.platform)
   }
