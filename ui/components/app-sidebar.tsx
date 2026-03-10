@@ -29,6 +29,7 @@ import {
   Cog,
   ScrollText,
   Activity,
+  Sprout,
 } from "lucide-react"
 import {
   Sidebar,
@@ -56,6 +57,7 @@ const financeNavItems = [
 ] as const
 
 const lifeNavItems = [
+  { key: "garden", icon: Sprout, href: "/garden" },
   { key: "diary", icon: BookOpen, href: "/diary" },
   { key: "goals", icon: Target, href: "/goals" },
   { key: "dday", icon: Clock, href: "/dday" },
