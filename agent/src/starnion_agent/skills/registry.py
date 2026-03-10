@@ -105,6 +105,14 @@ SKILLS: dict[str, SkillDef] = {
         cron_rules=["inactive_reminder"],
         sort_order=8,
     ),
+    "briefing": SkillDef(
+        id="briefing",
+        name="부재중 브리핑",
+        emoji="📋",
+        description="이메일, 예산, 최근 관심 주제를 한 번에 요약해 브리핑합니다",
+        category="notification",
+        sort_order=9,
+    ),
     "compaction": SkillDef(
         id="compaction",
         name="메모리 압축",
