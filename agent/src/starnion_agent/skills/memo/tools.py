@@ -15,6 +15,7 @@ from starnion_agent.db.pool import get_pool
 from starnion_agent.db.repositories import memo_db as memo_db_repo
 from starnion_agent.embedding.service import embed_text
 from starnion_agent.skills.guard import skill_guard
+from starnion_agent.skills.memory.auto_tag import schedule_auto_tag
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,9 @@ async def save_memo(
         tag=tag.strip() or "개인",
         embedding=embedding,
     )
+
+    # Auto-tag the saved memo (fire-and-forget)
+    schedule_auto_tag(user_id, "memo", memo["id"], memo["title"], content)
 
     lines = [
         f"메모를 저장했어요! (ID: {memo['id']})",

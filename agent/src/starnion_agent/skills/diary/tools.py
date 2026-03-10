@@ -11,6 +11,7 @@ from starnion_agent.db.repositories import daily_log as daily_log_repo
 from starnion_agent.db.repositories import diary_entry as diary_entry_repo
 from starnion_agent.embedding.service import embed_text
 from starnion_agent.skills.guard import skill_guard
+from starnion_agent.skills.memory.auto_tag import schedule_auto_tag
 
 
 class SaveDailyLogInput(BaseModel):
@@ -82,6 +83,11 @@ async def save_daily_log(content: str, sentiment: str = "") -> str:
         embedding=embedding,
     )
 
+    # Auto-tag the saved diary entry (fire-and-forget)
+    diary_row = await diary_entry_repo.list_entries(pool, user_id, limit=1)
+    if diary_row:
+        schedule_auto_tag(user_id, "diary", diary_row[0]["id"], title, content)
+
     if sentiment:
         return f"일상 기록을 저장했어요. (감정: {sentiment})"
     return "일상 기록을 저장했어요."
@@ -140,6 +146,9 @@ async def save_diary_entry(
         sentiment=mood,
         embedding=embedding,
     )
+
+    # Auto-tag the saved diary entry (fire-and-forget)
+    schedule_auto_tag(user_id, "diary", entry["id"], title, content)
 
     result_date = entry.get("entry_date", parsed_date or date.today())
     lines = [f"일기를 저장했어요! ({result_date})"]

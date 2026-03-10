@@ -444,6 +444,23 @@ CREATE INDEX IF NOT EXISTS idx_memos_embedding ON memos
 CREATE INDEX IF NOT EXISTS idx_memos_content_tsv ON memos USING gin(content_tsv);
 
 -- =============================================================
+-- MEMORY — CONTENT TAGS (auto-tagging overlay)
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS content_tags (
+    id          BIGSERIAL   PRIMARY KEY,
+    user_id     TEXT        NOT NULL,
+    source      TEXT        NOT NULL CHECK (source IN ('diary', 'memo')),
+    source_id   BIGINT      NOT NULL,
+    tag         TEXT        NOT NULL,
+    auto_tagged BOOLEAN     NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(source, source_id, tag)
+);
+CREATE INDEX IF NOT EXISTS idx_content_tags_user_tag ON content_tags(user_id, tag);
+CREATE INDEX IF NOT EXISTS idx_content_tags_source   ON content_tags(source, source_id);
+
+-- =============================================================
 -- LIFE — D-DAY
 -- =============================================================
 

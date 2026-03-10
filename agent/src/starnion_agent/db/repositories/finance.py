@@ -246,6 +246,40 @@ async def get_weekday_spending(
             return [dict(r) for r in rows]
 
 
+async def list_by_date_range(
+    pool: AsyncConnectionPool[Any],
+    user_id: str,
+    date_from: datetime,
+    date_to: datetime,
+) -> list[dict[str, Any]]:
+    """List finance records within a datetime range [date_from, date_to).
+
+    Args:
+        pool: The async connection pool.
+        user_id: Telegram user ID.
+        date_from: Range start (inclusive).
+        date_to: Range end (exclusive).
+
+    Returns:
+        List of finance record dicts ordered by created_at DESC.
+    """
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                """
+                SELECT id, user_id, amount, category, description, created_at
+                FROM finances
+                WHERE user_id = %s
+                  AND created_at >= %s
+                  AND created_at < %s
+                ORDER BY created_at DESC
+                """,
+                (user_id, date_from, date_to),
+            )
+            rows = await cur.fetchall()
+            return [dict(r) for r in rows]
+
+
 def _month_range(month: str) -> tuple[datetime, datetime]:
     """Compute the start (inclusive) and end (exclusive) of a month.
 

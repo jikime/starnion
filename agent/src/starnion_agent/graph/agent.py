@@ -33,7 +33,7 @@ from starnion_agent.skills.loader import (
     build_skill_instructions,
     load_all_skill_docs,
 )
-from starnion_agent.skills.memory.tools import retrieve_memory
+from starnion_agent.skills.memory.tools import get_time_travel_insight, retrieve_memory, search_by_tags
 from starnion_agent.skills.google.tools import (
     google_auth,
     google_calendar_create,
@@ -116,6 +116,8 @@ ALL_TOOLS = [
     save_finance,
     get_monthly_total,
     retrieve_memory,
+    get_time_travel_insight,
+    search_by_tags,
     save_daily_log,
     save_diary_entry,
     set_budget,

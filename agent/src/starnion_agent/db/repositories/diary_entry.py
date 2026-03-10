@@ -224,6 +224,34 @@ async def search_similar(
             return [dict(r) for r in rows]
 
 
+async def list_by_date_range(
+    pool: AsyncConnectionPool[Any],
+    user_id: str,
+    date_from: date,
+    date_to: date,
+) -> list[dict[str, Any]]:
+    """List diary entries within a date range (inclusive on both ends).
+
+    Returns:
+        Entries ordered by entry_date DESC, then created_at DESC.
+    """
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                """
+                SELECT id, user_id, title, content, mood, tags,
+                       entry_date, created_at, updated_at
+                FROM diary_entries
+                WHERE user_id = %s
+                  AND entry_date BETWEEN %s AND %s
+                ORDER BY entry_date DESC, created_at DESC
+                """,
+                (user_id, date_from, date_to),
+            )
+            rows = await cur.fetchall()
+            return [dict(r) for r in rows]
+
+
 async def search_fulltext(
     pool: AsyncConnectionPool[Any],
     user_id: str,
