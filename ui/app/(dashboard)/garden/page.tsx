@@ -161,27 +161,25 @@ function StarField() {
   )
 }
 
-// ── Income Stars (falling) ────────────────────────────────────────────────────
+// ── Income Stars (scattered sky) ──────────────────────────────────────────────
 
-function IncomeFallingStars({ income }: { income: number }) {
-  // Render 0–6 falling stars based on income amount
-  const count = Math.min(6, Math.max(0, Math.floor(income / 300_000)))
+function IncomeStars({ income }: { income: number }) {
+  // 수입 30만원당 별 1개, 최대 8개 — 하늘 전체에 부유
+  const count = Math.min(8, Math.max(0, Math.floor(income / 300_000)))
   const [stars, setStars] = useState<Array<{
-    id: number; x: number; size: number; delay: number; dur: number; landX: number; landY: number
+    id: number; x: number; y: number; size: number; delay: number; dur: number
   }>>([])
 
   useEffect(() => {
     if (!count) { setStars([]); return }
     setStars(Array.from({ length: count }, (_, i) => ({
       id: i,
-      // Spread across 20–80% width, avoid cloud area (right side)
-      x: parseFloat((20 + (i * 9.3 + Math.sin(i * 1.8) * 15) % 55).toFixed(2)),
-      size: 7 + (i % 3) * 3,
-      delay: parseFloat((i * 1.4).toFixed(1)),
-      dur: parseFloat((2.8 + (i % 3) * 0.5).toFixed(1)),
-      // Landing position (near bottom, scattered)
-      landX: parseFloat((15 + (i * 11.7 + Math.cos(i * 2.1) * 20) % 65).toFixed(2)),
-      landY: parseFloat((72 + (i % 3) * 5).toFixed(2)),
+      // 하늘 전체 산포: x 5–88%, y 4–42% (구름·나무 영역 피함)
+      x: parseFloat((5 + (i * 12.4 + Math.sin(i * 2.7) * 28) % 83).toFixed(2)),
+      y: parseFloat((4 + (i * 6.8 + Math.cos(i * 1.9) * 11) % 38).toFixed(2)),
+      size: 9 + (i % 3) * 4,
+      delay: parseFloat((i * 0.85).toFixed(2)),
+      dur: parseFloat((2.6 + (i % 4) * 0.55).toFixed(2)),
     })))
   }, [count])
 
@@ -190,34 +188,30 @@ function IncomeFallingStars({ income }: { income: number }) {
   return (
     <>
       {stars.map(s => (
-        <div key={s.id} className="absolute pointer-events-none" style={{ zIndex: 7 }}>
-          {/* Falling trail */}
-          <div style={{
-            position: "absolute",
+        <div
+          key={s.id}
+          className="absolute pointer-events-none"
+          style={{
             left: `${s.x}%`,
-            top: "5%",
-            animation: `gdn-star-fall ${s.dur}s ${s.delay}s ease-in infinite`,
-          }}>
-            <svg width={s.size * 2} height={s.size * 2} viewBox="-12 -12 24 24"
-              style={{ overflow: "visible" }}>
-              <polygon points={starPolygon(0, 0, s.size * 0.8, 5)}
-                fill="#fbbf24" opacity="0.9" />
-              <polygon points={starPolygon(0, 0, s.size * 1.3, 5)}
-                fill="#fbbf24" opacity="0.18" />
-            </svg>
-          </div>
-          {/* Landing sparkle */}
-          <div style={{
-            position: "absolute",
-            left: `${s.landX}%`,
-            top: `${s.landY}%`,
-            animation: `gdn-star-land ${s.dur}s ${s.delay + s.dur * 0.8}s ease-out infinite`,
-          }}>
-            <svg width="16" height="16" viewBox="-8 -8 16 16" style={{ overflow: "visible" }}>
-              <polygon points={starPolygon(0, 0, 5, 5)} fill="#fef08a" opacity="0.95" />
-              <circle cx="0" cy="0" r="8" fill="#fbbf24" opacity="0.15" />
-            </svg>
-          </div>
+            top: `${s.y}%`,
+            zIndex: 6,
+            animation: `gdn-float ${s.dur}s ${s.delay}s ease-in-out infinite`,
+          }}
+        >
+          <svg
+            width={s.size * 2.8} height={s.size * 2.8}
+            viewBox={`${-s.size * 1.4} ${-s.size * 1.4} ${s.size * 2.8} ${s.size * 2.8}`}
+            style={{ overflow: "visible" }}
+          >
+            {/* 외곽 글로우 */}
+            <polygon points={starPolygon(0, 0, s.size * 1.7, 5)} fill="#fbbf24" opacity="0.12" />
+            {/* 중간 글로우 */}
+            <polygon points={starPolygon(0, 0, s.size * 1.2, 5)} fill="#fde68a" opacity="0.28" />
+            {/* 별 본체 */}
+            <polygon points={starPolygon(0, 0, s.size, 5)} fill="#fbbf24" opacity="0.95" />
+            {/* 중심 하이라이트 */}
+            <circle cx="0" cy="0" r={s.size * 0.28} fill="white" opacity="0.55" />
+          </svg>
         </div>
       ))}
     </>
@@ -275,21 +269,23 @@ function AssetTree({
   const branchMidColor = isWithering ? "#a89080" : "#c4b5fd"
   const branchEndColor = isWithering ? "#9a8070" : "#e879f9"
 
-  // Withered branches droop downward (end points pulled down)
+  // Galaxy swirl branches — organic S-curves spreading outward
   const branches = isWithering
     ? [
-        { d: "M200,272 C178,248 130,220 110,175 C96,140 112,118 150,125", delay: "0s" },
-        { d: "M200,272 C222,248 270,220 290,177 C304,142 290,120 252,128", delay: "0.9s" },
-        { d: "M200,272 C200,248 192,200 196,155 C198,125 208,108 200,100", delay: "1.8s" },
-        { d: "M200,272 C172,268 148,262 128,248 C110,236 106,218 118,205", delay: "2.7s" },
-        { d: "M200,272 C228,268 252,262 272,248 C290,236 294,218 282,205", delay: "3.6s" },
+        // 시든 가지: 아래로 처지는 곡선
+        { d: "M200,268 C185,255 155,240 130,220 C108,202 100,182 115,168", delay: "0s" },
+        { d: "M200,268 C215,255 245,240 270,220 C292,202 300,182 285,168", delay: "0.9s" },
+        { d: "M200,268 C198,248 194,220 197,190 C199,165 205,148 200,138", delay: "1.8s" },
+        { d: "M200,268 C178,262 155,254 138,240 C120,226 116,208 128,196", delay: "2.7s" },
+        { d: "M200,268 C222,262 245,254 262,240 C280,226 284,208 272,196", delay: "3.6s" },
       ]
     : [
-        { d: "M200,272 C178,232 116,192 92,136 C74,94 106,66 154,80", delay: "0s" },
-        { d: "M200,272 C222,232 284,192 308,138 C326,96 294,68 246,82", delay: "0.9s" },
-        { d: "M200,272 C200,232 186,172 194,108 C198,68 216,50 200,38", delay: "1.8s" },
-        { d: "M200,272 C164,262 130,246 106,218 C82,192 78,158 97,140", delay: "2.7s" },
-        { d: "M200,272 C236,262 270,246 294,218 C318,192 322,158 303,140", delay: "3.6s" },
+        // 건강한 가지: 은하 소용돌이 S-curve
+        { d: "M200,268 C175,245 120,215 85,175 C55,138 68,92 118,82 C148,76 165,95 154,118", delay: "0s" },
+        { d: "M200,268 C225,245 280,215 315,175 C345,138 332,92 282,82 C252,76 235,95 246,118", delay: "0.9s" },
+        { d: "M200,268 C196,235 182,195 188,152 C194,112 210,78 200,48 C196,32 188,28 200,24", delay: "1.8s" },
+        { d: "M200,268 C170,255 138,240 110,215 C82,190 72,158 90,136 C104,118 128,116 140,132", delay: "2.7s" },
+        { d: "M200,268 C230,255 262,240 290,215 C318,190 328,158 310,136 C296,118 272,116 260,132", delay: "3.6s" },
       ]
 
   const fruitPositions = [
@@ -300,10 +296,10 @@ function AssetTree({
     [150, 170], [252, 172], [200, 116], [120, 188], [280, 190], [178, 132], [224, 128],
   ] as [number, number][]
 
-  // Tip positions change with withered branches
+  // Tip positions match new branch endpoints
   const tipPositions = isWithering
-    ? [[150, 125], [252, 128], [200, 100], [118, 205], [282, 205]]
-    : [[154, 80], [246, 82], [200, 38], [97, 140], [303, 140]]
+    ? [[115, 168], [285, 168], [200, 138], [128, 196], [272, 196]]
+    : [[154, 118], [246, 118], [200, 24], [140, 132], [260, 132]]
 
   return (
     <div
@@ -469,16 +465,27 @@ function SpendingCloud({ isRaining, categories }: {
         </defs>
 
         {/* Cloud shadow */}
-        <ellipse cx="90" cy="62" rx="72" ry="36" fill="#2a3a6a" opacity="0.4" />
+        <ellipse cx="90" cy="72" rx="72" ry="14" fill="#1a2a5a" opacity="0.35" />
 
-        {/* Cloud body layers */}
-        <ellipse cx="90" cy="58" rx="65" ry="32" fill="url(#gdn-cloud-fill)" filter="url(#gdn-cloud-glow)" />
-        <ellipse cx="62" cy="50" rx="42" ry="26" fill="#5a70a8" opacity="0.88" filter="url(#gdn-cloud-glow)" />
-        <ellipse cx="118" cy="48" rx="36" ry="24" fill="#5a70a8" opacity="0.88" filter="url(#gdn-cloud-glow)" />
-        <ellipse cx="88" cy="40" rx="30" ry="24" fill="#6b80c0" opacity="0.95" filter="url(#gdn-cloud-glow)" />
-
+        {/* Bumpy cloud body — single path silhouette */}
+        <path
+          d="M20,72 C20,72 18,58 28,52 C32,44 44,38 58,42
+             C60,32 70,22 84,22 C94,18 106,20 112,28
+             C118,20 130,16 142,22 C154,26 160,36 156,46
+             C166,42 178,46 180,56 C182,66 174,72 162,72 Z"
+          fill="url(#gdn-cloud-fill)"
+          filter="url(#gdn-cloud-glow)"
+        />
+        {/* Inner highlight layer */}
+        <path
+          d="M36,68 C36,68 34,56 44,50 C50,44 62,40 74,44
+             C78,36 86,30 96,30 C106,28 116,32 120,40
+             C128,34 140,36 144,44 C148,52 142,60 132,62
+             C136,68 Z"
+          fill="#7a90c8" opacity="0.55"
+        />
         {/* Highlight shimmer */}
-        <ellipse cx="75" cy="33" rx="18" ry="10" fill="white" opacity="0.08" />
+        <ellipse cx="82" cy="34" rx="20" ry="9" fill="white" opacity="0.10" />
 
         {/* Cloud label */}
         <text x="90" y="56" textAnchor="middle" fontSize="10.5" fill="white" opacity="0.88" fontWeight="600">지출 구름</text>
@@ -516,108 +523,112 @@ function SpendingCloud({ isRaining, categories }: {
 
 // ── Goal Flower ───────────────────────────────────────────────────────────────
 
-const FLOWER_COLORS = [
-  { petal: "#7c3aed", inner: "#c4b5fd", center: "#fbbf24" },
-  { petal: "#6366f1", inner: "#a5b4fc", center: "#fde68a" },
-  { petal: "#8b5cf6", inner: "#ddd6fe", center: "#fbbf24" },
-  { petal: "#a855f7", inner: "#e9d5ff", center: "#fef08a" },
+// 색상: 파랑-보라-청록 계열 (레퍼런스 이미지와 유사)
+const FLOWER_PALETTES = [
+  { p1: "#60a5fa", p2: "#818cf8", p3: "#c4b5fd", leaf: "#34d399", center: "#fbbf24" },
+  { p1: "#a78bfa", p2: "#c084fc", p3: "#e9d5ff", leaf: "#4ade80", center: "#fde68a" },
+  { p1: "#34d399", p2: "#60a5fa", p3: "#a5f3fc", leaf: "#4ade80", center: "#fbbf24" },
+  { p1: "#f472b6", p2: "#a78bfa", p3: "#ddd6fe", leaf: "#34d399", center: "#fef08a" },
 ]
 
-function FlowerSVG({ goal, index }: { goal: Goal; index: number }) {
-  const stage = goal.progress >= 76 ? 3 : goal.progress >= 51 ? 2 : goal.progress >= 26 ? 1 : 0
-  const col = FLOWER_COLORS[index % FLOWER_COLORS.length]
-  const BY = 108  // base y (stem bottom)
-  const TY = BY - 68  // top y (flower center)
+function TulipSVG({ goal, index }: { goal: Goal; index: number }) {
+  const progress = Math.max(0, Math.min(100, goal.progress ?? 0))
+  const col = FLOWER_PALETTES[index % FLOWER_PALETTES.length]
+
+  // 성장 단계: 0=씨앗 1=새싹 2=봉오리 3=반개화 4=만개
+  const stage = progress >= 80 ? 4 : progress >= 55 ? 3 : progress >= 30 ? 2 : progress >= 10 ? 1 : 0
+
+  // 만개 크기 기준, 진행도에 따라 스케일
+  const bloomScale = stage === 4 ? 1 : stage === 3 ? 0.8 : stage === 2 ? 0.6 : 0.4
+  const stemH = 62 + bloomScale * 12  // 줄기 길이
+  const BY = 118   // 줄기 밑 Y
+  const CY = BY - stemH  // 꽃 중심 Y
+
+  // 튤립 꽃잎 경로 (3장: 왼/중/오)
+  const P = bloomScale
+  const leftPetal  = `M0,${CY + 8 * P} C${-16 * P},${CY + 2 * P} ${-22 * P},${CY - 16 * P} ${-14 * P},${CY - 30 * P} C${-8 * P},${CY - 40 * P} ${-2 * P},${CY - 32 * P} 0,${CY - 18 * P}`
+  const rightPetal = `M0,${CY + 8 * P} C${16 * P},${CY + 2 * P} ${22 * P},${CY - 16 * P} ${14 * P},${CY - 30 * P} C${8 * P},${CY - 40 * P} ${2 * P},${CY - 32 * P} 0,${CY - 18 * P}`
+  const centerPetal= `M${-6 * P},${CY + 6 * P} C${-12 * P},${CY - 8 * P} ${-10 * P},${CY - 34 * P} 0,${CY - 42 * P} C${10 * P},${CY - 34 * P} ${12 * P},${CY - 8 * P} ${6 * P},${CY + 6 * P}`
 
   return (
     <g style={{
       transformOrigin: `0px ${BY}px`,
-      animation: stage >= 1 ? `gdn-sway ${3.2 + index * 0.5}s ${index * 0.9}s ease-in-out infinite` : undefined,
+      animation: stage >= 2 ? `gdn-sway ${3.4 + index * 0.6}s ${index * 0.7}s ease-in-out infinite` : undefined,
     }}>
       <defs>
-        <filter id={`gdn-fl-glow-${index}`} x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b" />
+        <filter id={`gdn-fl-glow-${index}`} x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b" />
           <feComposite in="b" in2="SourceGraphic" operator="over" />
         </filter>
-        <radialGradient id={`gdn-petal-${index}`} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={col.inner} stopOpacity="0.95" />
-          <stop offset="100%" stopColor={col.petal} stopOpacity="0.7" />
-        </radialGradient>
+        <linearGradient id={`gdn-tulip-${index}`} x1="0%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%" stopColor={col.p1} stopOpacity="0.95" />
+          <stop offset="50%" stopColor={col.p2} stopOpacity="0.85" />
+          <stop offset="100%" stopColor={col.p3} stopOpacity="0.75" />
+        </linearGradient>
       </defs>
 
-      {/* Stem */}
+      {/* 줄기 */}
       {stage >= 1 && (
-        <line x1="0" y1={BY} x2="0" y2={TY + 5}
-          stroke="#4ade80" strokeWidth="2.2" strokeLinecap="round" opacity="0.8" />
+        <path d={`M0,${BY} C${-4},${BY - stemH * 0.4} ${4},${BY - stemH * 0.7} 0,${CY + 10 * P}`}
+          fill="none" stroke={col.leaf} strokeWidth="2.8" strokeLinecap="round" opacity="0.82" />
       )}
 
-      {/* Leaves */}
-      {stage >= 2 && <>
-        <path d={`M0,${TY + 38} C-17,${TY + 26} -22,${TY + 14} -11,${TY + 8}`}
-          fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" opacity="0.72" />
-        <path d={`M0,${TY + 48} C17,${TY + 36} 22,${TY + 24} 11,${TY + 18}`}
-          fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" opacity="0.72" />
-      </>}
+      {/* 잎 (채운 leaf shape) */}
+      {stage >= 2 && (
+        <>
+          <path d={`M0,${BY - stemH * 0.32} C${-20},${BY - stemH * 0.45} ${-26},${BY - stemH * 0.62} ${-14},${BY - stemH * 0.64}`}
+            fill={col.leaf} opacity="0.72" />
+          <path d={`M0,${BY - stemH * 0.48} C${22},${BY - stemH * 0.62} ${28},${BY - stemH * 0.78} ${16},${BY - stemH * 0.80}`}
+            fill={col.leaf} opacity="0.72" />
+        </>
+      )}
 
-      {/* Stage 0: seed glow */}
+      {/* Stage 0: 씨앗 */}
       {stage === 0 && (
-        <circle cx="0" cy={BY} r="5.5" fill={col.petal} opacity="0.8"
+        <circle cx="0" cy={BY - 5} r="5" fill={col.p1} opacity="0.7"
           filter={`url(#gdn-fl-glow-${index})`}
-          style={{ animation: `gdn-twinkle 2.2s ${index * 0.5}s ease-in-out infinite alternate` }} />
+          style={{ animation: `gdn-twinkle 2.4s ${index * 0.6}s ease-in-out infinite alternate` }} />
       )}
 
-      {/* Stage 1: sprout bud */}
+      {/* Stage 1: 새싹 봉오리 */}
       {stage === 1 && (
         <g filter={`url(#gdn-fl-glow-${index})`}>
-          <ellipse cx="0" cy={TY - 6} rx="6" ry="14"
-            fill={col.petal} opacity="0.85" />
-          <ellipse cx="0" cy={TY - 6} rx="4" ry="9"
-            fill={col.inner} opacity="0.5" />
+          <ellipse cx="0" cy={CY} rx={7 * P} ry={16 * P} fill={`url(#gdn-tulip-${index})`} opacity="0.88" />
         </g>
       )}
 
-      {/* Stage 2: half bloom */}
-      {stage === 2 && (
-        <g filter={`url(#gdn-fl-glow-${index})`}>
-          {[0, 72, 144, 216, 288].map(angle => (
-            <ellipse key={angle} cx="0" cy={TY - 14}
-              rx="6.5" ry="15" fill={`url(#gdn-petal-${index})`} opacity="0.82"
-              transform={`rotate(${angle} 0 ${TY})`} />
-          ))}
-          <circle cx="0" cy={TY} r="7" fill={col.center} opacity="0.9" />
-        </g>
-      )}
-
-      {/* Stage 3: full bloom */}
-      {stage === 3 && (
+      {/* Stage 2+: 꽃잎 */}
+      {stage >= 2 && (
         <g filter={`url(#gdn-fl-glow-${index})`}
-          style={{ animation: `gdn-bloom 3.2s ${index * 0.5}s ease-in-out infinite` }}>
-          {/* Outer petals */}
-          {[0, 72, 144, 216, 288].map(angle => (
-            <ellipse key={`o${angle}`} cx="0" cy={TY - 18}
-              rx="9" ry="21" fill={`url(#gdn-petal-${index})`} opacity="0.78"
-              transform={`rotate(${angle} 0 ${TY})`} />
-          ))}
-          {/* Inner petals */}
-          {[36, 108, 180, 252, 324].map(angle => (
-            <ellipse key={`i${angle}`} cx="0" cy={TY - 14}
-              rx="6" ry="14" fill={col.inner} opacity="0.6"
-              transform={`rotate(${angle} 0 ${TY})`} />
-          ))}
-          {/* Center */}
-          <circle cx="0" cy={TY} r="9.5" fill={col.center} opacity="0.92" />
-          <polygon points={starPolygon(0, TY, 6, 5)} fill="white" opacity="0.85" />
-          {/* Center glow ring */}
-          <circle cx="0" cy={TY} r="13" fill={col.center} opacity="0.18" />
+          style={stage === 4 ? { animation: `gdn-bloom 3.5s ${index * 0.5}s ease-in-out infinite` } : undefined}>
+
+          {/* 외곽 글로우 헤일로 */}
+          <ellipse cx="0" cy={CY - 10 * P} rx={28 * P} ry={30 * P}
+            fill={col.p2} opacity="0.10" />
+
+          {/* 왼쪽 꽃잎 */}
+          <path d={leftPetal}  fill={`url(#gdn-tulip-${index})`} opacity="0.85" />
+          {/* 오른쪽 꽃잎 */}
+          <path d={rightPetal} fill={`url(#gdn-tulip-${index})`} opacity="0.85" />
+          {/* 가운데 꽃잎 (앞) */}
+          <path d={centerPetal} fill={`url(#gdn-tulip-${index})`} opacity="0.95" />
+
+          {/* 꽃잎 내측 하이라이트 */}
+          <path d={centerPetal} fill={col.p3} opacity="0.18" />
+
+          {/* 중심 별 */}
+          <circle cx="0" cy={CY - 4 * P} r={7 * P} fill={col.center} opacity="0.92" />
+          <polygon points={starPolygon(0, CY - 4 * P, 4.5 * P, 5)} fill="white" opacity="0.9" />
+          <circle cx="0" cy={CY - 4 * P} r={10 * P} fill={col.center} opacity="0.15" />
         </g>
       )}
 
-      {/* Label */}
-      <text x="0" y={BY + 16} textAnchor="middle" fontSize="10" fill="white" opacity="0.72">
-        {goal.icon} {goal.title.length > 5 ? goal.title.slice(0, 5) + "…" : goal.title}
+      {/* 라벨 */}
+      <text x="0" y={BY + 15} textAnchor="middle" fontSize="10" fill="white" opacity="0.75">
+        {goal.icon} {goal.title.length > 6 ? goal.title.slice(0, 6) + "…" : goal.title}
       </text>
-      <text x="0" y={BY + 28} textAnchor="middle" fontSize="9" fill="#c4b5fd" opacity="0.62">
-        {goal.progress.toFixed(0)}%
+      <text x="0" y={BY + 27} textAnchor="middle" fontSize="9" fill="#c4b5fd" opacity="0.60">
+        {progress.toFixed(0)}%
       </text>
     </g>
   )
@@ -627,17 +638,17 @@ function GoalFlowers({ goals }: { goals: Goal[] }) {
   const displayed = goals.slice(0, 4)
   if (!displayed.length) return null
 
-  const spacing = 78
-  const w = spacing * displayed.length + 20
+  const spacing = 86
+  const w = spacing * displayed.length + 24
 
   return (
-    <div className="absolute pointer-events-none" style={{ left: "3%", bottom: "10%", zIndex: 9 }}>
-      <svg viewBox={`-10 -20 ${w} 160`} width={w} height={160} style={{ overflow: "visible" }}>
-        <text x={(w - 20) / 2} y={-6} textAnchor="middle" fontSize="10.5"
-          fill="white" opacity="0.58" letterSpacing="1">목표 꽃</text>
+    <div className="absolute pointer-events-none" style={{ left: "2%", bottom: "9%", zIndex: 9 }}>
+      <svg viewBox={`-12 -22 ${w} 180`} width={w} height={180} style={{ overflow: "visible" }}>
+        <text x={(w - 24) / 2} y={-8} textAnchor="middle" fontSize="10"
+          fill="white" opacity="0.48" letterSpacing="2">목표 꽃</text>
         {displayed.map((goal, i) => (
-          <g key={goal.id} transform={`translate(${22 + i * spacing}, 0)`}>
-            <FlowerSVG goal={goal} index={i} />
+          <g key={goal.id} transform={`translate(${26 + i * spacing}, 0)`}>
+            <TulipSVG goal={goal} index={i} />
           </g>
         ))}
       </svg>
@@ -779,7 +790,7 @@ export default function GardenPage() {
 
     const [budgetRes, goalsRes, diaryRes, summaryRes, ddayRes] = await Promise.allSettled([
       fetch("/api/budget"),
-      fetch("/api/goals?status=completed"),
+      fetch("/api/goals"),
       fetch("/api/diary?limit=1"),
       fetch("/api/finance/summary"),
       fetch("/api/dday"),
@@ -864,8 +875,8 @@ export default function GardenPage() {
       {/* Stars */}
       <StarField />
 
-      {/* Income falling stars */}
-      {data && <IncomeFallingStars income={data.income} />}
+      {/* Income stars (scattered sky) */}
+      {data && <IncomeStars income={data.income} />}
 
       {/* Meteors */}
       {data && <Meteors count={data.meteorCount} />}
