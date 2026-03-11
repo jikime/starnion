@@ -30,6 +30,7 @@ import {
   ScrollText,
   Activity,
   Sprout,
+  HeartHandshake,
 } from "lucide-react"
 import {
   Sidebar,
@@ -57,8 +58,9 @@ const financeNavItems = [
 ] as const
 
 const lifeNavItems = [
-  { key: "garden", icon: Sprout, href: "/garden" },
-  { key: "diary", icon: BookOpen, href: "/diary" },
+  { key: "garden",   icon: Sprout,         href: "/garden" },
+  { key: "wellness", icon: HeartHandshake, href: "/wellness" },
+  { key: "diary",    icon: BookOpen,       href: "/diary" },
   { key: "goals", icon: Target, href: "/goals" },
   { key: "dday", icon: Clock, href: "/dday" },
   { key: "memo", icon: StickyNote, href: "/memo" },
