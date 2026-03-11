@@ -74,7 +74,7 @@ const WELLNESS_STYLES = `
   to   { transform: rotate(-360deg) translateX(var(--r, 70px)) rotate(360deg); }
 }
 @keyframes ws-glow {
-  0%, 100% { filter: drop-shadow(0 0 20px #fbbf2466) drop-shadow(0 0 40px #f9731633); }
+  0%, 100% { filter: drop-shadow(0 0 20px #fbbf24bb) drop-shadow(0 0 40px #f9731633); }
   50%       { filter: drop-shadow(0 0 36px #fbbf24aa) drop-shadow(0 0 60px #f9731655); }
 }
 @keyframes ws-float {
@@ -204,8 +204,8 @@ function MoodCalendar({ entries }: { entries: DiaryEntry[] }) {
 
   return (
     <div className="rounded-2xl p-3" style={{
-      background: "rgba(255,255,255,0.03)",
-      border: "1px solid rgba(255,255,255,0.07)",
+      background: "rgba(255,255,255,0.05)",
+      border: "1px solid rgba(255,255,255,0.12)",
       animation: "ws-cal-fade 0.35s ease-out",
     }}>
       {/* Header */}
@@ -213,7 +213,7 @@ function MoodCalendar({ entries }: { entries: DiaryEntry[] }) {
         <button
           onClick={prevMon}
           className="w-5 h-5 flex items-center justify-center rounded-full transition-all hover:bg-white/10"
-          style={{ color: "rgba(255,255,255,0.45)", fontSize: "14px" }}
+          style={{ color: "rgba(255,255,255,0.70)", fontSize: "16px" }}
         >‹</button>
         <span className="text-[13px] font-semibold tracking-widest"
           style={{ color: "rgba(255,255,255,0.65)" }}>
@@ -223,18 +223,34 @@ function MoodCalendar({ entries }: { entries: DiaryEntry[] }) {
           onClick={nextMon}
           disabled={isMaxMonth}
           className="w-5 h-5 flex items-center justify-center rounded-full transition-all hover:bg-white/10 disabled:opacity-20"
-          style={{ color: "rgba(255,255,255,0.45)", fontSize: "14px" }}
+          style={{ color: "rgba(255,255,255,0.70)", fontSize: "16px" }}
         >›</button>
       </div>
 
       {/* Day-of-week headers */}
-      <div className="grid grid-cols-7 mb-1">
-        {CAL_DAYS.map((d, i) => (
-          <div key={d} className="text-center"
-            style={{ fontSize: "10.5px", color: i === 0 ? "#f472b6aa" : i === 6 ? "#60a5faaa" : "rgba(255,255,255,0.32)" }}>
-            {d}
-          </div>
-        ))}
+      <div className="grid grid-cols-7 gap-x-[2px] mb-2">
+        {CAL_DAYS.map((d, i) => {
+          const isSunH = i === 0
+          const isSatH = i === 6
+          return (
+            <div key={d} className="flex justify-center">
+              <span style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 18, height: 18, borderRadius: "50%",
+                fontSize: "10px", fontWeight: 600,
+                background: isSunH ? "rgba(244,114,182,0.22)"
+                  : isSatH ? "rgba(96,165,250,0.22)"
+                  : "rgba(255,255,255,0.10)",
+                border: isSunH ? "1px solid rgba(244,114,182,0.50)"
+                  : isSatH ? "1px solid rgba(96,165,250,0.50)"
+                  : "1px solid rgba(255,255,255,0.18)",
+                color: isSunH ? "#f472b6"
+                  : isSatH ? "#60a5fa"
+                  : "rgba(255,255,255,0.75)",
+              }}>{d}</span>
+            </div>
+          )
+        })}
       </div>
 
       {/* Calendar grid */}
@@ -262,17 +278,17 @@ function MoodCalendar({ entries }: { entries: DiaryEntry[] }) {
                 fontWeight: isToday ? "700" : "400",
                 color: isToday
                   ? "#fbbf24"
-                  : cfg ? "rgba(255,255,255,0.7)"
-                  : isSun ? "rgba(244,114,182,0.45)"
-                  : isSat ? "rgba(96,165,250,0.45)"
-                  : "rgba(255,255,255,0.22)",
+                  : cfg ? "rgba(255,255,255,0.88)"
+                  : isSun ? "rgba(244,114,182,0.70)"
+                  : isSat ? "rgba(96,165,250,0.70)"
+                  : "rgba(255,255,255,0.52)",
               }}>
                 {day}
               </span>
               <div style={{
                 width: 5, height: 5, borderRadius: "50%",
                 background: cfg ? cfg.color : "transparent",
-                border: !cfg && isToday ? "1px solid #fbbf2466" : "none",
+                border: !cfg && isToday ? "1px solid #fbbf24bb" : "none",
                 boxShadow: cfg ? `0 0 5px ${cfg.color}99` : "none",
                 animation: cfg ? `ws-dot-pop 0.4s ${((day - 1) % 7) * 0.03}s ease-out both` : "none",
               }} />
@@ -288,7 +304,7 @@ function MoodCalendar({ entries }: { entries: DiaryEntry[] }) {
           <div key={cfg.label} className="flex items-center gap-1">
             <div style={{ width: 5, height: 5, borderRadius: "50%", background: cfg.color,
               boxShadow: `0 0 3px ${cfg.color}88` }} />
-            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)" }}>{cfg.label}</span>
+            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.65)" }}>{cfg.label}</span>
           </div>
         ))}
       </div>
@@ -337,7 +353,7 @@ function HealingTree({ emotions, totalDiaries, entries }: {
   return (
     <div className="flex flex-col gap-3 h-full">
       {/* Tree label */}
-      <div className="text-[12px] tracking-widest uppercase" style={{ color: "#fbbf2466" }}>
+      <div className="text-[12px] tracking-widest uppercase" style={{ color: "#fbbf24bb" }}>
         치유의 나무
       </div>
 
@@ -426,12 +442,12 @@ function HealingTree({ emotions, totalDiaries, entries }: {
         background: "rgba(255,255,255,0.04)",
         border: "1px solid rgba(255,255,255,0.07)",
       }}>
-        <div className="text-[11px] tracking-widest uppercase mb-2.5" style={{ color: "rgba(255,255,255,0.38)" }}>
+        <div className="text-[11px] tracking-widest uppercase mb-2.5" style={{ color: "rgba(255,255,255,0.70)" }}>
           FRUITS · 감정 레이어
         </div>
 
         {emotions.length === 0 ? (
-          <div className="text-[13px] text-center py-4" style={{ color: "rgba(255,255,255,0.28)" }}>
+          <div className="text-[13px] text-center py-4" style={{ color: "rgba(255,255,255,0.62)" }}>
             일기를 쓰면 감정이 채워져요
           </div>
         ) : (
@@ -451,7 +467,7 @@ function HealingTree({ emotions, totalDiaries, entries }: {
                     }}
                   />
                 </div>
-                <span className="text-[12px] w-4 shrink-0 text-right" style={{ color: "rgba(255,255,255,0.28)" }}>
+                <span className="text-[12px] w-4 shrink-0 text-right" style={{ color: "rgba(255,255,255,0.62)" }}>
                   {e.count}
                 </span>
               </div>
@@ -461,7 +477,7 @@ function HealingTree({ emotions, totalDiaries, entries }: {
 
         <div className="mt-2.5 pt-2 text-[12px]" style={{
           borderTop: "1px solid rgba(255,255,255,0.06)",
-          color: "rgba(255,255,255,0.28)",
+          color: "rgba(255,255,255,0.62)",
         }}>
           총 {totalDiaries}개의 기억
         </div>
@@ -567,7 +583,7 @@ function NionCenter({
 
       {/* Mood indicator */}
       <div className="text-center space-y-1">
-        <div className="text-[12px] tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.35)" }}>
+        <div className="text-[12px] tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.65)" }}>
           오늘의 마음
         </div>
         <div className="flex items-center gap-2 justify-center">
@@ -578,7 +594,7 @@ function NionCenter({
 
       {/* Healing message */}
       <div className="text-[15px] italic text-center px-3 leading-relaxed min-h-[2.8rem] flex items-center justify-center"
-        style={{ color: "rgba(255,255,255,0.52)", fontFamily: "Georgia, serif" }}>
+        style={{ color: "rgba(255,255,255,0.78)", fontFamily: "Georgia, serif" }}>
         {healingMsg}
       </div>
 
@@ -602,7 +618,7 @@ function NionCenter({
             </button>
           ))}
         </div>
-        <div className="text-[11px] tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.22)" }}>
+        <div className="text-[11px] tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.52)" }}>
           오늘의 감정 선택
         </div>
       </div>
@@ -652,7 +668,7 @@ function MindFlower({ label, href, color, children }: {
       >
         <div style={{ color }}>{children}</div>
       </div>
-      <span className="text-[12px]" style={{ color: "rgba(255,255,255,0.5)" }}>{label}</span>
+      <span className="text-[12px]" style={{ color: "rgba(255,255,255,0.75)" }}>{label}</span>
     </Link>
   )
 }
@@ -666,7 +682,7 @@ function CounselingSpace({ goals, diaryCountThisWeek, goalCompletionRate }: {
 }) {
   return (
     <div className="flex flex-col gap-3 h-full">
-      <div className="text-[12px] tracking-widest uppercase" style={{ color: "#fbbf2466" }}>
+      <div className="text-[12px] tracking-widest uppercase" style={{ color: "#fbbf24bb" }}>
         상담 공간
       </div>
 
@@ -687,14 +703,14 @@ function CounselingSpace({ goals, diaryCountThisWeek, goalCompletionRate }: {
 
           <div className="flex flex-col items-center">
             <DonutChart rate={goalCompletionRate} color="#fbbf24" />
-            <div className="text-[11px] mt-0.5 text-center" style={{ color: "rgba(255,255,255,0.3)" }}>
+            <div className="text-[11px] mt-0.5 text-center" style={{ color: "rgba(255,255,255,0.62)" }}>
               상담 세션 통계
             </div>
           </div>
 
           <div className="flex flex-col items-center gap-1">
             <div className="text-xl font-bold" style={{ color: "#f472b6" }}>{diaryCountThisWeek}</div>
-            <div className="text-[11px] text-center" style={{ color: "rgba(255,255,255,0.3)" }}>이번 주<br/>기록</div>
+            <div className="text-[11px] text-center" style={{ color: "rgba(255,255,255,0.62)" }}>이번 주<br/>기록</div>
           </div>
         </div>
       </div>
@@ -704,7 +720,7 @@ function CounselingSpace({ goals, diaryCountThisWeek, goalCompletionRate }: {
         background: "rgba(255,255,255,0.04)",
         border: "1px solid rgba(255,255,255,0.07)",
       }}>
-        <div className="text-[11px] tracking-widest uppercase mb-3" style={{ color: "rgba(255,255,255,0.38)" }}>
+        <div className="text-[11px] tracking-widest uppercase mb-3" style={{ color: "rgba(255,255,255,0.70)" }}>
           마음의 꽃
         </div>
         <div className="flex justify-around">
@@ -726,7 +742,7 @@ function CounselingSpace({ goals, diaryCountThisWeek, goalCompletionRate }: {
           background: "rgba(255,255,255,0.04)",
           border: "1px solid rgba(255,255,255,0.07)",
         }}>
-          <div className="text-[11px] tracking-widest uppercase mb-2.5" style={{ color: "rgba(255,255,255,0.38)" }}>
+          <div className="text-[11px] tracking-widest uppercase mb-2.5" style={{ color: "rgba(255,255,255,0.70)" }}>
             진행 중 목표
           </div>
           <div className="space-y-2.5">
@@ -871,7 +887,7 @@ export default function WellnessPage() {
       {/* Header */}
       <div className="relative flex items-center justify-between px-6 pt-5 pb-1" style={{ zIndex: 10 }}>
         <div>
-          <div className="text-[12px] tracking-widest uppercase mb-0.5" style={{ color: "#fbbf2455" }}>
+          <div className="text-[12px] tracking-widest uppercase mb-0.5" style={{ color: "#fbbf24bb" }}>
             ✦ Mental Wellness
           </div>
           <div className="text-xl font-semibold" style={{ color: "rgba(255,255,255,0.92)" }}>
@@ -938,10 +954,10 @@ export default function WellnessPage() {
           >
             <Image
               src="/nion-default.png" alt="Nion" width={32} height={32}
-              style={{ filter: "drop-shadow(0 0 8px #fbbf2466)" }}
+              style={{ filter: "drop-shadow(0 0 8px #fbbf24bb)" }}
             />
             <span className="flex-1 text-base italic" style={{
-              color: "rgba(255,255,255,0.32)",
+              color: "rgba(255,255,255,0.60)",
               fontFamily: "Georgia, serif",
             }}>
               니온에게 마음을 털어놓으세요…
