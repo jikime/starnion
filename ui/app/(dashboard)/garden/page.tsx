@@ -1090,16 +1090,16 @@ function formatTokens(n: number): string {
   return String(n)
 }
 
+const MONTHLY_TOKEN_LIMIT = 10_000_000 // 월 기준 1000만 토큰
+
 function EnergyCharger({ totalTokens, accent: _accent }: { totalTokens: number; accent: string }) {
-  // 배터리 시각 레벨: 0 ~ 100K 토큰을 0~100%로 표현 (시각 전용)
-  const visualPct = Math.min(100, (totalTokens / 100_000) * 100)
-  const fillColor = visualPct >= 80 ? "#f87171"
-    : visualPct >= 60 ? "#fb923c"
-    : visualPct >= 40 ? "#fbbf24"
+  const pct = Math.min(100, (totalTokens / MONTHLY_TOKEN_LIMIT) * 100)
+  const fillColor = pct >= 80 ? "#f87171"
+    : pct >= 60 ? "#fb923c"
+    : pct >= 40 ? "#fbbf24"
     : "#34d399"
-  const isHot = visualPct >= 60
-  const statusLabel = visualPct >= 80 ? "🔴 많음" : visualPct >= 60 ? "🟠 높음" : visualPct >= 40 ? "🟡 보통" : "🟢 여유"
-  const displayVal = formatTokens(totalTokens)
+  const isHot = pct >= 60
+  const statusLabel = pct >= 80 ? "🔴 과부하" : pct >= 60 ? "🟠 높음" : pct >= 40 ? "🟡 보통" : "🟢 여유"
   return (
     <div className="absolute" style={{ right: "4%", bottom: "8%", zIndex: 8 }}>
       <GardenPopover
@@ -1109,11 +1109,12 @@ function EnergyCharger({ totalTokens, accent: _accent }: { totalTokens: number; 
         side="top"
         align="end"
         stats={[
-          { label: "30일 토큰 합계", value: totalTokens.toLocaleString("ko-KR"), color: fillColor },
-          { label: "입출력 합산", value: displayVal, color: fillColor },
+          { label: "사용량", value: `${pct.toFixed(1)}%`, color: fillColor },
+          { label: "누적 토큰", value: formatTokens(totalTokens), color: fillColor },
+          { label: "월 한도", value: "1,000만 토큰" },
           { label: "상태", value: statusLabel },
         ]}
-        description="이번 달 니온이 사용한 AI 토큰 누적 수예요. 토큰이 많을수록 니온이 열심히 일하고 있다는 뜻이에요."
+        description="이번 달 니온이 사용한 AI 에너지(토큰)예요. 월 1,000만 토큰 기준으로 표시되며, 사용량이 높을수록 니온이 열심히 일하고 있다는 뜻이에요."
       >
         <div className="flex flex-col items-center gap-1 cursor-pointer hover:scale-110 transition-transform">
           <svg width="32" height="68" viewBox="0 0 32 68" style={{ overflow: "visible" }}>
@@ -1122,12 +1123,12 @@ function EnergyCharger({ totalTokens, accent: _accent }: { totalTokens: number; 
             <line x1="20" y1="6" x2="20" y2="10" stroke="#9ca3af" strokeWidth="1.5" opacity="0.4" />
             <rect x="4" y="10" width="24" height="54" rx="4" fill="rgba(255,255,255,0.06)" />
             <rect x="5" y="11" width="22" height="52" rx="3" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-            <rect x="6" y={12 + 50 * (1 - visualPct / 100)}
-              width="20" height={50 * visualPct / 100} rx="2"
+            <rect x="6" y={12 + 50 * (1 - pct / 100)}
+              width="20" height={50 * pct / 100} rx="2"
               fill={fillColor} opacity="0.75"
               style={{ animation: `gdn-charger-pulse 2s ease-in-out infinite` }} />
-            <text x="16" y="38" textAnchor="middle" fontSize="8" fill="white" fontWeight="bold" opacity="0.85">
-              {displayVal}
+            <text x="16" y="38" textAnchor="middle" fontSize="9" fill="white" fontWeight="bold" opacity="0.85">
+              {pct.toFixed(0)}%
             </text>
             {isHot && (
               <>
