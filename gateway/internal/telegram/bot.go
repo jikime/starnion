@@ -1146,11 +1146,12 @@ func (b *Bot) handlePairingRequest(chatID int64, telegramID, displayName, messag
 
 // personaNames maps persona IDs to display labels with emoji.
 var personaNames = map[string]string{
-	"assistant": "\U0001f916 기본 비서",
-	"finance":   "\U0001f4ca 금융 전문가",
-	"buddy":     "\U0001f60a 친한 친구",
-	"coach":     "\U0001f4aa 재정 코치",
-	"analyst":   "\U0001f50d 데이터 분석가",
+	"assistant":  "\U0001f916 기본 비서",
+	"finance":    "\U0001f4ca 금융 전문가",
+	"buddy":      "\U0001f60a 친한 친구",
+	"coach":      "\U0001f4aa 재정 코치",
+	"analyst":    "\U0001f50d 데이터 분석가",
+	"counselor":  "\U0001f49c 심리 상담사",
 }
 
 // handlePersona sends an inline keyboard for persona selection.
@@ -1166,6 +1167,7 @@ func (b *Bot) handlePersona(chatID int64) {
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("\U0001f50d 데이터 분석가", "persona:analyst"),
+			tgbotapi.NewInlineKeyboardButtonData("\U0001f49c 심리 상담사", "persona:counselor"),
 		),
 	)
 
@@ -1210,11 +1212,12 @@ func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQue
 
 	// personaNameByID maps Telegram persona IDs to the Korean names stored in personas.
 	personaNameByID := map[string]string{
-		"assistant": "기본 비서",
-		"finance":   "금융 전문가",
-		"buddy":     "친한 친구",
-		"coach":     "재정 코치",
-		"analyst":   "데이터 분석가",
+		"assistant":  "기본 비서",
+		"finance":    "금융 전문가",
+		"buddy":      "친한 친구",
+		"coach":      "재정 코치",
+		"analyst":    "데이터 분석가",
+		"counselor":  "심리 상담사",
 	}
 
 	if b.db != nil {
