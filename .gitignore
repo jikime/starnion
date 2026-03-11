@@ -20,6 +20,7 @@ htmlcov/
 
 # Go
 gateway/gateway
+starnion
 *.exe
 *.test
 *.out
