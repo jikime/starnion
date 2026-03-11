@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface DiaryEntry { mood: string; created_at: string }
+interface DiaryEntry { mood: string; created_at: string; entry_date?: string }
 interface Goal { id: number; title: string; icon: string; progress: number; status: string }
 
 interface EmotionStat {
@@ -26,6 +26,7 @@ interface WellnessData {
   goals: Goal[]
   diaryCountThisWeek: number
   goalCompletionRate: number
+  entries: DiaryEntry[]
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -103,6 +104,15 @@ const WELLNESS_STYLES = `
   0%, 100% { opacity: 0.18; }
   50%       { opacity: 0.38; }
 }
+@keyframes ws-cal-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ws-dot-pop {
+  0%   { transform: scale(0); opacity: 0; }
+  70%  { transform: scale(1.3); }
+  100% { transform: scale(1); opacity: 1; }
+}
 `
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -153,11 +163,145 @@ function BgStars() {
   )
 }
 
+// ── Mood Calendar ──────────────────────────────────────────────────────────────
+
+const CAL_DAYS = ["일", "월", "화", "수", "목", "금", "토"]
+
+function MoodCalendar({ entries }: { entries: DiaryEntry[] }) {
+  const today = new Date()
+  const [viewYear, setViewYear] = useState(today.getFullYear())
+  const [viewMonth, setViewMonth] = useState(today.getMonth())
+
+  // Build map: "YYYY-MM-DD" -> mood
+  const moodMap = new Map<string, string>()
+  entries.forEach(e => {
+    const key = e.entry_date ?? e.created_at.slice(0, 10)
+    if (!moodMap.has(key)) moodMap.set(key, e.mood)
+  })
+
+  const firstDow  = new Date(viewYear, viewMonth, 1).getDay()
+  const daysInMon = new Date(viewYear, viewMonth + 1, 0).getDate()
+  const todayStr  = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+  const isMaxMonth = viewYear === today.getFullYear() && viewMonth >= today.getMonth()
+
+  const prevMon = () => {
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) }
+    else setViewMonth(m => m - 1)
+  }
+  const nextMon = () => {
+    if (isMaxMonth) return
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) }
+    else setViewMonth(m => m + 1)
+  }
+
+  // Pad front with empty cells, then day numbers
+  const cells: (number | null)[] = [
+    ...Array<null>(firstDow).fill(null),
+    ...Array.from({ length: daysInMon }, (_, i) => i + 1),
+  ]
+  // Pad end to complete last row
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  return (
+    <div className="rounded-2xl p-3" style={{
+      background: "rgba(255,255,255,0.03)",
+      border: "1px solid rgba(255,255,255,0.07)",
+      animation: "ws-cal-fade 0.35s ease-out",
+    }}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2.5">
+        <button
+          onClick={prevMon}
+          className="w-5 h-5 flex items-center justify-center rounded-full transition-all hover:bg-white/10"
+          style={{ color: "rgba(255,255,255,0.35)", fontSize: "10px" }}
+        >‹</button>
+        <span className="text-[10px] font-semibold tracking-widest"
+          style={{ color: "rgba(255,255,255,0.55)" }}>
+          {viewYear}년 {viewMonth + 1}월
+        </span>
+        <button
+          onClick={nextMon}
+          disabled={isMaxMonth}
+          className="w-5 h-5 flex items-center justify-center rounded-full transition-all hover:bg-white/10 disabled:opacity-20"
+          style={{ color: "rgba(255,255,255,0.35)", fontSize: "10px" }}
+        >›</button>
+      </div>
+
+      {/* Day-of-week headers */}
+      <div className="grid grid-cols-7 mb-1">
+        {CAL_DAYS.map((d, i) => (
+          <div key={d} className="text-center"
+            style={{ fontSize: "8px", color: i === 0 ? "#f472b688" : i === 6 ? "#60a5fa88" : "rgba(255,255,255,0.22)" }}>
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-y-1">
+        {cells.map((day, idx) => {
+          if (!day) return <div key={`e-${idx}`} />
+          const mm = String(viewMonth + 1).padStart(2, "0")
+          const dd = String(day).padStart(2, "0")
+          const dateStr = `${viewYear}-${mm}-${dd}`
+          const mood = moodMap.get(dateStr)
+          const cfg  = mood ? MOOD_CONFIG[mood] : null
+          const isToday = dateStr === todayStr
+          const isSun = (firstDow + day - 1) % 7 === 0
+          const isSat = (firstDow + day - 1) % 7 === 6
+
+          return (
+            <div key={dateStr}
+              className="flex flex-col items-center gap-[2px] py-[1px] rounded-lg transition-all"
+              style={{
+                background: isToday ? "rgba(251,191,36,0.08)" : "transparent",
+                outline: isToday ? "1px solid rgba(251,191,36,0.25)" : "none",
+              }}>
+              <span style={{
+                fontSize: "8.5px",
+                fontWeight: isToday ? "700" : "400",
+                color: isToday
+                  ? "#fbbf24"
+                  : cfg ? "rgba(255,255,255,0.7)"
+                  : isSun ? "rgba(244,114,182,0.45)"
+                  : isSat ? "rgba(96,165,250,0.45)"
+                  : "rgba(255,255,255,0.22)",
+              }}>
+                {day}
+              </span>
+              <div style={{
+                width: 5, height: 5, borderRadius: "50%",
+                background: cfg ? cfg.color : "transparent",
+                border: !cfg && isToday ? "1px solid #fbbf2466" : "none",
+                boxShadow: cfg ? `0 0 5px ${cfg.color}99` : "none",
+                animation: cfg ? `ws-dot-pop 0.4s ${((day - 1) % 7) * 0.03}s ease-out both` : "none",
+              }} />
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-2.5 pt-2"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+        {Object.entries(MOOD_CONFIG).map(([, cfg]) => (
+          <div key={cfg.label} className="flex items-center gap-1">
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: cfg.color,
+              boxShadow: `0 0 3px ${cfg.color}88` }} />
+            <span style={{ fontSize: "7.5px", color: "rgba(255,255,255,0.28)" }}>{cfg.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Healing Tree ───────────────────────────────────────────────────────────────
 
-function HealingTree({ emotions, totalDiaries }: {
+function HealingTree({ emotions, totalDiaries, entries }: {
   emotions: EmotionStat[]
   totalDiaries: number
+  entries: DiaryEntry[]
 }) {
   const maxCount = Math.max(...emotions.map(e => e.count), 1)
 
@@ -322,6 +466,9 @@ function HealingTree({ emotions, totalDiaries }: {
           총 {totalDiaries}개의 기억
         </div>
       </div>
+
+      {/* Monthly mood calendar */}
+      <MoodCalendar entries={entries} />
     </div>
   )
 }
@@ -636,7 +783,7 @@ export default function WellnessPage() {
     setLoading(true)
 
     const [diaryRes, goalsRes] = await Promise.allSettled([
-      fetch("/api/diary?limit=60"),
+      fetch("/api/diary?limit=100"),
       fetch("/api/goals"),
     ])
 
@@ -691,6 +838,7 @@ export default function WellnessPage() {
       goals: goals.filter(g => g.status === "in_progress"),
       diaryCountThisWeek,
       goalCompletionRate,
+      entries,
     })
     setLoading(false)
   }, [])
@@ -757,8 +905,8 @@ export default function WellnessPage() {
           className="relative flex-1 grid gap-4 px-5 py-3"
           style={{ gridTemplateColumns: "1fr 1.1fr 1fr", zIndex: 10, animation: "ws-rise 0.4s ease-out" }}
         >
-          {/* Left: Healing Tree + Emotion chart */}
-          <HealingTree emotions={data.emotions} totalDiaries={data.totalDiaries} />
+          {/* Left: Healing Tree + Emotion chart + Calendar */}
+          <HealingTree emotions={data.emotions} totalDiaries={data.totalDiaries} entries={data.entries} />
 
           {/* Center: Nion */}
           <NionCenter
