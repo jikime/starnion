@@ -13,6 +13,46 @@ from starnion_agent.embedding.service import embed_text
 from starnion_agent.skills.guard import skill_guard
 from starnion_agent.skills.memory.auto_tag import schedule_auto_tag
 
+# Canonical mood values recognised by the UI (wellness page MOOD_CONFIG).
+# Any free-form sentiment string from the LLM is mapped to one of these.
+_VALID_MOODS = {"매우좋음", "좋음", "보통", "나쁨", "매우나쁨"}
+
+_MOOD_ALIASES: dict[str, str] = {
+    # 매우좋음
+    "매우좋음": "매우좋음", "매우 좋음": "매우좋음", "최고": "매우좋음",
+    "행복": "매우좋음", "기쁨": "매우좋음", "신남": "매우좋음", "흥분": "매우좋음",
+    "설렘": "매우좋음", "즐거움": "매우좋음", "뿌듯": "매우좋음",
+    "great": "매우좋음", "excellent": "매우좋음", "amazing": "매우좋음",
+    "happy": "매우좋음", "joyful": "매우좋음",
+    # 좋음
+    "좋음": "좋음", "좋아": "좋음", "괜찮음": "좋음", "평온": "좋음",
+    "편안": "좋음", "안정": "좋음", "산뜻": "좋음",
+    "good": "좋음", "nice": "좋음", "calm": "좋음", "peaceful": "좋음",
+    # 보통
+    "보통": "보통", "그냥": "보통", "무난": "보통", "중립": "보통",
+    "neutral": "보통", "okay": "보통", "ok": "보통", "normal": "보통",
+    # 나쁨
+    "나쁨": "나쁨", "안좋음": "나쁨", "피곤": "나쁨", "지침": "나쁨",
+    "스트레스": "나쁨", "슬픔": "나쁨", "슬프다": "나쁨", "우울": "나쁨",
+    "화남": "나쁨", "짜증": "나쁨", "걱정": "나쁨", "불안": "나쁨",
+    "sad": "나쁨", "tired": "나쁨", "stressed": "나쁨", "bad": "나쁨",
+    "anxious": "나쁨", "angry": "나쁨", "worried": "나쁨",
+    # 매우나쁨
+    "매우나쁨": "매우나쁨", "매우 나쁨": "매우나쁨", "최악": "매우나쁨",
+    "절망": "매우나쁨", "힘듦": "매우나쁨", "너무힘듦": "매우나쁨",
+    "terrible": "매우나쁨", "awful": "매우나쁨", "depressed": "매우나쁨",
+}
+
+
+def _normalize_mood(raw: str) -> str:
+    """Map a free-form mood/sentiment string to one of the 5 canonical values."""
+    if not raw:
+        return "보통"
+    key = raw.strip().lower()
+    if raw.strip() in _VALID_MOODS:
+        return raw.strip()
+    return _MOOD_ALIASES.get(key, _MOOD_ALIASES.get(raw.strip(), "보통"))
+
 
 class SaveDailyLogInput(BaseModel):
     """Input schema for save_daily_log tool."""
@@ -22,7 +62,7 @@ class SaveDailyLogInput(BaseModel):
     )
     sentiment: str = Field(
         default="",
-        description="감정 상태 (예: 좋음, 보통, 나쁨, 피곤, 기쁨). 비워두면 자동 분석합니다.",
+        description="감정 상태 (매우좋음/좋음/보통/나쁨/매우나쁨 또는 기쁨·피곤·슬픔 등 자유 형식). 비워두면 자동 분석합니다.",
     )
 
 
@@ -33,7 +73,7 @@ class SaveDiaryEntryInput(BaseModel):
     title: str = Field(default="", description="제목 (선택)")
     mood: str = Field(
         default="보통",
-        description="기분 상태 (예: 좋음, 보통, 나쁨, 피곤, 기쁨, 슬픔, 화남)",
+        description="기분 상태 (매우좋음/좋음/보통/나쁨/매우나쁨 또는 기쁨·피곤·슬픔·화남 등 자유 형식)",
     )
     tags: list[str] = Field(
         default_factory=list,
@@ -70,7 +110,7 @@ async def save_daily_log(content: str, sentiment: str = "") -> str:
     )
 
     # Also save to diary_entries so it appears in the Diary UI
-    mood = sentiment if sentiment else "보통"
+    mood = _normalize_mood(sentiment)
     title = content[:50] + ("…" if len(content) > 50 else "")
     await diary_entry_repo.create(
         pool,
@@ -124,6 +164,9 @@ async def save_diary_entry(
             return "날짜 형식이 올바르지 않아요. YYYY-MM-DD 형식으로 입력해 주세요."
 
     embedding = await embed_text(content)
+
+    # Normalise mood to one of the 5 canonical values recognised by the UI
+    mood = _normalize_mood(mood)
 
     # Save to diary_entries (user-facing, shown in UI)
     entry = await diary_entry_repo.create(
