@@ -21,6 +21,7 @@ interface GardenData {
   goals: Goal[]
   income: number
   meteorCount: number
+  diaryMoods: string[]
 }
 
 // ── Sky palettes ──────────────────────────────────────────────────────────────
@@ -654,6 +655,47 @@ function GoalFlowers({ goals }: { goals: Goal[] }) {
   )
 }
 
+// ── Emotion Seeds ─────────────────────────────────────────────────────────────
+
+const SEED_COLORS: Record<string, string> = {
+  매우좋음: "#fbbf24",
+  좋음:     "#34d399",
+  보통:     "#a78bfa",
+  나쁨:     "#60a5fa",
+  매우나쁨: "#818cf8",
+}
+
+function EmotionSeeds({ diaryMoods }: { diaryMoods: string[] }) {
+  if (!diaryMoods.length) return null
+  const seeds = diaryMoods.slice(0, 7)
+  return (
+    <div className="absolute pointer-events-none" style={{ bottom: "14%", right: "9%", zIndex: 7 }}>
+      <svg width="130" height="78" viewBox="0 0 130 78" style={{ overflow: "visible" }}>
+        <text x="65" y="9" textAnchor="middle" fontSize="7.5" fill="white" opacity="0.28" letterSpacing="1.5">
+          감정의 씨앗
+        </text>
+        {seeds.map((mood, i) => {
+          const color = SEED_COLORS[mood] ?? "#a78bfa"
+          const x = 8 + ((i * 17.6 + Math.sin(i * 2.1) * 8) % 114)
+          const y = 26 + Math.abs(Math.cos(i * 1.9)) * 28
+          return (
+            <g key={i}>
+              <circle cx={x} cy={y} r={8} fill={color} opacity="0.08" />
+              <ellipse cx={x} cy={y} rx={4.5} ry={6} fill={color} opacity="0.75"
+                style={{ animation: `gdn-bloom ${2.4 + i * 0.4}s ${i * 0.45}s ease-in-out infinite` }} />
+              <ellipse cx={x - 1} cy={y - 2} rx={1.5} ry={2.2} fill="white" opacity="0.30" />
+              <path
+                d={`M${x},${y - 6} C${x - 3},${y - 12} ${x + 3},${y - 13} ${x},${y - 16}`}
+                fill="none" stroke="#4ade80" strokeWidth="1.2" strokeLinecap="round" opacity="0.55"
+              />
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
 // ── Ground hills ──────────────────────────────────────────────────────────────
 
 function GroundHills({ accent }: { accent: string }) {
@@ -789,7 +831,7 @@ export default function GardenPage() {
     const [budgetRes, goalsRes, diaryRes, summaryRes, ddayRes] = await Promise.allSettled([
       fetch("/api/budget"),
       fetch("/api/goals"),
-      fetch("/api/diary?limit=1"),
+      fetch("/api/diary?limit=7"),
       fetch("/api/finance/summary"),
       fetch("/api/dday"),
     ])
@@ -815,7 +857,9 @@ export default function GardenPage() {
       ? goalsRaw
       : (goalsRaw as { goals?: Goal[] })?.goals ?? []
 
-    const mood = diaryRaw?.entries?.[0]?.mood ?? "보통"
+    const diaryEntries = diaryRaw?.entries ?? []
+    const mood = diaryEntries[0]?.mood ?? "보통"
+    const diaryMoods = diaryEntries.map(e => e.mood)
     const income = summaryRaw?.income ?? 0
 
     const totalBudget = budgets.reduce((s, b) => s + b.budget, 0)
@@ -841,6 +885,7 @@ export default function GardenPage() {
       goals: goals.slice(0, 4),
       income,
       meteorCount,
+      diaryMoods,
     })
     setLoading(false)
   }, [])
@@ -892,6 +937,9 @@ export default function GardenPage() {
 
       {/* Goal Flowers */}
       {data && <GoalFlowers goals={data.goals} />}
+
+      {/* Emotion Seeds (recent diary moods) */}
+      {data && <EmotionSeeds diaryMoods={data.diaryMoods} />}
 
       {/* Asset Tree */}
       {data && (
@@ -967,6 +1015,7 @@ export default function GardenPage() {
           </span>
           {data.isRaining && <span>☁️ 지출 구름</span>}
           {data.meteorCount > 0 && <span>☄️ 임박 일정</span>}
+          {data.diaryMoods.length > 0 && <span>🌱 감정의 씨앗</span>}
         </div>
       )}
     </div>

@@ -38,6 +38,29 @@ const MOOD_CONFIG: Record<string, { label: string; color: string; emoji: string 
   매우나쁨: { label: "Down",  color: "#818cf8", emoji: "🌙" },
 }
 
+const HEALING_MESSAGES: Record<string, string[]> = {
+  매우좋음: [
+    "오늘은 정말 빛나는 날이네요! 그 기쁨을 오래 간직하세요 ✨",
+    "행복한 에너지가 온 정원에 퍼지고 있어요 🌟",
+  ],
+  좋음: [
+    "마음이 평화롭군요. 이 순간을 충분히 누려요 🌿",
+    "따뜻한 하루를 보내고 계시네요. 잘 하고 있어요 💚",
+  ],
+  보통: [
+    "평범한 하루도 소중한 기록이에요. 오늘도 잘 하고 있어요 💜",
+    "보통인 날이 쌓여 특별한 삶이 돼요. 함께해요 🌙",
+  ],
+  나쁨: [
+    "힘든 감정도 괜찮아요. 니온이 옆에 있을게요 💙",
+    "조금 힘드시죠? 잠시 쉬어가도 돼요. 니온이 지켜볼게요 🌊",
+  ],
+  매우나쁨: [
+    "많이 지쳐있군요. 천천히, 조금씩 나아가요 🌙",
+    "오늘은 자신에게 따뜻하게 대해주세요. 니온이 응원해요 ⭐",
+  ],
+}
+
 // ── CSS keyframes ──────────────────────────────────────────────────────────────
 
 const WELLNESS_STYLES = `
@@ -138,6 +161,19 @@ function HealingTree({ emotions, totalDiaries }: {
 }) {
   const maxCount = Math.max(...emotions.map(e => e.count), 1)
 
+  // Memory leaves: 1 per 10 diary entries, max 8
+  const leafCount = Math.min(8, Math.floor(totalDiaries / 10))
+  const leafPositions = [
+    { x: 110, y: 178, color: "#fbbf24", rot: -35 },
+    { x: 290, y: 176, color: "#f472b6", rot: 35 },
+    { x: 200, y:  92, color: "#34d399", rot: 0 },
+    { x:  88, y: 158, color: "#a78bfa", rot: -25 },
+    { x: 312, y: 158, color: "#60a5fa", rot: 25 },
+    { x: 158, y: 132, color: "#fde68a", rot: -15 },
+    { x: 244, y: 130, color: "#86efac", rot: 15 },
+    { x: 200, y:  50, color: "#f9a8d4", rot: 0 },
+  ].slice(0, leafCount)
+
   const branches = [
     { d: "M200,268 C175,245 120,215 85,175 C55,138 68,92 118,82 C148,76 165,95 154,118", color: "#fbbf24", delay: "0s" },
     { d: "M200,268 C225,245 280,215 315,175 C345,138 332,92 282,82 C252,76 235,95 246,118", color: "#f472b6", delay: "1s" },
@@ -215,6 +251,23 @@ function HealingTree({ emotions, totalDiaries }: {
             </g>
           ))}
 
+          {/* Memory leaves (from diary count) */}
+          {leafPositions.map((lp, i) => (
+            <g key={`leaf-${i}`}>
+              <ellipse
+                cx={lp.x} cy={lp.y} rx={8} ry={5}
+                fill={lp.color} opacity="0.12"
+                transform={`rotate(${lp.rot} ${lp.x} ${lp.y})`}
+              />
+              <ellipse
+                cx={lp.x} cy={lp.y} rx={5.5} ry={3.5}
+                fill={lp.color} opacity="0.72"
+                transform={`rotate(${lp.rot} ${lp.x} ${lp.y})`}
+                style={{ animation: `ws-twinkle ${1.8 + i * 0.3}s ${i * 0.4}s ease-in-out infinite alternate` }}
+              />
+            </g>
+          ))}
+
           {/* Central orb */}
           <circle cx="200" cy="258" r="30" fill="#fbbf24" opacity="0.08" filter="url(#ws-glow-md)" />
           <circle cx="200" cy="258" r="22" fill="url(#ws-orb)" filter="url(#ws-glow-md)"
@@ -275,8 +328,19 @@ function HealingTree({ emotions, totalDiaries }: {
 
 // ── Nion Center ────────────────────────────────────────────────────────────────
 
-function NionCenter({ recentMood, nionState }: { recentMood: string; nionState: string }) {
-  const moodCfg = MOOD_CONFIG[recentMood] ?? MOOD_CONFIG["보통"]
+function NionCenter({
+  recentMood, nionState, activeMood, onMoodSelect,
+}: {
+  recentMood: string
+  nionState: string
+  activeMood: string
+  onMoodSelect: (mood: string) => void
+}) {
+  const displayMood = activeMood || recentMood
+  const moodCfg = MOOD_CONFIG[displayMood] ?? MOOD_CONFIG["보통"]
+  const healingMsg =
+    HEALING_MESSAGES[displayMood]?.[new Date().getMinutes() % 2] ??
+    HEALING_MESSAGES["보통"][0]
 
   // Orbiting hearts & stars
   const orbitItems = [
@@ -361,14 +425,39 @@ function NionCenter({ recentMood, nionState }: { recentMood: string; nionState: 
         </div>
         <div className="flex items-center gap-2 justify-center">
           <span className="text-lg">{moodCfg.emoji}</span>
-          <span className="text-sm font-medium" style={{ color: moodCfg.color }}>{recentMood}</span>
+          <span className="text-sm font-medium" style={{ color: moodCfg.color }}>{displayMood}</span>
         </div>
       </div>
 
-      {/* Prompt */}
-      <div className="text-[12px] italic text-center px-3 leading-relaxed"
-        style={{ color: "rgba(255,255,255,0.38)", fontFamily: "Georgia, serif" }}>
-        니온에게 마음을 털어놓으세요…
+      {/* Healing message */}
+      <div className="text-[12px] italic text-center px-3 leading-relaxed min-h-[2.8rem] flex items-center justify-center"
+        style={{ color: "rgba(255,255,255,0.52)", fontFamily: "Georgia, serif" }}>
+        {healingMsg}
+      </div>
+
+      {/* Mood selector */}
+      <div className="flex flex-col items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
+          {Object.entries(MOOD_CONFIG).map(([key, cfg]) => (
+            <button
+              key={key}
+              onClick={() => onMoodSelect(key)}
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+              style={{
+                background: displayMood === key ? `${cfg.color}28` : "transparent",
+                border: `1.5px solid ${displayMood === key ? cfg.color + "99" : "rgba(255,255,255,0.12)"}`,
+                boxShadow: displayMood === key ? `0 0 10px ${cfg.color}33` : "none",
+                cursor: "pointer",
+              }}
+              title={key}
+            >
+              <span className="text-base leading-none">{cfg.emoji}</span>
+            </button>
+          ))}
+        </div>
+        <div className="text-[9px] tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.22)" }}>
+          오늘의 감정 선택
+        </div>
       </div>
     </div>
   )
@@ -524,6 +613,7 @@ export default function WellnessPage() {
   const [data, setData] = useState<WellnessData | null>(null)
   const [loading, setLoading] = useState(true)
   const [nionState] = useState(() => NION_STATES[new Date().getHours() % NION_STATES.length])
+  const [activeMood, setActiveMood] = useState("")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -654,7 +744,12 @@ export default function WellnessPage() {
           <HealingTree emotions={data.emotions} totalDiaries={data.totalDiaries} />
 
           {/* Center: Nion */}
-          <NionCenter recentMood={data.recentMood} nionState={nionState} />
+          <NionCenter
+            recentMood={data.recentMood}
+            nionState={nionState}
+            activeMood={activeMood}
+            onMoodSelect={setActiveMood}
+          />
 
           {/* Right: Counseling space */}
           <CounselingSpace
