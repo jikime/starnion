@@ -213,17 +213,17 @@ function MoodCalendar({ entries }: { entries: DiaryEntry[] }) {
         <button
           onClick={prevMon}
           className="w-5 h-5 flex items-center justify-center rounded-full transition-all hover:bg-white/10"
-          style={{ color: "rgba(255,255,255,0.35)", fontSize: "10px" }}
+          style={{ color: "rgba(255,255,255,0.45)", fontSize: "14px" }}
         >‹</button>
-        <span className="text-[10px] font-semibold tracking-widest"
-          style={{ color: "rgba(255,255,255,0.55)" }}>
+        <span className="text-[13px] font-semibold tracking-widest"
+          style={{ color: "rgba(255,255,255,0.65)" }}>
           {viewYear}년 {viewMonth + 1}월
         </span>
         <button
           onClick={nextMon}
           disabled={isMaxMonth}
           className="w-5 h-5 flex items-center justify-center rounded-full transition-all hover:bg-white/10 disabled:opacity-20"
-          style={{ color: "rgba(255,255,255,0.35)", fontSize: "10px" }}
+          style={{ color: "rgba(255,255,255,0.45)", fontSize: "14px" }}
         >›</button>
       </div>
 
@@ -231,7 +231,7 @@ function MoodCalendar({ entries }: { entries: DiaryEntry[] }) {
       <div className="grid grid-cols-7 mb-1">
         {CAL_DAYS.map((d, i) => (
           <div key={d} className="text-center"
-            style={{ fontSize: "8px", color: i === 0 ? "#f472b688" : i === 6 ? "#60a5fa88" : "rgba(255,255,255,0.22)" }}>
+            style={{ fontSize: "10.5px", color: i === 0 ? "#f472b6aa" : i === 6 ? "#60a5faaa" : "rgba(255,255,255,0.32)" }}>
             {d}
           </div>
         ))}
@@ -258,7 +258,7 @@ function MoodCalendar({ entries }: { entries: DiaryEntry[] }) {
                 outline: isToday ? "1px solid rgba(251,191,36,0.25)" : "none",
               }}>
               <span style={{
-                fontSize: "8.5px",
+                fontSize: "11px",
                 fontWeight: isToday ? "700" : "400",
                 color: isToday
                   ? "#fbbf24"
@@ -288,7 +288,7 @@ function MoodCalendar({ entries }: { entries: DiaryEntry[] }) {
           <div key={cfg.label} className="flex items-center gap-1">
             <div style={{ width: 5, height: 5, borderRadius: "50%", background: cfg.color,
               boxShadow: `0 0 3px ${cfg.color}88` }} />
-            <span style={{ fontSize: "7.5px", color: "rgba(255,255,255,0.28)" }}>{cfg.label}</span>
+            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)" }}>{cfg.label}</span>
           </div>
         ))}
       </div>
@@ -337,7 +337,7 @@ function HealingTree({ emotions, totalDiaries, entries }: {
   return (
     <div className="flex flex-col gap-3 h-full">
       {/* Tree label */}
-      <div className="text-[10px] tracking-widest uppercase" style={{ color: "#fbbf2466" }}>
+      <div className="text-[12px] tracking-widest uppercase" style={{ color: "#fbbf2466" }}>
         치유의 나무
       </div>
 
@@ -426,19 +426,19 @@ function HealingTree({ emotions, totalDiaries, entries }: {
         background: "rgba(255,255,255,0.04)",
         border: "1px solid rgba(255,255,255,0.07)",
       }}>
-        <div className="text-[9px] tracking-widest uppercase mb-2.5" style={{ color: "rgba(255,255,255,0.38)" }}>
+        <div className="text-[11px] tracking-widest uppercase mb-2.5" style={{ color: "rgba(255,255,255,0.38)" }}>
           FRUITS · 감정 레이어
         </div>
 
         {emotions.length === 0 ? (
-          <div className="text-[11px] text-center py-4" style={{ color: "rgba(255,255,255,0.28)" }}>
+          <div className="text-[13px] text-center py-4" style={{ color: "rgba(255,255,255,0.28)" }}>
             일기를 쓰면 감정이 채워져요
           </div>
         ) : (
           <div className="space-y-2">
             {emotions.slice(0, 5).map((e, i) => (
               <div key={e.key} className="flex items-center gap-2">
-                <span className="text-[10px] w-11 text-right shrink-0 font-medium" style={{ color: e.color + "cc" }}>
+                <span className="text-[12px] w-11 text-right shrink-0 font-medium" style={{ color: e.color + "cc" }}>
                   {e.label}
                 </span>
                 <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
@@ -451,7 +451,7 @@ function HealingTree({ emotions, totalDiaries, entries }: {
                     }}
                   />
                 </div>
-                <span className="text-[10px] w-4 shrink-0 text-right" style={{ color: "rgba(255,255,255,0.28)" }}>
+                <span className="text-[12px] w-4 shrink-0 text-right" style={{ color: "rgba(255,255,255,0.28)" }}>
                   {e.count}
                 </span>
               </div>
@@ -459,7 +459,7 @@ function HealingTree({ emotions, totalDiaries, entries }: {
           </div>
         )}
 
-        <div className="mt-2.5 pt-2 text-[10px]" style={{
+        <div className="mt-2.5 pt-2 text-[12px]" style={{
           borderTop: "1px solid rgba(255,255,255,0.06)",
           color: "rgba(255,255,255,0.28)",
         }}>
@@ -567,17 +567,17 @@ function NionCenter({
 
       {/* Mood indicator */}
       <div className="text-center space-y-1">
-        <div className="text-[10px] tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.35)" }}>
+        <div className="text-[12px] tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.35)" }}>
           오늘의 마음
         </div>
         <div className="flex items-center gap-2 justify-center">
           <span className="text-lg">{moodCfg.emoji}</span>
-          <span className="text-sm font-medium" style={{ color: moodCfg.color }}>{displayMood}</span>
+          <span className="text-base font-medium" style={{ color: moodCfg.color }}>{displayMood}</span>
         </div>
       </div>
 
       {/* Healing message */}
-      <div className="text-[12px] italic text-center px-3 leading-relaxed min-h-[2.8rem] flex items-center justify-center"
+      <div className="text-[15px] italic text-center px-3 leading-relaxed min-h-[2.8rem] flex items-center justify-center"
         style={{ color: "rgba(255,255,255,0.52)", fontFamily: "Georgia, serif" }}>
         {healingMsg}
       </div>
@@ -602,7 +602,7 @@ function NionCenter({
             </button>
           ))}
         </div>
-        <div className="text-[9px] tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.22)" }}>
+        <div className="text-[11px] tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.22)" }}>
           오늘의 감정 선택
         </div>
       </div>
@@ -652,7 +652,7 @@ function MindFlower({ label, href, color, children }: {
       >
         <div style={{ color }}>{children}</div>
       </div>
-      <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.5)" }}>{label}</span>
+      <span className="text-[12px]" style={{ color: "rgba(255,255,255,0.5)" }}>{label}</span>
     </Link>
   )
 }
@@ -666,7 +666,7 @@ function CounselingSpace({ goals, diaryCountThisWeek, goalCompletionRate }: {
 }) {
   return (
     <div className="flex flex-col gap-3 h-full">
-      <div className="text-[10px] tracking-widest uppercase" style={{ color: "#fbbf2466" }}>
+      <div className="text-[12px] tracking-widest uppercase" style={{ color: "#fbbf2466" }}>
         상담 공간
       </div>
 
@@ -687,14 +687,14 @@ function CounselingSpace({ goals, diaryCountThisWeek, goalCompletionRate }: {
 
           <div className="flex flex-col items-center">
             <DonutChart rate={goalCompletionRate} color="#fbbf24" />
-            <div className="text-[9px] mt-0.5 text-center" style={{ color: "rgba(255,255,255,0.3)" }}>
+            <div className="text-[11px] mt-0.5 text-center" style={{ color: "rgba(255,255,255,0.3)" }}>
               상담 세션 통계
             </div>
           </div>
 
           <div className="flex flex-col items-center gap-1">
             <div className="text-xl font-bold" style={{ color: "#f472b6" }}>{diaryCountThisWeek}</div>
-            <div className="text-[9px] text-center" style={{ color: "rgba(255,255,255,0.3)" }}>이번 주<br/>기록</div>
+            <div className="text-[11px] text-center" style={{ color: "rgba(255,255,255,0.3)" }}>이번 주<br/>기록</div>
           </div>
         </div>
       </div>
@@ -704,7 +704,7 @@ function CounselingSpace({ goals, diaryCountThisWeek, goalCompletionRate }: {
         background: "rgba(255,255,255,0.04)",
         border: "1px solid rgba(255,255,255,0.07)",
       }}>
-        <div className="text-[9px] tracking-widest uppercase mb-3" style={{ color: "rgba(255,255,255,0.38)" }}>
+        <div className="text-[11px] tracking-widest uppercase mb-3" style={{ color: "rgba(255,255,255,0.38)" }}>
           마음의 꽃
         </div>
         <div className="flex justify-around">
@@ -726,7 +726,7 @@ function CounselingSpace({ goals, diaryCountThisWeek, goalCompletionRate }: {
           background: "rgba(255,255,255,0.04)",
           border: "1px solid rgba(255,255,255,0.07)",
         }}>
-          <div className="text-[9px] tracking-widest uppercase mb-2.5" style={{ color: "rgba(255,255,255,0.38)" }}>
+          <div className="text-[11px] tracking-widest uppercase mb-2.5" style={{ color: "rgba(255,255,255,0.38)" }}>
             진행 중 목표
           </div>
           <div className="space-y-2.5">
@@ -734,7 +734,7 @@ function CounselingSpace({ goals, diaryCountThisWeek, goalCompletionRate }: {
               <div key={g.id} className="flex items-center gap-2">
                 <span className="text-sm">{g.icon}</span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-[11px] truncate" style={{ color: "rgba(255,255,255,0.72)" }}>
+                  <div className="text-[13px] truncate" style={{ color: "rgba(255,255,255,0.72)" }}>
                     {g.title}
                   </div>
                   <div className="h-1.5 rounded-full mt-1 overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
@@ -744,7 +744,7 @@ function CounselingSpace({ goals, diaryCountThisWeek, goalCompletionRate }: {
                     }} />
                   </div>
                 </div>
-                <span className="text-[10px] shrink-0" style={{ color: "#a78bfa" }}>
+                <span className="text-[12px] shrink-0" style={{ color: "#a78bfa" }}>
                   {g.progress.toFixed(0)}%
                 </span>
               </div>
@@ -871,10 +871,10 @@ export default function WellnessPage() {
       {/* Header */}
       <div className="relative flex items-center justify-between px-6 pt-5 pb-1" style={{ zIndex: 10 }}>
         <div>
-          <div className="text-[10px] tracking-widest uppercase mb-0.5" style={{ color: "#fbbf2455" }}>
+          <div className="text-[12px] tracking-widest uppercase mb-0.5" style={{ color: "#fbbf2455" }}>
             ✦ Mental Wellness
           </div>
-          <div className="text-lg font-semibold" style={{ color: "rgba(255,255,255,0.92)" }}>
+          <div className="text-xl font-semibold" style={{ color: "rgba(255,255,255,0.92)" }}>
             마음을 돌보는 시간
           </div>
         </div>
@@ -895,7 +895,7 @@ export default function WellnessPage() {
         <div className="flex-1 flex items-center justify-center relative" style={{ zIndex: 10 }}>
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="size-8 animate-spin" style={{ color: "#fbbf24" }} />
-            <span className="text-sm" style={{ color: "#fbbf2488" }}>
+            <span className="text-base" style={{ color: "#fbbf2488" }}>
               니온이 정원을 준비하는 중…
             </span>
           </div>
@@ -940,7 +940,7 @@ export default function WellnessPage() {
               src="/nion-default.png" alt="Nion" width={32} height={32}
               style={{ filter: "drop-shadow(0 0 8px #fbbf2466)" }}
             />
-            <span className="flex-1 text-sm italic" style={{
+            <span className="flex-1 text-base italic" style={{
               color: "rgba(255,255,255,0.32)",
               fontFamily: "Georgia, serif",
             }}>
