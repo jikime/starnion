@@ -445,15 +445,15 @@ export function PersonasView() {
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
+          <DialogHeader className="shrink-0">
             <DialogTitle>{editing ? t("dialog.editTitle") : t("dialog.createTitle")}</DialogTitle>
             <DialogDescription>
               {t("dialog.description")}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2 overflow-y-auto flex-1 pr-1">
             {/* Name */}
             <div className="space-y-1.5">
               <Label>{t("dialog.nameLabel")}</Label>
@@ -572,8 +572,8 @@ export function PersonasView() {
                 placeholder={t("dialog.systemPromptPlaceholder")}
                 value={form.systemPrompt}
                 onChange={e => setForm(f => ({ ...f, systemPrompt: e.target.value }))}
-                rows={4}
-                className="resize-none text-sm"
+                rows={6}
+                className="resize-y text-sm min-h-[120px]"
               />
             </div>
 
@@ -595,7 +595,7 @@ export function PersonasView() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 shrink-0">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               {t("dialog.cancel")}
             </Button>
