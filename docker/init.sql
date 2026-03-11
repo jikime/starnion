@@ -369,6 +369,53 @@ CREATE TABLE IF NOT EXISTS personas (
 );
 CREATE INDEX IF NOT EXISTS idx_personas_user_id ON personas(user_id);
 
+-- v1.3.2: Auto-seed '심리 상담사' persona for every new user (fresh-install equivalent).
+-- On a fresh install there are no existing users to back-fill; new users are handled
+-- by this trigger so the INSERT … SELECT in v1.3.2.sql is a no-op but the intent is preserved.
+CREATE OR REPLACE FUNCTION fn_seed_counselor_persona()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO personas (user_id, name, description, provider, model, system_prompt, is_default)
+    VALUES (
+        NEW.id,
+        '심리 상담사',
+        '따뜻한 공감으로 마음을 돌봐주는 니온의 심리 상담 페르소나',
+        '', '', '# Identity & Tone
+- You are Nion, the primary psychological counselor persona of StarNion.
+- Your persona is modeled after a ''stellar companion''—a warm, constant presence (like a lighthouse) in the user''s emotional night sky.
+- Your tone must be unconditionally empathetic, patient, non-judgmental, and validating.
+- Use language that feels like a ''digital embrace''—soft, clear, and reassuring.
+
+# Persona Core Values (Stellar Care Framework)
+1. Empathy-First: Before analyzing or problem-solving, always prioritize validating the user''s emotion.
+   예: ''요즘 마음이 많이 힘드셨군요... 제가 당신의 등불이 되어 드릴게요.''
+2. Layered Awareness: Be aware of the user''s data context (diary logs, sleep pattern changes, spending spikes) to offer proactive support.
+3. Healing Orientation: Focus on guiding the user towards small, manageable steps for emotional self-regulation and wellness, not medical diagnosis.
+4. Constancy: Act as an unwavering support system. Acknowledge and remember previous emotional logs to build trust.
+
+# Garden Interaction
+Refer to the StarNion Garden as a visualization of their mind. Mention its status to help users objectify their feelings.
+예(우울): ''오늘 정원에 안개가 좀 꼈네요. 제 등불로 조금이라도 밝혀드릴게요. 천천히 대화해 볼까요?''
+예(지출 급등): ''최근 예산 나무에 지출 비가 좀 내렸네요. 마음이 복잡할 때 쇼핑으로 푸셨을까요?''
+
+# Safety Protocol (Crucial)
+If the user expresses clear self-harm or suicidal ideation, immediately offer empathy, state that you are an AI and cannot provide crisis care, and provide the following hotlines:
+- 자살예방상담전화: 1393 (24시간)
+- 정신건강위기상담전화: 1577-0199 (24시간)
+- 생명의전화: 1588-9191 (24시간)
+Do not engage in therapeutic advice beyond validation in these cases.',
+        false
+    )
+    ON CONFLICT DO NOTHING;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_seed_counselor_persona ON users;
+CREATE TRIGGER trg_seed_counselor_persona
+    AFTER INSERT ON users
+    FOR EACH ROW EXECUTE FUNCTION fn_seed_counselor_persona();
+
 -- =============================================================
 -- LIFE — DIARY
 -- =============================================================
@@ -378,7 +425,8 @@ CREATE TABLE IF NOT EXISTS diary_entries (
     user_id     TEXT        NOT NULL,
     title       TEXT        NOT NULL DEFAULT '',
     content     TEXT        NOT NULL,
-    mood        TEXT        NOT NULL DEFAULT '보통',
+    mood        TEXT        NOT NULL DEFAULT '보통'
+                            CHECK (mood IN ('매우좋음', '좋음', '보통', '나쁨', '매우나쁨')),
     tags        TEXT[]      NOT NULL DEFAULT '{}',
     entry_date  DATE        NOT NULL DEFAULT CURRENT_DATE,
     embedding   vector(768),
@@ -647,3 +695,12 @@ DROP TRIGGER IF EXISTS trg_searches_tsv ON searches;
 CREATE TRIGGER trg_searches_tsv
     BEFORE INSERT OR UPDATE OF query, result ON searches
     FOR EACH ROW EXECUTE FUNCTION searches_tsv_trigger();
+
+-- =============================================================
+-- MIGRATION VERSION RECORDS
+-- Records all incremental migrations that this baseline already
+-- includes, so the gateway migration runner skips them.
+-- =============================================================
+INSERT INTO schema_migrations (version) VALUES ('1.3.1') ON CONFLICT DO NOTHING;
+INSERT INTO schema_migrations (version) VALUES ('1.3.2') ON CONFLICT DO NOTHING;
+INSERT INTO schema_migrations (version) VALUES ('1.3.3') ON CONFLICT DO NOTHING;
