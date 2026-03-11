@@ -612,7 +612,20 @@ const NION_STATES = ["healing", "plant", "watch", "polish", "sweep"]
 export default function WellnessPage() {
   const [data, setData] = useState<WellnessData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [nionState] = useState(() => NION_STATES[new Date().getHours() % NION_STATES.length])
+  const [nionState, setNionState] = useState(() => NION_STATES[new Date().getHours() % NION_STATES.length])
+
+  useEffect(() => {
+    const update = () => setNionState(NION_STATES[new Date().getHours() % NION_STATES.length])
+    const now = new Date()
+    const msUntilNextHour =
+      (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000 - now.getMilliseconds()
+    let intervalId: ReturnType<typeof setInterval>
+    const timeoutId = setTimeout(() => {
+      update()
+      intervalId = setInterval(update, 60 * 60 * 1000)
+    }, msUntilNextHour)
+    return () => { clearTimeout(timeoutId); clearInterval(intervalId) }
+  }, [])
   const [activeMood, setActiveMood] = useState("")
 
   const load = useCallback(async () => {
