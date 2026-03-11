@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2, RefreshCw, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -185,6 +186,65 @@ const GARDEN_STYLES = `
 }
 `
 
+// ── Garden Popover ─────────────────────────────────────────────────────────────
+
+function GardenPopover({
+  children, title, icon, description, stats, accent, side = "top", align = "center",
+}: {
+  children: React.ReactNode
+  title: string
+  icon: string
+  description: string
+  stats?: Array<{ label: string; value: string | number; color?: string }>
+  accent?: string
+  side?: "top" | "bottom" | "left" | "right"
+  align?: "start" | "center" | "end"
+}) {
+  const accentColor = accent ?? "#a78bfa"
+  return (
+    <Popover>
+      <PopoverTrigger asChild>{children}</PopoverTrigger>
+      <PopoverContent
+        side={side}
+        align={align}
+        sideOffset={10}
+        className="w-60 p-0 border shadow-2xl outline-none"
+        style={{
+          background: "rgba(5,8,30,0.96)",
+          backdropFilter: "blur(18px)",
+          border: `1px solid ${accentColor}50`,
+          zIndex: 200,
+        }}
+      >
+        <div className="p-4 space-y-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{icon}</span>
+            <span className="text-sm font-bold text-white tracking-wide">{title}</span>
+          </div>
+          {stats && stats.length > 0 && (
+            <div
+              className="space-y-1.5 py-2 border-y"
+              style={{ borderColor: `${accentColor}25` }}
+            >
+              {stats.map((s, i) => (
+                <div key={i} className="flex justify-between items-center text-xs">
+                  <span className="text-white/50">{s.label}</span>
+                  <span className="font-semibold" style={{ color: s.color ?? accentColor }}>
+                    {s.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.5)" }}>
+            {description}
+          </p>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 // ── StarField ─────────────────────────────────────────────────────────────────
 
 function StarField() {
@@ -230,7 +290,7 @@ function GoldStarDust({ income }: { income: number }) {
     if (!count) { setParticles([]); return }
     setParticles(Array.from({ length: count }, (_, i) => ({
       id: i,
-      x: 35 + (i * 3.2 + Math.sin(i * 1.7) * 12) % 30, // 나무 중심 위 35-65%
+      x: 35 + (i * 3.2 + Math.sin(i * 1.7) * 12) % 30,
       size: 3 + (i % 3) * 2,
       delay: parseFloat((i * 0.55).toFixed(2)),
       dur: parseFloat((2.2 + (i % 4) * 0.4).toFixed(2)),
@@ -322,7 +382,7 @@ function Meteors({ count }: { count: number }) {
 
 // ── D-Day 타임캡슐 ─────────────────────────────────────────────────────────────
 
-function TimeCapsule({ ddays }: { ddays: DDay[] }) {
+function TimeCapsule({ ddays, accent: _accent }: { ddays: DDay[]; accent: string }) {
   const upcoming = ddays
     .filter(d => d.dday_value >= 0)
     .sort((a, b) => a.dday_value - b.dday_value)[0]
@@ -333,45 +393,58 @@ function TimeCapsule({ ddays }: { ddays: DDay[] }) {
   const isClose = upcoming.dday_value <= 7
   const capColor = isImminent ? "#f87171" : isClose ? "#fbbf24" : "#a78bfa"
   const animDur = isImminent ? "1s" : isClose ? "2s" : "3.5s"
+  const urgencyLabel = isImminent ? "🚨 임박!" : isClose ? "⚡ 곧 다가와요" : "📅 예정됨"
+  const allUpcoming = ddays.filter(d => d.dday_value >= 0).sort((a, b) => a.dday_value - b.dday_value)
 
   return (
-    <div className="absolute pointer-events-none" style={{ right: "4%", top: "38%", zIndex: 8 }}>
-      <div className="flex flex-col items-center gap-0.5">
-        <svg width="52" height="82" viewBox="0 0 52 82" style={{ overflow: "visible" }}>
-          {/* Outer glow */}
-          <ellipse cx="26" cy="44" rx="20" ry="30" fill={capColor} opacity="0.08"
-            style={{ animation: `gdn-capsule-glow ${animDur} ease-in-out infinite` }} />
-          {/* Body */}
-          <rect x="6" y="14" width="40" height="54" rx="20"
-            fill={capColor} opacity="0.12"
-            style={{ filter: `drop-shadow(0 0 ${isImminent ? 16 : isClose ? 10 : 6}px ${capColor})` }} />
-          <rect x="7" y="15" width="38" height="52" rx="19"
-            fill="none" stroke={capColor} strokeWidth="1.4" opacity="0.7" />
-          {/* Inner glow */}
-          <rect x="11" y="19" width="30" height="44" rx="15" fill={capColor} opacity="0.07" />
-          {/* Shine */}
-          <ellipse cx="19" cy="27" rx="5" ry="8" fill="white" opacity="0.12" />
-          {/* D-Day value */}
-          <text x="26" y="38" textAnchor="middle" fontSize="10" fontWeight="bold"
-            fill={capColor} opacity="0.95" style={{ fontFamily: "system-ui" }}>
-            D-{upcoming.dday_value}
-          </text>
-          {/* Title */}
-          <text x="26" y="52" textAnchor="middle" fontSize="7" fill="white" opacity="0.5">
-            {upcoming.title.length > 6 ? upcoming.title.slice(0, 6) + "…" : upcoming.title}
-          </text>
-          {/* Top star (imminent only) */}
-          {isImminent && (
-            <polygon points={starPolygon(26, 6, 7, 5)} fill={capColor} opacity="0.9"
-              style={{ animation: `gdn-twinkle 0.7s ease-in-out infinite alternate` }} />
-          )}
-          {/* Nion standing beside when imminent */}
-          {isClose && (
-            <text x="46" y="58" fontSize="11" opacity="0.7">🧑</text>
-          )}
-        </svg>
-        <span className="text-[8px] tracking-wider" style={{ color: `${capColor}88` }}>타임 캡슐</span>
-      </div>
+    <div className="absolute" style={{ right: "4%", top: "38%", zIndex: 8 }}>
+      <GardenPopover
+        icon="💊"
+        title="타임 캡슐"
+        accent={capColor}
+        side="left"
+        align="center"
+        stats={[
+          { label: "제목", value: upcoming.title, color: capColor },
+          { label: "D-Day", value: `D-${upcoming.dday_value}`, color: capColor },
+          { label: "긴급도", value: urgencyLabel },
+          ...(allUpcoming.length > 1
+            ? [{ label: "전체 일정", value: `${allUpcoming.length}개` }]
+            : []),
+        ]}
+        description="중요한 날까지 카운트다운 중이에요. D-Day가 가까워질수록 캡슐이 더 밝게 빛납니다."
+      >
+        <div className="flex flex-col items-center gap-1 cursor-pointer hover:scale-105 transition-transform">
+          <svg width="52" height="82" viewBox="0 0 52 82" style={{ overflow: "visible" }}>
+            <ellipse cx="26" cy="44" rx="20" ry="30" fill={capColor} opacity="0.08"
+              style={{ animation: `gdn-capsule-glow ${animDur} ease-in-out infinite` }} />
+            <rect x="6" y="14" width="40" height="54" rx="20"
+              fill={capColor} opacity="0.12"
+              style={{ filter: `drop-shadow(0 0 ${isImminent ? 16 : isClose ? 10 : 6}px ${capColor})` }} />
+            <rect x="7" y="15" width="38" height="52" rx="19"
+              fill="none" stroke={capColor} strokeWidth="1.4" opacity="0.7" />
+            <rect x="11" y="19" width="30" height="44" rx="15" fill={capColor} opacity="0.07" />
+            <ellipse cx="19" cy="27" rx="5" ry="8" fill="white" opacity="0.12" />
+            <text x="26" y="38" textAnchor="middle" fontSize="11" fontWeight="bold"
+              fill={capColor} opacity="0.95" style={{ fontFamily: "system-ui" }}>
+              D-{upcoming.dday_value}
+            </text>
+            <text x="26" y="53" textAnchor="middle" fontSize="9" fill="white" opacity="0.6">
+              {upcoming.title.length > 6 ? upcoming.title.slice(0, 6) + "…" : upcoming.title}
+            </text>
+            {isImminent && (
+              <polygon points={starPolygon(26, 6, 7, 5)} fill={capColor} opacity="0.9"
+                style={{ animation: `gdn-twinkle 0.7s ease-in-out infinite alternate` }} />
+            )}
+            {isClose && (
+              <text x="46" y="58" fontSize="11" opacity="0.7">🧑</text>
+            )}
+          </svg>
+          <span className="text-xs tracking-wider font-medium" style={{ color: `${capColor}bb` }}>
+            타임 캡슐
+          </span>
+        </div>
+      </GardenPopover>
     </div>
   )
 }
@@ -550,7 +623,7 @@ function AssetTree({
       </svg>
 
       {isWithering && (
-        <div className="absolute left-1/2 -translate-x-1/2 -bottom-6 whitespace-nowrap text-[10px] text-center"
+        <div className="absolute left-1/2 -translate-x-1/2 -bottom-6 whitespace-nowrap text-xs text-center"
           style={{ color: isSevere ? "#f87171" : "#fb923c" }}>
           {isSevere ? "🥀 나무가 시들고 있어요" : "🍂 나무가 힘을 잃고 있어요"}
         </div>
@@ -561,8 +634,8 @@ function AssetTree({
 
 // ── Spending Cloud ─────────────────────────────────────────────────────────────
 
-function SpendingCloud({ isRaining, categories }: {
-  isRaining: boolean; categories: string[]
+function SpendingCloud({ isRaining, categories, accent }: {
+  isRaining: boolean; categories: string[]; accent: string
 }) {
   const drops = useMemo(() =>
     Array.from({ length: 18 }, (_, i) => ({
@@ -574,45 +647,69 @@ function SpendingCloud({ isRaining, categories }: {
 
   return (
     <div className="absolute" style={{ right: "6%", top: "11%", zIndex: 8 }}>
-      <svg viewBox="0 0 180 130" width="180" height="130" style={{ overflow: "visible" }}>
-        <defs>
-          <filter id="gdn-cloud-glow" x="-25%" y="-25%" width="150%" height="150%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="4.5" result="b" />
-            <feComposite in="b" in2="SourceGraphic" operator="over" />
-          </filter>
-          <radialGradient id="gdn-cloud-fill" cx="50%" cy="40%" r="60%">
-            <stop offset="0%"   stopColor="#6b80b8" stopOpacity="0.92" />
-            <stop offset="100%" stopColor="#3a4a7a" stopOpacity="0.75" />
-          </radialGradient>
-        </defs>
-        <ellipse cx="90" cy="72" rx="72" ry="14" fill="#1a2a5a" opacity="0.35" />
-        <path d="M20,72 C20,72 18,58 28,52 C32,44 44,38 58,42 C60,32 70,22 84,22 C94,18 106,20 112,28 C118,20 130,16 142,22 C154,26 160,36 156,46 C166,42 178,46 180,56 C182,66 174,72 162,72 Z"
-          fill="url(#gdn-cloud-fill)" filter="url(#gdn-cloud-glow)" />
-        <path d="M36,68 C36,68 34,56 44,50 C50,44 62,40 74,44 C78,36 86,30 96,30 C106,28 116,32 120,40 C128,34 140,36 144,44 C148,52 142,60 132,62 C136,68 Z"
-          fill="#7a90c8" opacity="0.55" />
-        <ellipse cx="82" cy="34" rx="20" ry="9" fill="white" opacity="0.10" />
-        <text x="90" y="56" textAnchor="middle" fontSize="10.5" fill="white" opacity="0.88" fontWeight="600">지출 구름</text>
-        {isRaining && drops.map(d => (
-          <line key={d.id} x1={d.x} y1={72} x2={d.x - 5} y2={90}
-            stroke="#93c5fd" strokeWidth="1.8" strokeLinecap="round"
-            style={{ animation: `gdn-rain ${d.dur}s ${d.delay}s ease-in infinite`, opacity: 0 }} />
-        ))}
-        {isRaining && (
-          <text x="90" y="112" textAnchor="middle" fontSize="8.5" fill="#93c5fd" opacity="0.7" fontStyle="italic">
-            Spending Storm
-          </text>
-        )}
-      </svg>
-      {categories.length > 0 && (
-        <div className="flex flex-wrap gap-1 justify-center mt-0.5 max-w-[180px]">
-          {categories.slice(0, 3).map(c => (
-            <span key={c} className="text-[10px] px-1.5 py-0.5 rounded-full"
-              style={{ background: "rgba(239,68,68,0.2)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.3)" }}>
-              {c}
-            </span>
-          ))}
+      <GardenPopover
+        icon="☁️"
+        title="지출 구름"
+        accent={isRaining ? "#f87171" : accent}
+        side="bottom"
+        align="end"
+        stats={[
+          { label: "상태", value: isRaining ? "🌧 지출 초과" : "☀️ 양호", color: isRaining ? "#f87171" : "#34d399" },
+          ...(categories.length > 0
+            ? [{ label: "초과 카테고리", value: `${categories.length}개`, color: "#fca5a5" }]
+            : []),
+          ...categories.slice(0, 3).map(c => ({ label: "  •", value: c, color: "#fca5a5" })),
+        ]}
+        description={
+          isRaining
+            ? "예산을 초과한 카테고리가 있어요. 지출 패턴을 확인하고 조절해보세요. 구름이 걷히면 나무가 더 무성해져요."
+            : "지출이 예산 범위 안에 있어요. 이 상태를 유지하면 나무에 열매가 맺혀요."
+        }
+      >
+        <div className="cursor-pointer hover:scale-105 transition-transform">
+          <svg viewBox="0 0 180 130" width="180" height="130" style={{ overflow: "visible" }}>
+            <defs>
+              <filter id="gdn-cloud-glow" x="-25%" y="-25%" width="150%" height="150%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="4.5" result="b" />
+                <feComposite in="b" in2="SourceGraphic" operator="over" />
+              </filter>
+              <radialGradient id="gdn-cloud-fill" cx="50%" cy="40%" r="60%">
+                <stop offset="0%"   stopColor="#6b80b8" stopOpacity="0.92" />
+                <stop offset="100%" stopColor="#3a4a7a" stopOpacity="0.75" />
+              </radialGradient>
+            </defs>
+            <ellipse cx="90" cy="72" rx="72" ry="14" fill="#1a2a5a" opacity="0.35" />
+            <path d="M20,72 C20,72 18,58 28,52 C32,44 44,38 58,42 C60,32 70,22 84,22 C94,18 106,20 112,28 C118,20 130,16 142,22 C154,26 160,36 156,46 C166,42 178,46 180,56 C182,66 174,72 162,72 Z"
+              fill="url(#gdn-cloud-fill)" filter="url(#gdn-cloud-glow)" />
+            <path d="M36,68 C36,68 34,56 44,50 C50,44 62,40 74,44 C78,36 86,30 96,30 C106,28 116,32 120,40 C128,34 140,36 144,44 C148,52 142,60 132,62 C136,68 Z"
+              fill="#7a90c8" opacity="0.55" />
+            <ellipse cx="82" cy="34" rx="20" ry="9" fill="white" opacity="0.10" />
+            <text x="90" y="55" textAnchor="middle" fontSize="12" fill="white" opacity="0.88" fontWeight="600">
+              지출 구름
+            </text>
+            {isRaining && drops.map(d => (
+              <line key={d.id} x1={d.x} y1={72} x2={d.x - 5} y2={90}
+                stroke="#93c5fd" strokeWidth="1.8" strokeLinecap="round"
+                style={{ animation: `gdn-rain ${d.dur}s ${d.delay}s ease-in infinite`, opacity: 0 }} />
+            ))}
+            {isRaining && (
+              <text x="90" y="112" textAnchor="middle" fontSize="10" fill="#93c5fd" opacity="0.7" fontStyle="italic">
+                Spending Storm
+              </text>
+            )}
+          </svg>
+          {categories.length > 0 && (
+            <div className="flex flex-wrap gap-1 justify-center mt-0.5 max-w-[180px]">
+              {categories.slice(0, 3).map(c => (
+                <span key={c} className="text-[11px] px-1.5 py-0.5 rounded-full"
+                  style={{ background: "rgba(239,68,68,0.2)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.3)" }}>
+                  {c}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </GardenPopover>
     </div>
   )
 }
@@ -685,32 +782,51 @@ function TulipSVG({ goal, index }: { goal: Goal; index: number }) {
           <circle cx="0" cy={CY - 4*P} r={10*P} fill={col.center} opacity="0.15" />
         </g>
       )}
-      <text x="0" y={BY + 15} textAnchor="middle" fontSize="10" fill="white" opacity="0.75">
+      <text x="0" y={BY + 16} textAnchor="middle" fontSize="11" fill="white" opacity="0.80">
         {goal.icon} {goal.title.length > 6 ? goal.title.slice(0, 6) + "…" : goal.title}
       </text>
-      <text x="0" y={BY + 27} textAnchor="middle" fontSize="9" fill="#c4b5fd" opacity="0.60">
+      <text x="0" y={BY + 29} textAnchor="middle" fontSize="10" fill="#c4b5fd" opacity="0.70">
         {progress.toFixed(0)}%
       </text>
     </g>
   )
 }
 
-function GoalFlowers({ goals }: { goals: Goal[] }) {
+function GoalFlowers({ goals, accent }: { goals: Goal[]; accent: string }) {
   const displayed = goals.slice(0, 4)
   if (!displayed.length) return null
   const spacing = 86
   const w = spacing * displayed.length + 24
   return (
-    <div className="absolute pointer-events-none" style={{ left: "2%", bottom: "9%", zIndex: 9 }}>
-      <svg viewBox={`-12 -22 ${w} 180`} width={w} height={180} style={{ overflow: "visible" }}>
-        <text x={(w - 24) / 2} y={-8} textAnchor="middle" fontSize="10"
-          fill="white" opacity="0.48" letterSpacing="2">목표 꽃</text>
-        {displayed.map((goal, i) => (
-          <g key={goal.id} transform={`translate(${26 + i * spacing}, 0)`}>
-            <TulipSVG goal={goal} index={i} />
-          </g>
-        ))}
-      </svg>
+    <div className="absolute" style={{ left: "2%", bottom: "9%", zIndex: 9 }}>
+      <GardenPopover
+        icon="🌸"
+        title="목표 꽃"
+        accent={accent}
+        side="top"
+        align="start"
+        stats={[
+          { label: "전체 목표", value: `${goals.length}개` },
+          ...displayed.map(g => ({
+            label: `${g.icon} ${g.title.length > 8 ? g.title.slice(0, 8) + "…" : g.title}`,
+            value: `${(g.progress ?? 0).toFixed(0)}%`,
+            color: g.progress >= 80 ? "#34d399" : g.progress >= 50 ? "#fbbf24" : accent,
+          })),
+        ]}
+        description="목표 달성률에 따라 꽃이 피어나요. 80% 이상이면 활짝 핀 꽃이 돼요. 꾸준히 목표를 달성할수록 정원이 풍성해집니다."
+      >
+        <div className="cursor-pointer hover:brightness-110 transition-all">
+          <svg viewBox={`-12 -22 ${w} 180`} width={w} height={180} style={{ overflow: "visible" }}>
+            <text x={(w - 24) / 2} y={-8} textAnchor="middle" fontSize="11"
+              fill="white" opacity="0.55" letterSpacing="2">목표 꽃</text>
+            {displayed.map((goal, i) => (
+              <g key={goal.id} transform={`translate(${26 + i * spacing}, 0)`}>
+                <TulipSVG goal={goal} index={i} />
+              </g>
+            ))}
+          </svg>
+        </div>
+      </GardenPopover>
     </div>
   )
 }
@@ -721,139 +837,193 @@ const SEED_COLORS: Record<string, string> = {
   매우좋음: "#fbbf24", 좋음: "#34d399", 보통: "#a78bfa", 나쁨: "#60a5fa", 매우나쁨: "#818cf8",
 }
 
-function EmotionSeeds({ diaryMoods }: { diaryMoods: string[] }) {
+const MOOD_LABELS: Record<string, string> = {
+  매우좋음: "😄 매우 좋음", 좋음: "🙂 좋음", 보통: "😐 보통", 나쁨: "😔 나쁨", 매우나쁨: "😢 매우 나쁨",
+}
+
+function EmotionSeeds({ diaryMoods, accent }: { diaryMoods: string[]; accent: string }) {
   if (!diaryMoods.length) return null
   const seeds = diaryMoods.slice(0, 7)
+  const moodCounts = seeds.reduce<Record<string, number>>((acc, m) => {
+    acc[m] = (acc[m] ?? 0) + 1; return acc
+  }, {})
   return (
-    <div className="absolute pointer-events-none" style={{ bottom: "14%", right: "9%", zIndex: 7 }}>
-      <svg width="130" height="78" viewBox="0 0 130 78" style={{ overflow: "visible" }}>
-        <text x="65" y="9" textAnchor="middle" fontSize="7.5" fill="white" opacity="0.28" letterSpacing="1.5">
-          감정의 씨앗
-        </text>
-        {seeds.map((mood, i) => {
-          const color = SEED_COLORS[mood] ?? "#a78bfa"
-          const x = 8 + ((i * 17.6 + Math.sin(i * 2.1) * 8) % 114)
-          const y = 26 + Math.abs(Math.cos(i * 1.9)) * 28
-          return (
-            <g key={i}>
-              <circle cx={x} cy={y} r={8} fill={color} opacity="0.08" />
-              <ellipse cx={x} cy={y} rx={4.5} ry={6} fill={color} opacity="0.75"
-                style={{ animation: `gdn-bloom ${2.4 + i * 0.4}s ${i * 0.45}s ease-in-out infinite` }} />
-              <ellipse cx={x - 1} cy={y - 2} rx={1.5} ry={2.2} fill="white" opacity="0.30" />
-              <path d={`M${x},${y - 6} C${x - 3},${y - 12} ${x + 3},${y - 13} ${x},${y - 16}`}
-                fill="none" stroke="#4ade80" strokeWidth="1.2" strokeLinecap="round" opacity="0.55" />
-            </g>
-          )
-        })}
-      </svg>
+    <div className="absolute" style={{ bottom: "14%", right: "9%", zIndex: 7 }}>
+      <GardenPopover
+        icon="🌱"
+        title="감정의 씨앗"
+        accent={accent}
+        side="top"
+        align="end"
+        stats={[
+          { label: "기록 수", value: `${seeds.length}개` },
+          ...Object.entries(moodCounts).map(([mood, cnt]) => ({
+            label: MOOD_LABELS[mood] ?? mood,
+            value: `${cnt}일`,
+            color: SEED_COLORS[mood] ?? accent,
+          })),
+        ]}
+        description="일기를 기록할 때마다 감정 씨앗이 심어져요. 감정 색상이 정원의 분위기를 만들어냅니다."
+      >
+        <div className="cursor-pointer hover:brightness-110 transition-all">
+          <svg width="130" height="78" viewBox="0 0 130 78" style={{ overflow: "visible" }}>
+            <text x="65" y="10" textAnchor="middle" fontSize="10" fill="white" opacity="0.40" letterSpacing="1.5">
+              감정의 씨앗
+            </text>
+            {seeds.map((mood, i) => {
+              const color = SEED_COLORS[mood] ?? "#a78bfa"
+              const x = 8 + ((i * 17.6 + Math.sin(i * 2.1) * 8) % 114)
+              const y = 26 + Math.abs(Math.cos(i * 1.9)) * 28
+              return (
+                <g key={i}>
+                  <circle cx={x} cy={y} r={8} fill={color} opacity="0.08" />
+                  <ellipse cx={x} cy={y} rx={4.5} ry={6} fill={color} opacity="0.75"
+                    style={{ animation: `gdn-bloom ${2.4 + i * 0.4}s ${i * 0.45}s ease-in-out infinite` }} />
+                  <ellipse cx={x - 1} cy={y - 2} rx={1.5} ry={2.2} fill="white" opacity="0.30" />
+                  <path d={`M${x},${y - 6} C${x - 3},${y - 12} ${x + 3},${y - 13} ${x},${y - 16}`}
+                    fill="none" stroke="#4ade80" strokeWidth="1.2" strokeLinecap="round" opacity="0.55" />
+                </g>
+              )
+            })}
+          </svg>
+        </div>
+      </GardenPopover>
     </div>
   )
 }
 
 // ── 마법 호수 (Magic Lake) — 이미지 파일 수 ──────────────────────────────────
 
-function MagicLake({ imageCount }: { imageCount: number }) {
+function MagicLake({ imageCount, accent: _accent }: { imageCount: number; accent: string }) {
   if (!imageCount) return null
   const reflections = Math.min(5, imageCount)
   return (
-    <div className="absolute pointer-events-none" style={{ left: "24%", bottom: "9%", zIndex: 6 }}>
-      <svg width="100" height="54" viewBox="0 0 100 54" style={{ overflow: "visible" }}>
-        {/* Lake body */}
-        <ellipse cx="50" cy="38" rx="46" ry="14" fill="#1a3a6a" opacity="0.55" />
-        <ellipse cx="50" cy="36" rx="44" ry="12" fill="#1e4080" opacity="0.45" />
-        {/* Shine */}
-        <ellipse cx="36" cy="30" rx="14" ry="5" fill="white" opacity="0.07" />
-        {/* Ripples */}
-        {[0, 1, 2].map(i => (
-          <ellipse key={i} cx="50" cy="38" rx={16 + i * 10} ry={5 + i * 3}
-            fill="none" stroke="#60a5fa" strokeWidth="0.8" strokeOpacity="0.25"
-            style={{ animation: `gdn-lake-ripple ${2.5 + i * 0.8}s ${i * 0.9}s ease-out infinite` }} />
-        ))}
-        {/* Image reflections */}
-        {Array.from({ length: reflections }, (_, i) => {
-          const x = 14 + i * 18
-          return (
-            <g key={i}>
-              <rect x={x} y={28} width={12} height={8} rx={2}
-                fill="#60a5fa" opacity="0.28"
-                style={{ animation: `gdn-bloom ${2 + i * 0.4}s ${i * 0.35}s ease-in-out infinite` }} />
-            </g>
-          )
-        })}
-        {/* Label */}
-        <text x="50" y="11" textAnchor="middle" fontSize="7.5" fill="white" opacity="0.3" letterSpacing="1">
-          마법 호수
-        </text>
-        <text x="50" y="20" textAnchor="middle" fontSize="7" fill="#93c5fd" opacity="0.45">
-          {imageCount}장
-        </text>
-      </svg>
+    <div className="absolute" style={{ left: "24%", bottom: "9%", zIndex: 6 }}>
+      <GardenPopover
+        icon="🌊"
+        title="마법 호수"
+        accent="#60a5fa"
+        side="top"
+        align="center"
+        stats={[
+          { label: "저장된 이미지", value: `${imageCount}장`, color: "#93c5fd" },
+          { label: "수면 반영", value: `${reflections}개`, color: "#60a5fa" },
+        ]}
+        description="업로드한 이미지들이 호수에 반영돼요. 호수는 당신의 기억 거울이에요. 이미지가 많을수록 호수가 더 풍성해집니다."
+      >
+        <div className="cursor-pointer hover:scale-105 transition-transform">
+          <svg width="100" height="54" viewBox="0 0 100 54" style={{ overflow: "visible" }}>
+            <ellipse cx="50" cy="38" rx="46" ry="14" fill="#1a3a6a" opacity="0.55" />
+            <ellipse cx="50" cy="36" rx="44" ry="12" fill="#1e4080" opacity="0.45" />
+            <ellipse cx="36" cy="30" rx="14" ry="5" fill="white" opacity="0.07" />
+            {[0, 1, 2].map(i => (
+              <ellipse key={i} cx="50" cy="38" rx={16 + i * 10} ry={5 + i * 3}
+                fill="none" stroke="#60a5fa" strokeWidth="0.8" strokeOpacity="0.25"
+                style={{ animation: `gdn-lake-ripple ${2.5 + i * 0.8}s ${i * 0.9}s ease-out infinite` }} />
+            ))}
+            {Array.from({ length: reflections }, (_, i) => {
+              const x = 14 + i * 18
+              return (
+                <g key={i}>
+                  <rect x={x} y={28} width={12} height={8} rx={2}
+                    fill="#60a5fa" opacity="0.28"
+                    style={{ animation: `gdn-bloom ${2 + i * 0.4}s ${i * 0.35}s ease-in-out infinite` }} />
+                </g>
+              )
+            })}
+            <text x="50" y="12" textAnchor="middle" fontSize="10" fill="white" opacity="0.45" letterSpacing="1">
+              마법 호수
+            </text>
+            <text x="50" y="22" textAnchor="middle" fontSize="10" fill="#93c5fd" opacity="0.60">
+              {imageCount}장
+            </text>
+          </svg>
+        </div>
+      </GardenPopover>
     </div>
   )
 }
 
 // ── 풍경 Wind Bell — 오디오 파일 수 ──────────────────────────────────────────
 
-function WindBell({ audioCount }: { audioCount: number }) {
+function WindBell({ audioCount, accent: _accent }: { audioCount: number; accent: string }) {
   if (!audioCount) return null
   return (
-    <div className="absolute pointer-events-none" style={{ left: "5%", top: "16%", zIndex: 8 }}>
-      <div className="flex flex-col items-center gap-0.5"
-        style={{ animation: `gdn-bell-swing ${2.8}s ease-in-out infinite`, transformOrigin: "center top" }}>
-        <svg width="36" height="60" viewBox="0 0 36 60" style={{ overflow: "visible" }}>
-          {/* Chain */}
-          <line x1="18" y1="0" x2="18" y2="10" stroke="#a78bfa" strokeWidth="1" opacity="0.5" />
-          {/* Bell body */}
-          <path d="M6,12 C6,8 8,6 18,6 C28,6 30,8 30,12 L30,36 C30,42 26,46 18,48 C10,46 6,42 6,36 Z"
-            fill="#a78bfa" opacity="0.2" />
-          <path d="M7,13 C7,9 9,7 18,7 C27,7 29,9 29,13 L29,35 C29,41 25,45 18,47"
-            fill="none" stroke="#a78bfa" strokeWidth="1.2" opacity="0.55" />
-          {/* Shine */}
-          <ellipse cx="13" cy="16" rx="3" ry="7" fill="white" opacity="0.12" />
-          {/* Clapper */}
-          <circle cx="18" cy="48" r="3.5" fill="#a78bfa" opacity="0.6" />
-          <line x1="18" y1="46" x2="18" y2="42" stroke="#a78bfa" strokeWidth="1" opacity="0.4" />
-          {/* Sound waves */}
-          {[0, 1].map(i => (
-            <path key={i}
-              d={`M${26 + i * 6},${22 + i * 4} C${30 + i * 6},${26 + i * 4} ${30 + i * 6},${30 + i * 4} ${26 + i * 6},${34 + i * 4}`}
-              fill="none" stroke="#c4b5fd" strokeWidth="1"
-              strokeOpacity={0.3 - i * 0.1}
-              style={{ animation: `gdn-charger-pulse ${1.8 + i * 0.4}s ${i * 0.3}s ease-in-out infinite` }} />
-          ))}
-        </svg>
-        <span className="text-[8px]" style={{ color: "#a78bfa88" }}>{audioCount}개</span>
-      </div>
+    <div className="absolute" style={{ left: "5%", top: "16%", zIndex: 8 }}>
+      <GardenPopover
+        icon="🔔"
+        title="풍경"
+        accent="#a78bfa"
+        side="right"
+        align="start"
+        stats={[
+          { label: "오디오 파일", value: `${audioCount}개`, color: "#c4b5fd" },
+        ]}
+        description="저장된 오디오 파일이 풍경을 울려요. 소리를 기록할수록 정원에 멜로디가 가득 찹니다."
+      >
+        <div
+          className="flex flex-col items-center gap-1 cursor-pointer hover:scale-110 transition-transform"
+          style={{ animation: `gdn-bell-swing 2.8s ease-in-out infinite`, transformOrigin: "center top" }}
+        >
+          <svg width="36" height="60" viewBox="0 0 36 60" style={{ overflow: "visible" }}>
+            <line x1="18" y1="0" x2="18" y2="10" stroke="#a78bfa" strokeWidth="1" opacity="0.5" />
+            <path d="M6,12 C6,8 8,6 18,6 C28,6 30,8 30,12 L30,36 C30,42 26,46 18,48 C10,46 6,42 6,36 Z"
+              fill="#a78bfa" opacity="0.2" />
+            <path d="M7,13 C7,9 9,7 18,7 C27,7 29,9 29,13 L29,35 C29,41 25,45 18,47"
+              fill="none" stroke="#a78bfa" strokeWidth="1.2" opacity="0.55" />
+            <ellipse cx="13" cy="16" rx="3" ry="7" fill="white" opacity="0.12" />
+            <circle cx="18" cy="48" r="3.5" fill="#a78bfa" opacity="0.6" />
+            <line x1="18" y1="46" x2="18" y2="42" stroke="#a78bfa" strokeWidth="1" opacity="0.4" />
+            {[0, 1].map(i => (
+              <path key={i}
+                d={`M${26 + i * 6},${22 + i * 4} C${30 + i * 6},${26 + i * 4} ${30 + i * 6},${30 + i * 4} ${26 + i * 6},${34 + i * 4}`}
+                fill="none" stroke="#c4b5fd" strokeWidth="1"
+                strokeOpacity={0.3 - i * 0.1}
+                style={{ animation: `gdn-charger-pulse ${1.8 + i * 0.4}s ${i * 0.3}s ease-in-out infinite` }} />
+            ))}
+          </svg>
+          <span className="text-xs font-medium" style={{ color: "#a78bfacc" }}>{audioCount}개</span>
+        </div>
+      </GardenPopover>
     </div>
   )
 }
 
 // ── 지식 배낭 Knowledge Backpack — 문서 수 ───────────────────────────────────
 
-function KnowledgeBackpack({ docCount }: { docCount: number }) {
+function KnowledgeBackpack({ docCount, accent: _accent }: { docCount: number; accent: string }) {
   if (!docCount) return null
   return (
-    <div className="absolute pointer-events-none" style={{ left: "5%", top: "44%", zIndex: 8 }}>
-      <div className="flex flex-col items-center gap-0.5"
-        style={{ animation: "gdn-float 4s ease-in-out infinite" }}>
-        <svg width="40" height="46" viewBox="0 0 40 46" style={{ overflow: "visible" }}>
-          {/* Strap top */}
-          <path d="M14,4 C14,0 26,0 26,4" fill="none" stroke="#fbbf24" strokeWidth="2" opacity="0.55" />
-          {/* Bag body */}
-          <rect x="4" y="8" width="32" height="30" rx="6" fill="#fbbf24" opacity="0.15" />
-          <rect x="5" y="9" width="30" height="28" rx="5" fill="none" stroke="#fbbf24" strokeWidth="1.2" opacity="0.5" />
-          {/* Pocket */}
-          <rect x="10" y="24" width="20" height="10" rx="3" fill="#fbbf24" opacity="0.1" />
-          <rect x="11" y="25" width="18" height="8"  rx="2" fill="none" stroke="#fbbf24" strokeWidth="0.8" opacity="0.4" />
-          {/* Zipper */}
-          <line x1="8" y1="18" x2="32" y2="18" stroke="#fde68a" strokeWidth="1" strokeOpacity="0.35" />
-          <circle cx="20" cy="18" r="2.5" fill="#fbbf24" opacity="0.6" />
-          {/* Doc count badge */}
-          <circle cx="34" cy="10" r="7" fill="#f59e0b" opacity="0.9" />
-          <text x="34" y="14" textAnchor="middle" fontSize="7.5" fill="white" fontWeight="bold">{docCount}</text>
-        </svg>
-        <span className="text-[8px]" style={{ color: "#fbbf2488" }}>지식 배낭</span>
-      </div>
+    <div className="absolute" style={{ left: "5%", top: "44%", zIndex: 8 }}>
+      <GardenPopover
+        icon="🎒"
+        title="지식 배낭"
+        accent="#fbbf24"
+        side="right"
+        align="center"
+        stats={[
+          { label: "저장된 문서", value: `${docCount}개`, color: "#fde68a" },
+        ]}
+        description="업로드한 문서들이 배낭 속에 담겨 있어요. 니온이 이 지식을 활용해 더 똑똑하게 답변해 드립니다."
+      >
+        <div
+          className="flex flex-col items-center gap-1 cursor-pointer hover:scale-110 transition-transform"
+          style={{ animation: "gdn-float 4s ease-in-out infinite" }}
+        >
+          <svg width="40" height="46" viewBox="0 0 40 46" style={{ overflow: "visible" }}>
+            <path d="M14,4 C14,0 26,0 26,4" fill="none" stroke="#fbbf24" strokeWidth="2" opacity="0.55" />
+            <rect x="4" y="8" width="32" height="30" rx="6" fill="#fbbf24" opacity="0.15" />
+            <rect x="5" y="9" width="30" height="28" rx="5" fill="none" stroke="#fbbf24" strokeWidth="1.2" opacity="0.5" />
+            <rect x="10" y="24" width="20" height="10" rx="3" fill="#fbbf24" opacity="0.1" />
+            <rect x="11" y="25" width="18" height="8"  rx="2" fill="none" stroke="#fbbf24" strokeWidth="0.8" opacity="0.4" />
+            <line x1="8" y1="18" x2="32" y2="18" stroke="#fde68a" strokeWidth="1" strokeOpacity="0.35" />
+            <circle cx="20" cy="18" r="2.5" fill="#fbbf24" opacity="0.6" />
+            <circle cx="34" cy="10" r="8" fill="#f59e0b" opacity="0.9" />
+            <text x="34" y="14.5" textAnchor="middle" fontSize="9" fill="white" fontWeight="bold">{docCount}</text>
+          </svg>
+          <span className="text-xs font-medium" style={{ color: "#fbbf24bb" }}>지식 배낭</span>
+        </div>
+      </GardenPopover>
     </div>
   )
 }
@@ -862,118 +1032,150 @@ function KnowledgeBackpack({ docCount }: { docCount: number }) {
 
 const GEM_COLORS = ["#f472b6", "#60a5fa", "#34d399", "#fbbf24", "#a78bfa", "#fb923c"]
 
-function MagicWand({ skillCount }: { skillCount: number }) {
+function MagicWand({ skillCount, accent: _accent }: { skillCount: number; accent: string }) {
   if (!skillCount) return null
   const gems = Math.min(6, skillCount)
   return (
-    <div className="absolute pointer-events-none" style={{ right: "22%", bottom: "24%", zIndex: 8 }}>
-      <div className="flex flex-col items-center gap-0.5"
-        style={{ animation: "gdn-float 3.5s 0.5s ease-in-out infinite" }}>
-        <svg width="28" height="90" viewBox="0 0 28 90" style={{ overflow: "visible" }}>
-          {/* Wand shaft */}
-          <line x1="14" y1="80" x2="14" y2="28" stroke="#e2d5b0" strokeWidth="3" strokeLinecap="round" opacity="0.6" />
-          {/* Wand tip glow */}
-          <circle cx="14" cy="24" r="6" fill="white" opacity="0.2"
-            style={{ animation: "gdn-orb-pulse 2s ease-in-out infinite" }} />
-          <circle cx="14" cy="24" r="4" fill="white" opacity="0.7" />
-          {/* Gems along shaft */}
-          {Array.from({ length: gems }, (_, i) => {
-            const y = 32 + i * 8
-            const color = GEM_COLORS[i % GEM_COLORS.length]
-            return (
-              <g key={i}>
-                <circle cx="14" cy={y} r="3.5" fill={color} opacity="0.85"
-                  style={{ animation: `gdn-gem-sparkle ${1.6 + i * 0.3}s ${i * 0.35}s ease-in-out infinite` }} />
-                <circle cx="13" cy={y - 1} r="1.2" fill="white" opacity="0.4" />
-              </g>
-            )
-          })}
-          {/* Sparkle lines from tip */}
-          {[[8, 10], [20, 10], [6, 18], [22, 18]].map(([x2, y2], i) => (
-            <line key={i} x1="14" y1="24" x2={x2} y2={y2}
-              stroke="white" strokeWidth="0.8" strokeOpacity="0.35"
-              style={{ animation: `gdn-twinkle ${1.2 + i * 0.4}s ${i * 0.3}s ease-in-out infinite alternate` }} />
-          ))}
-        </svg>
-        <span className="text-[8px]" style={{ color: "rgba(255,255,255,0.35)" }}>마법 지팡이</span>
-      </div>
+    <div className="absolute" style={{ right: "22%", bottom: "24%", zIndex: 8 }}>
+      <GardenPopover
+        icon="🪄"
+        title="마법 지팡이"
+        accent="#e879f9"
+        side="top"
+        align="center"
+        stats={[
+          { label: "활성 스킬", value: `${skillCount}개`, color: "#e879f9" },
+          { label: "젬 장착", value: `${gems}개`, color: "#c084fc" },
+        ]}
+        description="활성화된 스킬이 많을수록 지팡이가 강해져요. 니온이 더 다양한 일을 도와줄 수 있어요."
+      >
+        <div
+          className="flex flex-col items-center gap-1 cursor-pointer hover:scale-110 transition-transform"
+          style={{ animation: "gdn-float 3.5s 0.5s ease-in-out infinite" }}
+        >
+          <svg width="28" height="90" viewBox="0 0 28 90" style={{ overflow: "visible" }}>
+            <line x1="14" y1="80" x2="14" y2="28" stroke="#e2d5b0" strokeWidth="3" strokeLinecap="round" opacity="0.6" />
+            <circle cx="14" cy="24" r="6" fill="white" opacity="0.2"
+              style={{ animation: "gdn-orb-pulse 2s ease-in-out infinite" }} />
+            <circle cx="14" cy="24" r="4" fill="white" opacity="0.7" />
+            {Array.from({ length: gems }, (_, i) => {
+              const y = 32 + i * 8
+              const color = GEM_COLORS[i % GEM_COLORS.length]
+              return (
+                <g key={i}>
+                  <circle cx="14" cy={y} r="3.5" fill={color} opacity="0.85"
+                    style={{ animation: `gdn-gem-sparkle ${1.6 + i * 0.3}s ${i * 0.35}s ease-in-out infinite` }} />
+                  <circle cx="13" cy={y - 1} r="1.2" fill="white" opacity="0.4" />
+                </g>
+              )
+            })}
+            {[[8, 10], [20, 10], [6, 18], [22, 18]].map(([x2, y2], i) => (
+              <line key={i} x1="14" y1="24" x2={x2} y2={y2}
+                stroke="white" strokeWidth="0.8" strokeOpacity="0.35"
+                style={{ animation: `gdn-twinkle ${1.2 + i * 0.4}s ${i * 0.3}s ease-in-out infinite alternate` }} />
+            ))}
+          </svg>
+          <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.55)" }}>마법 지팡이</span>
+        </div>
+      </GardenPopover>
     </div>
   )
 }
 
 // ── 에너지 충전기 Energy Charger — 토큰 사용량 ───────────────────────────────
 
-function EnergyCharger({ tokenUsagePct }: { tokenUsagePct: number }) {
+function EnergyCharger({ tokenUsagePct, accent: _accent }: { tokenUsagePct: number; accent: string }) {
   const fillColor = tokenUsagePct >= 80 ? "#f87171"
     : tokenUsagePct >= 60 ? "#fb923c"
     : tokenUsagePct >= 40 ? "#fbbf24"
     : "#34d399"
   const isHot = tokenUsagePct >= 60
+  const statusLabel = tokenUsagePct >= 80 ? "🔴 과부하" : tokenUsagePct >= 60 ? "🟠 높음" : tokenUsagePct >= 40 ? "🟡 보통" : "🟢 여유"
   return (
-    <div className="absolute pointer-events-none" style={{ right: "4%", bottom: "8%", zIndex: 8 }}>
-      <div className="flex flex-col items-center gap-0.5">
-        <svg width="32" height="68" viewBox="0 0 32 68" style={{ overflow: "visible" }}>
-          {/* Plug tip */}
-          <rect x="10" y="0" width="12" height="6" rx="2" fill="#9ca3af" opacity="0.5" />
-          <line x1="12" y1="6" x2="12" y2="10" stroke="#9ca3af" strokeWidth="1.5" opacity="0.4" />
-          <line x1="20" y1="6" x2="20" y2="10" stroke="#9ca3af" strokeWidth="1.5" opacity="0.4" />
-          {/* Battery body */}
-          <rect x="4" y="10" width="24" height="54" rx="4" fill="rgba(255,255,255,0.06)" />
-          <rect x="5" y="11" width="22" height="52" rx="3" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-          {/* Fill level */}
-          <rect x="6" y={12 + 50 * (1 - tokenUsagePct / 100)}
-            width="20" height={50 * tokenUsagePct / 100} rx="2"
-            fill={fillColor} opacity="0.75"
-            style={{ animation: `gdn-charger-pulse 2s ease-in-out infinite` }} />
-          {/* Percentage text */}
-          <text x="16" y="40" textAnchor="middle" fontSize="8" fill="white" fontWeight="bold" opacity="0.8">
-            {Math.round(tokenUsagePct)}%
-          </text>
-          {/* Heat effect */}
-          {isHot && (
-            <>
-              <text x="30" y="20" fontSize="10" opacity="0.6" style={{ animation: "gdn-float 1.5s ease-in-out infinite" }}>🔥</text>
-              {/* Nion fanning */}
-              <text x="-4" y="35" fontSize="10" opacity="0.55">🪭</text>
-            </>
-          )}
-        </svg>
-        <span className="text-[8px]" style={{ color: `${fillColor}88` }}>에너지</span>
-      </div>
+    <div className="absolute" style={{ right: "4%", bottom: "8%", zIndex: 8 }}>
+      <GardenPopover
+        icon="🔋"
+        title="에너지 충전기"
+        accent={fillColor}
+        side="top"
+        align="end"
+        stats={[
+          { label: "토큰 사용량", value: `${Math.round(tokenUsagePct)}%`, color: fillColor },
+          { label: "상태", value: statusLabel },
+        ]}
+        description="이번 달 AI 에너지(토큰) 사용량이에요. 사용량이 높으면 니온이 피로해질 수 있어요. 80% 이상이면 쉬게 해주세요."
+      >
+        <div className="flex flex-col items-center gap-1 cursor-pointer hover:scale-110 transition-transform">
+          <svg width="32" height="68" viewBox="0 0 32 68" style={{ overflow: "visible" }}>
+            <rect x="10" y="0" width="12" height="6" rx="2" fill="#9ca3af" opacity="0.5" />
+            <line x1="12" y1="6" x2="12" y2="10" stroke="#9ca3af" strokeWidth="1.5" opacity="0.4" />
+            <line x1="20" y1="6" x2="20" y2="10" stroke="#9ca3af" strokeWidth="1.5" opacity="0.4" />
+            <rect x="4" y="10" width="24" height="54" rx="4" fill="rgba(255,255,255,0.06)" />
+            <rect x="5" y="11" width="22" height="52" rx="3" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+            <rect x="6" y={12 + 50 * (1 - tokenUsagePct / 100)}
+              width="20" height={50 * tokenUsagePct / 100} rx="2"
+              fill={fillColor} opacity="0.75"
+              style={{ animation: `gdn-charger-pulse 2s ease-in-out infinite` }} />
+            <text x="16" y="40" textAnchor="middle" fontSize="9" fill="white" fontWeight="bold" opacity="0.85">
+              {Math.round(tokenUsagePct)}%
+            </text>
+            {isHot && (
+              <>
+                <text x="30" y="20" fontSize="10" opacity="0.6" style={{ animation: "gdn-float 1.5s ease-in-out infinite" }}>🔥</text>
+                <text x="-4" y="35" fontSize="10" opacity="0.55">🪭</text>
+              </>
+            )}
+          </svg>
+          <span className="text-xs font-medium" style={{ color: `${fillColor}cc` }}>에너지</span>
+        </div>
+      </GardenPopover>
     </div>
   )
 }
 
 // ── 정찰용 별 Scout Star — 웹검색 ────────────────────────────────────────────
 
-function ScoutStar() {
+function ScoutStar({ accent: _accent }: { accent: string }) {
   return (
-    <div className="absolute pointer-events-none" style={{ left: "46%", top: "6%", zIndex: 7 }}>
-      <div style={{ animation: "gdn-scout-fly 5s ease-in-out infinite" }}>
-        <svg width="24" height="24" viewBox="-12 -12 24 24" style={{ overflow: "visible" }}>
-          <polygon points={starPolygon(0, 0, 9, 5)} fill="#fde68a" opacity="0.88" />
-          <circle cx="0" cy="0" r="3" fill="white" opacity="0.6" />
-          {/* Tail trail */}
-          <line x1="0" y1="9" x2="0" y2="22" stroke="#fde68a" strokeWidth="1.5"
-            strokeOpacity="0.3" strokeLinecap="round"
-            style={{ animation: "gdn-charger-pulse 5s ease-in-out infinite" }} />
-        </svg>
-      </div>
-      <div className="text-center" style={{ marginTop: 2 }}>
-        <span className="text-[7px]" style={{ color: "#fde68a55" }}>정찰 별</span>
-      </div>
+    <div className="absolute" style={{ left: "46%", top: "6%", zIndex: 7 }}>
+      <GardenPopover
+        icon="⭐"
+        title="정찰용 별"
+        accent="#fde68a"
+        side="bottom"
+        align="center"
+        stats={[
+          { label: "상태", value: "🟢 활성", color: "#34d399" },
+        ]}
+        description="웹 검색 기능의 상징이에요. 니온이 인터넷을 탐색하며 최신 정보를 가져옵니다. 별이 높이 날수록 더 넓게 탐색해요."
+      >
+        <div className="cursor-pointer hover:scale-110 transition-transform">
+          <div style={{ animation: "gdn-scout-fly 5s ease-in-out infinite" }}>
+            <svg width="24" height="24" viewBox="-12 -12 24 24" style={{ overflow: "visible" }}>
+              <polygon points={starPolygon(0, 0, 9, 5)} fill="#fde68a" opacity="0.88" />
+              <circle cx="0" cy="0" r="3" fill="white" opacity="0.6" />
+              <line x1="0" y1="9" x2="0" y2="22" stroke="#fde68a" strokeWidth="1.5"
+                strokeOpacity="0.3" strokeLinecap="round"
+                style={{ animation: "gdn-charger-pulse 5s ease-in-out infinite" }} />
+            </svg>
+          </div>
+          <div className="text-center mt-1">
+            <span className="text-[11px] font-medium" style={{ color: "#fde68a88" }}>정찰 별</span>
+          </div>
+        </div>
+      </GardenPopover>
     </div>
   )
 }
 
 // ── 은하수 길 Galaxy Path — 연동 서비스 수 ───────────────────────────────────
 
-function GalaxyPath({ integrationCount }: { integrationCount: number }) {
+function GalaxyPath({ integrationCount, accent: _accent }: { integrationCount: number; accent: string }) {
   if (!integrationCount) return null
-  const brightness = Math.min(integrationCount / 5, 1) // max at 5 integrations
+  const brightness = Math.min(integrationCount / 5, 1)
   return (
-    <div className="absolute bottom-0 left-0 right-0 pointer-events-none" style={{ zIndex: 4 }}>
-      <svg viewBox="0 0 1200 28" preserveAspectRatio="none" width="100%" height="28">
+    <div className="absolute bottom-0 left-0 right-0" style={{ zIndex: 4 }}>
+      <svg viewBox="0 0 1200 32" preserveAspectRatio="none" width="100%" height="32">
         <defs>
           <linearGradient id="gdn-galaxy" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%"   stopColor="#312e81" stopOpacity="0" />
@@ -983,20 +1185,43 @@ function GalaxyPath({ integrationCount }: { integrationCount: number }) {
             <stop offset="100%" stopColor="#312e81" stopOpacity="0" />
           </linearGradient>
         </defs>
-        {/* Galaxy band */}
-        <rect x="0" y="8" width="1200" height="12" fill="url(#gdn-galaxy)"
+        <rect x="0" y="8" width="1200" height="14" fill="url(#gdn-galaxy)"
           style={{ animation: "gdn-galaxy-shimmer 3s ease-in-out infinite" }} />
-        {/* Stars on path */}
         {Array.from({ length: Math.min(integrationCount * 4, 20) }, (_, i) => (
-          <circle key={i} cx={60 + i * 56} cy={14} r={1.2}
+          <circle key={i} cx={60 + i * 56} cy={15} r={1.4}
             fill="white" opacity={0.3 + (i % 3) * 0.2}
             style={{ animation: `gdn-twinkle ${1.5 + (i % 4) * 0.4}s ${i * 0.25}s ease-in-out infinite alternate` }} />
         ))}
-        {/* Label */}
-        <text x="600" y="10" textAnchor="middle" fontSize="6" fill="white" opacity={0.25 * brightness} letterSpacing="3">
+        <text x="600" y="12" textAnchor="middle" fontSize="8" fill="white" opacity={0.30 * brightness} letterSpacing="3">
           은하수 길 · {integrationCount}개 연동
         </text>
       </svg>
+      {/* Clickable info button */}
+      <div className="absolute right-4 bottom-1" style={{ zIndex: 10 }}>
+        <GardenPopover
+          icon="🌌"
+          title="은하수 길"
+          accent="#818cf8"
+          side="top"
+          align="end"
+          stats={[
+            { label: "연동 서비스", value: `${integrationCount}개`, color: "#818cf8" },
+            { label: "은하 밝기", value: `${Math.round(brightness * 100)}%`, color: "#a5b4fc" },
+          ]}
+          description="연동된 AI 서비스가 많을수록 은하수가 더 밝게 빛나요. 설정에서 API 키를 추가하면 은하가 넓어집니다."
+        >
+          <button
+            className="text-[11px] font-medium px-2 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+            style={{
+              background: "rgba(79,70,229,0.25)",
+              border: "1px solid rgba(129,140,248,0.4)",
+              color: `rgba(165,180,252,${0.5 + brightness * 0.5})`,
+            }}
+          >
+            🌌 {integrationCount}개 연동
+          </button>
+        </GardenPopover>
+      </div>
     </div>
   )
 }
@@ -1034,7 +1259,6 @@ function BudgetPopup({ data, onClose, accent }: {
   const isOver = budgetRemaining < 0
   const pct = totalBudget > 0 ? Math.min(100, (totalSpent / totalBudget) * 100) : 0
 
-  // 별자리: 카테고리를 별로 배치
   const maxSpent = Math.max(...budgetItems.map(b => b.spent), 1)
   const starPositions = budgetItems.slice(0, 6).map((b, i) => {
     const angle = (i / Math.max(budgetItems.slice(0, 6).length, 1)) * Math.PI * 2 - Math.PI / 2
@@ -1083,7 +1307,6 @@ function BudgetPopup({ data, onClose, accent }: {
               ✦ BUDGET CONSTELLATION ✦
             </div>
             <svg width="180" height="140" viewBox="0 0 180 140" className="mx-auto" style={{ overflow: "visible" }}>
-              {/* Constellation lines */}
               {starPositions.map((s, i) => {
                 const next = starPositions[(i + 1) % starPositions.length]
                 return (
@@ -1091,22 +1314,20 @@ function BudgetPopup({ data, onClose, accent }: {
                     stroke={accent} strokeWidth="0.5" strokeOpacity="0.2" />
                 )
               })}
-              {/* Center hub */}
               <circle cx="90" cy="70" r="4" fill={accent} opacity="0.3" />
               {starPositions.map((s, i) => (
                 <line key={`hub-${i}`} x1="90" y1="70" x2={s.x} y2={s.y}
                   stroke={accent} strokeWidth="0.3" strokeOpacity="0.1" />
               ))}
-              {/* Stars */}
               {starPositions.map((s, i) => (
                 <g key={i}>
                   <circle cx={s.x} cy={s.y} r={s.size * 1.8} fill={s.color} opacity="0.08" />
                   <polygon points={starPolygon(s.x, s.y, s.size, 5)} fill={s.color} opacity="0.88"
                     style={{ animation: `gdn-twinkle ${1.5 + i * 0.3}s ${i * 0.4}s ease-in-out infinite alternate` }} />
-                  <text x={s.x} y={s.y + s.size + 9} textAnchor="middle" fontSize="7" fill="white" opacity="0.55">
+                  <text x={s.x} y={s.y + s.size + 10} textAnchor="middle" fontSize="8" fill="white" opacity="0.60">
                     {s.label}
                   </text>
-                  <text x={s.x} y={s.y + s.size + 17} textAnchor="middle" fontSize="6.5" fill={s.color} opacity="0.7">
+                  <text x={s.x} y={s.y + s.size + 20} textAnchor="middle" fontSize="7.5" fill={s.color} opacity="0.75">
                     {s.pct.toFixed(0)}%
                   </text>
                 </g>
@@ -1238,7 +1459,6 @@ export default function GardenPage() {
     const docCount   = docList.length
     const skillCount = skillList.filter((s) => s.is_enabled !== false).length
 
-    // Token usage percentage (assume max ~500K tokens/month)
     const rawTokens = usageRaw?.total_tokens ?? usageRaw?.summary?.total_tokens ?? 0
     const tokenUsagePct = Math.min(100, (rawTokens / 500_000) * 100)
 
@@ -1285,7 +1505,7 @@ export default function GardenPage() {
       {/* Background stars */}
       <StarField />
 
-      {/* 골드 스타 더스트 (수입 발생 시 나무 위로 내려오는 더스트) */}
+      {/* 골드 스타 더스트 */}
       {data && <GoldStarDust income={data.income} />}
 
       {/* 수입 별 (하늘 산포) */}
@@ -1294,45 +1514,49 @@ export default function GardenPage() {
       {/* 유성 (임박 일정) */}
       {data && <Meteors count={data.meteorCount} />}
 
-      {/* 정찰용 별 (항상 표시 - 웹검색 기능 상징) */}
-      <ScoutStar />
+      {/* 정찰용 별 */}
+      <ScoutStar accent={palette.accent} />
 
       {/* 풍경 Wind Bell */}
-      {data && <WindBell audioCount={data.audioCount} />}
+      {data && <WindBell audioCount={data.audioCount} accent={palette.accent} />}
 
       {/* 지식 배낭 */}
-      {data && <KnowledgeBackpack docCount={data.docCount} />}
+      {data && <KnowledgeBackpack docCount={data.docCount} accent={palette.accent} />}
 
       {/* Ground hills */}
       <GroundHills accent={palette.accent} />
 
-      {/* 은하수 길 (연동 서비스, 언덕 위에 겹쳐서 표시) */}
-      {data && <GalaxyPath integrationCount={data.integrationCount} />}
+      {/* 은하수 길 */}
+      {data && <GalaxyPath integrationCount={data.integrationCount} accent={palette.accent} />}
 
       {/* 지출 구름 */}
       {data && (
-        <SpendingCloud isRaining={data.isRaining} categories={data.overBudgetCategories} />
+        <SpendingCloud
+          isRaining={data.isRaining}
+          categories={data.overBudgetCategories}
+          accent={palette.accent}
+        />
       )}
 
       {/* 목표 꽃 */}
-      {data && <GoalFlowers goals={data.goals} />}
+      {data && <GoalFlowers goals={data.goals} accent={palette.accent} />}
 
       {/* 마법 호수 */}
-      {data && <MagicLake imageCount={data.imageCount} />}
+      {data && <MagicLake imageCount={data.imageCount} accent={palette.accent} />}
 
       {/* 감정 씨앗 */}
-      {data && <EmotionSeeds diaryMoods={data.diaryMoods} />}
+      {data && <EmotionSeeds diaryMoods={data.diaryMoods} accent={palette.accent} />}
 
       {/* 마법 지팡이 */}
-      {data && <MagicWand skillCount={data.skillCount} />}
+      {data && <MagicWand skillCount={data.skillCount} accent={palette.accent} />}
 
       {/* 에너지 충전기 */}
-      {data && <EnergyCharger tokenUsagePct={data.tokenUsagePct} />}
+      {data && <EnergyCharger tokenUsagePct={data.tokenUsagePct} accent={palette.accent} />}
 
       {/* 타임 캡슐 */}
-      {data && <TimeCapsule ddays={data.ddays} />}
+      {data && <TimeCapsule ddays={data.ddays} accent={palette.accent} />}
 
-      {/* 자산의 나무 (페르소나 오라 포함) */}
+      {/* 자산의 나무 */}
       {data && (
         <AssetTree
           savingsRate={data.savingsRate}
@@ -1343,7 +1567,7 @@ export default function GardenPage() {
         />
       )}
 
-      {/* 예산 팝업 (별자리 차트) */}
+      {/* 예산 팝업 */}
       {showPopup && data && (
         <BudgetPopup data={data} onClose={() => setShowPopup(false)} accent={palette.accent} />
       )}
@@ -1391,11 +1615,11 @@ export default function GardenPage() {
 
       {/* Bottom legend */}
       {data && !showPopup && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-4 text-[10px] flex-wrap justify-center"
-          style={{ zIndex: 20, color: "rgba(255,255,255,0.35)", maxWidth: "90%" }}>
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-3 text-xs flex-wrap justify-center"
+          style={{ zIndex: 20, color: "rgba(255,255,255,0.40)", maxWidth: "90%" }}>
           {data.goals.length > 0 && <span>🌸 목표 꽃</span>}
-          <span className="cursor-pointer hover:opacity-70 transition-opacity"
-            style={{ color: `${palette.accent}88` }}
+          <span className="cursor-pointer hover:opacity-70 transition-opacity font-medium"
+            style={{ color: `${palette.accent}aa` }}
             onClick={() => setShowPopup(true)}>
             ✦ 자산의 나무 (터치)
           </span>
