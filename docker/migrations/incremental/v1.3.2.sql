@@ -8,7 +8,7 @@
 
 INSERT INTO personas (user_id, name, description, provider, model, system_prompt, is_default)
 SELECT
-    p.uuid_id,
+    p.id,
     '심리 상담사',
     '따뜻한 공감으로 마음을 돌봐주는 니온의 심리 상담 페르소나',
     '',
@@ -38,11 +38,11 @@ If the user expresses clear self-harm or suicidal ideation, immediately offer em
 - 생명의전화: 1588-9191 (24시간)
 Do not engage in therapeutic advice beyond validation in these cases.',
     false
-FROM profiles p
+FROM users p
 WHERE NOT EXISTS (
     SELECT 1
     FROM personas pe
-    WHERE pe.user_id = p.uuid_id
+    WHERE pe.user_id = p.id
       AND pe.name = '심리 상담사'
 );
 
