@@ -453,7 +453,7 @@ export function PersonasView() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2 overflow-y-auto flex-1 pr-1">
+          <div className="space-y-4 py-2 overflow-y-auto flex-1 pr-1 scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {/* Name */}
             <div className="space-y-1.5">
               <Label>{t("dialog.nameLabel")}</Label>
