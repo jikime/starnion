@@ -572,8 +572,7 @@ export function PersonasView() {
                 placeholder={t("dialog.systemPromptPlaceholder")}
                 value={form.systemPrompt}
                 onChange={e => setForm(f => ({ ...f, systemPrompt: e.target.value }))}
-                rows={6}
-                className="resize-y text-sm min-h-[120px]"
+                className="resize-none text-sm h-[180px]"
               />
             </div>
 
