@@ -529,9 +529,13 @@ function CounselingSpace({ goals, diaryCountThisWeek, goalCompletionRate }: {
         border: "1px solid rgba(255,255,255,0.07)",
       }}>
         <div className="flex items-center gap-3">
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="text-3xl" style={{ filter: "drop-shadow(0 0 8px #fbbf2444)" }}>🪑</span>
-            <span className="text-xl" style={{ filter: "drop-shadow(0 0 6px #fbbf2433)" }}>☕</span>
+          <div className="flex flex-col items-center gap-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/wellness-chair.png" alt="의자" width={72} height={72}
+              style={{ objectFit: "contain", filter: "drop-shadow(0 0 10px #fbbf2444)" }} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/wellness-coffee.png" alt="커피" width={52} height={52}
+              style={{ objectFit: "contain", filter: "drop-shadow(0 0 8px #fbbf2433)" }} />
           </div>
 
           <div className="flex flex-col items-center">
