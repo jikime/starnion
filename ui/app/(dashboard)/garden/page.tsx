@@ -30,7 +30,7 @@ interface GardenData {
   audioCount: number      // 풍경
   imageCount: number      // 마법 호수
   skillCount: number      // 마법 지팡이
-  tokenUsagePct: number   // 에너지 충전기 (0-100)
+  totalTokens: number     // 에너지 충전기 (누적 토큰 수)
   activePersona: string   // 니온 오라
   integrationCount: number // 은하수 길
 }
@@ -1084,13 +1084,22 @@ function MagicWand({ skillCount, accent: _accent }: { skillCount: number; accent
 
 // ── 에너지 충전기 Energy Charger — 토큰 사용량 ───────────────────────────────
 
-function EnergyCharger({ tokenUsagePct, accent: _accent }: { tokenUsagePct: number; accent: string }) {
-  const fillColor = tokenUsagePct >= 80 ? "#f87171"
-    : tokenUsagePct >= 60 ? "#fb923c"
-    : tokenUsagePct >= 40 ? "#fbbf24"
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
+}
+
+function EnergyCharger({ totalTokens, accent: _accent }: { totalTokens: number; accent: string }) {
+  // 배터리 시각 레벨: 0 ~ 100K 토큰을 0~100%로 표현 (시각 전용)
+  const visualPct = Math.min(100, (totalTokens / 100_000) * 100)
+  const fillColor = visualPct >= 80 ? "#f87171"
+    : visualPct >= 60 ? "#fb923c"
+    : visualPct >= 40 ? "#fbbf24"
     : "#34d399"
-  const isHot = tokenUsagePct >= 60
-  const statusLabel = tokenUsagePct >= 80 ? "🔴 과부하" : tokenUsagePct >= 60 ? "🟠 높음" : tokenUsagePct >= 40 ? "🟡 보통" : "🟢 여유"
+  const isHot = visualPct >= 60
+  const statusLabel = visualPct >= 80 ? "🔴 많음" : visualPct >= 60 ? "🟠 높음" : visualPct >= 40 ? "🟡 보통" : "🟢 여유"
+  const displayVal = formatTokens(totalTokens)
   return (
     <div className="absolute" style={{ right: "4%", bottom: "8%", zIndex: 8 }}>
       <GardenPopover
@@ -1100,10 +1109,11 @@ function EnergyCharger({ tokenUsagePct, accent: _accent }: { tokenUsagePct: numb
         side="top"
         align="end"
         stats={[
-          { label: "토큰 사용량", value: `${Math.round(tokenUsagePct)}%`, color: fillColor },
+          { label: "30일 토큰 합계", value: totalTokens.toLocaleString("ko-KR"), color: fillColor },
+          { label: "입출력 합산", value: displayVal, color: fillColor },
           { label: "상태", value: statusLabel },
         ]}
-        description="이번 달 AI 에너지(토큰) 사용량이에요. 사용량이 높으면 니온이 피로해질 수 있어요. 80% 이상이면 쉬게 해주세요."
+        description="이번 달 니온이 사용한 AI 토큰 누적 수예요. 토큰이 많을수록 니온이 열심히 일하고 있다는 뜻이에요."
       >
         <div className="flex flex-col items-center gap-1 cursor-pointer hover:scale-110 transition-transform">
           <svg width="32" height="68" viewBox="0 0 32 68" style={{ overflow: "visible" }}>
@@ -1112,12 +1122,12 @@ function EnergyCharger({ tokenUsagePct, accent: _accent }: { tokenUsagePct: numb
             <line x1="20" y1="6" x2="20" y2="10" stroke="#9ca3af" strokeWidth="1.5" opacity="0.4" />
             <rect x="4" y="10" width="24" height="54" rx="4" fill="rgba(255,255,255,0.06)" />
             <rect x="5" y="11" width="22" height="52" rx="3" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-            <rect x="6" y={12 + 50 * (1 - tokenUsagePct / 100)}
-              width="20" height={50 * tokenUsagePct / 100} rx="2"
+            <rect x="6" y={12 + 50 * (1 - visualPct / 100)}
+              width="20" height={50 * visualPct / 100} rx="2"
               fill={fillColor} opacity="0.75"
               style={{ animation: `gdn-charger-pulse 2s ease-in-out infinite` }} />
-            <text x="16" y="40" textAnchor="middle" fontSize="9" fill="white" fontWeight="bold" opacity="0.85">
-              {Math.round(tokenUsagePct)}%
+            <text x="16" y="38" textAnchor="middle" fontSize="8" fill="white" fontWeight="bold" opacity="0.85">
+              {displayVal}
             </text>
             {isHot && (
               <>
@@ -1459,8 +1469,9 @@ export default function GardenPage() {
     const docCount   = docList.length
     const skillCount = skillList.filter((s) => s.is_enabled !== false).length
 
-    const rawTokens = usageRaw?.total_tokens ?? usageRaw?.summary?.total_tokens ?? 0
-    const tokenUsagePct = Math.min(100, (rawTokens / 500_000) * 100)
+    // API 응답: { summary: { total_input_tokens, total_output_tokens, ... } }
+    const usageSummary = (usageRaw as { summary?: { total_input_tokens?: number; total_output_tokens?: number } } | null)?.summary
+    const totalTokens = (usageSummary?.total_input_tokens ?? 0) + (usageSummary?.total_output_tokens ?? 0)
 
     const activePersona = personaRaw?.persona ?? "assistant"
 
@@ -1477,7 +1488,7 @@ export default function GardenPage() {
       income, meteorCount, diaryMoods,
       ddays, budgetItems: budgets,
       docCount, audioCount, imageCount, skillCount,
-      tokenUsagePct, activePersona, integrationCount,
+      totalTokens, activePersona, integrationCount,
     })
     setLoading(false)
   }, [])
@@ -1551,7 +1562,7 @@ export default function GardenPage() {
       {data && <MagicWand skillCount={data.skillCount} accent={palette.accent} />}
 
       {/* 에너지 충전기 */}
-      {data && <EnergyCharger tokenUsagePct={data.tokenUsagePct} accent={palette.accent} />}
+      {data && <EnergyCharger totalTokens={data.totalTokens} accent={palette.accent} />}
 
       {/* 타임 캡슐 */}
       {data && <TimeCapsule ddays={data.ddays} accent={palette.accent} />}
