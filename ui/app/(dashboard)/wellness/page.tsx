@@ -691,14 +691,22 @@ function CounselingSpace({ goals, diaryCountThisWeek, goalCompletionRate }: {
         background: "rgba(255,255,255,0.04)",
         border: "1px solid rgba(255,255,255,0.07)",
       }}>
-        <div className="flex flex-col items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/wellness-coffee.png" alt="커피" width={52} height={52}
-            style={{ objectFit: "contain", filter: "drop-shadow(0 0 8px #fbbf2433)" }} />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/wellness-chair.png" alt="의자" width={72} height={72}
-            style={{ objectFit: "contain", filter: "drop-shadow(0 0 10px #fbbf2444)" }} />
+        <div className="flex items-center justify-center gap-4">
+          {/* 커피 */}
+          <div className="flex flex-col items-center gap-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/wellness-coffee.png" alt="커피" width={52} height={52}
+              style={{ objectFit: "contain", filter: "drop-shadow(0 0 8px #fbbf2433)" }} />
+          </div>
 
+          {/* 의자 */}
+          <div className="flex flex-col items-center gap-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/wellness-chair.png" alt="의자" width={72} height={72}
+              style={{ objectFit: "contain", filter: "drop-shadow(0 0 10px #fbbf2444)" }} />
+          </div>
+
+          {/* 상담 세션 통계 */}
           <div className="flex flex-col items-center">
             <DonutChart rate={goalCompletionRate} color="#fbbf24" />
             <div className="text-[11px] mt-0.5 text-center" style={{ color: "rgba(255,255,255,0.62)" }}>
@@ -706,6 +714,7 @@ function CounselingSpace({ goals, diaryCountThisWeek, goalCompletionRate }: {
             </div>
           </div>
 
+          {/* 이번 주 기록 */}
           <div className="flex flex-col items-center gap-1">
             <div className="text-xl font-bold" style={{ color: "#f472b6" }}>{diaryCountThisWeek}</div>
             <div className="text-[11px] text-center" style={{ color: "rgba(255,255,255,0.62)" }}>이번 주<br/>기록</div>
