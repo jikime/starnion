@@ -27,7 +27,6 @@ plugins:
 
 # Exclude from build
 exclude:
-  - "*.sh"
   - Gemfile
   - Gemfile.lock
   - node_modules
