@@ -38,7 +38,7 @@ Starnion is an AI agent platform built around **Nion**, your personal AI compani
 
 **API Keys required:**
 
-- At least one LLM provider: [Google Gemini](https://aistudio.google.com/), [OpenAI](https://platform.openai.com/), or [Anthropic](https://console.anthropic.com/)
+- At least one LLM provider: [Google Gemini](https://aistudio.google.com/), [OpenAI](https://platform.openai.com/), [Anthropic](https://console.anthropic.com/), [GLM/Z.AI](https://z.ai/), or any OpenAI-compatible endpoint (e.g. Ollama)
 - Telegram Bot Token — optional, from [@BotFather](https://t.me/BotFather)
 
 ---
@@ -106,7 +106,7 @@ make starnion
 ./starnion setup
 ```
 
-The wizard walks through: database connection, admin account, MinIO, service URLs, Google OAuth (optional), and embedding engine (optional).
+The wizard walks through: database connection, admin account, MinIO, service URLs, and embedding engine (optional).
 
 **Run**
 
@@ -166,11 +166,11 @@ curl http://localhost:8080/healthz
 | Layer | Technology |
 |-------|------------|
 | Web UI | Next.js 16 · Tailwind CSS 4 · shadcn/ui |
-| Auth | NextAuth.js (Credentials + Google OAuth) |
+| Auth | NextAuth.js (Credentials) |
 | Gateway | Go · Echo · go-telegram-bot-api |
 | Agent | Python 3.13 · LangGraph · gRPC |
-| LLM | Google Gemini · OpenAI GPT · Anthropic Claude |
-| Embedding | gemini-embedding-001 (768-dim) |
+| LLM | Google Gemini · OpenAI GPT · Anthropic Claude · GLM (Z.AI) · Ollama (custom) |
+| Embedding | OpenAI text-embedding-3-small · Gemini gemini-embedding-001 (768-dim) |
 | Database | PostgreSQL 16 · pgvector (HNSW) |
 | File Storage | MinIO (S3-compatible) |
 | Scheduler | robfig/cron (KST) |
