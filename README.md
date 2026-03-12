@@ -51,6 +51,13 @@ Starnion is an AI agent platform built around **Nion**, your personal AI compani
 curl -fsSL https://jikime.github.io/starnion/install.sh | bash
 ```
 
+After installation, run the setup wizard once, then start all services:
+
+```bash
+starnion setup   # Interactive setup — creates ~/.starnion/starnion.yaml
+starnion dev     # Start gateway + agent + UI
+```
+
 ### From source
 
 **Install prerequisites**
