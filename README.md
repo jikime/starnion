@@ -108,13 +108,15 @@ make starnion
 
 The wizard walks through: database connection, admin account, MinIO, service URLs, and embedding engine (optional).
 
-**Run**
+**Run** (choose one)
 
+Option A — Native mode (gateway + agent + UI as local processes):
 ```bash
-# Native mode — gateway + agent + UI as local processes
 ./starnion dev
+```
 
-# Docker mode — build and run all services in containers (source tree required)
+Option B — Docker mode (all services in containers, source tree required):
+```bash
 ./starnion docker up --build
 ```
 
