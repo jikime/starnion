@@ -47,7 +47,13 @@ Starnion is an AI agent platform built around **Nion**, your personal AI compani
 
 ### One-line installer (Linux / macOS)
 
+Requires **Node.js 20+** and **pnpm** to be installed beforehand.
+`uv` is installed automatically if missing.
+
 ```bash
+# Install pnpm if not already installed
+npm install -g pnpm
+
 curl -fsSL https://jikime.github.io/starnion/install.sh | bash
 ```
 
