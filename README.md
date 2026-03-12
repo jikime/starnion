@@ -57,18 +57,20 @@ npm install -g pnpm
 curl -fsSL https://jikime.github.io/starnion/install.sh | bash
 ```
 
-After installation, start PostgreSQL + MinIO first, then run the setup wizard:
+After installation, PostgreSQL + MinIO must be running before setup:
 
 ```bash
-# Start PostgreSQL + MinIO (skip if you already have them running)
+# 1. Start PostgreSQL + MinIO (skip if you already have them running)
 cp ~/.starnion/docker/.env.example ~/.starnion/docker/.env   # set your passwords
 docker compose -f ~/.starnion/docker/docker-compose.yml up -d postgres minio
 
-# Configure and run
-starnion setup   # Interactive setup — creates ~/.starnion/starnion.yaml
-starnion dev     # Start gateway + agent + UI (native)
+# 2. Run the setup wizard (creates ~/.starnion/starnion.yaml)
+starnion setup
+
+# 3. Start all services
+starnion dev              # native mode: gateway + agent + UI
 # — or —
-starnion docker up --build   # Start all services via Docker
+starnion docker up --build   # Docker mode: agent + gateway + UI (postgres/minio already running)
 ```
 
 ### From source
