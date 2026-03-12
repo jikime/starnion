@@ -122,6 +122,24 @@ func runUpdate(checkOnly bool, skipDocker bool) error {
 	PrintOK("업데이트", fmt.Sprintf("StarNion v%s 설치 완료", latest))
 	PrintHint("변경사항: " + release.HTMLURL)
 
+	// ── Post-install: regenerate ui/.env and run DB migrations ─────────────
+	cfg, err := LoadConfig()
+	if err == nil {
+		root := installRoot()
+		if wErr := WriteUIEnv(cfg, root); wErr != nil {
+			PrintWarn("ui/.env", fmt.Sprintf("재생성 실패: %v", wErr))
+		} else {
+			PrintOK("ui/.env", "재생성 완료")
+		}
+		if mErr := connectAndMigrate(cfg, root); mErr != nil {
+			PrintWarn("migrate", fmt.Sprintf("마이그레이션 실패: %v", mErr))
+		} else {
+			PrintOK("migrate", "마이그레이션 완료")
+		}
+	} else {
+		PrintWarn("config", fmt.Sprintf("설정 파일 로드 실패: %v", err))
+	}
+
 	// ── Docker image pull (if running) ─────────────────────────────────────
 	if !skipDocker {
 		runDockerUpdate()

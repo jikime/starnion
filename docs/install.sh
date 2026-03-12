@@ -192,21 +192,18 @@ if [[ -d "$TMPDIR_WORK/ui" ]]; then
 fi
 
 # Install docker/ files to ~/.starnion/docker/
-# Preserves existing .env to avoid overwriting secrets on update
+# starnion.yaml is never touched (it is the user's config source of truth).
+# docker/.env contains DB credentials — back it up, replace the whole dir, restore it.
 if [[ -d "$TMPDIR_WORK/docker" ]]; then
-  mkdir -p "${STARNION_HOME}/docker/migrations/incremental"
-  # Copy all docker files except .env (preserve existing secrets)
-  for f in "$TMPDIR_WORK/docker"/*; do
-    fname="$(basename "$f")"
-    if [[ "$fname" == ".env" ]]; then
-      continue  # never overwrite existing .env
-    fi
-    if [[ -d "$f" ]]; then
-      cp -r "$f" "${STARNION_HOME}/docker/${fname}"
-    else
-      cp "$f" "${STARNION_HOME}/docker/${fname}"
-    fi
-  done
+  DOCKER_ENV_BACKUP=""
+  if [[ -f "${STARNION_HOME}/docker/.env" ]]; then
+    DOCKER_ENV_BACKUP="$(cat "${STARNION_HOME}/docker/.env")"
+  fi
+  rm -rf "${STARNION_HOME}/docker"
+  mv "$TMPDIR_WORK/docker" "${STARNION_HOME}/docker"
+  if [[ -n "$DOCKER_ENV_BACKUP" ]]; then
+    printf '%s' "$DOCKER_ENV_BACKUP" > "${STARNION_HOME}/docker/.env"
+  fi
 fi
 
 ok "StarNion v${VERSION} 설치 완료 → ${BINARY_DEST}"
