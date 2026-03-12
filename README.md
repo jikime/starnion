@@ -165,7 +165,7 @@ curl http://localhost:8080/healthz
 
 | Layer | Technology |
 |-------|------------|
-| Web UI | Next.js 15 · Tailwind CSS · shadcn/ui |
+| Web UI | Next.js 16 · Tailwind CSS 4 · shadcn/ui |
 | Auth | NextAuth.js (Credentials + Google OAuth) |
 | Gateway | Go · Echo · go-telegram-bot-api |
 | Agent | Python 3.13 · LangGraph · gRPC |
@@ -184,7 +184,7 @@ curl http://localhost:8080/healthz
 
 ```
 starnion/
-├── ui/                   # Next.js 15 Web UI
+├── ui/                   # Next.js 16 Web UI
 ├── agent/                # Python LangGraph agent (gRPC :50051)
 ├── gateway/              # Go gateway — REST API + Telegram + Cron
 ├── proto/                # Protobuf / gRPC definitions
