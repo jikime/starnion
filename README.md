@@ -34,6 +34,7 @@ Starnion is an AI agent platform built around **Nion**, your personal AI compani
 | **Node.js** | 20+ |
 | **Docker** | 24+ (with Compose v2) |
 | **PostgreSQL** | 16 + pgvector |
+| **MinIO** | RELEASE.2024-01-01 or later |
 
 **API Keys required:**
 
