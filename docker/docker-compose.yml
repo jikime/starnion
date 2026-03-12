@@ -47,8 +47,6 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-starnion}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-starnion}?sslmode=disable
       GRPC_PORT: ${GRPC_PORT:-50051}
-    volumes:
-      - ${HOME}/.starnion/starnion.yaml:/root/.starnion/starnion.yaml:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,8 +76,6 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: ${MINIO_BUCKET:-starnion-files}
       MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
-    volumes:
-      - ${HOME}/.starnion/starnion.yaml:/root/.starnion/starnion.yaml:ro
     depends_on:
       postgres:
         condition: service_healthy
