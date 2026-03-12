@@ -9,7 +9,7 @@
 set -euo pipefail
 
 # ── Pinned version (updated automatically on release) ─────────────────────────
-STARNION_VERSION="1.4.3"
+STARNION_VERSION="1.4.4"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 if [[ -t 1 ]] && [[ "${NO_COLOR:-}" == "" ]]; then
