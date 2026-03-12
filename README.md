@@ -71,6 +71,9 @@ Go 1.22+, Node.js 20+, and Docker must also be installed.
 git clone https://github.com/jikime/starnion.git
 cd starnion
 
+# Create docker environment file (edit passwords before starting)
+cp docker/.env.example docker/.env
+
 # Start PostgreSQL + MinIO (infrastructure only)
 docker compose -f docker/docker-compose.yml up -d postgres minio
 
