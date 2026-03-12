@@ -234,8 +234,7 @@ dim "   docker compose -f ~/.starnion/docker/docker-compose.yml up -d postgres m
 echo
 dim "2) 초기 설정 및 실행"
 dim "   starnion setup      # 초기 설정 마법사"
-dim "   starnion dev        # 전체 서비스 실행 (네이티브)"
-dim "   starnion docker up --build  # 전체 서비스 실행 (Docker)"
+dim "   starnion dev        # 전체 서비스 실행"
 echo
 dim "starnion update     # 최신 버전으로 업데이트"
 echo

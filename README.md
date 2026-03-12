@@ -67,10 +67,8 @@ docker compose -f ~/.starnion/docker/docker-compose.yml up -d postgres minio
 # 2. Run the setup wizard (creates ~/.starnion/starnion.yaml)
 starnion setup
 
-# 3. Start all services
-starnion dev              # native mode: gateway + agent + UI
-# — or —
-starnion docker up --build   # Docker mode: agent + gateway + UI (postgres/minio already running)
+# 3. Start all services (native mode)
+starnion dev
 ```
 
 ### From source
@@ -113,8 +111,11 @@ The wizard walks through: database connection, admin account, MinIO, service URL
 **Run**
 
 ```bash
-# Start all services: gateway (:8080) + agent (:50051) + UI (:3000)
+# Native mode — gateway + agent + UI as local processes
 ./starnion dev
+
+# Docker mode — build and run all services in containers (source tree required)
+./starnion docker up --build
 ```
 
 `starnion dev` automatically runs `uv sync` and `pnpm install` when dependencies are out of date. Press **Ctrl+C** to stop all services.
