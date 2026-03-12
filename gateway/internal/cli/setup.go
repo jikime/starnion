@@ -305,6 +305,31 @@ func RunSetup(projectRoot string) error {
 		}
 
 		if embeddingAPIKey != "" {
+			// Dimension selection — only on first-time setup (cannot be changed later).
+			var embeddingDims int
+			if cfg.Embedding.Dimensions == 0 {
+				var dimsStr string
+				if err := huh.NewForm(huh.NewGroup(
+					huh.NewSelect[string]().
+						Title("벡터 차원 수").
+						Description("설정 후 변경하려면 DB 전체 재색인이 필요합니다.").
+						Options(
+							huh.NewOption("768  (기본값, Gemini 포함 모든 모델 지원)", "768"),
+							huh.NewOption("1536 (더 높은 정확도, OpenAI / Gemini 지원)", "1536"),
+						).
+						Value(&dimsStr),
+				)).Run(); err != nil {
+					return fmt.Errorf("embedding dimension setup cancelled: %w", err)
+				}
+				if dimsStr == "1536" {
+					embeddingDims = 1536
+				} else {
+					embeddingDims = 768
+				}
+			} else {
+				embeddingDims = cfg.Embedding.Dimensions
+			}
+
 			cfg.Embedding.Provider = embeddingProvider
 			cfg.Embedding.APIKey = embeddingAPIKey
 			if embeddingProvider == "openai" {
@@ -312,8 +337,20 @@ func RunSetup(projectRoot string) error {
 			} else {
 				cfg.Embedding.Model = "gemini-embedding-001"
 			}
-			cfg.Embedding.Dimensions = 768
-			PrintOK("Embedding", embeddingProvider+" / "+cfg.Embedding.Model+" (768 dims)")
+			cfg.Embedding.Dimensions = embeddingDims
+
+			// If user chose 1536, resize vector columns (baseline was created with 768).
+			if embeddingDims == 1536 {
+				PrintInfo("벡터 컬럼을 1536차원으로 변경 중...")
+				if err := resizeVectorColumns(cfg, 1536); err != nil {
+					PrintWarn("vector resize", fmt.Sprintf("컬럼 변경 실패: %v", err))
+				} else {
+					PrintOK("vector", "모든 embedding 컬럼 → vector(1536) 변경 완료")
+				}
+			}
+
+			PrintOK("Embedding", fmt.Sprintf("%s / %s (%d dims)",
+				embeddingProvider, cfg.Embedding.Model, cfg.Embedding.Dimensions))
 		} else {
 			PrintWarn("Embedding", "API Key 없음 — 건너뜁니다")
 		}
@@ -572,7 +609,10 @@ func RunConfigEmbedding() error {
 
 	cfg.Embedding.Provider = provider
 	cfg.Embedding.APIKey = apiKey
-	cfg.Embedding.Dimensions = 768
+	// Dimensions are fixed at first setup — never overwrite an existing value.
+	if cfg.Embedding.Dimensions == 0 {
+		cfg.Embedding.Dimensions = 768
+	}
 	if provider == "openai" {
 		cfg.Embedding.Model = "text-embedding-3-small"
 	} else {
@@ -588,6 +628,35 @@ func RunConfigEmbedding() error {
 		cfg.Embedding.Provider, cfg.Embedding.Model, cfg.Embedding.Dimensions))
 	PrintWarn("재시작", "변경 사항을 적용하려면 starnion agent를 재시작하세요.")
 	fmt.Println()
+	return nil
+}
+
+// resizeVectorColumns alters all embedding columns to the requested dimension.
+// Called once during first-time setup when the user selects a non-default dimension.
+func resizeVectorColumns(cfg StarNionConfig, dims int) error {
+	db, err := sql.Open("postgres", cfg.Database.DSN())
+	if err != nil {
+		return fmt.Errorf("DB 연결 실패: %w", err)
+	}
+	defer db.Close()
+	if err := db.Ping(); err != nil {
+		return fmt.Errorf("DB 접속 실패: %w", err)
+	}
+
+	alters := []string{
+		fmt.Sprintf(`ALTER TABLE daily_logs       ALTER COLUMN embedding       TYPE vector(%d)`, dims),
+		fmt.Sprintf(`ALTER TABLE document_sections ALTER COLUMN embedding      TYPE vector(%d)`, dims),
+		fmt.Sprintf(`ALTER TABLE knowledge_base    ALTER COLUMN embedding      TYPE vector(%d)`, dims),
+		fmt.Sprintf(`ALTER TABLE diary_entries     ALTER COLUMN embedding      TYPE vector(%d)`, dims),
+		fmt.Sprintf(`ALTER TABLE memos             ALTER COLUMN embedding      TYPE vector(%d)`, dims),
+		fmt.Sprintf(`ALTER TABLE searches          ALTER COLUMN embedding      TYPE vector(%d)`, dims),
+		fmt.Sprintf(`ALTER TABLE searches          ALTER COLUMN query_embedding TYPE vector(%d)`, dims),
+	}
+	for _, q := range alters {
+		if _, err := db.Exec(q); err != nil {
+			return fmt.Errorf("ALTER 실패 (%s): %w", q, err)
+		}
+	}
 	return nil
 }
 
