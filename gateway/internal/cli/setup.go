@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -371,6 +373,14 @@ func RunSetup(projectRoot string) error {
 		PrintWarn("env", fmt.Sprintf("ui/.env 생성 실패: %v", err))
 	}
 
+	// ── Write docker/.env (Docker Compose env vars, source-tree only) ────────
+	dockerDir := filepath.Join(projectRoot, "docker")
+	if _, err := os.Stat(dockerDir); err == nil {
+		if err := WriteDockerEnv(cfg, dockerDir); err != nil {
+			PrintWarn("env", fmt.Sprintf("docker/.env 생성 실패: %v", err))
+		}
+	}
+
 	// ── Done ──────────────────────────────────────────────────────────────────
 	fmt.Println()
 	tw := termWidth()
@@ -621,6 +631,14 @@ func RunConfigEmbedding() error {
 
 	if err := SaveConfig(cfg); err != nil {
 		return fmt.Errorf("설정 저장 실패: %w", err)
+	}
+
+	// Sync docker/.env when present (source-tree mode).
+	dockerDir := filepath.Join(projectRoot(), "docker")
+	if _, err := os.Stat(dockerDir); err == nil {
+		if err := WriteDockerEnv(cfg, dockerDir); err != nil {
+			PrintWarn("env", fmt.Sprintf("docker/.env 동기화 실패: %v", err))
+		}
 	}
 
 	fmt.Println()

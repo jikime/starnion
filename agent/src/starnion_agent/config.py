@@ -1,7 +1,14 @@
-"""Configuration management — reads from ~/.starnion/starnion.yaml."""
+"""Configuration management — reads from ~/.starnion/starnion.yaml.
+
+Priority order (highest to lowest):
+  1. Environment variables  — for Docker / container deployments
+  2. ~/.starnion/starnion.yaml — written by `starnion setup`
+  3. Hardcoded defaults        — fallback only
+"""
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -87,29 +94,38 @@ class Settings:
     def from_yaml(cls) -> "Settings":
         raw = _load_yaml()
 
-        db = raw.get("database", {})
-        host = db.get("host", "localhost")
-        port = db.get("port", 5432)
-        name = db.get("name", "starnion")
-        user = db.get("user", "postgres")
-        password = db.get("password", "")
-        ssl_mode = db.get("ssl_mode", "disable")
-        database_url = (
-            f"postgresql://{user}:{password}@{host}:{port}/{name}?sslmode={ssl_mode}"
-        )
+        # ── Database ─────────────────────────────────────────────────────────
+        # DATABASE_URL env var (set by docker-compose) takes priority over YAML.
+        database_url = os.environ.get("DATABASE_URL", "")
+        if not database_url:
+            db = raw.get("database", {})
+            host = db.get("host", "localhost")
+            port = db.get("port", 5432)
+            name = db.get("name", "starnion")
+            user = db.get("user", "postgres")
+            password = db.get("password", "")
+            ssl_mode = db.get("ssl_mode", "disable")
+            database_url = (
+                f"postgresql://{user}:{password}@{host}:{port}/{name}?sslmode={ssl_mode}"
+            )
 
+        # ── Gateway ──────────────────────────────────────────────────────────
         gw = raw.get("gateway", {})
-        gateway_url = gw.get("url", "http://localhost:8080")
-        grpc_port = int(gw.get("grpc_port", 50051))
+        gateway_url = os.environ.get("GATEWAY_URL") or gw.get("url", "http://localhost:8080")
+        grpc_port = int(os.environ.get("GRPC_PORT") or gw.get("grpc_port", 50051))
 
+        # ── Embedding ────────────────────────────────────────────────────────
+        # Env vars (EMBEDDING_*) override YAML values so Docker mode can be
+        # configured without mounting starnion.yaml into the container.
         emb = raw.get("embedding", {})
         embedding = EmbeddingConfig(
-            provider=emb.get("provider", "openai"),
-            api_key=emb.get("api_key", ""),
-            model=emb.get("model", "text-embedding-3-small"),
-            dimensions=int(emb.get("dimensions", 768)),
+            provider=os.environ.get("EMBEDDING_PROVIDER") or emb.get("provider", "openai"),
+            api_key=os.environ.get("EMBEDDING_API_KEY") or emb.get("api_key", ""),
+            model=os.environ.get("EMBEDDING_MODEL") or emb.get("model", "text-embedding-3-small"),
+            dimensions=int(os.environ.get("EMBEDDING_DIMENSIONS") or emb.get("dimensions", 768)),
         )
 
+        # ── Google OAuth ─────────────────────────────────────────────────────
         g = raw.get("google", {})
         google = GoogleConfig(
             client_id=g.get("client_id", ""),
@@ -117,9 +133,10 @@ class Settings:
             redirect_uri=g.get("redirect_uri", ""),
         )
 
+        # ── Gemini ───────────────────────────────────────────────────────────
         gem = raw.get("gemini", {})
         gemini = GeminiConfig(
-            model=gem.get("model") or "gemini-2.5-pro",
+            model=os.environ.get("GEMINI_MODEL") or gem.get("model") or "gemini-2.5-pro",
         )
 
         return cls(
