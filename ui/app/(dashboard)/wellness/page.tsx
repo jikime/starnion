@@ -691,15 +691,13 @@ function CounselingSpace({ goals, diaryCountThisWeek, goalCompletionRate }: {
         background: "rgba(255,255,255,0.04)",
         border: "1px solid rgba(255,255,255,0.07)",
       }}>
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col items-center gap-1">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/wellness-chair.png" alt="의자" width={72} height={72}
-              style={{ objectFit: "contain", filter: "drop-shadow(0 0 10px #fbbf2444)" }} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/wellness-coffee.png" alt="커피" width={52} height={52}
-              style={{ objectFit: "contain", filter: "drop-shadow(0 0 8px #fbbf2433)" }} />
-          </div>
+        <div className="flex flex-col items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/wellness-coffee.png" alt="커피" width={52} height={52}
+            style={{ objectFit: "contain", filter: "drop-shadow(0 0 8px #fbbf2433)" }} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/wellness-chair.png" alt="의자" width={72} height={72}
+            style={{ objectFit: "contain", filter: "drop-shadow(0 0 10px #fbbf2444)" }} />
 
           <div className="flex flex-col items-center">
             <DonutChart rate={goalCompletionRate} color="#fbbf24" />
