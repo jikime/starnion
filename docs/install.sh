@@ -228,8 +228,14 @@ echo -e "${GOLD}  ✦  설치 완료  ✦${NC}"
 echo -e "${GOLD}  ══════════════════════════════════════════${NC}"
 echo
 echo -e "  시작하기:"
-dim "starnion setup      # 초기 설정 마법사"
-dim "starnion dev        # 전체 서비스 실행"
-dim "starnion docker up  # Docker로 실행"
+dim "1) PostgreSQL + MinIO 시작 (기존 서버가 있으면 건너뜀)"
+dim "   cp ~/.starnion/docker/.env.example ~/.starnion/docker/.env"
+dim "   docker compose -f ~/.starnion/docker/docker-compose.yml up -d postgres minio"
+echo
+dim "2) 초기 설정 및 실행"
+dim "   starnion setup      # 초기 설정 마법사"
+dim "   starnion dev        # 전체 서비스 실행 (네이티브)"
+dim "   starnion docker up --build  # 전체 서비스 실행 (Docker)"
+echo
 dim "starnion update     # 최신 버전으로 업데이트"
 echo
