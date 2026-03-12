@@ -151,38 +151,18 @@ func WaitForService(label, hint string, check func() bool) bool {
 // ── Full system check ─────────────────────────────────────────────────────────
 
 type SystemCheckResult struct {
-	PostgresOK bool
-	MinIOOK    bool
-	UvOK       bool
-	NodeOK     bool
-	PnpmOK     bool // dev mode only
+	UvOK   bool
+	NodeOK bool
+	PnpmOK bool // dev mode only
 }
 
 // RunSystemCheck performs the [1/7] system dependency check.
-// It blocks until PostgreSQL and MinIO are reachable, and auto-installs uv if missing.
-// devMode=true also checks pnpm (needed for local source dev).
-func RunSystemCheck(pgHost string, pgPort int, minioPublicURL string) SystemCheckResult {
+// Only checks tool availability (uv, node, pnpm).
+// PostgreSQL and MinIO are checked AFTER the user enters their connection details.
+func RunSystemCheck() SystemCheckResult {
 	res := SystemCheckResult{}
 
-	// PostgreSQL ── must be running before we proceed
-	PrintInfo("PostgreSQL 확인 중...")
-	res.PostgresOK = WaitForService(
-		"PostgreSQL",
-		postgresStartHint(),
-		func() bool { return CheckPostgres(pgHost, pgPort) },
-	)
-	PrintOK("PostgreSQL", fmt.Sprintf("%s:%d 연결 확인", pgHost, pgPort))
-
-	// MinIO ── must be running before we proceed
-	PrintInfo("MinIO 확인 중...")
-	res.MinIOOK = WaitForService(
-		"MinIO",
-		minioStartHint(),
-		func() bool { return CheckMinIO(minioPublicURL) },
-	)
-	PrintOK("MinIO", minioPublicURL+" 연결 확인")
-
-	// uv ── auto-install if missing (B approach)
+	// uv ── auto-install if missing
 	res.UvOK = ensureUV()
 
 	// node ── required for UI standalone server
@@ -204,4 +184,17 @@ func RunSystemCheck(pgHost string, pgPort int, minioPublicURL string) SystemChec
 	}
 
 	return res
+}
+
+// CheckPostgresWithWait checks PostgreSQL reachability at the given host:port,
+// blocking until the service is available or the user gives up.
+func CheckPostgresWithWait(host string, port int) {
+	addr := fmt.Sprintf("%s:%d", host, port)
+	PrintInfo(fmt.Sprintf("PostgreSQL 연결 확인 중... (%s)", addr))
+	WaitForService(
+		"PostgreSQL",
+		postgresStartHint(),
+		func() bool { return CheckPostgres(host, port) },
+	)
+	PrintOK("PostgreSQL", addr+" 연결 확인")
 }

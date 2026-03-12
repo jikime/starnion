@@ -38,10 +38,10 @@ func RunSetup(projectRoot string) error {
 	cfg := DefaultConfig()
 
 	// ════════════════════════════════════════════════════════════════════════════
-	// [1/6] SYSTEM CHECK
+	// [1/7] SYSTEM CHECK — tools only (PostgreSQL checked after DB details entered)
 	// ════════════════════════════════════════════════════════════════════════════
 	PrintSectionHeader(1, 7, "SYSTEM CHECK")
-	_ = RunSystemCheck(cfg.Database.Host, cfg.Database.Port, cfg.MinIO.PublicURL)
+	_ = RunSystemCheck()
 
 	// ════════════════════════════════════════════════════════════════════════════
 	// [2/6] DATABASE
@@ -90,6 +90,10 @@ func RunSetup(projectRoot string) error {
 	if cfg.Database.User == "" {
 		cfg.Database.User = "postgres"
 	}
+
+	// Check PostgreSQL reachability using the user-entered host:port.
+	// Blocks until the server responds (or the user quits).
+	CheckPostgresWithWait(cfg.Database.Host, cfg.Database.Port)
 
 	// Verify connection + run migrations
 	if err := connectAndMigrate(cfg, projectRoot); err != nil {
