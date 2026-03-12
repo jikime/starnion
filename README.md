@@ -53,27 +53,48 @@ curl -fsSL https://jikime.github.io/starnion/install.sh | bash
 
 ### From source
 
+**Install prerequisites**
+
 ```bash
-# 1. Clone
+# uv — Python package manager (required for the AI agent)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# pnpm — Node.js package manager (required for the Web UI)
+npm install -g pnpm
+```
+
+Go 1.22+, Node.js 20+, and Docker must also be installed.
+
+**Clone & build**
+
+```bash
 git clone https://github.com/jikime/starnion.git
 cd starnion
 
-# 2. Configure environment
-cp .env.example .env
-# Edit .env — set your LLM API key and (optionally) Telegram bot token
-
-# 3. Start infrastructure
+# Start PostgreSQL + MinIO (infrastructure only)
 docker compose -f docker/docker-compose.yml up -d postgres minio
 
-# 4. Start Python agent  (gRPC :50051)
-cd agent && uv run python -m starnion_agent
-
-# 5. Start Go gateway   (HTTP :8080 + Telegram polling)
-cd gateway && go run ./cmd/gateway
-
-# 6. Start Web UI       (http://localhost:3000)
-cd ui && pnpm install && pnpm dev
+# Build the starnion CLI (outputs ./starnion in the project root)
+cd gateway && make starnion && cd ..
 ```
+
+**Configure**
+
+```bash
+# Interactive setup wizard — creates ~/.starnion/starnion.yaml
+./starnion setup
+```
+
+The wizard walks through: database connection, admin account, MinIO, service URLs, Google OAuth (optional), and embedding engine (optional).
+
+**Run**
+
+```bash
+# Start all services: gateway (:8080) + agent (:50051) + UI (:3000)
+./starnion dev
+```
+
+`starnion dev` automatically runs `uv sync` and `pnpm install` when dependencies are out of date. Press **Ctrl+C** to stop all services.
 
 ### Verify
 
