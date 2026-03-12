@@ -75,7 +75,7 @@ cd starnion
 docker compose -f docker/docker-compose.yml up -d postgres minio
 
 # Build the starnion CLI (outputs ./starnion in the project root)
-cd gateway && make starnion && cd ..
+make starnion
 ```
 
 **Configure**
