@@ -139,16 +139,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader className="border-b border-sidebar-border h-14">
-        <Link href="/" className="flex items-center gap-2 px-4 py-1">
+        <Link href="/" className="flex items-center px-4 py-1 h-full">
           <NextImage
-            src="/starnion_mascot.png"
+            src="/brand_text_logo.png"
             alt="StarNion"
-            width={40}
+            width={220}
             height={40}
             className="object-contain"
             priority
           />
-          <span className="text-2xl font-semibold leading-none translate-y-0.5">StarNion</span>
         </Link>
       </SidebarHeader>
       <SidebarContent>
