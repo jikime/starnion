@@ -69,14 +69,12 @@ starnion dev     # Start gateway + agent + UI
 **Install prerequisites**
 
 ```bash
-# uv — Python package manager (required for the AI agent)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
 # pnpm — Node.js package manager (required for the Web UI)
 npm install -g pnpm
 ```
 
 Go 1.22+, Node.js 20+, and Docker must also be installed.
+`uv` is installed automatically by `starnion setup` if missing.
 
 **Clone & build**
 
