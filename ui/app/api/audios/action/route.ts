@@ -44,7 +44,6 @@ export async function POST(req: NextRequest) {
   }
 
   const payload: Record<string, unknown> = {
-    user_id: session.user.id,
     message: agentMessage,
   }
 

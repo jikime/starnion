@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = req.nextUrl
-  const qs = new URLSearchParams({ user_id: session.user.id })
+  const qs = new URLSearchParams()
   for (const key of ["year", "month"]) {
     const v = searchParams.get(key)
     if (v) qs.set(key, v)
@@ -29,7 +29,7 @@ export async function PUT(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}))
   const res = await gatewayFetch(
-    `/api/v1/budget?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/budget`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

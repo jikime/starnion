@@ -62,9 +62,9 @@ func scanDday(rows interface {
 
 // ListDdays handles GET /api/v1/ddays?user_id=
 func (h *DdayHandler) ListDdays(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	rows, err := h.db.QueryContext(c.Request().Context(), `
@@ -91,9 +91,9 @@ func (h *DdayHandler) ListDdays(c echo.Context) error {
 
 // CreateDday handles POST /api/v1/ddays?user_id=
 func (h *DdayHandler) CreateDday(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	var body struct {
@@ -128,9 +128,9 @@ func (h *DdayHandler) CreateDday(c echo.Context) error {
 
 // UpdateDday handles PUT /api/v1/ddays/:id?user_id=
 func (h *DdayHandler) UpdateDday(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -167,9 +167,9 @@ func (h *DdayHandler) UpdateDday(c echo.Context) error {
 
 // DeleteDday handles DELETE /api/v1/ddays/:id?user_id=
 func (h *DdayHandler) DeleteDday(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {

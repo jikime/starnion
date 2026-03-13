@@ -35,11 +35,11 @@ type imageItem struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// ListImages GET /api/v1/images?user_id=&type=&source=&limit=&offset=
+// ListImages GET /api/v1/images?type=&source=&limit=&offset=
 func (h *ImageHandler) ListImages(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	imgType := c.QueryParam("type")     // optional: generated|edited|analyzed
@@ -101,11 +101,11 @@ func (h *ImageHandler) ListImages(c echo.Context) error {
 	return c.JSON(http.StatusOK, items)
 }
 
-// DeleteImage DELETE /api/v1/images/:id?user_id=
+// DeleteImage DELETE /api/v1/images/:id
 func (h *ImageHandler) DeleteImage(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {

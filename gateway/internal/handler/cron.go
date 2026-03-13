@@ -96,11 +96,11 @@ type scheduleResponse struct {
 }
 
 // ListUserSchedules returns all user-created schedules.
-// GET /api/v1/cron/schedules?user_id=...
+// GET /api/v1/cron/schedules
 func (h *CronHandler) ListUserSchedules(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	ctx := c.Request().Context()
@@ -146,11 +146,11 @@ func (h *CronHandler) ListUserSchedules(c echo.Context) error {
 }
 
 // CreateUserSchedule inserts a new schedule into knowledge_base.
-// POST /api/v1/cron/schedules?user_id=...
+// POST /api/v1/cron/schedules
 func (h *CronHandler) CreateUserSchedule(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	var req struct {
@@ -215,12 +215,15 @@ func (h *CronHandler) CreateUserSchedule(c echo.Context) error {
 }
 
 // UpdateUserSchedule replaces a schedule's data.
-// PUT /api/v1/cron/schedules/:id?user_id=...
+// PUT /api/v1/cron/schedules/:id
 func (h *CronHandler) UpdateUserSchedule(c echo.Context) error {
-	userID := c.QueryParam("user_id")
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
 	schedID := c.Param("id")
-	if userID == "" || schedID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and id required"})
+	if schedID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "id required"})
 	}
 
 	var req struct {
@@ -287,12 +290,15 @@ func (h *CronHandler) UpdateUserSchedule(c echo.Context) error {
 }
 
 // DeleteUserSchedule removes a schedule from knowledge_base.
-// DELETE /api/v1/cron/schedules/:id?user_id=...
+// DELETE /api/v1/cron/schedules/:id
 func (h *CronHandler) DeleteUserSchedule(c echo.Context) error {
-	userID := c.QueryParam("user_id")
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
 	schedID := c.Param("id")
-	if userID == "" || schedID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and id required"})
+	if schedID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "id required"})
 	}
 
 	ctx := c.Request().Context()
@@ -315,12 +321,15 @@ func (h *CronHandler) DeleteUserSchedule(c echo.Context) error {
 }
 
 // ToggleUserSchedule flips a schedule between active and completed.
-// POST /api/v1/cron/schedules/:id/toggle?user_id=...
+// POST /api/v1/cron/schedules/:id/toggle
 func (h *CronHandler) ToggleUserSchedule(c echo.Context) error {
-	userID := c.QueryParam("user_id")
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
 	schedID := c.Param("id")
-	if userID == "" || schedID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and id required"})
+	if schedID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "id required"})
 	}
 
 	ctx := c.Request().Context()

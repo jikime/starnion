@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const unreadOnly = searchParams.get("unread_only") ?? "false"
 
   const res = await gatewayFetch(
-    `/api/v1/notifications?user_id=${session.user.id}&limit=${limit}&unread_only=${unreadOnly}`,
+    `/api/v1/notifications?limit=${limit}&unread_only=${unreadOnly}`,
     { cache: "no-store" },
   )
   const data = await res.json().catch(() => ({ notifications: [], unread_count: 0 }))
@@ -23,7 +23,7 @@ export async function PATCH(req: NextRequest) {
   if (!session?.user?.id) return NextResponse.json({ error: "unauthorized" }, { status: 401 })
 
   const body = await req.json().catch(() => ({}))
-  const res = await gatewayFetch(`/api/v1/notifications/read?user_id=${session.user.id}`, {
+  const res = await gatewayFetch(`/api/v1/notifications/read`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

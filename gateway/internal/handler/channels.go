@@ -41,9 +41,10 @@ type telegramStatusResponse struct {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-// userIDFromRequest extracts the user_id query param (set by the Next.js proxy).
+// userIDFromRequest extracts the authenticated userID from the JWT context.
 func userIDFromRequest(c echo.Context) string {
-	return c.QueryParam("user_id")
+	id, _ := c.Get("userID").(string)
+	return id
 }
 
 // ── GetTelegram ────────────────────────────────────────────────────────────
@@ -53,7 +54,7 @@ func userIDFromRequest(c echo.Context) string {
 func (h *ChannelHandler) GetTelegram(c echo.Context) error {
 	userID := userIDFromRequest(c)
 	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	if h.db == nil {
 		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "database unavailable"})
@@ -127,7 +128,7 @@ func (h *ChannelHandler) GetTelegram(c echo.Context) error {
 func (h *ChannelHandler) UpdateTelegram(c echo.Context) error {
 	userID := userIDFromRequest(c)
 	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	if h.db == nil {
 		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "database unavailable"})
@@ -255,11 +256,11 @@ func (h *ChannelHandler) UpdateTelegram(c echo.Context) error {
 // ── Pairing endpoints ──────────────────────────────────────────────────────
 
 type pairingRequest struct {
-	ID          string  `json:"id"`
-	TelegramID  string  `json:"telegramId"`
-	DisplayName string  `json:"displayName"`
-	MessageText string  `json:"messageText"`
-	RequestedAt string  `json:"requestedAt"`
+	ID          string `json:"id"`
+	TelegramID  string `json:"telegramId"`
+	DisplayName string `json:"displayName"`
+	MessageText string `json:"messageText"`
+	RequestedAt string `json:"requestedAt"`
 }
 
 // ListPairing returns pending pairing requests for the caller's bot.
@@ -267,7 +268,7 @@ type pairingRequest struct {
 func (h *ChannelHandler) ListPairing(c echo.Context) error {
 	userID := userIDFromRequest(c)
 	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	if h.db == nil {
 		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "database unavailable"})
@@ -312,7 +313,7 @@ func (h *ChannelHandler) DenyPairing(c echo.Context) error {
 func (h *ChannelHandler) resolvePairing(c echo.Context, status string) error {
 	userID := userIDFromRequest(c)
 	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	reqID := c.Param("id")
 	if h.db == nil {

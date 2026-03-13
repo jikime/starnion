@@ -30,9 +30,9 @@ type notificationItem struct {
 // List returns the latest notifications for a user.
 // GET /api/v1/notifications?user_id=<uuid>&limit=20&unread_only=false
 func (h *NotificationsHandler) List(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	limit := 20
@@ -90,9 +90,9 @@ func (h *NotificationsHandler) List(c echo.Context) error {
 // UnreadCount returns only the unread notification count.
 // GET /api/v1/notifications/unread-count?user_id=<uuid>
 func (h *NotificationsHandler) UnreadCount(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	var count int
@@ -111,9 +111,9 @@ func (h *NotificationsHandler) UnreadCount(c echo.Context) error {
 // PATCH /api/v1/notifications/read?user_id=<uuid>
 // Body: {"id": 123}  or  {"all": true}
 func (h *NotificationsHandler) MarkRead(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	var body struct {

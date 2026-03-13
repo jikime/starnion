@@ -9,8 +9,7 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
   }
 
-  const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await gatewayFetch(`/api/v1/statistics/insights?${qs}`, { cache: "no-store" })
+  const res = await gatewayFetch(`/api/v1/statistics/insights`, { cache: "no-store" })
   const data = await res.json().catch(() => ({}))
   return NextResponse.json(data, { status: res.ok ? 200 : res.status })
 }

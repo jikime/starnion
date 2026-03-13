@@ -39,11 +39,11 @@ type documentItem struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// ListDocuments GET /documents?user_id=
+// ListDocuments GET /documents
 func (h *DocumentHandler) ListDocuments(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
@@ -79,13 +79,13 @@ func (h *DocumentHandler) ListDocuments(c echo.Context) error {
 
 // UploadDocument POST /documents (multipart: file, user_id)
 func (h *DocumentHandler) UploadDocument(c echo.Context) error {
-	if h.minio == nil {
-		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "storage not configured"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
-	userID := c.FormValue("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	if h.minio == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "storage not configured"})
 	}
 
 	fh, err := c.FormFile("file")
@@ -95,12 +95,12 @@ func (h *DocumentHandler) UploadDocument(c echo.Context) error {
 
 	// Validate supported formats.
 	allowed := map[string]bool{
-		"application/pdf": true,
+		"application/pdf":    true,
 		"application/msword": true,
 		"application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
 		"application/vnd.ms-excel": true,
 		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":         true,
-		"application/vnd.ms-powerpoint": true,
+		"application/vnd.ms-powerpoint":                                             true,
 		"application/vnd.openxmlformats-officedocument.presentationml.presentation": true,
 		"text/plain":    true,
 		"text/markdown": true,
@@ -169,11 +169,11 @@ func (h *DocumentHandler) UploadDocument(c echo.Context) error {
 	})
 }
 
-// DeleteDocument DELETE /documents/:id?user_id=
+// DeleteDocument DELETE /documents/:id
 func (h *DocumentHandler) DeleteDocument(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {

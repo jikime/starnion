@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
   if (!q.trim()) return NextResponse.json([])
 
-  const qs = new URLSearchParams({ user_id: session.user.id, q, limit })
+  const qs = new URLSearchParams({ q, limit })
   const res = await gatewayFetch(`/api/v1/search/hybrid?${qs}`, {
     cache: "no-store",
   }).catch(() => null)

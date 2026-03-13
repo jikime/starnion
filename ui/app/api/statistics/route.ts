@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = req.nextUrl
-  const qs = new URLSearchParams({ user_id: session.user.id })
+  const qs = new URLSearchParams()
   const months = searchParams.get("months")
   if (months) qs.set("months", months)
 

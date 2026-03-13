@@ -11,9 +11,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const { id } = await params
   const body = await req.json().catch(() => ({}))
-  const qs = new URLSearchParams({ user_id: session.user.id })
-
-  const res = await gatewayFetch(`/api/v1/goals/${id}?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/goals/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -29,9 +27,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   }
 
   const { id } = await params
-  const qs = new URLSearchParams({ user_id: session.user.id })
-
-  const res = await gatewayFetch(`/api/v1/goals/${id}?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/goals/${id}`, {
     method: "DELETE",
   })
   const data = await res.json().catch(() => ({}))

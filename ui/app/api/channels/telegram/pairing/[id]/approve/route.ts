@@ -12,7 +12,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params
 
   const res = await gatewayFetch(
-    `/api/v1/channels/telegram/pairing/${encodeURIComponent(id)}/approve?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/channels/telegram/pairing/${encodeURIComponent(id)}/approve`,
     { method: "POST" }
   )
 

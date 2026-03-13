@@ -19,25 +19,25 @@ func NewAnalyticsHandler(db *sql.DB) *AnalyticsHandler {
 
 // GET /api/v1/analytics?user_id=...
 func (h *AnalyticsHandler) GetAnalytics(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	ctx := c.Request().Context()
 
 	// ── 1. Summary ────────────────────────────────────────────────────────────
 	type summaryStats struct {
-		TotalMessages      int     `json:"total_messages"`
-		ThisMonth          int     `json:"this_month"`
-		UserMessages       int     `json:"user_messages"`
-		AIMessages         int     `json:"ai_messages"`
-		TotalConversations int     `json:"total_conversations"`
-		ActiveConversations int    `json:"active_conversations"`
-		TelegramMessages   int     `json:"telegram_messages"`
-		WebchatMessages    int     `json:"webchat_messages"`
-		AvgPerDay          float64 `json:"avg_per_day"`
-		MoM                float64 `json:"mom"`
+		TotalMessages       int     `json:"total_messages"`
+		ThisMonth           int     `json:"this_month"`
+		UserMessages        int     `json:"user_messages"`
+		AIMessages          int     `json:"ai_messages"`
+		TotalConversations  int     `json:"total_conversations"`
+		ActiveConversations int     `json:"active_conversations"`
+		TelegramMessages    int     `json:"telegram_messages"`
+		WebchatMessages     int     `json:"webchat_messages"`
+		AvgPerDay           float64 `json:"avg_per_day"`
+		MoM                 float64 `json:"mom"`
 	}
 	var summary summaryStats
 	h.db.QueryRowContext(ctx, `
@@ -230,10 +230,10 @@ func (h *AnalyticsHandler) GetAnalytics(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, map[string]any{
-		"summary":       summary,
-		"daily_trend":   dailyTrend,
-		"hourly_dist":   hourlyDist,
-		"platforms":     platforms,
-		"weekly_trend":  weeklyTrend,
+		"summary":      summary,
+		"daily_trend":  dailyTrend,
+		"hourly_dist":  hourlyDist,
+		"platforms":    platforms,
+		"weekly_trend": weeklyTrend,
 	})
 }

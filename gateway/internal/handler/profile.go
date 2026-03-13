@@ -27,11 +27,11 @@ var supportedLanguages = map[string]bool{
 }
 
 // Get returns the authenticated user's profile.
-// GET /api/v1/profile?user_id=<uuid>
+// GET /api/v1/profile
 func (h *ProfileHandler) Get(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	var name, email sql.NullString
@@ -61,12 +61,12 @@ func (h *ProfileHandler) Get(c echo.Context) error {
 }
 
 // Update saves display_name, language preference, and optionally changes the password.
-// PATCH /api/v1/profile?user_id=<uuid>
+// PATCH /api/v1/profile
 // Body: { "name": "...", "language": "ko", "current_password": "...", "new_password": "..." }
 func (h *ProfileHandler) Update(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	var body struct {

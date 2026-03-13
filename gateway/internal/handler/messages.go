@@ -42,9 +42,9 @@ type messageRow struct {
 // Messages are returned in chronological order (oldest first within the page).
 func (h *MessageHandler) List(c echo.Context) error {
 	convID := c.Param("id")
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	before := c.QueryParam("before") // empty = latest page
 

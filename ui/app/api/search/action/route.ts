@@ -25,7 +25,6 @@ export async function POST(req: NextRequest) {
   }
 
   const payload = {
-    user_id: session.user.id,
     message: `웹에서 다음 내용을 검색해줘: ${body.query as string}`,
   }
 

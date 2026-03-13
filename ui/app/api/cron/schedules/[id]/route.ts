@@ -15,7 +15,7 @@ export async function PUT(
   const { id } = await params
   const body = await request.json()
   const res = await gatewayFetch(
-    `/api/v1/cron/schedules/${encodeURIComponent(id)}?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/cron/schedules/${encodeURIComponent(id)}`,
     { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
   )
   const data = await res.json().catch(() => ({}))
@@ -33,7 +33,7 @@ export async function DELETE(
 
   const { id } = await params
   const res = await gatewayFetch(
-    `/api/v1/cron/schedules/${encodeURIComponent(id)}?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/cron/schedules/${encodeURIComponent(id)}`,
     { method: "DELETE" }
   )
   const data = await res.json().catch(() => ({}))

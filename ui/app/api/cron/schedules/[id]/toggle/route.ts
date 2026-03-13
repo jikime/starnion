@@ -14,7 +14,7 @@ export async function POST(
 
   const { id } = await params
   const res = await gatewayFetch(
-    `/api/v1/cron/schedules/${encodeURIComponent(id)}/toggle?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/cron/schedules/${encodeURIComponent(id)}/toggle`,
     { method: "POST" }
   )
   const data = await res.json().catch(() => ({}))

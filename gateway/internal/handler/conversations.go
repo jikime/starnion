@@ -34,11 +34,11 @@ type conversationRow struct {
 }
 
 // List returns all conversations for a user, newest first.
-// GET /api/v1/conversations?user_id=<uuid>
+// GET /api/v1/conversations
 func (h *ConversationHandler) List(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	rows, err := h.db.QueryContext(c.Request().Context(), `
@@ -67,18 +67,19 @@ func (h *ConversationHandler) List(c echo.Context) error {
 }
 
 // Create creates a new conversation for a user.
-// POST /api/v1/conversations  Body: { "user_id": "...", "title": "...", "platform": "..." }
+// POST /api/v1/conversations  Body: { "title": "...", "platform": "..." }
 func (h *ConversationHandler) Create(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+
 	var req struct {
-		UserID   string `json:"user_id"`
 		Title    string `json:"title"`
 		Platform string `json:"platform"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
-	}
-	if req.UserID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
 	}
 	if req.Title == "" {
 		req.Title = "새 대화"
@@ -93,9 +94,9 @@ func (h *ConversationHandler) Create(c echo.Context) error {
 		INSERT INTO conversations (id, user_id, title, thread_id, platform)
 		VALUES ($1::uuid, $2, $3, $4, $5)
 		RETURNING id, title, platform, created_at, updated_at
-	`, newID, req.UserID, req.Title, newID, req.Platform).Scan(&row.ID, &row.Title, &row.Platform, &row.CreatedAt, &row.UpdatedAt)
+	`, newID, userID, req.Title, newID, req.Platform).Scan(&row.ID, &row.Title, &row.Platform, &row.CreatedAt, &row.UpdatedAt)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", req.UserID).Msg("conversations: create failed")
+		log.Error().Err(err).Str("user_id", userID).Msg("conversations: create failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "create failed"})
 	}
 
@@ -103,24 +104,24 @@ func (h *ConversationHandler) Create(c echo.Context) error {
 }
 
 // UpdateTitle updates the title of a conversation (auto-titled from first message).
-// PATCH /api/v1/conversations/:id  Body: { "user_id": "...", "title": "..." }
+// PATCH /api/v1/conversations/:id  Body: { "title": "..." }
 func (h *ConversationHandler) UpdateTitle(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
 	id := c.Param("id")
 	var req struct {
-		UserID string `json:"user_id"`
-		Title  string `json:"title"`
+		Title string `json:"title"`
 	}
 	if err := c.Bind(&req); err != nil || req.Title == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "title is required"})
-	}
-	if req.UserID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
 	}
 
 	res, err := h.db.ExecContext(c.Request().Context(), `
 		UPDATE conversations SET title = $1, updated_at = NOW()
 		WHERE id = $2 AND user_id = $3
-	`, req.Title, id, req.UserID)
+	`, req.Title, id, userID)
 	if err != nil {
 		log.Error().Err(err).Str("id", id).Msg("conversations: update title failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "update failed"})

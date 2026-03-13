@@ -11,7 +11,7 @@ export async function GET() {
   }
 
   const res = await gatewayFetch(
-    `/api/v1/channels/telegram/pairing?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/channels/telegram/pairing`,
     { cache: "no-store" }
   )
 

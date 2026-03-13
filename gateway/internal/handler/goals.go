@@ -47,11 +47,11 @@ type goalItem struct {
 // ── handlers ──────────────────────────────────────────────────────────────────
 
 // ListGoals handles GET /api/v1/goals
-// Query params: user_id, status (in_progress|completed|abandoned|all)
+// Query params: status (in_progress|completed|abandoned|all)
 func (h *GoalsHandler) ListGoals(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	status := c.QueryParam("status")
@@ -191,9 +191,9 @@ func (h *GoalsHandler) ListGoals(c echo.Context) error {
 
 // GetGoal handles GET /api/v1/goals/:id
 func (h *GoalsHandler) GetGoal(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id := c.Param("id")
 
@@ -254,8 +254,12 @@ func (h *GoalsHandler) GetGoal(c echo.Context) error {
 
 // CreateGoal handles POST /api/v1/goals
 func (h *GoalsHandler) CreateGoal(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+
 	var req struct {
-		UserID      string  `json:"user_id"`
 		Title       string  `json:"title"`
 		Icon        string  `json:"icon"`
 		Category    string  `json:"category"`
@@ -268,8 +272,8 @@ func (h *GoalsHandler) CreateGoal(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid body"})
 	}
-	if req.UserID == "" || strings.TrimSpace(req.Title) == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and title required"})
+	if strings.TrimSpace(req.Title) == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "title required"})
 	}
 	if req.Icon == "" {
 		req.Icon = "🎯"
@@ -291,7 +295,7 @@ func (h *GoalsHandler) CreateGoal(c echo.Context) error {
 		INSERT INTO goals (user_id, title, icon, category, target_value, unit, start_date, end_date, description)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id
-	`, req.UserID, req.Title, req.Icon, req.Category,
+	`, userID, req.Title, req.Icon, req.Category,
 		req.TargetValue, req.Unit, req.StartDate, endDateArg, req.Description,
 	).Scan(&id)
 	if err != nil {
@@ -304,9 +308,9 @@ func (h *GoalsHandler) CreateGoal(c echo.Context) error {
 
 // UpdateGoal handles PUT /api/v1/goals/:id
 func (h *GoalsHandler) UpdateGoal(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id := c.Param("id")
 
@@ -382,9 +386,9 @@ func (h *GoalsHandler) UpdateGoal(c echo.Context) error {
 
 // DeleteGoal handles DELETE /api/v1/goals/:id
 func (h *GoalsHandler) DeleteGoal(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id := c.Param("id")
 
@@ -404,9 +408,9 @@ func (h *GoalsHandler) DeleteGoal(c echo.Context) error {
 
 // AddCheckin handles POST /api/v1/goals/:id/checkin
 func (h *GoalsHandler) AddCheckin(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id := c.Param("id")
 
@@ -441,9 +445,9 @@ func (h *GoalsHandler) AddCheckin(c echo.Context) error {
 
 // RemoveCheckin handles DELETE /api/v1/goals/:id/checkin
 func (h *GoalsHandler) RemoveCheckin(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id := c.Param("id")
 	date := c.QueryParam("date")

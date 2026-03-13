@@ -28,7 +28,7 @@ func NewModelsHandler(db *sql.DB) *ModelsHandler {
 
 type providerResp struct {
 	Provider      string    `json:"provider"`
-	APIKeyMasked  string    `json:"apiKeyMasked"`  // masked for display
+	APIKeyMasked  string    `json:"apiKeyMasked"` // masked for display
 	HasKey        bool      `json:"hasKey"`
 	BaseURL       string    `json:"baseUrl"`
 	EndpointType  string    `json:"endpointType"`
@@ -36,11 +36,11 @@ type providerResp struct {
 	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
-// ListProviders GET /api/v1/providers?user_id=
+// ListProviders GET /api/v1/providers
 func (h *ModelsHandler) ListProviders(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "unauthorized"})
 	}
 
 	rows, err := h.db.QueryContext(c.Request().Context(), `
@@ -82,13 +82,13 @@ func (h *ModelsHandler) ListProviders(c echo.Context) error {
 	return c.JSON(http.StatusOK, echo.Map{"providers": result})
 }
 
-// UpsertProvider POST /api/v1/providers?user_id=
+// UpsertProvider POST /api/v1/providers
 // Body: { provider, apiKey, baseUrl, enabledModels }
 // If apiKey is "" the existing key is kept (allows updating models without re-entering key).
 func (h *ModelsHandler) UpsertProvider(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "unauthorized"})
 	}
 
 	var body struct {
@@ -128,12 +128,15 @@ func (h *ModelsHandler) UpsertProvider(c echo.Context) error {
 	return c.JSON(http.StatusOK, echo.Map{"ok": true})
 }
 
-// DeleteProvider DELETE /api/v1/providers/:provider?user_id=
+// DeleteProvider DELETE /api/v1/providers/:provider
 func (h *ModelsHandler) DeleteProvider(c echo.Context) error {
-	userID := c.QueryParam("user_id")
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "unauthorized"})
+	}
 	provider := c.Param("provider")
-	if userID == "" || provider == "" {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id and provider required"})
+	if provider == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "provider required"})
 	}
 
 	if _, err := h.db.ExecContext(c.Request().Context(),
@@ -351,11 +354,11 @@ var builtinPersonas = []builtinPersona{
 	},
 }
 
-// ListPersonas GET /api/v1/personas?user_id=
+// ListPersonas GET /api/v1/personas
 func (h *ModelsHandler) ListPersonas(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "unauthorized"})
 	}
 
 	ctx := c.Request().Context()
@@ -399,11 +402,11 @@ func (h *ModelsHandler) ListPersonas(c echo.Context) error {
 	return c.JSON(http.StatusOK, echo.Map{"personas": result})
 }
 
-// CreatePersona POST /api/v1/personas?user_id=
+// CreatePersona POST /api/v1/personas
 func (h *ModelsHandler) CreatePersona(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "unauthorized"})
 	}
 
 	var body struct {
@@ -442,12 +445,15 @@ func (h *ModelsHandler) CreatePersona(c echo.Context) error {
 	return c.JSON(http.StatusCreated, echo.Map{"id": id})
 }
 
-// UpdatePersona PUT /api/v1/personas/:id?user_id=
+// UpdatePersona PUT /api/v1/personas/:id
 func (h *ModelsHandler) UpdatePersona(c echo.Context) error {
-	userID := c.QueryParam("user_id")
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "unauthorized"})
+	}
 	id := c.Param("id")
-	if userID == "" || id == "" {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id and id required"})
+	if id == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "id required"})
 	}
 
 	var body struct {
@@ -508,12 +514,15 @@ func (h *ModelsHandler) UpdatePersona(c echo.Context) error {
 	return c.JSON(http.StatusOK, echo.Map{"ok": true})
 }
 
-// DeletePersona DELETE /api/v1/personas/:id?user_id=
+// DeletePersona DELETE /api/v1/personas/:id
 func (h *ModelsHandler) DeletePersona(c echo.Context) error {
-	userID := c.QueryParam("user_id")
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "unauthorized"})
+	}
 	id := c.Param("id")
-	if userID == "" || id == "" {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id and id required"})
+	if id == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "id required"})
 	}
 
 	if _, err := h.db.ExecContext(c.Request().Context(),
@@ -614,11 +623,11 @@ type modelAssignmentResp struct {
 	Model    string `json:"model"`
 }
 
-// ListModelAssignments GET /api/v1/model-assignments?user_id=
+// ListModelAssignments GET /api/v1/model-assignments
 func (h *ModelsHandler) ListModelAssignments(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "unauthorized"})
 	}
 
 	rows, err := h.db.QueryContext(c.Request().Context(), `
@@ -644,12 +653,12 @@ func (h *ModelsHandler) ListModelAssignments(c echo.Context) error {
 	return c.JSON(http.StatusOK, echo.Map{"assignments": result})
 }
 
-// UpsertModelAssignment POST /api/v1/model-assignments?user_id=
+// UpsertModelAssignment POST /api/v1/model-assignments
 // Body: { assignments: [{ useCase, provider, model }] }
 func (h *ModelsHandler) UpsertModelAssignment(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "unauthorized"})
 	}
 
 	var body struct {

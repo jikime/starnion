@@ -10,7 +10,7 @@ export async function GET() {
   }
 
   const res = await gatewayFetch(
-    `/api/v1/conversations?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/conversations`,
     { cache: "no-store" }
   )
   const data = await res.json().catch(() => [])
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const res = await gatewayFetch(`/api/v1/conversations`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: session.user.id, title }),
+    body: JSON.stringify({ title }),
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {

@@ -10,7 +10,7 @@ export async function GET() {
   }
 
   const res = await gatewayFetch(
-    `/api/v1/profile/persona?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/profile/persona`,
     { cache: "no-store" }
   )
   const data = await res.json().catch(() => ({ persona: "assistant" }))
@@ -29,7 +29,7 @@ export async function PATCH(request: Request) {
   }
 
   const res = await gatewayFetch(
-    `/api/v1/profile/persona?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/profile/persona`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

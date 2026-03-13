@@ -15,7 +15,7 @@ export async function PUT(
   const { id } = await params
   const body = await req.json().catch(() => ({}))
   const res = await gatewayFetch(
-    `/api/v1/finance/transactions/${encodeURIComponent(id)}?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/finance/transactions/${encodeURIComponent(id)}`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -37,7 +37,7 @@ export async function DELETE(
 
   const { id } = await params
   const res = await gatewayFetch(
-    `/api/v1/finance/transactions/${encodeURIComponent(id)}?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/finance/transactions/${encodeURIComponent(id)}`,
     { method: "DELETE" }
   )
   const data = await res.json().catch(() => ({}))

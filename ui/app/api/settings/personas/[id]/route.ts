@@ -12,7 +12,7 @@ export async function PUT(
 
   const { id } = await params
   const body = await req.json().catch(() => ({}))
-  const res = await gatewayFetch(`/api/v1/personas/${id}?user_id=${session.user.id}`, {
+  const res = await gatewayFetch(`/api/v1/personas/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -30,7 +30,7 @@ export async function DELETE(
 
   const { id } = await params
   const res = await gatewayFetch(
-    `/api/v1/personas/${id}?user_id=${session.user.id}`,
+    `/api/v1/personas/${id}`,
     { method: "DELETE" }
   )
   const data = await res.json().catch(() => ({}))

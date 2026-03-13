@@ -35,6 +35,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             id: user.userId,
             name: user.name,
             email: user.email,
+            token: user.token as string | undefined,
           }
         } catch {
           return null
@@ -46,6 +47,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     jwt({ token, user, trigger, session }) {
       if (user?.id) token.userId = user.id
+      if (user && "token" in user && user.token) {
+        token.gatewayToken = user.token as string
+      }
       // Allow session update to refresh userId after account linking.
       if (trigger === "update" && session?.userId) {
         token.userId = session.userId as string
@@ -54,6 +58,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     session({ session, token }) {
       if (token.userId) session.user.id = token.userId as string
+      if (token.gatewayToken) (session as typeof session & { gatewayToken: string }).gatewayToken = token.gatewayToken as string
       return session
     },
   },

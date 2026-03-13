@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = req.nextUrl
-  const qs = new URLSearchParams({ user_id: session.user.id })
+  const qs = new URLSearchParams()
   for (const key of ["year", "month", "page", "limit"]) {
     const v = searchParams.get(key)
     if (v) qs.set(key, v)
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   const res = await gatewayFetch(`/api/v1/diary/entries`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, user_id: session.user.id }),
+    body: JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))
   return NextResponse.json(data, { status: res.ok ? 201 : res.status })

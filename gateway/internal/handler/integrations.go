@@ -24,16 +24,16 @@ func NewIntegrationHandler(db *sql.DB, cfg GoogleOAuthConfig) *IntegrationHandle
 // integrationStatus represents the connection state of a single provider.
 type integrationStatus struct {
 	Connected bool   `json:"connected"`
-	Email     string `json:"email,omitempty"`   // Google only
-	Scopes    string `json:"scopes,omitempty"`  // Google only
+	Email     string `json:"email,omitempty"`  // Google only
+	Scopes    string `json:"scopes,omitempty"` // Google only
 }
 
 // Status returns the connection state of all integrations for the current user.
-// GET /api/v1/integrations/status?user_id=...
+// GET /api/v1/integrations/status
 func (h *IntegrationHandler) Status(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	result := map[string]integrationStatus{}
@@ -95,35 +95,39 @@ func (h *IntegrationHandler) Status(c echo.Context) error {
 }
 
 // TavilyConnect saves (or updates) a Tavily API key for the user.
-// PUT /api/v1/integrations/tavily  Body: { "user_id": "...", "api_key": "..." }
+// PUT /api/v1/integrations/tavily  Body: { "api_key": "..." }
 func (h *IntegrationHandler) TavilyConnect(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+
 	var req struct {
-		UserID string `json:"user_id"`
 		APIKey string `json:"api_key"`
 	}
-	if err := c.Bind(&req); err != nil || req.UserID == "" || req.APIKey == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and api_key required"})
+	if err := c.Bind(&req); err != nil || req.APIKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "api_key required"})
 	}
 
 	_, err := h.db.ExecContext(c.Request().Context(),
 		`INSERT INTO integration_keys (user_id, provider, api_key)
 		 VALUES ($1, 'tavily', $2)
 		 ON CONFLICT (user_id, provider) DO UPDATE SET api_key = EXCLUDED.api_key, updated_at = NOW()`,
-		req.UserID, req.APIKey,
+		userID, req.APIKey,
 	)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", req.UserID).Msg("integrations: tavily connect failed")
+		log.Error().Err(err).Str("user_id", userID).Msg("integrations: tavily connect failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "save failed"})
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "connected"})
 }
 
 // TavilyDisconnect removes the Tavily API key for the user.
-// DELETE /api/v1/integrations/tavily?user_id=...
+// DELETE /api/v1/integrations/tavily
 func (h *IntegrationHandler) TavilyDisconnect(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	_, err := h.db.ExecContext(c.Request().Context(),
@@ -137,11 +141,11 @@ func (h *IntegrationHandler) TavilyDisconnect(c echo.Context) error {
 }
 
 // GoogleAuthURL returns the Google OAuth2 authorization URL for web users.
-// GET /api/v1/integrations/google/auth-url?user_id=...
+// GET /api/v1/integrations/google/auth-url
 func (h *IntegrationHandler) GoogleAuthURL(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	clientID := h.googleCfg.ClientID
@@ -181,11 +185,11 @@ func (h *IntegrationHandler) GoogleAuthURL(c echo.Context) error {
 }
 
 // GoogleDisconnect removes the Google tokens for the current user.
-// DELETE /api/v1/integrations/google?user_id=...
+// DELETE /api/v1/integrations/google
 func (h *IntegrationHandler) GoogleDisconnect(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	_, err := h.db.ExecContext(c.Request().Context(), `
@@ -204,35 +208,39 @@ func (h *IntegrationHandler) GoogleDisconnect(c echo.Context) error {
 }
 
 // NotionConnect saves (or updates) a Notion API key for the user.
-// PUT /api/v1/integrations/notion  Body: { "user_id": "...", "api_key": "..." }
+// PUT /api/v1/integrations/notion  Body: { "api_key": "..." }
 func (h *IntegrationHandler) NotionConnect(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+
 	var req struct {
-		UserID string `json:"user_id"`
 		APIKey string `json:"api_key"`
 	}
-	if err := c.Bind(&req); err != nil || req.UserID == "" || req.APIKey == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and api_key required"})
+	if err := c.Bind(&req); err != nil || req.APIKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "api_key required"})
 	}
 
 	_, err := h.db.ExecContext(c.Request().Context(),
 		`INSERT INTO integration_keys (user_id, provider, api_key)
 		 VALUES ($1, 'notion', $2)
 		 ON CONFLICT (user_id, provider) DO UPDATE SET api_key = EXCLUDED.api_key, updated_at = NOW()`,
-		req.UserID, req.APIKey,
+		userID, req.APIKey,
 	)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", req.UserID).Msg("integrations: notion connect failed")
+		log.Error().Err(err).Str("user_id", userID).Msg("integrations: notion connect failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "save failed"})
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "connected"})
 }
 
 // NotionDisconnect removes the Notion API key for the user.
-// DELETE /api/v1/integrations/notion?user_id=...
+// DELETE /api/v1/integrations/notion
 func (h *IntegrationHandler) NotionDisconnect(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	_, err := h.db.ExecContext(c.Request().Context(),
@@ -246,35 +254,39 @@ func (h *IntegrationHandler) NotionDisconnect(c echo.Context) error {
 }
 
 // NaverSearchConnect saves (or updates) a Naver Search API client credentials for the user.
-// PUT /api/v1/integrations/naver_search  Body: { "user_id": "...", "api_key": "client_id:client_secret" }
+// PUT /api/v1/integrations/naver_search  Body: { "api_key": "client_id:client_secret" }
 func (h *IntegrationHandler) NaverSearchConnect(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+
 	var req struct {
-		UserID string `json:"user_id"`
 		APIKey string `json:"api_key"` // stored as "client_id:client_secret"
 	}
-	if err := c.Bind(&req); err != nil || req.UserID == "" || req.APIKey == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and api_key required"})
+	if err := c.Bind(&req); err != nil || req.APIKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "api_key required"})
 	}
 
 	_, err := h.db.ExecContext(c.Request().Context(),
 		`INSERT INTO integration_keys (user_id, provider, api_key)
 		 VALUES ($1, 'naver_search', $2)
 		 ON CONFLICT (user_id, provider) DO UPDATE SET api_key = EXCLUDED.api_key, updated_at = NOW()`,
-		req.UserID, req.APIKey,
+		userID, req.APIKey,
 	)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", req.UserID).Msg("integrations: naver_search connect failed")
+		log.Error().Err(err).Str("user_id", userID).Msg("integrations: naver_search connect failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "save failed"})
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "connected"})
 }
 
 // NaverSearchDisconnect removes the Naver Search credentials for the user.
-// DELETE /api/v1/integrations/naver_search?user_id=...
+// DELETE /api/v1/integrations/naver_search
 func (h *IntegrationHandler) NaverSearchDisconnect(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	_, err := h.db.ExecContext(c.Request().Context(),
@@ -288,35 +300,39 @@ func (h *IntegrationHandler) NaverSearchDisconnect(c echo.Context) error {
 }
 
 // GeminiConnect saves (or updates) a Gemini API key for the user.
-// PUT /api/v1/integrations/gemini  Body: { "user_id": "...", "api_key": "..." }
+// PUT /api/v1/integrations/gemini  Body: { "api_key": "..." }
 func (h *IntegrationHandler) GeminiConnect(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+
 	var req struct {
-		UserID string `json:"user_id"`
 		APIKey string `json:"api_key"`
 	}
-	if err := c.Bind(&req); err != nil || req.UserID == "" || req.APIKey == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and api_key required"})
+	if err := c.Bind(&req); err != nil || req.APIKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "api_key required"})
 	}
 
 	_, err := h.db.ExecContext(c.Request().Context(),
 		`INSERT INTO integration_keys (user_id, provider, api_key)
 		 VALUES ($1, 'gemini', $2)
 		 ON CONFLICT (user_id, provider) DO UPDATE SET api_key = EXCLUDED.api_key, updated_at = NOW()`,
-		req.UserID, req.APIKey,
+		userID, req.APIKey,
 	)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", req.UserID).Msg("integrations: gemini connect failed")
+		log.Error().Err(err).Str("user_id", userID).Msg("integrations: gemini connect failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "save failed"})
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "connected"})
 }
 
 // GeminiDisconnect removes the Gemini API key for the user.
-// DELETE /api/v1/integrations/gemini?user_id=...
+// DELETE /api/v1/integrations/gemini
 func (h *IntegrationHandler) GeminiDisconnect(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	_, err := h.db.ExecContext(c.Request().Context(),
@@ -330,35 +346,39 @@ func (h *IntegrationHandler) GeminiDisconnect(c echo.Context) error {
 }
 
 // GitHubConnect saves (or updates) a GitHub PAT for the user.
-// PUT /api/v1/integrations/github  Body: { "user_id": "...", "api_key": "..." }
+// PUT /api/v1/integrations/github  Body: { "api_key": "..." }
 func (h *IntegrationHandler) GitHubConnect(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+
 	var req struct {
-		UserID string `json:"user_id"`
 		APIKey string `json:"api_key"`
 	}
-	if err := c.Bind(&req); err != nil || req.UserID == "" || req.APIKey == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and api_key required"})
+	if err := c.Bind(&req); err != nil || req.APIKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "api_key required"})
 	}
 
 	_, err := h.db.ExecContext(c.Request().Context(),
 		`INSERT INTO integration_keys (user_id, provider, api_key)
 		 VALUES ($1, 'github', $2)
 		 ON CONFLICT (user_id, provider) DO UPDATE SET api_key = EXCLUDED.api_key, updated_at = NOW()`,
-		req.UserID, req.APIKey,
+		userID, req.APIKey,
 	)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", req.UserID).Msg("integrations: github connect failed")
+		log.Error().Err(err).Str("user_id", userID).Msg("integrations: github connect failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "save failed"})
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "connected"})
 }
 
 // GitHubDisconnect removes the GitHub PAT for the user.
-// DELETE /api/v1/integrations/github?user_id=...
+// DELETE /api/v1/integrations/github
 func (h *IntegrationHandler) GitHubDisconnect(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	_, err := h.db.ExecContext(c.Request().Context(),

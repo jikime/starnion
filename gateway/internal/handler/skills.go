@@ -22,9 +22,9 @@ func NewSkillHandler(svc *skill.Service) *SkillHandler {
 // List returns all skills with the user's enabled state.
 // GET /api/v1/skills?user_id=...
 func (h *SkillHandler) List(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	skills, err := h.svc.GetUserSkills(userID)
@@ -63,10 +63,13 @@ func (h *SkillHandler) List(c echo.Context) error {
 // Toggle flips a skill's enabled state for the user.
 // POST /api/v1/skills/:id/toggle?user_id=...
 func (h *SkillHandler) Toggle(c echo.Context) error {
-	userID := c.QueryParam("user_id")
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
 	skillID := c.Param("id")
-	if userID == "" || skillID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and skill id required"})
+	if skillID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "skill id required"})
 	}
 
 	newEnabled, err := h.svc.Toggle(userID, skillID)

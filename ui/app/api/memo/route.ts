@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = req.nextUrl
-  const qs = new URLSearchParams({ user_id: session.user.id })
+  const qs = new URLSearchParams()
   const tag = searchParams.get("tag")
   const q = searchParams.get("q")
   if (tag) qs.set("tag", tag)
@@ -28,8 +28,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}))
-  const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await gatewayFetch(`/api/v1/memos?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/memos`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

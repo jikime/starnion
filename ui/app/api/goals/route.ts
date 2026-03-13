@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = req.nextUrl
-  const qs = new URLSearchParams({ user_id: session.user.id })
+  const qs = new URLSearchParams()
   const status = searchParams.get("status")
   if (status) qs.set("status", status)
 
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const res = await gatewayFetch(`/api/v1/goals`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, user_id: session.user.id }),
+    body: JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))
   return NextResponse.json(data, { status: res.ok ? 201 : res.status })

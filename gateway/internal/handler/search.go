@@ -35,9 +35,9 @@ type searchItem struct {
 
 // ListSearches GET /api/v1/searches?user_id=&limit=&offset=
 func (h *SearchHandler) ListSearches(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	limit := 50
@@ -80,13 +80,17 @@ func (h *SearchHandler) ListSearches(c echo.Context) error {
 
 // SaveSearch POST /api/v1/searches
 func (h *SearchHandler) SaveSearch(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+
 	var req struct {
-		UserID string `json:"user_id"`
 		Query  string `json:"query"`
 		Result string `json:"result"`
 	}
-	if err := c.Bind(&req); err != nil || req.UserID == "" || req.Query == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and query are required"})
+	if err := c.Bind(&req); err != nil || req.Query == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "query is required"})
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
@@ -97,15 +101,15 @@ func (h *SearchHandler) SaveSearch(c echo.Context) error {
 		INSERT INTO searches (user_id, query, result)
 		VALUES ($1, $2, $3)
 		RETURNING id
-	`, req.UserID, req.Query, req.Result).Scan(&id)
+	`, userID, req.Query, req.Result).Scan(&id)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", req.UserID).Msg("save search failed")
+		log.Error().Err(err).Str("user_id", userID).Msg("save search failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "save failed"})
 	}
 
 	// Fire-and-forget: ask the Python agent to embed this search result.
 	if h.agentHTTPURL != "" {
-		go h.embedSearch(req.UserID, id)
+		go h.embedSearch(userID, id)
 	}
 
 	return c.JSON(http.StatusCreated, map[string]any{"id": id})
@@ -128,13 +132,16 @@ func (h *SearchHandler) embedSearch(userID string, searchID int64) {
 	}
 }
 
-// HybridSearch GET /api/v1/search/hybrid?q=&user_id=&limit=
+// HybridSearch GET /api/v1/search/hybrid?q=&limit=
 // Proxies to the Python agent's GET /search endpoint on port 8082.
 func (h *SearchHandler) HybridSearch(c echo.Context) error {
-	userID := c.QueryParam("user_id")
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
 	q := c.QueryParam("q")
-	if userID == "" || q == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and q are required"})
+	if q == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "q is required"})
 	}
 
 	limit := 10
@@ -171,9 +178,9 @@ func (h *SearchHandler) HybridSearch(c echo.Context) error {
 
 // DeleteSearch DELETE /api/v1/searches/:id?user_id=
 func (h *SearchHandler) DeleteSearch(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {

@@ -10,9 +10,9 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url)
-  const qs = new URLSearchParams({ user_id: session.user.id })
+  const qs = new URLSearchParams()
   for (const [k, v] of searchParams.entries()) {
-    if (k !== "user_id") qs.set(k, v)
+    qs.set(k, v)
   }
 
   const res = await gatewayFetch(`/api/v1/searches?${qs}`, { cache: "no-store" })
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   const res = await gatewayFetch(`/api/v1/searches`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, user_id: session.user.id }),
+    body: JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))
   return NextResponse.json(data, { status: res.ok ? 201 : res.status })

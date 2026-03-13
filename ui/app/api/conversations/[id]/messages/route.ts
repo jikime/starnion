@@ -18,7 +18,7 @@ export async function GET(
   const before = url.searchParams.get("before") ?? ""
   const limit = url.searchParams.get("limit") ?? "30"
 
-  const qs = new URLSearchParams({ user_id: session.user.id, limit })
+  const qs = new URLSearchParams({ limit })
   if (before) qs.set("before", before)
 
   const res = await gatewayFetch(`/api/v1/conversations/${id}/messages?${qs}`, { cache: "no-store" })

@@ -10,7 +10,7 @@ export async function DELETE() {
   }
 
   const res = await gatewayFetch(
-    `/api/v1/integrations/google?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/integrations/google`,
     { method: "DELETE" }
   )
   const data = await res.json().catch(() => ({}))

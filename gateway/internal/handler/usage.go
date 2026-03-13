@@ -20,9 +20,9 @@ func NewUsageHandler(db *sql.DB) *UsageHandler {
 
 // GET /api/v1/usage?user_id=...&days=30&page=1&limit=50
 func (h *UsageHandler) GetUsage(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	days, _ := strconv.Atoi(c.QueryParam("days"))
@@ -44,12 +44,12 @@ func (h *UsageHandler) GetUsage(c echo.Context) error {
 
 	// ── 1. Summary KPIs ───────────────────────────────────────────────────
 	type summary struct {
-		TotalRequests   int     `json:"total_requests"`
-		SuccessRequests int     `json:"success_requests"`
-		TotalInputTokens  int64 `json:"total_input_tokens"`
-		TotalOutputTokens int64 `json:"total_output_tokens"`
-		TotalCachedTokens int64 `json:"total_cached_tokens"`
-		TotalCostUSD    float64 `json:"total_cost_usd"`
+		TotalRequests     int     `json:"total_requests"`
+		SuccessRequests   int     `json:"success_requests"`
+		TotalInputTokens  int64   `json:"total_input_tokens"`
+		TotalOutputTokens int64   `json:"total_output_tokens"`
+		TotalCachedTokens int64   `json:"total_cached_tokens"`
+		TotalCostUSD      float64 `json:"total_cost_usd"`
 	}
 	var sum summary
 	h.db.QueryRowContext(ctx, `
@@ -71,14 +71,14 @@ func (h *UsageHandler) GetUsage(c echo.Context) error {
 
 	// ── 2. Daily aggregates (last N days) ─────────────────────────────────
 	type dailyRow struct {
-		Date          string  `json:"date"`
-		Requests      int     `json:"requests"`
-		InputTokens   int64   `json:"input_tokens"`
-		OutputTokens  int64   `json:"output_tokens"`
-		CachedTokens  int64   `json:"cached_tokens"`
-		CostUSD       float64 `json:"cost_usd"`
-		SuccessCount  int     `json:"success_count"`
-		ErrorCount    int     `json:"error_count"`
+		Date         string  `json:"date"`
+		Requests     int     `json:"requests"`
+		InputTokens  int64   `json:"input_tokens"`
+		OutputTokens int64   `json:"output_tokens"`
+		CachedTokens int64   `json:"cached_tokens"`
+		CostUSD      float64 `json:"cost_usd"`
+		SuccessCount int     `json:"success_count"`
+		ErrorCount   int     `json:"error_count"`
 	}
 	dailyRows, err := h.db.QueryContext(ctx, `
 		WITH days AS (

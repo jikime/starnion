@@ -32,9 +32,9 @@ type memoItem struct {
 // ListMemos handles GET /api/v1/memos
 // Query params: user_id, tag, q (search)
 func (h *MemoHandler) ListMemos(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	tag := c.QueryParam("tag")
@@ -80,9 +80,9 @@ func (h *MemoHandler) ListMemos(c echo.Context) error {
 
 // CreateMemo handles POST /api/v1/memos
 func (h *MemoHandler) CreateMemo(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	var body struct {
@@ -120,9 +120,9 @@ func (h *MemoHandler) CreateMemo(c echo.Context) error {
 
 // UpdateMemo handles PUT /api/v1/memos/:id
 func (h *MemoHandler) UpdateMemo(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -161,9 +161,9 @@ func (h *MemoHandler) UpdateMemo(c echo.Context) error {
 
 // DeleteMemo handles DELETE /api/v1/memos/:id
 func (h *MemoHandler) DeleteMemo(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {

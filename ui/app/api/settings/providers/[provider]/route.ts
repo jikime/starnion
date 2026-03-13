@@ -12,7 +12,7 @@ export async function DELETE(
 
   const { provider } = await params
   const res = await gatewayFetch(
-    `/api/v1/providers/${provider}?user_id=${session.user.id}`,
+    `/api/v1/providers/${provider}`,
     { method: "DELETE" }
   )
   const data = await res.json().catch(() => ({}))

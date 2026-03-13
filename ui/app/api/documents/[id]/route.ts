@@ -12,8 +12,7 @@ export async function DELETE(
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
   }
 
-  const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await gatewayFetch(`/api/v1/documents/${params.id}?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/documents/${params.id}`, {
     method: "DELETE",
   })
   const data = await res.json().catch(() => ({}))

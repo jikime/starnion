@@ -37,9 +37,9 @@ type reportItem struct {
 
 // ListReports GET /reports?user_id=&type=&limit=20&offset=0
 func (h *ReportHandler) ListReports(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	reportType := c.QueryParam("type")
@@ -99,9 +99,9 @@ func (h *ReportHandler) ListReports(c echo.Context) error {
 
 // GetReport GET /reports/:id?user_id=
 func (h *ReportHandler) GetReport(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -127,28 +127,32 @@ func (h *ReportHandler) GetReport(c echo.Context) error {
 	return c.JSON(http.StatusOK, item)
 }
 
-// GenerateReport POST /reports/generate { "user_id": "...", "report_type": "weekly" }
+// GenerateReport POST /reports/generate { "report_type": "weekly" }
 func (h *ReportHandler) GenerateReport(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+
 	var req struct {
-		UserID     string `json:"user_id"`
 		ReportType string `json:"report_type"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
-	if req.UserID == "" || req.ReportType == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and report_type are required"})
+	if req.ReportType == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "report_type is required"})
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 120*time.Second)
 	defer cancel()
 
 	resp, err := h.grpcClient.GenerateReport(ctx, &starnionv1.ReportRequest{
-		UserId:     req.UserID,
+		UserId:     userID,
 		ReportType: req.ReportType,
 	})
 	if err != nil {
-		log.Error().Err(err).Str("user_id", req.UserID).Str("type", req.ReportType).Msg("generate report failed")
+		log.Error().Err(err).Str("user_id", userID).Str("type", req.ReportType).Msg("generate report failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "report generation failed"})
 	}
 	if resp.Content == "" {
@@ -165,9 +169,9 @@ func (h *ReportHandler) GenerateReport(c echo.Context) error {
 	err = h.db.QueryRowContext(saveCtx, `
 		INSERT INTO reports (user_id, report_type, title, content)
 		VALUES ($1, $2, $3, $4) RETURNING id
-	`, req.UserID, req.ReportType, title, resp.Content).Scan(&id)
+	`, userID, req.ReportType, title, resp.Content).Scan(&id)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", req.UserID).Msg("save report failed")
+		log.Error().Err(err).Str("user_id", userID).Msg("save report failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "save failed"})
 	}
 

@@ -20,9 +20,9 @@ func NewStatisticsHandler(db *sql.DB) *StatisticsHandler {
 
 // GET /api/v1/statistics?user_id=...&months=6
 func (h *StatisticsHandler) GetStatistics(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	months := 6
 	if m := c.QueryParam("months"); m != "" {
@@ -199,14 +199,14 @@ func (h *StatisticsHandler) GetStatistics(c echo.Context) error {
 
 	// ── 5. Summary stats ──────────────────────────────────────────────────────
 	type summaryStats struct {
-		TotalExpense    int     `json:"total_expense"`
-		AvgDaily        float64 `json:"avg_daily"`
-		TxCount         int     `json:"tx_count"`
-		TopCategory     string  `json:"top_category"`
-		TopCategoryAmt  int     `json:"top_category_amt"`
-		ThisMonthExpense int    `json:"this_month_expense"`
-		LastMonthExpense int    `json:"last_month_expense"`
-		MoM             float64 `json:"mom"` // month-over-month %
+		TotalExpense     int     `json:"total_expense"`
+		AvgDaily         float64 `json:"avg_daily"`
+		TxCount          int     `json:"tx_count"`
+		TopCategory      string  `json:"top_category"`
+		TopCategoryAmt   int     `json:"top_category_amt"`
+		ThisMonthExpense int     `json:"this_month_expense"`
+		LastMonthExpense int     `json:"last_month_expense"`
+		MoM              float64 `json:"mom"` // month-over-month %
 	}
 	var summary summaryStats
 	h.db.QueryRowContext(ctx, `
@@ -244,10 +244,10 @@ func (h *StatisticsHandler) GetStatistics(c echo.Context) error {
 
 	// ── 6. Conversation stats ─────────────────────────────────────────────────
 	type convStats struct {
-		TotalMessages  int `json:"total_messages"`
-		ThisMonth      int `json:"this_month"`
-		UserMessages   int `json:"user_messages"`
-		Conversations  int `json:"conversations"`
+		TotalMessages int `json:"total_messages"`
+		ThisMonth     int `json:"this_month"`
+		UserMessages  int `json:"user_messages"`
+		Conversations int `json:"conversations"`
 	}
 	var conv convStats
 	h.db.QueryRowContext(ctx, `
@@ -274,9 +274,9 @@ func (h *StatisticsHandler) GetStatistics(c echo.Context) error {
 // GET /api/v1/statistics/insights?user_id=...
 // Generates simple rule-based insights from spending patterns.
 func (h *StatisticsHandler) GetInsights(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	ctx := c.Request().Context()

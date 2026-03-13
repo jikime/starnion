@@ -55,9 +55,9 @@ type financeSummary struct {
 // GetSummary returns current-month totals, 6-month trend and category breakdown.
 // GET /api/v1/finance/summary?user_id=...&year=YYYY&month=M
 func (h *FinanceHandler) GetSummary(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	now := time.Now()
@@ -179,9 +179,9 @@ func (h *FinanceHandler) GetSummary(c echo.Context) error {
 // ListTransactions returns paginated transactions for a user/month.
 // GET /api/v1/finance/transactions?user_id=...&year=YYYY&month=M&category=...&type=expense|income&page=1&limit=20
 func (h *FinanceHandler) ListTransactions(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	now := time.Now()
@@ -281,8 +281,12 @@ func (h *FinanceHandler) ListTransactions(c echo.Context) error {
 // CreateTransaction inserts a new finance record.
 // POST /api/v1/finance/transactions
 func (h *FinanceHandler) CreateTransaction(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+
 	var req struct {
-		UserID      string `json:"user_id"`
 		Amount      int    `json:"amount"`
 		Category    string `json:"category"`
 		Description string `json:"description"`
@@ -291,8 +295,8 @@ func (h *FinanceHandler) CreateTransaction(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
-	if req.UserID == "" || req.Amount == 0 || req.Category == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id, amount, category required"})
+	if req.Amount == 0 || req.Category == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "amount, category required"})
 	}
 
 	var createdAt time.Time
@@ -310,7 +314,7 @@ func (h *FinanceHandler) CreateTransaction(c echo.Context) error {
 	err := h.db.QueryRowContext(ctx,
 		`INSERT INTO finances (user_id, amount, category, description, created_at)
 		VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-		req.UserID, req.Amount, req.Category, req.Description, createdAt,
+		userID, req.Amount, req.Category, req.Description, createdAt,
 	).Scan(&id)
 	if err != nil {
 		log.Error().Err(err).Msg("finance: create failed")
@@ -329,10 +333,13 @@ func (h *FinanceHandler) CreateTransaction(c echo.Context) error {
 // UpdateTransaction updates a finance record by id (user-scoped).
 // PUT /api/v1/finance/transactions/:id?user_id=...
 func (h *FinanceHandler) UpdateTransaction(c echo.Context) error {
-	userID := c.QueryParam("user_id")
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
 	idStr := c.Param("id")
-	if userID == "" || idStr == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and id required"})
+	if idStr == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "id required"})
 	}
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -387,10 +394,13 @@ func (h *FinanceHandler) UpdateTransaction(c echo.Context) error {
 // DeleteTransaction removes a finance record by id (user-scoped).
 // DELETE /api/v1/finance/transactions/:id?user_id=...
 func (h *FinanceHandler) DeleteTransaction(c echo.Context) error {
-	userID := c.QueryParam("user_id")
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
 	idStr := c.Param("id")
-	if userID == "" || idStr == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and id required"})
+	if idStr == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "id required"})
 	}
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {

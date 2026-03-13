@@ -18,7 +18,7 @@ export async function PUT(request: Request) {
   const res = await gatewayFetch(`/api/v1/integrations/github`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: session.user.id, api_key: apiKey }),
+    body: JSON.stringify({ api_key: apiKey }),
   })
   const data = await res.json().catch(() => ({}))
   return NextResponse.json(data, { status: res.ok ? 200 : res.status })
@@ -31,7 +31,7 @@ export async function DELETE() {
   }
 
   const res = await gatewayFetch(
-    `/api/v1/integrations/github?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/integrations/github`,
     { method: "DELETE" }
   )
   const data = await res.json().catch(() => ({}))

@@ -13,8 +13,7 @@ export async function DELETE(
   }
 
   const { id } = await params
-  const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await gatewayFetch(`/api/v1/images/${id}?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/images/${id}`, {
     method: "DELETE",
   })
   const data = await res.json().catch(() => ({}))

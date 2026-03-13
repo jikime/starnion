@@ -38,9 +38,9 @@ type audioItem struct {
 
 // ListAudios GET /api/v1/audios?user_id=&type=&source=
 func (h *AudioHandler) ListAudios(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	audioType := c.QueryParam("type")
@@ -107,8 +107,12 @@ func (h *AudioHandler) ListAudios(c echo.Context) error {
 // Saves audio metadata immediately after a client-side MinIO upload.
 // Returns the new row ID so the caller can later PATCH the transcript.
 func (h *AudioHandler) SaveAudio(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+
 	var req struct {
-		UserID   string `json:"user_id"`
 		URL      string `json:"url"`
 		Name     string `json:"name"`
 		Mime     string `json:"mime"`
@@ -118,8 +122,8 @@ func (h *AudioHandler) SaveAudio(c echo.Context) error {
 		Type     string `json:"type"`
 		Prompt   string `json:"prompt"`
 	}
-	if err := c.Bind(&req); err != nil || req.UserID == "" || req.URL == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and url are required"})
+	if err := c.Bind(&req); err != nil || req.URL == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "url is required"})
 	}
 	if !strings.HasPrefix(req.Mime, "audio/") {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "mime must be audio/*"})
@@ -139,9 +143,9 @@ func (h *AudioHandler) SaveAudio(c echo.Context) error {
 		INSERT INTO audios (user_id, url, name, mime, size, duration, source, type, prompt)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id
-	`, req.UserID, req.URL, req.Name, req.Mime, req.Size, req.Duration, req.Source, req.Type, req.Prompt).Scan(&id)
+	`, userID, req.URL, req.Name, req.Mime, req.Size, req.Duration, req.Source, req.Type, req.Prompt).Scan(&id)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", req.UserID).Msg("save audio failed")
+		log.Error().Err(err).Str("user_id", userID).Msg("save audio failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "save failed"})
 	}
 	return c.JSON(http.StatusCreated, map[string]any{"id": id})
@@ -150,9 +154,9 @@ func (h *AudioHandler) SaveAudio(c echo.Context) error {
 // UpdateTranscript PATCH /api/v1/audios/:id/transcript?user_id=
 // Stores the STT result for a previously saved audio row.
 func (h *AudioHandler) UpdateTranscript(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -183,9 +187,9 @@ func (h *AudioHandler) UpdateTranscript(c echo.Context) error {
 
 // DeleteAudio DELETE /api/v1/audios/:id?user_id=
 func (h *AudioHandler) DeleteAudio(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {

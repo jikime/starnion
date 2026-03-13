@@ -10,7 +10,7 @@ export async function GET() {
   }
 
   const res = await gatewayFetch(
-    `/api/v1/integrations/status?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/integrations/status`,
     { cache: "no-store" }
   )
   const data = await res.json().catch(() => ({}))

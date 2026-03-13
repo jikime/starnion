@@ -18,7 +18,7 @@ import (
 	"github.com/jikime/starnion/gateway/internal/handler"
 	"github.com/jikime/starnion/gateway/internal/identity"
 	"github.com/jikime/starnion/gateway/internal/logbuf"
-	"github.com/jikime/starnion/gateway/internal/middleware"
+	gwmiddleware "github.com/jikime/starnion/gateway/internal/middleware"
 	"github.com/jikime/starnion/gateway/internal/scheduler"
 	"github.com/jikime/starnion/gateway/internal/skill"
 	"github.com/jikime/starnion/gateway/internal/storage"
@@ -156,8 +156,8 @@ func main() {
 	// Middleware
 	e.Use(echomw.RequestID())
 	e.Use(echomw.Recover())
-	e.Use(middleware.CORSConfig(cfg.CORS.AllowedOrigins, cfg.CORS.AllowedMethods, cfg.CORS.AllowedHeaders))
-	e.Use(middleware.RequestLogger())
+	e.Use(gwmiddleware.CORSConfig(cfg.CORS.AllowedOrigins, cfg.CORS.AllowedMethods, cfg.CORS.AllowedHeaders))
+	e.Use(gwmiddleware.RequestLogger())
 
 	// Health check
 	e.GET("/healthz", func(c echo.Context) error {
@@ -202,8 +202,8 @@ func main() {
 		})
 	})
 
-	// Credential login — verifies email + password, returns user info for session creation.
-	// POST /auth/login → { "userId": "...", "email": "...", "name": "..." }
+	// Credential login — verifies email + password, issues a JWT, returns user info.
+	// POST /auth/login → { "token": "...", "userId": "...", "email": "...", "name": "...", "expires_at": "..." }
 	e.POST("/auth/login", func(c echo.Context) error {
 		if db == nil {
 			return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "database unavailable"})
@@ -228,10 +228,18 @@ func main() {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "login failed"})
 		}
 
-		return c.JSON(http.StatusOK, map[string]string{
-			"userId": user.UserID,
-			"email":  user.Email,
-			"name":   user.Name,
+		token, err := authSvc.IssueToken(user.UserID, "web")
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "could not issue token"})
+		}
+
+		expiresAt := time.Now().UTC().Add(30 * 24 * time.Hour)
+		return c.JSON(http.StatusOK, map[string]any{
+			"token":      token,
+			"userId":     user.UserID,
+			"email":      user.Email,
+			"name":       user.Name,
+			"expires_at": expiresAt.Format(time.RFC3339),
 		})
 	})
 
@@ -377,6 +385,7 @@ func main() {
 
 	// API routes
 	api := e.Group("/api/v1")
+	api.Use(gwmiddleware.JWTAuth(authSvc))
 
 	chatHandler := handler.NewChatHandler(grpcConn)
 	api.POST("/chat", chatHandler.Chat)
@@ -414,9 +423,9 @@ func main() {
 
 		// Profile persona: GET/PATCH /api/v1/profile/persona?user_id=<uuid>
 		api.GET("/profile/persona", func(c echo.Context) error {
-			userID := c.QueryParam("user_id")
-			if userID == "" {
-				return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+			userID, ok := c.Get("userID").(string)
+			if !ok || userID == "" {
+				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			}
 			var persona string
 			err := db.QueryRowContext(c.Request().Context(), `
@@ -430,9 +439,9 @@ func main() {
 		})
 
 		api.PATCH("/profile/persona", func(c echo.Context) error {
-			userID := c.QueryParam("user_id")
-			if userID == "" {
-				return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+			userID, ok := c.Get("userID").(string)
+			if !ok || userID == "" {
+				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			}
 			var body struct {
 				Persona string `json:"persona"`
@@ -630,6 +639,11 @@ func main() {
 	// Manual report trigger for testing proactive notifications.
 	// POST /api/v1/report { "user_id": "12345", "chat_id": 12345, "report_type": "weekly" }
 	api.POST("/report", func(c echo.Context) error {
+		userID, ok := c.Get("userID").(string)
+		if !ok || userID == "" {
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		}
+
 		if sched == nil {
 			return c.JSON(http.StatusServiceUnavailable, map[string]string{
 				"error": "scheduler not available (telegram bot disabled)",
@@ -637,33 +651,29 @@ func main() {
 		}
 
 		var req struct {
-			UserID     string `json:"user_id"`
 			ChatID     int64  `json:"chat_id"`
 			ReportType string `json:"report_type"`
 		}
 		if err := c.Bind(&req); err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 		}
-		if req.UserID == "" {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id is required"})
-		}
 		if req.ReportType == "" {
 			req.ReportType = "weekly"
 		}
 		// If chat_id not provided, use user_id as chat_id (DM).
 		if req.ChatID == 0 {
-			if parsed, err := strconv.ParseInt(req.UserID, 10, 64); err == nil {
+			if parsed, err := strconv.ParseInt(userID, 10, 64); err == nil {
 				req.ChatID = parsed
 			}
 		}
 
-		if err := sched.GenerateAndSendType(req.UserID, req.ChatID, req.ReportType); err != nil {
+		if err := sched.GenerateAndSendType(userID, req.ChatID, req.ReportType); err != nil {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
 		return c.JSON(http.StatusOK, map[string]string{
 			"status":      "sent",
-			"user_id":     req.UserID,
+			"user_id":     userID,
 			"report_type": req.ReportType,
 		})
 	})

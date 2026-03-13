@@ -10,9 +10,9 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url)
-  const qs = new URLSearchParams({ user_id: session.user.id })
+  const qs = new URLSearchParams()
   for (const [k, v] of searchParams.entries()) {
-    if (k !== "user_id") qs.set(k, v)
+    qs.set(k, v)
   }
 
   const res = await gatewayFetch(`/api/v1/images?${qs}`, { cache: "no-store" })

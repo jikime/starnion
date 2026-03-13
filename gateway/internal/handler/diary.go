@@ -40,9 +40,9 @@ type diaryEntry struct {
 // ListEntries handles GET /api/v1/diary/entries
 // Query params: user_id, year, month, page, limit
 func (h *DiaryHandler) ListEntries(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	page, _ := strconv.Atoi(c.QueryParam("page"))
@@ -117,9 +117,9 @@ func (h *DiaryHandler) ListEntries(c echo.Context) error {
 
 // GetEntry handles GET /api/v1/diary/entries/:id
 func (h *DiaryHandler) GetEntry(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id := c.Param("id")
 
@@ -145,8 +145,12 @@ func (h *DiaryHandler) GetEntry(c echo.Context) error {
 
 // CreateEntry handles POST /api/v1/diary/entries
 func (h *DiaryHandler) CreateEntry(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+
 	var req struct {
-		UserID    string   `json:"user_id"`
 		Title     string   `json:"title"`
 		Content   string   `json:"content"`
 		Mood      string   `json:"mood"`
@@ -155,9 +159,6 @@ func (h *DiaryHandler) CreateEntry(c echo.Context) error {
 	}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid body"})
-	}
-	if req.UserID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
 	}
 	if strings.TrimSpace(req.Content) == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "content required"})
@@ -181,7 +182,7 @@ func (h *DiaryHandler) CreateEntry(c echo.Context) error {
 		`INSERT INTO diary_entries (user_id, title, content, mood, tags, entry_date)
 		 VALUES ($1, $2, $3, $4, $5, $6)
 		 RETURNING id`,
-		req.UserID, req.Title, req.Content, req.Mood, pq.Array(req.Tags), entryDate,
+		userID, req.Title, req.Content, req.Mood, pq.Array(req.Tags), entryDate,
 	).Scan(&id)
 	if err != nil {
 		log.Error().Err(err).Msg("diary: create failed")
@@ -193,9 +194,9 @@ func (h *DiaryHandler) CreateEntry(c echo.Context) error {
 
 // UpdateEntry handles PUT /api/v1/diary/entries/:id
 func (h *DiaryHandler) UpdateEntry(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id := c.Param("id")
 
@@ -245,9 +246,9 @@ func (h *DiaryHandler) UpdateEntry(c echo.Context) error {
 
 // DeleteEntry handles DELETE /api/v1/diary/entries/:id
 func (h *DiaryHandler) DeleteEntry(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	id := c.Param("id")
 

@@ -11,9 +11,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { id } = await params
   const body = await req.json().catch(() => ({}))
-  const qs = new URLSearchParams({ user_id: session.user.id })
-
-  const res = await gatewayFetch(`/api/v1/goals/${id}/checkin?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/goals/${id}/checkin`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -30,7 +28,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { id } = await params
   const date = req.nextUrl.searchParams.get("date") ?? ""
-  const qs = new URLSearchParams({ user_id: session.user.id })
+  const qs = new URLSearchParams()
   if (date) qs.set("date", date)
 
   const res = await gatewayFetch(`/api/v1/goals/${id}/checkin?${qs}`, {

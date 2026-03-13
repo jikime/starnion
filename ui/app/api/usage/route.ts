@@ -15,7 +15,6 @@ export async function GET(req: NextRequest) {
   const limit = searchParams.get("limit") ?? "50"
 
   const qs = new URLSearchParams({
-    user_id: session.user.id,
     days,
     page,
     limit,

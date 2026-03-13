@@ -49,9 +49,9 @@ var defaultCategories = []string{"식비", "교통", "쇼핑", "구독", "의료
 // GetBudget returns budget limits + current-month spending per category.
 // GET /api/v1/budget?user_id=...&year=YYYY&month=M
 func (h *BudgetHandler) GetBudget(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	now := time.Now()
@@ -248,9 +248,9 @@ func (h *BudgetHandler) GetBudget(c echo.Context) error {
 // UpdateBudget saves budget limits and thresholds into profile preferences.
 // PUT /api/v1/budget?user_id=...
 func (h *BudgetHandler) UpdateBudget(c echo.Context) error {
-	userID := c.QueryParam("user_id")
-	if userID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
 	var req struct {

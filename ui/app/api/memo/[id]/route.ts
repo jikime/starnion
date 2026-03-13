@@ -11,8 +11,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const { id } = await params
   const body = await req.json().catch(() => ({}))
-  const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await gatewayFetch(`/api/v1/memos/${id}?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/memos/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -28,8 +27,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   }
 
   const { id } = await params
-  const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await gatewayFetch(`/api/v1/memos/${id}?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/memos/${id}`, {
     method: "DELETE",
   })
   const data = await res.json().catch(() => ({}))

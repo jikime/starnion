@@ -10,7 +10,7 @@ export async function GET() {
   }
 
   const res = await gatewayFetch(
-    `/api/v1/channels/telegram?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/channels/telegram`,
     { cache: "no-store" }
   )
 
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   }
 
   const res = await gatewayFetch(
-    `/api/v1/channels/telegram?user_id=${encodeURIComponent(session.user.id)}`,
+    `/api/v1/channels/telegram`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

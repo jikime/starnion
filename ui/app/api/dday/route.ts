@@ -9,8 +9,7 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
   }
 
-  const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await gatewayFetch(`/api/v1/ddays?${qs}`, { cache: "no-store" })
+  const res = await gatewayFetch(`/api/v1/ddays`, { cache: "no-store" })
   const data = await res.json().catch(() => [])
   return NextResponse.json(data, { status: res.ok ? 200 : res.status })
 }
@@ -22,8 +21,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}))
-  const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await gatewayFetch(`/api/v1/ddays?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/ddays`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

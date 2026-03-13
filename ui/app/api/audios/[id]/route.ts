@@ -13,8 +13,7 @@ export async function DELETE(
   }
 
   const { id } = await params
-  const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await gatewayFetch(`/api/v1/audios/${id}?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/audios/${id}`, {
     method: "DELETE",
   })
   const data = await res.json().catch(() => ({}))
@@ -37,8 +36,7 @@ export async function PATCH(
     return NextResponse.json({ error: "invalid body" }, { status: 400 })
   }
 
-  const qs = new URLSearchParams({ user_id: session.user.id })
-  const res = await gatewayFetch(`/api/v1/audios/${id}/transcript?${qs}`, {
+  const res = await gatewayFetch(`/api/v1/audios/${id}/transcript`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
