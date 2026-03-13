@@ -9,11 +9,13 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Bell, Settings, User, Loader2, CheckCircle, AlertCircle } from "lucide-react"
 
 interface Profile {
   name: string
   email: string
+  language: string
 }
 
 type SaveStatus = "idle" | "saving" | "saved" | "error"
@@ -22,7 +24,7 @@ export default function SettingsPage() {
   const t = useTranslations("settings")
 
   // ── Account state ──────────────────────────────────────────────────────────
-  const [profile, setProfile] = useState<Profile>({ name: "", email: "" })
+  const [profile, setProfile] = useState<Profile>({ name: "", email: "", language: "ko" })
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle")
   const [saveError, setSaveError] = useState("")
@@ -39,7 +41,7 @@ export default function SettingsPage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.name !== undefined) {
-          setProfile({ name: data.name ?? "", email: data.email ?? "" })
+          setProfile({ name: data.name ?? "", email: data.email ?? "", language: data.language ?? "ko" })
         }
       })
       .catch(() => {})
@@ -53,28 +55,28 @@ export default function SettingsPage() {
       const res = await fetch("/api/settings/account", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: profile.name }),
+        body: JSON.stringify({ name: profile.name, language: profile.language }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.error ?? "저장에 실패했어요.")
+        throw new Error(data.error ?? t("saveFailed"))
       }
       setSaveStatus("saved")
       setTimeout(() => setSaveStatus("idle"), 2500)
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "저장에 실패했어요.")
+      setSaveError(err instanceof Error ? err.message : t("saveFailed"))
       setSaveStatus("error")
     }
   }
 
   async function handleChangePassword() {
     if (newPassword !== confirmPassword) {
-      setPwError("새 비밀번호가 일치하지 않아요.")
+      setPwError(t("passwordMismatch"))
       setPwStatus("error")
       return
     }
     if (newPassword.length < 8) {
-      setPwError("비밀번호는 8자 이상이어야 해요.")
+      setPwError(t("passwordTooShort"))
       setPwStatus("error")
       return
     }
@@ -88,7 +90,7 @@ export default function SettingsPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.error ?? "비밀번호 변경에 실패했어요.")
+        throw new Error(data.error ?? t("passwordChangeFailed"))
       }
       setPwStatus("saved")
       setCurrentPassword("")
@@ -96,7 +98,7 @@ export default function SettingsPage() {
       setConfirmPassword("")
       setTimeout(() => setPwStatus("idle"), 2500)
     } catch (err) {
-      setPwError(err instanceof Error ? err.message : "비밀번호 변경에 실패했어요.")
+      setPwError(err instanceof Error ? err.message : t("passwordChangeFailed"))
       setPwStatus("error")
     }
   }
@@ -202,7 +204,7 @@ export default function SettingsPage() {
                 {loading ? (
                   <div className="flex items-center gap-2 text-muted-foreground py-4">
                     <Loader2 className="size-4 animate-spin" />
-                    <span className="text-sm">불러오는 중...</span>
+                    <span className="text-sm">{t("loading")}</span>
                   </div>
                 ) : (
                   <>
@@ -217,7 +219,7 @@ export default function SettingsPage() {
                     <div className="space-y-2">
                       <Label htmlFor="email">{t("email")}</Label>
                       <Input id="email" type="email" value={profile.email} disabled />
-                      <p className="text-xs text-muted-foreground">이메일은 변경할 수 없어요.</p>
+                      <p className="text-xs text-muted-foreground">{t("emailReadOnly")}</p>
                     </div>
                     {saveStatus === "error" && (
                       <div className="flex items-center gap-2 text-sm text-destructive">
@@ -228,7 +230,7 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-end gap-3">
                       {saveStatus === "saved" && (
                         <span className="flex items-center gap-1 text-sm text-emerald-500">
-                          <CheckCircle className="size-4" /> 저장됐어요
+                          <CheckCircle className="size-4" /> {t("saved")}
                         </span>
                       )}
                       <Button
@@ -244,14 +246,40 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
+            {/* AI language selector */}
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("aiLanguage")}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">{t("aiLanguageDescription")}</p>
+                  <Select
+                    value={profile.language}
+                    onValueChange={(value) => setProfile((p) => ({ ...p, language: value }))}
+                  >
+                    <SelectTrigger className="w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ko">한국어</SelectItem>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="ja">日本語</SelectItem>
+                      <SelectItem value="zh">中文</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Password change */}
             <Card>
               <CardHeader>
-                <CardTitle>비밀번호 변경</CardTitle>
+                <CardTitle>{t("passwordChange")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="current-pw">현재 비밀번호</Label>
+                  <Label htmlFor="current-pw">{t("currentPassword")}</Label>
                   <Input
                     id="current-pw"
                     type="password"
@@ -261,7 +289,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="new-pw">새 비밀번호</Label>
+                  <Label htmlFor="new-pw">{t("newPassword")}</Label>
                   <Input
                     id="new-pw"
                     type="password"
@@ -271,7 +299,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="confirm-pw">새 비밀번호 확인</Label>
+                  <Label htmlFor="confirm-pw">{t("confirmPassword")}</Label>
                   <Input
                     id="confirm-pw"
                     type="password"
@@ -289,7 +317,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-end gap-3">
                   {pwStatus === "saved" && (
                     <span className="flex items-center gap-1 text-sm text-emerald-500">
-                      <CheckCircle className="size-4" /> 변경됐어요
+                      <CheckCircle className="size-4" /> {t("passwordChanged")}
                     </span>
                   )}
                   <Button
@@ -298,7 +326,7 @@ export default function SettingsPage() {
                     variant="outline"
                   >
                     {pwStatus === "saving" && <Loader2 className="size-4 animate-spin mr-2" />}
-                    비밀번호 변경
+                    {t("passwordChange")}
                   </Button>
                 </div>
               </CardContent>

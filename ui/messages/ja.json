@@ -110,7 +110,21 @@
     "name": "名前",
     "email": "メール",
     "timezone": "タイムゾーン",
-    "save": "保存"
+    "save": "保存",
+    "loading": "読み込み中...",
+    "emailReadOnly": "メールアドレスは変更できません。",
+    "saved": "保存しました",
+    "passwordChange": "パスワード変更",
+    "currentPassword": "現在のパスワード",
+    "newPassword": "新しいパスワード",
+    "confirmPassword": "新しいパスワード（確認）",
+    "passwordChanged": "変更しました",
+    "saveFailed": "保存に失敗しました。",
+    "passwordChangeFailed": "パスワード変更に失敗しました。",
+    "passwordMismatch": "新しいパスワードが一致しません。",
+    "passwordTooShort": "パスワードは8文字以上にしてください。",
+    "aiLanguage": "AI応答言語",
+    "aiLanguageDescription": "AIが会話で使用する言語を選択してください"
   },
   "common": {
     "save": "保存",
@@ -534,9 +548,9 @@
     "newConvPlaceholder": "新しい会話を開始するか、左側から会話を選択してください",
     "personas": {
       "assistant": "デフォルトアシスタント",
+      "heart_friend": "心の友",
+      "life_coach": "ライフコーチ",
       "finance": "金融専門家",
-      "buddy": "友人",
-      "coach": "ファイナンシャルコーチ",
       "analyst": "データアナリスト"
     }
   },
@@ -904,6 +918,33 @@
     "saving": "保存中...",
     "update": "更新",
     "connect": "接続",
+    "tabs": {
+      "providers": "プロバイダー",
+      "assignments": "モデル割り当て"
+    },
+    "endpointType": {
+      "label": "エンドポイントタイプ",
+      "ollama": "Ollama",
+      "openai_compatible": "OpenAI互換",
+      "other": "その他（手動入力）"
+    },
+    "fetchModels": "モデルを取得",
+    "fetching": "取得中...",
+    "assignments": {
+      "subtitle": "特定用途のみ専用モデルを設定してください。未設定時はペルソナモデルが使用されます。",
+      "serverDefault": "(ペルソナデフォルト)",
+      "noModels": "使用可能なモデルがありません。まずプロバイダーを接続してください。",
+      "save": "保存",
+      "saved": "モデル割り当てが保存されました。",
+      "saveFailed": "保存に失敗しました。",
+      "useCases": {
+        "image": "画像分析",
+        "audio": "音声分析 (STT)",
+        "report": "レポート / Cron",
+        "image_gen": "画像生成",
+        "audio_gen": "音声生成 (TTS)"
+      }
+    },
     "toast": {
       "baseUrlRequired": "Base URLを入力してください。",
       "apiKeyRequired": "APIキーを入力してください。",
@@ -913,7 +954,9 @@
       "networkError": "ネットワークエラーのためAPIキーを確認できません。",
       "saved": "{name}を保存しました。",
       "saveFailed": "保存に失敗しました。",
-      "removed": "{name}を削除しました。"
+      "removed": "{name}を削除しました。",
+      "fetchFailed": "モデルリストを取得できません。",
+      "fetchSuccess": "{count}個のモデルを取得しました。"
     }
   },
   "personas": {
@@ -944,6 +987,7 @@
       "modelCustom": "直接入力...",
       "modelIdPlaceholder": "モデルIDを入力（例：claude-opus-4-6）",
       "noModelsHint": "モデルページで有効化されているモデルがありません。上のリストから直接入力を選択するか、先にモデルページでモデルを有効にしてください。",
+      "noCustomEndpointModels": "Custom Endpointにモデルが追加されていません。先にモデル設定でCustom Endpointを構成してください。",
       "systemPromptLabel": "システムプロンプト",
       "systemPromptPlaceholder": "このペルソナに付与する役割と指示を記述してください。空白の場合はデフォルトプロンプトが使用されます。",
       "defaultLabel": "デフォルトペルソナに設定",
@@ -959,7 +1003,8 @@
       "saveFailed": "保存に失敗しました。",
       "defaultSet": "{name}をデフォルトペルソナに設定しました。",
       "defaultFailed": "デフォルト設定に失敗しました。",
-      "deleted": "ペルソナが削除されました。"
+      "deleted": "ペルソナが削除されました。",
+      "noToolsWarning": "⚠️ このモデルはtool callingに対応していないため、スキル・ツール機能が制限されます。保存を続行します。"
     }
   }
 }
