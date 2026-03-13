@@ -18,7 +18,51 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import { Pencil, Trash2, Plus, Star, PenLine, UserCircle } from "lucide-react"
+import { Pencil, Trash2, Plus, Star, PenLine, UserCircle, AlertTriangle, Wrench } from "lucide-react"
+
+// ── Tool calling support helpers ─────────────────────────────────────────────
+
+const OLLAMA_TOOLS_PREFIXES = [
+  "llama3.1", "llama3.2", "llama3.3",
+  "qwen2.5", "qwen3",
+  "mistral-nemo", "mistral-small",
+  "firefunction-v2", "command-r",
+  "granite3", "granite4",
+  "hermes3", "nemotron-mini",
+  "phi4", "deepseek-r1",
+  "aya-expanse", "smollm2",
+]
+
+function ollamaModelSupportsTools(modelName: string): boolean {
+  const base = modelName.split(":")[0].toLowerCase()
+  return OLLAMA_TOOLS_PREFIXES.some(
+    p => base === p || base.startsWith(p + "-") || base.startsWith(p + "."),
+  )
+}
+
+/**
+ * true  = confirmed supported
+ * false = confirmed NOT supported
+ * null  = unknown
+ */
+function personaModelSupportsTools(
+  provider: string,
+  model: string,
+  endpointType?: string,
+): boolean | null {
+  switch (provider) {
+    case "anthropic":
+    case "openai":
+    case "gemini":
+    case "zai":
+      return true
+    case "custom":
+      if (endpointType === "ollama") return ollamaModelSupportsTools(model)
+      return null
+    default:
+      return null
+  }
+}
 
 // ── Provider catalog (fallback when no models are enabled in DB) ─────────────
 
@@ -97,6 +141,7 @@ interface ProviderData {
   hasKey: boolean
   baseUrl: string
   enabledModels: string[]
+  endpointType?: string
 }
 
 interface PersonaForm {
@@ -168,23 +213,26 @@ export function PersonasView() {
   // ── Model helpers ─────────────────────────────────────────────────────────
 
   // Returns models available for the selected provider:
-  // 1. Uses enabled models from DB if configured
-  // 2. Falls back to PROVIDER_META catalog
+  // 1. Custom provider → uses enabledModels from custom endpoint config
+  // 2. Other providers → uses enabled models from DB, falls back to PROVIDER_META catalog
   const availableModels = (): { id: string; name: string }[] => {
     const prov = form.provider
-    if (!prov || prov === "custom") return []
+    if (!prov) return []
 
     const dbProvider = providerData.find(p => p.provider === prov)
     const enabledIds = dbProvider?.enabledModels ?? []
-    const catalogModels = PROVIDER_META[prov]?.models ?? []
 
+    if (prov === "custom") {
+      return enabledIds.map(id => ({ id, name: id }))
+    }
+
+    const catalogModels = PROVIDER_META[prov]?.models ?? []
     if (enabledIds.length > 0) {
       return enabledIds.map(id => {
         const found = catalogModels.find(m => m.id === id)
         return found ?? { id, name: id }
       })
     }
-
     return catalogModels
   }
 
@@ -204,12 +252,11 @@ export function PersonasView() {
 
   const openEdit = (p: Persona) => {
     setEditing(p)
-    // If model is not in the catalog for the provider, switch to custom mode
-    const models = p.provider === "custom"
-      ? []
-      : availableModelsForProvider(p.provider)
-    const inCatalog = models.some(m => m.id === p.model)
-    setCustomModelMode(p.provider === "custom" || !inCatalog)
+    const models = availableModelsForProvider(p.provider)
+    const inList = models.some(m => m.id === p.model)
+    // customModelMode when model is not in the available list
+    // (for custom provider with no configured models, models is empty → always true)
+    setCustomModelMode(!inList)
     setForm({
       name: p.name,
       description: p.description,
@@ -223,9 +270,12 @@ export function PersonasView() {
 
   // Helper: models for a given provider (for openEdit)
   const availableModelsForProvider = (prov: string): { id: string; name: string }[] => {
-    if (!prov || prov === "custom") return []
+    if (!prov) return []
     const dbProvider = providerData.find(p => p.provider === prov)
     const enabledIds = dbProvider?.enabledModels ?? []
+    if (prov === "custom") {
+      return enabledIds.map(id => ({ id, name: id }))
+    }
     const catalogModels = PROVIDER_META[prov]?.models ?? []
     if (enabledIds.length > 0) {
       return enabledIds.map(id => {
@@ -238,7 +288,9 @@ export function PersonasView() {
 
   const handleProviderChange = (v: string) => {
     setForm(f => ({ ...f, provider: v, model: "" }))
-    setCustomModelMode(v === "custom")
+    const customModels = providerData.find(p => p.provider === "custom")?.enabledModels ?? []
+    // customModelMode only if custom provider has no configured models
+    setCustomModelMode(v === "custom" && customModels.length === 0)
   }
 
   const handleModelSelect = (v: string) => {
@@ -255,6 +307,15 @@ export function PersonasView() {
 
   const savePersona = async () => {
     if (!form.name.trim()) return
+
+    // Soft warning: tool calling not supported
+    const endpointType = providerData.find(p => p.provider === "custom")?.endpointType
+    const toolsSupport = personaModelSupportsTools(form.provider, form.model, endpointType)
+    if (toolsSupport === false) {
+      showToast(t("toast.noToolsWarning"), false)
+      await new Promise(r => setTimeout(r, 1500))
+    }
+
     setSaving(true)
     try {
       const url = editing ? `/api/settings/personas/${editing.id}` : "/api/settings/personas"
@@ -365,6 +426,8 @@ export function PersonasView() {
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {personas.map(p => {
             const provMeta = PROVIDER_META[p.provider]
+            const cardEndpointType = providerData.find(pd => pd.provider === "custom")?.endpointType
+            const toolsSupport = personaModelSupportsTools(p.provider, p.model, cardEndpointType)
             return (
               <Card key={p.id} className={`shadow-none ${p.isDefault ? "border-primary/50" : ""}`}>
                 <CardHeader className="pb-2">
@@ -428,6 +491,12 @@ export function PersonasView() {
                     {p.isDefault && (
                       <Badge className="text-xs bg-primary/10 text-primary border-primary/20">
                         {t("defaultBadge")}
+                      </Badge>
+                    )}
+                    {toolsSupport === false && (
+                      <Badge variant="outline" className="text-xs text-amber-500 border-amber-300 gap-0.5">
+                        <AlertTriangle className="h-3 w-3" />
+                        tools 불가
                       </Badge>
                     )}
                   </div>
@@ -503,17 +572,8 @@ export function PersonasView() {
             {/* Model */}
             <div className="space-y-1.5">
               <Label>{t("dialog.modelLabel")}</Label>
-
-              {/* Custom provider → always text input */}
-              {form.provider === "custom" ? (
-                <Input
-                  placeholder={t("dialog.customModelPlaceholder")}
-                  value={form.model}
-                  onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
-                  className="font-mono text-xs"
-                />
-              ) : (
-                <>
+              <>
+                {models.length > 0 ? (
                   <Select
                     value={selectModelValue}
                     onValueChange={handleModelSelect}
@@ -525,16 +585,30 @@ export function PersonasView() {
                       />
                     </SelectTrigger>
                     <SelectContent>
-                      {models.map(m => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name}
-                          {m.name !== m.id && (
-                            <span className="ml-1 text-xs text-muted-foreground font-mono">
-                              {m.id}
+                      {models.map(m => {
+                        const dialogEndpointType = providerData.find(p => p.provider === form.provider)?.endpointType
+                        const mToolsSupport = personaModelSupportsTools(form.provider, m.id, dialogEndpointType)
+                        return (
+                          <SelectItem key={m.id} value={m.id}>
+                            <span className="flex items-center gap-1.5">
+                              <span>
+                                {m.name}
+                                {m.name !== m.id && (
+                                  <span className="ml-1 text-xs text-muted-foreground font-mono">
+                                    {m.id}
+                                  </span>
+                                )}
+                              </span>
+                              {mToolsSupport === true && (
+                                <Wrench className="h-3 w-3 text-green-500 shrink-0" />
+                              )}
+                              {mToolsSupport === false && (
+                                <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                              )}
                             </span>
-                          )}
-                        </SelectItem>
-                      ))}
+                          </SelectItem>
+                        )
+                      })}
                       {/* Always offer free-form entry */}
                       <SelectItem value={CUSTOM_MODEL_VALUE}>
                         <span className="flex items-center gap-1.5 text-muted-foreground">
@@ -544,25 +618,31 @@ export function PersonasView() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
-
-                  {/* Free-form model text input */}
-                  {customModelMode && (
-                    <Input
-                      autoFocus
-                      placeholder={t("dialog.modelIdPlaceholder")}
-                      value={form.model}
-                      onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
-                      className="font-mono text-xs mt-1.5"
-                    />
-                  )}
-
-                  {form.provider && models.length === 0 && !customModelMode && (
-                    <p className="text-xs text-muted-foreground">
-                      {t("dialog.noModelsHint")}
+                ) : (
+                  form.provider === "custom" && (
+                    <p className="text-xs text-amber-500">
+                      {t("dialog.noCustomEndpointModels")}
                     </p>
-                  )}
-                </>
-              )}
+                  )
+                )}
+
+                {/* Free-form model text input — shown when no list models or user picked "직접 입력" */}
+                {(customModelMode || (form.provider && models.length === 0)) && (
+                  <Input
+                    autoFocus={customModelMode}
+                    placeholder={t("dialog.modelIdPlaceholder")}
+                    value={form.model}
+                    onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
+                    className="font-mono text-xs mt-1.5"
+                  />
+                )}
+
+                {form.provider && form.provider !== "custom" && models.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {t("dialog.noModelsHint")}
+                  </p>
+                )}
+              </>
             </div>
 
             {/* System prompt */}

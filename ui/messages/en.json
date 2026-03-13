@@ -123,8 +123,8 @@
     "passwordChangeFailed": "Failed to change password.",
     "passwordMismatch": "New passwords do not match.",
     "passwordTooShort": "Password must be at least 8 characters.",
-    "aiLanguage": "AI Response Language",
-    "aiLanguageDescription": "Select the language AI will use in conversations"
+    "aiLanguage": "Language Preference",
+    "aiLanguageDescription": "Select the language you use when talking with AI"
   },
   "common": {
     "save": "Save",

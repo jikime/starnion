@@ -123,8 +123,8 @@
     "passwordChangeFailed": "パスワード変更に失敗しました。",
     "passwordMismatch": "新しいパスワードが一致しません。",
     "passwordTooShort": "パスワードは8文字以上にしてください。",
-    "aiLanguage": "AI応答言語",
-    "aiLanguageDescription": "AIが会話で使用する言語を選択してください"
+    "aiLanguage": "言語設定",
+    "aiLanguageDescription": "AIとの会話で使用する言語を選択してください"
   },
   "common": {
     "save": "保存",

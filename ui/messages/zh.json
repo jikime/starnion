@@ -123,8 +123,8 @@
     "passwordChangeFailed": "修改密码失败。",
     "passwordMismatch": "新密码不一致。",
     "passwordTooShort": "密码至少需要8位字符。",
-    "aiLanguage": "AI响应语言",
-    "aiLanguageDescription": "选择AI在对话中使用的语言"
+    "aiLanguage": "语言设置",
+    "aiLanguageDescription": "选择您与AI交流时使用的语言"
   },
   "common": {
     "save": "保存",

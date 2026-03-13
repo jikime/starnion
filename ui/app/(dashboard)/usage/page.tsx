@@ -98,6 +98,9 @@ const PROVIDER_COLORS: Record<string, string> = {
   gemini:    "#4285F4",
   anthropic: "#D97706",
   openai:    "#10A37F",
+  ollama:    "#2ECC71",
+  custom:    "#9B59B6",
+  zai:       "#E74C3C",
   unknown:   "#3b6de0",
 }
 

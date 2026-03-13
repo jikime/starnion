@@ -221,6 +221,24 @@ export default function SettingsPage() {
                       <Input id="email" type="email" value={profile.email} disabled />
                       <p className="text-xs text-muted-foreground">{t("emailReadOnly")}</p>
                     </div>
+                    <div className="space-y-2">
+                      <Label>{t("aiLanguage")}</Label>
+                      <p className="text-xs text-muted-foreground">{t("aiLanguageDescription")}</p>
+                      <Select
+                        value={profile.language}
+                        onValueChange={(value) => setProfile((p) => ({ ...p, language: value }))}
+                      >
+                        <SelectTrigger className="w-48">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ko">한국어</SelectItem>
+                          <SelectItem value="en">English</SelectItem>
+                          <SelectItem value="ja">日本語</SelectItem>
+                          <SelectItem value="zh">中文</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     {saveStatus === "error" && (
                       <div className="flex items-center gap-2 text-sm text-destructive">
                         <AlertCircle className="size-4" />
@@ -243,32 +261,6 @@ export default function SettingsPage() {
                     </div>
                   </>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* AI language selector */}
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("aiLanguage")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">{t("aiLanguageDescription")}</p>
-                  <Select
-                    value={profile.language}
-                    onValueChange={(value) => setProfile((p) => ({ ...p, language: value }))}
-                  >
-                    <SelectTrigger className="w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ko">한국어</SelectItem>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="ja">日本語</SelectItem>
-                      <SelectItem value="zh">中文</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </CardContent>
             </Card>
 
