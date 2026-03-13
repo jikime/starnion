@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -30,6 +31,7 @@ type providerResp struct {
 	APIKeyMasked  string    `json:"apiKeyMasked"`  // masked for display
 	HasKey        bool      `json:"hasKey"`
 	BaseURL       string    `json:"baseUrl"`
+	EndpointType  string    `json:"endpointType"`
 	EnabledModels []string  `json:"enabledModels"`
 	UpdatedAt     time.Time `json:"updatedAt"`
 }
@@ -42,7 +44,7 @@ func (h *ModelsHandler) ListProviders(c echo.Context) error {
 	}
 
 	rows, err := h.db.QueryContext(c.Request().Context(), `
-		SELECT provider, api_key, base_url, enabled_models, updated_at
+		SELECT provider, api_key, base_url, endpoint_type, enabled_models, updated_at
 		FROM providers
 		WHERE user_id = $1
 		ORDER BY provider
@@ -55,10 +57,10 @@ func (h *ModelsHandler) ListProviders(c echo.Context) error {
 
 	result := []providerResp{}
 	for rows.Next() {
-		var provider, apiKey, baseURL string
+		var provider, apiKey, baseURL, endpointType string
 		var models pq.StringArray
 		var updatedAt time.Time
-		if err := rows.Scan(&provider, &apiKey, &baseURL, &models, &updatedAt); err != nil {
+		if err := rows.Scan(&provider, &apiKey, &baseURL, &endpointType, &models, &updatedAt); err != nil {
 			continue
 		}
 		masked := ""
@@ -72,6 +74,7 @@ func (h *ModelsHandler) ListProviders(c echo.Context) error {
 			APIKeyMasked:  masked,
 			HasKey:        apiKey != "",
 			BaseURL:       baseURL,
+			EndpointType:  endpointType,
 			EnabledModels: []string(models),
 			UpdatedAt:     updatedAt,
 		})
@@ -93,6 +96,7 @@ func (h *ModelsHandler) UpsertProvider(c echo.Context) error {
 		APIKey        string   `json:"apiKey"`
 		BaseURL       string   `json:"baseUrl"`
 		EnabledModels []string `json:"enabledModels"`
+		EndpointType  string   `json:"endpointType"`
 	}
 	if err := c.Bind(&body); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid body"})
@@ -103,16 +107,20 @@ func (h *ModelsHandler) UpsertProvider(c echo.Context) error {
 	if body.EnabledModels == nil {
 		body.EnabledModels = []string{}
 	}
+	if body.EndpointType == "" {
+		body.EndpointType = "other"
+	}
 
 	_, err := h.db.ExecContext(c.Request().Context(), `
-		INSERT INTO providers (user_id, provider, api_key, base_url, enabled_models, updated_at)
-		VALUES ($1, $2, $3, $4, $5, NOW())
+		INSERT INTO providers (user_id, provider, api_key, base_url, enabled_models, endpoint_type, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())
 		ON CONFLICT (user_id, provider) DO UPDATE SET
 			api_key        = CASE WHEN $3 = '' THEN providers.api_key ELSE $3 END,
 			base_url       = $4,
 			enabled_models = $5,
+			endpoint_type  = $6,
 			updated_at     = NOW()
-	`, userID, body.Provider, body.APIKey, body.BaseURL, pq.Array(body.EnabledModels))
+	`, userID, body.Provider, body.APIKey, body.BaseURL, pq.Array(body.EnabledModels), body.EndpointType)
 	if err != nil {
 		log.Error().Err(err).Str("provider", body.Provider).Msg("UpsertProvider failed")
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "save failed"})
@@ -512,6 +520,165 @@ func (h *ModelsHandler) DeletePersona(c echo.Context) error {
 		`DELETE FROM personas WHERE id = $1::uuid AND user_id = $2`, id, userID,
 	); err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "delete failed"})
+	}
+	return c.JSON(http.StatusOK, echo.Map{"ok": true})
+}
+
+// ── Custom endpoint model fetch ────────────────────────────────────────────
+
+// FetchCustomModels POST /api/v1/providers/custom/models
+// Body: { baseUrl, endpointType, apiKey }
+// Returns { models: ["model1", ...] } by probing the endpoint.
+func (h *ModelsHandler) FetchCustomModels(c echo.Context) error {
+	var body struct {
+		BaseURL      string `json:"baseUrl"`
+		EndpointType string `json:"endpointType"`
+		APIKey       string `json:"apiKey"`
+	}
+	if err := c.Bind(&body); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid body"})
+	}
+	if body.BaseURL == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "baseUrl required"})
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	base := strings.TrimRight(body.BaseURL, "/")
+	var models []string
+
+	switch body.EndpointType {
+	case "ollama":
+		req, err := http.NewRequest(http.MethodGet, base+"/api/tags", nil)
+		if err != nil {
+			return c.JSON(http.StatusBadGateway, echo.Map{"error": "요청 생성 실패: " + err.Error()})
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return c.JSON(http.StatusBadGateway, echo.Map{"error": "연결할 수 없어요: " + err.Error()})
+		}
+		defer resp.Body.Close()
+		var data struct {
+			Models []struct {
+				Name string `json:"name"`
+			} `json:"models"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			return c.JSON(http.StatusBadGateway, echo.Map{"error": "응답을 파싱할 수 없어요."})
+		}
+		for _, m := range data.Models {
+			models = append(models, m.Name)
+		}
+
+	case "openai_compatible":
+		req, err := http.NewRequest(http.MethodGet, base+"/v1/models", nil)
+		if err != nil {
+			return c.JSON(http.StatusBadGateway, echo.Map{"error": "요청 생성 실패: " + err.Error()})
+		}
+		if body.APIKey != "" {
+			req.Header.Set("Authorization", "Bearer "+body.APIKey)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return c.JSON(http.StatusBadGateway, echo.Map{"error": "연결할 수 없어요: " + err.Error()})
+		}
+		defer resp.Body.Close()
+		var data struct {
+			Data []struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			return c.JSON(http.StatusBadGateway, echo.Map{"error": "응답을 파싱할 수 없어요."})
+		}
+		for _, m := range data.Data {
+			models = append(models, m.ID)
+		}
+
+	default:
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "endpointType은 ollama 또는 openai_compatible이어야 해요."})
+	}
+
+	if models == nil {
+		models = []string{}
+	}
+	log.Info().Str("baseUrl", body.BaseURL).Str("type", body.EndpointType).
+		Int("count", len(models)).Msg("[Custom] FetchCustomModels")
+	return c.JSON(http.StatusOK, echo.Map{"models": models})
+}
+
+// ── Model assignments ─────────────────────────────────────────────────────
+
+type modelAssignmentResp struct {
+	UseCase  string `json:"useCase"`
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+}
+
+// ListModelAssignments GET /api/v1/model-assignments?user_id=
+func (h *ModelsHandler) ListModelAssignments(c echo.Context) error {
+	userID := c.QueryParam("user_id")
+	if userID == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id required"})
+	}
+
+	rows, err := h.db.QueryContext(c.Request().Context(), `
+		SELECT use_case, provider, model
+		FROM model_assignments
+		WHERE user_id = $1
+		ORDER BY use_case
+	`, userID)
+	if err != nil {
+		log.Error().Err(err).Msg("ListModelAssignments query failed")
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "query failed"})
+	}
+	defer rows.Close()
+
+	result := []modelAssignmentResp{}
+	for rows.Next() {
+		var r modelAssignmentResp
+		if err := rows.Scan(&r.UseCase, &r.Provider, &r.Model); err != nil {
+			continue
+		}
+		result = append(result, r)
+	}
+	return c.JSON(http.StatusOK, echo.Map{"assignments": result})
+}
+
+// UpsertModelAssignment POST /api/v1/model-assignments?user_id=
+// Body: { assignments: [{ useCase, provider, model }] }
+func (h *ModelsHandler) UpsertModelAssignment(c echo.Context) error {
+	userID := c.QueryParam("user_id")
+	if userID == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "user_id required"})
+	}
+
+	var body struct {
+		Assignments []struct {
+			UseCase  string `json:"useCase"`
+			Provider string `json:"provider"`
+			Model    string `json:"model"`
+		} `json:"assignments"`
+	}
+	if err := c.Bind(&body); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid body"})
+	}
+
+	ctx := c.Request().Context()
+	for _, a := range body.Assignments {
+		if a.UseCase == "" {
+			continue
+		}
+		if _, err := h.db.ExecContext(ctx, `
+			INSERT INTO model_assignments (user_id, use_case, provider, model, updated_at)
+			VALUES ($1, $2, $3, $4, NOW())
+			ON CONFLICT (user_id, use_case) DO UPDATE SET
+				provider   = $3,
+				model      = $4,
+				updated_at = NOW()
+		`, userID, a.UseCase, a.Provider, a.Model); err != nil {
+			log.Error().Err(err).Str("useCase", a.UseCase).Msg("UpsertModelAssignment failed")
+			return c.JSON(http.StatusInternalServerError, echo.Map{"error": "save failed"})
+		}
 	}
 	return c.JSON(http.StatusOK, echo.Map{"ok": true})
 }
