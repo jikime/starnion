@@ -39,18 +39,18 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           {/* 브랜드명 */}
-          <div className="mb-3 flex items-center gap-2">
+          <div className="mb-3">
             <span
               className="text-3xl font-bold tracking-tight"
-              style={{ color: "oklch(0.72 0.15 210.00)", fontFamily: "var(--font-sans)" }}
+              style={{ fontFamily: "var(--font-sans)", color: "oklch(0.95 0.02 210.00)" }}
             >
-              star
+              Star
             </span>
             <span
               className="text-3xl font-bold tracking-tight"
-              style={{ color: "oklch(0.95 0.02 210.00)", fontFamily: "var(--font-sans)" }}
+              style={{ fontFamily: "var(--font-sans)", color: "oklch(0.72 0.15 210.00)" }}
             >
-              nion
+              Nion
             </span>
           </div>
 
@@ -96,14 +96,14 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 bg-background">
         {/* 모바일에서 보이는 로고 */}
         <div className="lg:hidden mb-8 text-center">
+          <span className="text-2xl font-bold" style={{ fontFamily: "var(--font-sans)" }}>
+            Star
+          </span>
           <span
             className="text-2xl font-bold"
             style={{ color: "oklch(0.72 0.15 210.00)", fontFamily: "var(--font-sans)" }}
           >
-            star
-          </span>
-          <span className="text-2xl font-bold text-foreground" style={{ fontFamily: "var(--font-sans)" }}>
-            nion
+            Nion
           </span>
         </div>
 
