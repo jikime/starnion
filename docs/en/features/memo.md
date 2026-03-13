@@ -167,6 +167,43 @@ AI: "Shopping list memo deleted."
 
 ---
 
+## 💬 Telegram Usage Examples
+
+> Just talk to Nion in natural language. No special commands needed — chat like you normally would!
+
+### Saving Memos
+
+```
+Save a memo: Dentist appointment tomorrow at 2 PM
+```
+→ Saved as a memo with the "Schedule" tag
+
+```
+Travel packing memo: Passport, charger, travel insurance
+```
+→ Saved as a memo with the "Travel" tag
+
+### Viewing Memos
+
+```
+Show me my memo list
+```
+→ Displays all saved memos
+
+```
+Find my travel-related memos
+```
+→ Searches for memos with the "Travel" tag
+
+### Deleting Memos
+
+```
+Delete the dentist appointment memo
+```
+→ The memo is deleted
+
+---
+
 ## Tips & FAQ
 
 **Q. How should I decide between using a memo and a diary?**

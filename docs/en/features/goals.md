@@ -203,6 +203,48 @@ Chat: "I saved 500,000 won this month" → progress update
 
 ---
 
+## 💬 Telegram Usage Examples
+
+> Just talk to Nion in natural language. No special commands needed — chat like you normally would!
+
+### Creating Goals
+
+```
+Create a goal to exercise every day
+```
+→ A habit tracking goal is created
+
+```
+Set a goal to read 3 books this month
+```
+→ A numeric goal is created
+
+### Updating Progress
+
+```
+Finished my workout today!
+```
+→ Today's check-in is recorded for the exercise goal
+
+```
+Finished reading "Demian"
+```
+→ Reading goal progress is updated
+
+### Viewing Goals
+
+```
+Show me my goal progress
+```
+→ Displays progress for all active goals
+
+```
+Show me my completed goals
+```
+→ Lists all achieved goals
+
+---
+
 ## Tips & FAQ
 
 **Q. How many goals can I have at one time?**

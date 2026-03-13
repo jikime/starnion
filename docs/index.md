@@ -34,7 +34,9 @@ Starnion is a self-hosted personal AI agent platform. All your data stays on you
 | **Multi-channel** | Web UI, Telegram bot, WebSocket real-time chat |
 | **Finance** | Natural language expense tracking & budget management |
 | **Memory & RAG** | 4-layer semantic memory across all your data |
-| **Skills** | 34+ AI skills — diary, goals, memos, documents, and more |
+| **Skills** | 34 AI skills — diary, goals, memos, documents, and more |
+| **System Scheduler** | 9 notification jobs individually toggleable per user |
+| **Language Preference** | AI responds in your chosen language (ko/en/ja/zh) |
 | **Multimodal** | Image analysis, audio transcription, document parsing |
 | **Privacy-first** | All data on your own PostgreSQL + MinIO |
 | **Multi-provider** | Gemini, OpenAI, Anthropic, Ollama support |
@@ -52,7 +54,7 @@ Web UI (Next.js) + Telegram
   ├─ Telegram Bot
   └─ gRPC Client ──────────▶ Python Agent (:50051)
                               ├─ LangGraph ReAct
-                              ├─ 34+ Skills
+                              ├─ 34 Skills
                               └─ 4-Layer Memory
                                       │
                               PostgreSQL + pgvector

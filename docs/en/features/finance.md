@@ -623,6 +623,65 @@ AI:   Food budget updated from 400,000 won → 450,000 won.
 
 ---
 
+## 💬 Telegram Usage Examples
+
+> Just talk to Nion in natural language. No special commands needed — chat like you normally would!
+
+### Recording Expenses
+
+```
+Spent $5.50 on an iced latte at Starbucks
+```
+→ Automatically recorded under the Cafe category
+
+```
+Lunch was $8 for kimchi stew
+```
+→ Automatically categorized as Food
+
+```
+Taxi fare was $12
+```
+→ Recorded under Transportation
+
+### Viewing Expenses
+
+```
+How much did I spend this month?
+```
+→ Shows total monthly spending with category breakdown
+
+```
+How much did I spend on food last week?
+```
+→ Shows the food category total for last week
+
+### Budget Management
+
+```
+Set my food budget to $300 for this month
+```
+→ Food category budget is set
+
+```
+How much budget do I have left?
+```
+→ Shows remaining budget and usage rate per category
+
+### Editing and Deleting
+
+```
+Change the Starbucks $5.50 I just entered to $4.50
+```
+→ The expense record is updated
+
+```
+Delete today's taxi fare
+```
+→ The expense record is removed
+
+---
+
 ## Frequently Asked Questions
 
 **Q. I entered the wrong amount. How do I fix it?**

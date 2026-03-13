@@ -96,6 +96,30 @@ Notifications that Starnion sends automatically. Sent when conditions are met, w
 | Pattern Analysis Results | Users with sufficient analysis data | Every day at 14:00 |
 | D-Day Reminder | Users with registered D-Days | Every day at 08:00 |
 
+### Controlling System Notifications
+
+Each system notification can be individually enabled or disabled.
+
+**How to:**
+1. Click **Schedules** in the left menu.
+2. Select the **System** tab.
+3. Click the **Switch toggle** to the right of the notification you want to control.
+   - On: Notification is sent when the condition is met
+   - Off: Notification is not sent regardless of conditions
+
+| System Notification | Toggleable |
+|---------------------|-----------|
+| Weekly Report | O |
+| Budget Warning | O |
+| Daily Spending Summary | O |
+| Inactivity Reminder | O |
+| Month-End Summary | O |
+| Spending Anomaly | O |
+| Pattern Analysis Results | O |
+| Goal Progress | O |
+| D-Day Reminder | O |
+| Background Analysis Jobs | X (always running) |
+
 ---
 
 ## System Automatic Notification Examples
@@ -272,6 +296,55 @@ To prevent notification overload, notifications are blocked under the following 
 
 ---
 
+## 💬 Telegram Usage Examples
+
+> Just talk to Nion in natural language. No special commands needed — chat like you normally would!
+
+### Setting Reminders
+
+```
+Remind me to exercise every day at 8 AM
+```
+→ A daily recurring reminder at 08:00 is registered
+
+```
+Set a reminder every Friday at 6 PM for weekly wrap-up
+```
+→ A weekly Friday 18:00 reminder is registered
+
+```
+Remind me about my doctor's appointment on March 20 at 10 AM
+```
+→ A one-time reminder is registered
+
+### Managing Reminders
+
+```
+Show me my reminder list
+```
+→ Displays all registered reminders
+
+```
+Turn off the exercise reminder
+```
+→ The reminder is deactivated
+
+```
+Change the exercise reminder time to 7 AM
+```
+→ The reminder time is updated
+
+### Deleting Reminders
+
+```
+Delete the doctor's appointment reminder
+```
+→ The reminder is removed
+
+> Example notification from Nion: "Time to exercise! 💪" — The message you set when creating the reminder is sent via Telegram.
+
+---
+
 ## FAQ
 
 **Q. How many reminders can I create?**
@@ -284,7 +357,7 @@ A. Telegram notifications require Telegram to be connected. The AI may mention r
 A. Yes. You can specify minute-level precision, for example "Remind me every day at 8:30 AM."
 
 **Q. Can I turn off system automatic notifications (budget warnings, spending anomalies, etc.)?**
-A. Currently there is no option to disable individual system automatic notifications. Deactivating the relevant feature (e.g., budget, budget tracker) will automatically stop the related notifications.
+A. Yes, you can. Go to **Schedules menu > System tab** to individually toggle each notification on or off. The 9 notification-sending system schedulers (weekly report, budget warning, daily summary, etc.) each have a Switch toggle. Background analysis jobs (conversation analysis, pattern analysis, etc.) run silently without toggles.
 
 **Q. Can I set a one-time reminder for a specific date?**
 A. Yes. Specifying a particular date, such as "Remind me on March 20 at 10 AM," registers a one-time reminder. It is automatically deactivated after that time has passed.

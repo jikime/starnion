@@ -21,6 +21,12 @@ A hyper-personalized AI agent platform for finance, journaling, goals, and daily
 
 Starnion is an AI agent platform built around **Nion**, your personal AI companion. Talk to Nion in natural language to track expenses, write diary entries, set goals, search your memories, and more — across Web UI and Telegram.
 
+**Key highlights:**
+- **34 built-in skills** — finance, diary, goals, memos, documents, image/audio/video, web search, and more
+- **System Scheduler Toggle** — 9 notification jobs (weekly report, budget warning, daily summary, etc.) can be individually enabled/disabled per user via Settings > Schedules > System tab
+- **Language Preference** — Set your preferred language in Settings > Account; AI responds in Korean, English, Japanese, or Chinese
+- **Multi-provider LLM** — Gemini, OpenAI, Anthropic, GLM (Z.AI), Ollama support
+
 > Full feature documentation is available at **[jikime.github.io/starnion](https://jikime.github.io/starnion/)**.
 
 ---
@@ -202,12 +208,12 @@ starnion/
 
 Full documentation is hosted at **[jikime.github.io/starnion](https://jikime.github.io/starnion/)**.
 
-| | 🇺🇸 English | 🇰🇷 한국어 |
-|-|------------|-----------|
-| Introduction | [Introduction](https://jikime.github.io/starnion/en/getting-started/introduction) | [소개](https://jikime.github.io/starnion/ko/getting-started/introduction) |
-| Quick Start | [Quick Start](https://jikime.github.io/starnion/en/getting-started/quickstart) | [빠른 시작](https://jikime.github.io/starnion/ko/getting-started/quickstart) |
-| Installation | [Installation](https://jikime.github.io/starnion/en/getting-started/installation) | [설치 가이드](https://jikime.github.io/starnion/ko/getting-started/installation) |
-| Architecture | [Architecture](https://jikime.github.io/starnion/en/architecture/overview) | [아키텍처](https://jikime.github.io/starnion/ko/architecture/overview) |
+| | 🇺🇸 English | 🇰🇷 한국어 | 🇯🇵 日本語 | 🇨🇳 中文 |
+|-|------------|-----------|----------|---------|
+| Introduction | [Introduction](https://jikime.github.io/starnion/en/getting-started/introduction) | [소개](https://jikime.github.io/starnion/ko/getting-started/introduction) | [Starnionとは](https://jikime.github.io/starnion/ja/getting-started/introduction) | [简介](https://jikime.github.io/starnion/zh/getting-started/introduction) |
+| Quick Start | [Quick Start](https://jikime.github.io/starnion/en/getting-started/quickstart) | [빠른 시작](https://jikime.github.io/starnion/ko/getting-started/quickstart) | [クイックスタート](https://jikime.github.io/starnion/ja/getting-started/quickstart) | [快速开始](https://jikime.github.io/starnion/zh/getting-started/quickstart) |
+| Installation | [Installation](https://jikime.github.io/starnion/en/getting-started/installation) | [설치 가이드](https://jikime.github.io/starnion/ko/getting-started/installation) | [インストール](https://jikime.github.io/starnion/ja/getting-started/installation) | [安装指南](https://jikime.github.io/starnion/zh/getting-started/installation) |
+| Architecture | [Architecture](https://jikime.github.io/starnion/en/architecture/overview) | [아키텍처](https://jikime.github.io/starnion/ko/architecture/overview) | [アーキテクチャ](https://jikime.github.io/starnion/ja/architecture/overview) | [架构](https://jikime.github.io/starnion/zh/architecture/overview) |
 
 ---
 

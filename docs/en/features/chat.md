@@ -339,6 +339,48 @@ AI:   Sure, here's the document summarized in 3 lines.
 
 ---
 
+## 💬 Telegram Usage Examples
+
+> Just talk to Nion in natural language. No special commands needed — chat like you normally would!
+
+### Casual Conversation
+
+```
+The weather's great today! Any suggestions for what to do?
+```
+→ Nion recommends activities suited to the weather
+
+```
+I've been really stressed out lately
+```
+→ Nion empathizes and suggests stress relief methods
+
+### Asking Questions
+
+```
+How do I make a delicious kimchi stew?
+```
+→ Provides a step-by-step recipe
+
+```
+What's the weather like in Seoul this week?
+```
+→ Shares weather information
+
+### File Attachments
+
+```
+[Attach photo] Organize this receipt for me
+```
+→ Analyzes the receipt and automatically records the expenses
+
+```
+[Voice message] (meeting recording)
+```
+→ Transcribes the audio to text and summarizes it
+
+---
+
 ## Frequently Asked Questions
 
 **Q. How long are conversations stored?**

@@ -158,6 +158,43 @@ AI: You have 18 diary entries from February.
 
 ---
 
+## 💬 Telegram Usage Examples
+
+> Just talk to Nion in natural language. No special commands needed — chat like you normally would!
+
+### Writing a Diary Entry
+
+```
+Had a great time at a restaurant with friends today, so happy!
+```
+→ Automatically analyzed with "happy" emotion and saved as a diary entry
+
+```
+Finished my presentation at work! Feeling proud
+```
+→ Recorded with "proud" emotion
+
+### Viewing Diary Entries
+
+```
+Show me this week's diary
+```
+→ Shows diary entries written this week
+
+```
+When did I feel good last month?
+```
+→ Shows dates and entries recorded with positive emotions
+
+### Emotion Analysis
+
+```
+How have my emotions been lately?
+```
+→ Analyzes recent emotion trends and patterns
+
+---
+
 ## Tips & FAQ
 
 **Q. How are diary entries different from memos?**

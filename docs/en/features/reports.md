@@ -340,6 +340,43 @@ Allowed `report_type` values: `daily`, `weekly`, `monthly`, `anomaly`, `pattern`
 
 ---
 
+## 💬 Telegram Usage Examples
+
+> Just talk to Nion in natural language. No special commands needed — chat like you normally would!
+
+### Generating Reports
+
+```
+Create a weekly report
+```
+→ A spending analysis report for this week is generated
+
+```
+Show me this month's monthly report
+```
+→ A comprehensive monthly report is generated
+
+### Requesting Analysis
+
+```
+Analyze my spending patterns
+```
+→ Analyzes spending patterns and identifies savings opportunities
+
+```
+How's my savings goal progress?
+```
+→ Generates a goal progress report
+
+### Comparing Periods
+
+```
+Compare last week's and this week's spending
+```
+→ Provides a comparative analysis of the two periods
+
+---
+
 ## FAQ
 
 **Q. I want to receive the weekly report on a day other than Monday.**

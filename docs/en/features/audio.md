@@ -208,6 +208,36 @@ AI:   Interview Q&A:
 
 ---
 
+## 💬 Telegram Usage Examples
+
+> Just talk to Nion in natural language. No special commands needed — chat like you normally would!
+
+### Voice Message Transcription
+
+```
+[Send voice message] Convert this to text
+```
+→ Transcribes the voice message to text
+
+```
+[Attach meeting recording] Summarize this
+```
+→ Transcribes the recording and summarizes the key points
+
+### Audio File Use Cases
+
+```
+[Attach English lecture recording] List the vocabulary I don't know
+```
+→ Extracts key expressions and vocabulary from the lecture
+
+```
+[Attach interview recording] Organize it in Q&A format
+```
+→ Structures the interview content into question-answer format
+
+---
+
 ## Tips & FAQ
 
 **Q. Can long files (1 hour or more) be transcribed?**

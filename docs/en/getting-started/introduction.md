@@ -67,7 +67,9 @@ Running on your server = complete control
 |---------|-------------|
 | **Multi-AI Providers** | Simultaneous support for Anthropic, OpenAI, Google Gemini, Z.AI |
 | **Multi-Channel** | Access via Web UI, Telegram, and Discord |
-| **Skill System** | 30+ built-in skills including weather, translation, search, and scheduling |
+| **Skill System** | 34 built-in skills including weather, translation, search, and scheduling |
+| **System Scheduler** | 9 notification jobs (weekly report, budget warning, etc.) individually toggleable per user |
+| **Language Preference** | Set preferred language in Settings > Account; AI responds in your chosen language (ko/en/ja/zh) |
 | **Document Processing** | PDF and DOCX upload with semantic search (pgvector) |
 | **Image Analysis** | Image upload and AI analysis |
 | **Audio Processing** | Voice memo upload and transcription |
@@ -111,7 +113,7 @@ Channel Integrations:
 
 | Component | Role | Tech Stack |
 |-----------|------|------------|
-| **UI** | Web interface | Next.js 15, React 19, TypeScript |
+| **UI** | Web interface | Next.js 16, React 19, TypeScript |
 | **Gateway** | REST API server / WebSocket | Go 1.22+, Gin |
 | **Agent** | AI engine / gRPC server | Python 3.13+, LangGraph, gRPC |
 | **PostgreSQL** | Main database / vector search | PostgreSQL 16 + pgvector |
@@ -160,11 +162,12 @@ User Message
 
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| Next.js | 15 | Web framework |
+| Next.js | 16 | Web framework |
 | React | 19 | UI library |
 | TypeScript | 5+ | Type safety |
 | NextAuth | v5 | Authentication |
-| Tailwind CSS | - | Styling |
+| Tailwind CSS | 4 | Styling |
+| shadcn/ui | - | UI component library |
 
 ### Infrastructure
 

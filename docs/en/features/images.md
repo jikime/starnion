@@ -200,6 +200,38 @@ AI:   Dishes you can make with the ingredients in your fridge:
 
 ---
 
+## 💬 Telegram Usage Examples
+
+> Just talk to Nion in natural language. No special commands needed — chat like you normally would!
+
+### Image Analysis
+
+```
+[Attach receipt photo] Organize this for me
+```
+→ Analyzes the receipt and automatically records items and amounts in your ledger
+
+```
+[Attach food photo] How many calories is this?
+```
+→ Analyzes the food photo and estimates the calorie count
+
+### Image Generation
+
+```
+Draw a cat wearing a spacesuit standing on the moon
+```
+→ AI generates an image matching the description
+
+### Work Use
+
+```
+[Attach whiteboard photo] Convert the meeting notes to text
+```
+→ Converts the whiteboard content into text
+
+---
+
 ## Tips & FAQ
 
 **Q. Receipt recognition isn't working well.**
