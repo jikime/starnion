@@ -11,24 +11,27 @@ import re
 from datetime import datetime
 
 from langchain_core.messages import HumanMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
 
-from starnion_agent.config import settings
 from starnion_agent.db.pool import get_pool
-from starnion_agent.skills.gemini_key import get_gemini_api_key
 from starnion_agent.db.repositories import daily_log as daily_log_repo
 from starnion_agent.db.repositories import knowledge as knowledge_repo
+from starnion_agent.persona import LANGUAGE_INSTRUCTIONS
 
 logger = logging.getLogger(__name__)
 
 CONVERSATION_KEY_PREFIX = "conversation:analysis:"
 
 
-async def analyze_conversation(user_id: str) -> str:
+async def analyze_conversation(user_id: str, language: str = "ko") -> str:
     """Analyze today's conversations and store insights in knowledge_base.
 
     Called via gRPC GenerateReport(report_type="conversation_analysis").
     Background-only: results are stored but NOT sent to the user.
+
+    Args:
+        user_id: UUID of the user.
+        language: Response language code (``"ko"``, ``"en"``, ``"ja"``, ``"zh"``).
+            Defaults to ``"ko"`` for backward compatibility.
 
     Returns:
         A summary string for logging.
@@ -53,16 +56,13 @@ async def analyze_conversation(user_id: str) -> str:
     logs_text = _build_logs_summary(today_logs, now)
 
     # 3. Call LLM for structured analysis.
-    api_key = await get_gemini_api_key(user_id)
-    if not api_key:
-        return "Gemini API 키가 설정되지 않아 대화 분석을 건너뜁니다."
+    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    try:
+        llm = await get_llm_for_use_case(user_id, "report")
+    except RuntimeError:
+        return "AI 프로바이더가 설정되지 않아 대화 분석을 생성할 수 없습니다."
 
-    llm = ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        google_api_key=api_key,
-    )
-
-    prompt = _build_conversation_analysis_prompt(logs_text)
+    prompt = _build_conversation_analysis_prompt(logs_text, language=language)
     response = await llm.ainvoke([HumanMessage(content=prompt)])
 
     # 4. Parse and store insights.
@@ -104,9 +104,16 @@ def _build_logs_summary(logs: list[dict], now: datetime) -> str:
     return "\n".join(lines)
 
 
-def _build_conversation_analysis_prompt(logs_text: str) -> str:
-    """Build the LLM prompt for conversation analysis."""
+def _build_conversation_analysis_prompt(logs_text: str, language: str = "ko") -> str:
+    """Build the LLM prompt for conversation analysis.
+
+    Args:
+        logs_text: Text summary of today's daily logs.
+        language: Response language code (ko, en, ja, zh). Defaults to "ko".
+    """
+    lang_instruction = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["ko"])
     return (
+        f"{lang_instruction}\n\n"
         "당신은 사용자 대화 분석 전문가입니다. "
         "아래 오늘의 대화/일기 기록을 분석하여 핵심 인사이트를 추출하세요.\n\n"
         "반드시 아래 JSON 형식으로만 응답하세요 (다른 텍스트 없이):\n"

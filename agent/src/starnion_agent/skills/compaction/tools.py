@@ -11,21 +11,19 @@ import re
 from datetime import datetime, timedelta
 
 from langchain_core.messages import HumanMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
 
-from starnion_agent.config import settings
 from starnion_agent.db.pool import get_pool
-from starnion_agent.skills.gemini_key import get_gemini_api_key
 from starnion_agent.db.repositories import daily_log as daily_log_repo
 from starnion_agent.db.repositories import knowledge as knowledge_repo
 from starnion_agent.embedding.service import embed_text
+from starnion_agent.persona import LANGUAGE_INSTRUCTIONS
 
 logger = logging.getLogger(__name__)
 
 MEMORY_KEY_PREFIX = "memory:weekly_summary:"
 
 
-async def compact_memory(user_id: str) -> str:
+async def compact_memory(user_id: str, language: str = "ko") -> str:
     """Compact old daily logs into weekly summaries.
 
     Called via gRPC GenerateReport(report_type="memory_compaction").
@@ -63,14 +61,11 @@ async def compact_memory(user_id: str) -> str:
         return "주별 그룹이 없습니다."
 
     # 3. Summarize each week and collect results.
-    api_key = await get_gemini_api_key(user_id)
-    if not api_key:
-        return "Gemini API 키가 설정되지 않아 메모리 압축을 건너뜁니다."
-
-    llm = ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        google_api_key=api_key,
-    )
+    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    try:
+        llm = await get_llm_for_use_case(user_id, "chat_default")
+    except RuntimeError:
+        return "AI 프로바이더가 설정되지 않아 메모리 압축을 생성할 수 없습니다."
 
     summaries: list[tuple[str, str, list[int]]] = []  # (key, summary_json, log_ids)
     all_ids_to_delete: list[int] = []
@@ -79,7 +74,7 @@ async def compact_memory(user_id: str) -> str:
         if len(logs) < 2:
             continue
 
-        prompt = _build_compaction_prompt(logs, week_label)
+        prompt = _build_compaction_prompt(logs, week_label, language=language)
         try:
             response = await llm.ainvoke([HumanMessage(content=prompt)])
         except Exception:
@@ -152,7 +147,7 @@ def _group_logs_by_week(logs: list[dict]) -> dict[str, list[dict]]:
     return groups
 
 
-def _build_compaction_prompt(logs: list[dict], week_label: str) -> str:
+def _build_compaction_prompt(logs: list[dict], week_label: str, language: str = "ko") -> str:
     """Build the LLM prompt for weekly log summarization."""
     lines = [f"[{week_label} 일기/대화 기록]"]
     for log_entry in logs:
@@ -165,8 +160,10 @@ def _build_compaction_prompt(logs: list[dict], week_label: str) -> str:
         lines.append(f"  {date_str}{sentiment_str}: {log_entry['content']}")
 
     logs_text = "\n".join(lines)
+    lang_instruction = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["ko"])
 
     return (
+        f"{lang_instruction}\n\n"
         "당신은 개인 기록 요약 전문가입니다. "
         "아래의 1주일간 일기/대화 기록을 읽고 핵심 내용을 요약하세요.\n\n"
         "반드시 아래 JSON 형식으로만 응답하세요 (다른 텍스트 없이):\n"

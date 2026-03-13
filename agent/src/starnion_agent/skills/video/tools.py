@@ -88,7 +88,7 @@ async def generate_video(prompt: str, frames: int = 5) -> str:
     for i in range(frames):
         frame_prompt = f"{prompt} (frame {i + 1}/{frames})"
         try:
-            response = client.models.generate_images(
+            response = await client.aio.models.generate_images(
                 model="imagen-3.0-generate-002",
                 prompt=frame_prompt,
                 config=types.GenerateImagesConfig(number_of_images=1),

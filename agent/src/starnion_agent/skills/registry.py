@@ -378,6 +378,7 @@ SKILLS: dict[str, SkillDef] = {
             "browser_type",
             "browser_press",
             "browser_select",
+            "browser_hover",
             "browser_scroll",
             "browser_evaluate",
             "browser_wait_for",

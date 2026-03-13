@@ -11,16 +11,13 @@ import re
 from datetime import datetime, timedelta
 
 from langchain_core.messages import HumanMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
 
-from starnion_agent.config import settings
 from starnion_agent.db.pool import get_pool
-from starnion_agent.skills.gemini_key import get_gemini_api_key
 from starnion_agent.db.repositories import daily_log as daily_log_repo
 from starnion_agent.db.repositories import finance as finance_repo
 from starnion_agent.db.repositories import knowledge as knowledge_repo
 from starnion_agent.db.repositories import profile as profile_repo
-from starnion_agent.persona import DEFAULT_PERSONA, get_tone_instruction
+from starnion_agent.persona import DEFAULT_PERSONA, LANGUAGE_INSTRUCTIONS, get_tone_instruction
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +34,16 @@ WEEKDAY_NAMES = {
 }
 
 
-async def analyze_patterns(user_id: str) -> str:
+async def analyze_patterns(user_id: str, language: str = "ko") -> str:
     """Analyze user spending/behavior patterns and store in knowledge_base.
 
     Called daily via gRPC GenerateReport(report_type="pattern_analysis").
     Results are stored but NOT sent to the user.
+
+    Args:
+        user_id: UUID of the user.
+        language: Response language code (``"ko"``, ``"en"``, ``"ja"``, ``"zh"``).
+            Defaults to ``"ko"`` for backward compatibility.
     """
     pool = get_pool()
 
@@ -85,16 +87,13 @@ async def analyze_patterns(user_id: str) -> str:
     )
 
     # 5. Call LLM for structured pattern detection.
-    api_key = await get_gemini_api_key(user_id)
-    if not api_key:
-        return "Gemini API 키가 설정되지 않아 패턴 분석을 건너뜁니다."
+    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    try:
+        llm = await get_llm_for_use_case(user_id, "report")
+    except RuntimeError:
+        return "AI 프로바이더가 설정되지 않아 패턴 분석을 생성할 수 없습니다."
 
-    llm = ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        google_api_key=api_key,
-    )
-
-    prompt = _build_analysis_prompt(data_summary)
+    prompt = _build_analysis_prompt(data_summary, language=language)
     response = await llm.ainvoke([HumanMessage(content=prompt)])
 
     # 6. Parse and store patterns.
@@ -116,10 +115,15 @@ async def analyze_patterns(user_id: str) -> str:
     return "패턴 분석 결과를 파싱할 수 없었습니다."
 
 
-async def generate_pattern_insight(user_id: str) -> str:
+async def generate_pattern_insight(user_id: str, language: str = "ko") -> str:
     """Generate a personalized notification based on stored patterns.
 
     Called via gRPC GenerateReport(report_type="pattern_insight").
+
+    Args:
+        user_id: UUID of the user.
+        language: Response language code (``"ko"``, ``"en"``, ``"ja"``, ``"zh"``).
+            Defaults to ``"ko"`` for backward compatibility.
     """
     pool = get_pool()
 
@@ -157,16 +161,13 @@ async def generate_pattern_insight(user_id: str) -> str:
         persona_id = preferences.get("persona", DEFAULT_PERSONA)
 
     # 3. Build prompt and generate insight.
-    api_key = await get_gemini_api_key(user_id)
-    if not api_key:
-        return ""
+    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    try:
+        llm = await get_llm_for_use_case(user_id, "report")
+    except RuntimeError:
+        return "AI 프로바이더가 설정되지 않아 패턴 인사이트를 생성할 수 없습니다."
 
-    llm = ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        google_api_key=api_key,
-    )
-
-    prompt = _build_insight_prompt(patterns, today_records, monthly, budget, now, persona_id)
+    prompt = _build_insight_prompt(patterns, today_records, monthly, budget, now, persona_id, language=language)
     response = await llm.ainvoke([HumanMessage(content=prompt)])
     return response.content
 
@@ -252,9 +253,16 @@ def _build_analysis_data(
     return "\n".join(lines)
 
 
-def _build_analysis_prompt(data_summary: str) -> str:
-    """Build the LLM prompt for structured pattern analysis."""
+def _build_analysis_prompt(data_summary: str, language: str = "ko") -> str:
+    """Build the LLM prompt for structured pattern analysis.
+
+    Args:
+        data_summary: Text summary of user spending and behavior data.
+        language: Response language code (ko, en, ja, zh). Defaults to "ko".
+    """
+    lang_instruction = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["ko"])
     return (
+        f"{lang_instruction}\n\n"
         "당신은 재정 패턴 분석 전문가입니다. "
         "아래 사용자의 지출 및 행동 데이터를 분석하여 반복 패턴을 감지하세요.\n\n"
         "반드시 아래 JSON 형식으로만 응답하세요 (다른 텍스트 없이):\n"
@@ -300,8 +308,19 @@ def _build_insight_prompt(
     budget: dict,
     now: datetime,
     persona_id: str = DEFAULT_PERSONA,
+    language: str = "ko",
 ) -> str:
-    """Build the LLM prompt for generating a personalized pattern insight notification."""
+    """Build the LLM prompt for generating a personalized pattern insight notification.
+
+    Args:
+        patterns: Detected spending/behavior patterns from knowledge_base.
+        today_records: Today's spending records.
+        monthly: Monthly category spending summary.
+        budget: User's budget configuration.
+        now: Current datetime.
+        persona_id: Persona ID for tone selection.
+        language: Response language code (ko, en, ja, zh). Defaults to "ko".
+    """
     lines: list[str] = []
 
     # Pattern descriptions.
@@ -333,8 +352,10 @@ def _build_insight_prompt(
     data_summary = "\n".join(lines)
 
     tone = get_tone_instruction(persona_id)
+    lang_instruction = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["ko"])
 
     return (
+        f"{lang_instruction}\n\n"
         f"당신은 개인 재정 AI 비서 '지기'입니다.\n{tone}\n\n"
         "사용자의 지출 패턴을 바탕으로 오늘 도움이 될 만한 맞춤 알림을 작성해주세요.\n\n"
         "포함할 내용:\n"

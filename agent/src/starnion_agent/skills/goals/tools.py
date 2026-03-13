@@ -12,17 +12,14 @@ from datetime import date, datetime, timedelta
 
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
-from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
-from starnion_agent.config import settings
 from starnion_agent.context import get_current_user
 from starnion_agent.db.pool import get_pool
-from starnion_agent.skills.gemini_key import get_gemini_api_key
 from starnion_agent.db.repositories import finance as finance_repo
 from starnion_agent.db.repositories import goal_db as goal_db_repo
 from starnion_agent.db.repositories import profile as profile_repo
-from starnion_agent.persona import DEFAULT_PERSONA, get_tone_instruction
+from starnion_agent.persona import DEFAULT_PERSONA, LANGUAGE_INSTRUCTIONS, get_tone_instruction
 from starnion_agent.skills.guard import skill_guard
 
 logger = logging.getLogger(__name__)
@@ -262,7 +259,7 @@ async def update_goal_progress(goal_id: int, progress_pct: float) -> str:
 # --- Report Functions (called via gRPC, NOT @tool) ---
 
 
-async def evaluate_goals(user_id: str) -> str:
+async def evaluate_goals(user_id: str, language: str = "ko") -> str:
     """Evaluate progress on all active goals and cache evaluation in metadata."""
     pool = get_pool()
     active_goals = await goal_db_repo.list_goals(pool, user_id, status="in_progress")
@@ -302,16 +299,13 @@ async def evaluate_goals(user_id: str) -> str:
 
     data_summary = _build_evaluation_data(active_goals, monthly, daily_totals, budget, now)
 
-    api_key = await get_gemini_api_key(user_id)
-    if not api_key:
-        return "Gemini API 키가 설정되지 않아 목표 평가를 건너뜁니다."
+    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    try:
+        llm = await get_llm_for_use_case(user_id, "report")
+    except RuntimeError:
+        return "AI 프로바이더가 설정되지 않아 목표 평가를 생성할 수 없습니다."
 
-    llm = ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        google_api_key=api_key,
-    )
-
-    prompt = _build_evaluation_prompt(data_summary)
+    prompt = _build_evaluation_prompt(data_summary, language=language)
     response = await llm.ainvoke([HumanMessage(content=prompt)])
 
     evaluations = _extract_json(response.content)
@@ -343,7 +337,7 @@ async def evaluate_goals(user_id: str) -> str:
     return f"{len(active_goals)}개 목표 평가 완료: {', '.join(summary_parts)}"
 
 
-async def generate_goal_status(user_id: str) -> str:
+async def generate_goal_status(user_id: str, language: str = "ko") -> str:
     """Generate a weekly goal progress notification."""
     pool = get_pool()
     active_goals = await goal_db_repo.list_goals(pool, user_id, status="in_progress")
@@ -363,16 +357,13 @@ async def generate_goal_status(user_id: str) -> str:
         budget = preferences.get("budget", {})
         persona_id = preferences.get("persona", DEFAULT_PERSONA)
 
-    api_key = await get_gemini_api_key(user_id)
-    if not api_key:
-        return ""
+    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    try:
+        llm = await get_llm_for_use_case(user_id, "report")
+    except RuntimeError:
+        return "AI 프로바이더가 설정되지 않아 목표 상태 알림을 생성할 수 없습니다."
 
-    llm = ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        google_api_key=api_key,
-    )
-
-    prompt = _build_status_prompt(active_goals, monthly, budget, now, persona_id)
+    prompt = _build_status_prompt(active_goals, monthly, budget, now, persona_id, language=language)
     response = await llm.ainvoke([HumanMessage(content=prompt)])
     return response.content
 
@@ -428,8 +419,9 @@ def _build_evaluation_data(
     return "\n".join(lines)
 
 
-def _build_evaluation_prompt(data_summary: str) -> str:
+def _build_evaluation_prompt(data_summary: str, language: str = "ko") -> str:
     """Build the LLM prompt for structured goal evaluation."""
+    lang_instruction = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["ko"])
     return (
         "당신은 재정 목표 평가 전문가입니다. "
         "사용자의 활성 목표와 현재 지출 데이터를 분석하여 각 목표의 진행 상황을 평가하세요.\n\n"
@@ -441,7 +433,7 @@ def _build_evaluation_prompt(data_summary: str) -> str:
         '      "goal_id": "목표 ID (숫자)",\n'
         '      "progress_pct": 45,\n'
         '      "verdict": "on_track | warning | critical | achieved",\n'
-        '      "summary": "한국어 요약 (1-2문장)"\n'
+        '      "summary": "1-2 sentence summary"\n'
         "    }\n"
         "  ]\n"
         "}\n"
@@ -455,7 +447,8 @@ def _build_evaluation_prompt(data_summary: str) -> str:
         "- budget_limit: (현재 지출 / 목표 금액) * 100 (낮을수록 좋음)\n"
         "- savings: (절약된 금액 / 목표 금액) * 100 (높을수록 좋음)\n"
         "- habit: 관련 행동 변화 정도 (0-100)\n\n"
-        f"데이터:\n{data_summary}"
+        f"데이터:\n{data_summary}\n\n"
+        f"{lang_instruction}"
     )
 
 
@@ -465,6 +458,7 @@ def _build_status_prompt(
     budget: dict,
     now: datetime,
     persona_id: str = DEFAULT_PERSONA,
+    language: str = "ko",
 ) -> str:
     """Build the LLM prompt for generating a goal status notification."""
     lines: list[str] = []
@@ -507,6 +501,7 @@ def _build_status_prompt(
 
     data_summary = "\n".join(lines)
     tone = get_tone_instruction(persona_id)
+    lang_instruction = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["ko"])
 
     return (
         f"당신은 개인 재정 AI 비서 '지기'입니다.\n{tone}\n\n"
@@ -517,7 +512,8 @@ def _build_status_prompt(
         "3. 주의가 필요한 목표에 대한 구체적 제안\n"
         "4. 다음 주를 위한 실행 가능한 팁\n\n"
         "길이: 3-5문장으로 간결하게. 이모지 적절히 1-2개 사용.\n\n"
-        f"데이터:\n{data_summary}"
+        f"데이터:\n{data_summary}\n\n"
+        f"{lang_instruction}"
     )
 
 

@@ -19,8 +19,9 @@ from starnion_agent.db.pool import get_pool
 from starnion_agent.db.repositories import skill as skill_repo
 from starnion_agent.db.repositories import provider as provider_repo
 from starnion_agent.db.repositories import usage as usage_repo
+from starnion_agent.db.repositories.profile import get_user_language
 from starnion_agent.pricing import calculate_cost, get_provider
-from starnion_agent.persona import DEFAULT_PERSONA, _NAME_TO_ID, build_system_prompt, get_persona
+from starnion_agent.persona import DEFAULT_PERSONA, NAME_TO_ID, build_system_prompt, get_persona
 from starnion_agent.skills.audio.tools import generate_audio, transcribe_audio
 from starnion_agent.skills.budget.tools import get_budget_status, set_budget
 from starnion_agent.skills.diary.tools import save_daily_log, save_diary_entry
@@ -97,6 +98,7 @@ from starnion_agent.skills.browser.tools import (
     browser_type,
     browser_press,
     browser_select,
+    browser_hover,
     browser_scroll,
     browser_evaluate,
     browser_wait_for,
@@ -107,6 +109,29 @@ from starnion_agent.skills.browser.tools import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ── ANSI colour helpers ──────────────────────────────────────────────────────
+_ANSI_RESET  = "\033[0m"
+_ANSI_BOLD   = "\033[1m"
+_ANSI_DIM    = "\033[2m"
+
+_PROVIDER_COLORS: dict[str, str] = {
+    "anthropic": "\033[95m",   # bright magenta
+    "gemini":    "\033[94m",   # bright blue
+    "openai":    "\033[92m",   # bright green
+    "zai":       "\033[96m",   # bright cyan
+    "custom":    "\033[93m",   # bright yellow
+}
+
+
+def _model_tag(provider: str, model: str, suffix: str = "") -> str:
+    """Return a coloured '[provider/model]' tag for log messages."""
+    color = _PROVIDER_COLORS.get(provider, "\033[97m")  # bright white fallback
+    label = f"{provider}/{model}"
+    dim_suffix = f" {_ANSI_DIM}{suffix}{_ANSI_RESET}" if suffix else ""
+    return f"{_ANSI_BOLD}{color}[{label}]{_ANSI_RESET}{dim_suffix}"
+
+
 
 # Module-level reference for cleanup during shutdown.
 _checkpointer_cm: Any = None
@@ -198,6 +223,7 @@ ALL_TOOLS = [
     browser_type,
     browser_press,
     browser_select,
+    browser_hover,
     browser_scroll,
     browser_evaluate,
     browser_wait_for,
@@ -207,19 +233,30 @@ ALL_TOOLS = [
     browser_close,
 ]
 
-# LLM instance cache: (provider, model, key_hash) → LLM object.
+# LLM instance cache: (provider, model, key_hash, endpoint_type) → LLM object.
 # Avoids recreating identical clients on every request.
 _MAX_LLM_CACHE = 50
-_llm_cache: dict[tuple[str, str, str], Any] = {}
+_llm_cache: dict[tuple[str, str, str, str], Any] = {}
 
 
-def _make_llm(provider: str, model: str, api_key: str, base_url: str = "") -> Any:
+def _make_llm(
+    provider: str,
+    model: str,
+    api_key: str,
+    base_url: str = "",
+    endpoint_type: str = "",
+) -> Any:
     """Return a cached LangChain chat model for the given (provider, model, key).
+
+    For custom endpoints:
+      - endpoint_type="ollama"  → uses OpenAI-compatible API at {base_url}/v1
+        (Ollama supports OpenAI-compatible /v1 since v0.1.24; no extra dependency needed)
+      - endpoint_type="openai_compatible" or "" → uses base_url as-is
 
     Raises RuntimeError for unknown providers — callers must configure a valid provider.
     """
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()[:16]
-    cache_key = (provider, model, key_hash)
+    cache_key = (provider, model, key_hash, endpoint_type)
     if cache_key in _llm_cache:
         return _llm_cache[cache_key]
 
@@ -240,12 +277,16 @@ def _make_llm(provider: str, model: str, api_key: str, base_url: str = "") -> An
             base_url=base_url or "https://api.z.ai/api/paas/v4",
         )
     elif provider == "custom" and base_url:
-        from langchain_openai import ChatOpenAI  # lazy import
-        llm = ChatOpenAI(
-            model=model,
-            api_key=api_key or "sk-none",  # type: ignore[call-arg]
-            base_url=base_url,
-        )
+        if endpoint_type == "ollama":
+            from langchain_ollama import ChatOllama  # lazy import
+            llm = ChatOllama(model=model, base_url=base_url.rstrip("/"))
+        else:
+            from langchain_openai import ChatOpenAI  # lazy import
+            llm = ChatOpenAI(
+                model=model,
+                api_key=api_key or "sk-none",  # type: ignore[call-arg]
+                base_url=base_url,
+            )
     else:
         raise RuntimeError(
             f"Unknown provider '{provider}' or missing base_url. "
@@ -259,18 +300,39 @@ def _make_llm(provider: str, model: str, api_key: str, base_url: str = "") -> An
     return llm
 
 
+def _is_assignment_valid(assign: dict[str, Any]) -> bool:
+    """Return True when an assignment row has enough data to create an LLM."""
+    provider = assign.get("provider", "")
+    model = assign.get("model", "")
+    api_key = assign.get("api_key", "")
+    base_url = assign.get("base_url", "")
+
+    if not provider or not model:
+        return False
+    if provider == "custom":
+        # Custom endpoints need base_url; Ollama doesn't require api_key.
+        return bool(base_url)
+    return bool(api_key)
+
+
 async def _get_enabled_context(
     user_id: str | None,
-) -> tuple[str, list[str], str, str, Any, str | None]:
-    """Query user persona, enabled skills, and LLM override in a single pass.
+) -> tuple[str, list[str], str, str, Any, str | None, str, str]:
+    """Query user persona, enabled skills, and LLM in a single pass.
+
+    Chat model = persona's provider/model (no model_assignment override for chat).
+    Model assignments are only used for dedicated tasks (image, audio, report).
 
     Returns:
         (persona_id, enabled_tool_names, catalog_text, instructions_text,
-         llm_override, custom_system_prompt)
+         llm_override, custom_system_prompt, endpoint_type, active_prov)
 
         ``llm_override`` is None when no provider is configured — the caller
         must raise an error in that case.
         ``custom_system_prompt`` is the raw text from personas.system_prompt.
+        ``endpoint_type`` is the endpoint type of the selected LLM.
+        ``active_prov`` is the resolved provider label for usage logging
+        (e.g. "gemini", "anthropic", "openai", "ollama", "custom").
     """
     persona_id = DEFAULT_PERSONA
     enabled_tool_names: list[str] = []
@@ -278,36 +340,45 @@ async def _get_enabled_context(
     instructions_text = ""
     llm_override = None
     custom_system_prompt: str | None = None
+    active_endpoint_type = ""
+    active_prov = ""
 
     if not user_id:
-        return persona_id, enabled_tool_names, catalog_text, instructions_text, llm_override, custom_system_prompt
+        return persona_id, enabled_tool_names, catalog_text, instructions_text, llm_override, custom_system_prompt, active_endpoint_type, active_prov
 
     pool = get_pool()
 
-    # 1. User's default persona (personas table) — provider + model + api_key required.
+    # 1. User's default persona (personas table) — for persona_id + system_prompt.
     persona_row = await provider_repo.get_default_persona_with_provider(pool, user_id)
+    persona_provider_llm = None  # LLM built from persona's provider (fallback)
+
+    persona_endpoint_type = ""
     if persona_row:
         prov = persona_row.get("provider", "")
         model = persona_row.get("model", "")
         api_key = persona_row.get("api_key", "")
         base_url = persona_row.get("base_url", "")
+        endpoint_type = persona_row.get("endpoint_type", "")
         persona_name = persona_row.get("persona_name", "")
         custom_system_prompt = persona_row.get("system_prompt") or None
 
         # Map DB Korean display name → PERSONAS key (e.g. "친한 친구" → "buddy").
         # For built-in personas, use the Python-controlled tone from PERSONAS dict
         # so that tone strength is always under our control (not old DB text).
-        resolved_id = _NAME_TO_ID.get(persona_name, "")
+        resolved_id = NAME_TO_ID.get(persona_name, "")
         if resolved_id:
             persona_id = resolved_id
             custom_system_prompt = None  # Use Python built-in tone (always up-to-date)
         # else: truly custom persona → keep custom_system_prompt from DB
 
-        if prov and model and api_key:
-            llm_override = _make_llm(prov, model, api_key, base_url)
+        if prov and model and (api_key or prov == "custom"):
+            persona_provider_llm = _make_llm(prov, model, api_key, base_url, endpoint_type)
+            persona_endpoint_type = endpoint_type
+            active_prov = endpoint_type if (prov == "custom" and endpoint_type) else prov
             logger.info(
-                "[Persona] user=%s | persona='%s' | provider=%s | model=%s | custom_prompt=%s",
-                user_id, persona_name, prov, model,
+                "[Persona] user=%s | persona='%s' | %s | custom_prompt=%s",
+                user_id, persona_name,
+                _model_tag(prov, model, "(persona provider)"),
                 "yes" if custom_system_prompt else "no",
             )
         else:
@@ -318,7 +389,11 @@ async def _get_enabled_context(
     else:
         logger.info("[Persona] user=%s | no default persona found", user_id)
 
-    # 2. Enabled skills (single DB query).
+    # 2. Persona is the authoritative chat model — no model_assignment override.
+    llm_override = persona_provider_llm
+    active_endpoint_type = persona_endpoint_type
+
+    # 3. Enabled skills (single DB query).
     enabled = await skill_repo.get_enabled_skills(pool, user_id)
 
     for sid in enabled:
@@ -330,7 +405,81 @@ async def _get_enabled_context(
     catalog_text = build_skill_catalog(skill_docs)
     instructions_text = build_skill_instructions(skill_docs)
 
-    return persona_id, enabled_tool_names, catalog_text, instructions_text, llm_override, custom_system_prompt
+    return persona_id, enabled_tool_names, catalog_text, instructions_text, llm_override, custom_system_prompt, active_endpoint_type, active_prov
+
+
+async def get_llm_for_use_case(user_id: str, use_case: str) -> Any:
+    """Return an LLM configured for the given use case.
+
+    Fallback chain:
+      1. model_assignments[use_case]  — specific assignment (image, audio, report)
+      2. Default persona's provider   — persona-level configuration
+      3. RuntimeError                 — no provider configured
+
+    Intended for use by task-specific callers (report generation, image/audio
+    processing) that want to honour the user's per-use-case model preference.
+    """
+    pool = get_pool()
+
+    assignments = await provider_repo.get_all_model_assignments_with_provider(pool, user_id)
+
+    assign = assignments.get(use_case)
+    if assign and _is_assignment_valid(assign):
+        logger.info(
+            "[ModelAssignment] user=%s | use_case=%s | %s",
+            user_id, use_case,
+            _model_tag(assign["provider"], assign["model"], "(assignment)"),
+        )
+        return _make_llm(
+            assign["provider"],
+            assign["model"],
+            assign.get("api_key", ""),
+            assign.get("base_url", ""),
+            assign.get("endpoint_type", ""),
+        )
+
+    # Fall back to persona provider.
+    persona_row = await provider_repo.get_default_persona_with_provider(pool, user_id)
+    if persona_row:
+        prov = persona_row.get("provider", "")
+        model = persona_row.get("model", "")
+        api_key = persona_row.get("api_key", "")
+        base_url = persona_row.get("base_url", "")
+        endpoint_type = persona_row.get("endpoint_type", "")
+        if prov and model and (api_key or prov == "custom"):
+            logger.info(
+                "[ModelAssignment] user=%s | use_case=%s | %s",
+                user_id, use_case,
+                _model_tag(prov, model, "(fallback: persona provider)"),
+            )
+            return _make_llm(prov, model, api_key, base_url, endpoint_type)
+
+    raise RuntimeError("AI provider not configured")
+
+
+async def get_model_config_for_use_case(user_id: str | None, use_case: str) -> dict | None:
+    """Return the raw model assignment config for a generative use case, or None.
+
+    Unlike get_llm_for_use_case, this does NOT build an LLM object and does NOT
+    fall back to the persona provider.  Callers use their own hardcoded defaults
+    when None is returned (e.g. image_gen → gemini-3.1-flash-image-preview).
+
+    Used by image/audio generation tools that call provider-specific APIs directly
+    (google-genai, ollama) rather than going through LangChain.
+    """
+    if not user_id:
+        return None
+    pool = get_pool()
+    assignments = await provider_repo.get_all_model_assignments_with_provider(pool, user_id)
+    assign = assignments.get(use_case)
+    if assign and _is_assignment_valid(assign):
+        logger.info(
+            "[ModelAssignment] user=%s | use_case=%s | %s",
+            user_id, use_case,
+            _model_tag(assign["provider"], assign["model"], "(generative assignment)"),
+        )
+        return dict(assign)
+    return None
 
 
 def _build_prompt(
@@ -339,9 +488,10 @@ def _build_prompt(
     catalog_text: str,
     instructions_text: str,
     custom_system_prompt: str | None = None,
+    language: str = "ko",
 ) -> str:
     """Assemble the system prompt with progressive skill disclosure."""
-    prompt_text = build_system_prompt(persona_id, custom_prompt=custom_system_prompt)
+    prompt_text = build_system_prompt(persona_id, custom_prompt=custom_system_prompt, language=language)
 
     # Level 1: Skill catalog (name + description for awareness).
     if catalog_text:
@@ -378,6 +528,7 @@ async def _agent_node(state: MessagesState) -> dict:
       5. Invokes the model and returns the response.
     """
     user_id = get_current_user()
+    active_prov = ""
 
     try:
         (
@@ -387,6 +538,8 @@ async def _agent_node(state: MessagesState) -> dict:
             instructions_text,
             llm_override,
             custom_system_prompt,
+            _,
+            active_prov,
         ) = await _get_enabled_context(user_id)
     except Exception:
         logger.warning("Failed to load persona/skills, using defaults", exc_info=True)
@@ -401,12 +554,26 @@ async def _agent_node(state: MessagesState) -> dict:
         raise RuntimeError("AI provider not configured")
 
     active_llm = llm_override
+    _llm_provider = getattr(active_llm, "_provider", "") or ""
+    _llm_model    = getattr(active_llm, "model", getattr(active_llm, "model_name", "unknown"))
+    # Infer provider label from class name when _provider attr is absent.
+    if not _llm_provider:
+        _cls = type(active_llm).__name__.lower()
+        if "anthropic" in _cls:   _llm_provider = "anthropic"
+        elif "google"  in _cls:   _llm_provider = "gemini"
+        elif "openai"  in _cls:   _llm_provider = "openai"
+        else:                      _llm_provider = _cls
     logger.info(
-        "[LLM] user=%s | provider=%s / model=%s",
+        "[LLM] user=%s | %s",
         user_id,
-        type(active_llm).__name__,
-        getattr(active_llm, "model", getattr(active_llm, "model_name", "unknown")),
+        _model_tag(_llm_provider, _llm_model, "(chat)"),
     )
+
+    # 사용자 선호 언어 조회 (DB 오류 시 기본값 'ko' 반환).
+    user_language = "ko"
+    if user_id:
+        pool = get_pool()
+        user_language = await get_user_language(pool, user_id)
 
     # Build system prompt (custom_system_prompt takes priority over persona_id tone).
     prompt_text = _build_prompt(
@@ -415,6 +582,7 @@ async def _agent_node(state: MessagesState) -> dict:
         catalog_text,
         instructions_text,
         custom_system_prompt=custom_system_prompt,
+        language=user_language,
     )
     messages = [SystemMessage(content=prompt_text)] + state["messages"]
 
@@ -428,7 +596,7 @@ async def _agent_node(state: MessagesState) -> dict:
 
     # Determine model name and provider for usage logging.
     active_model = getattr(active_llm, "model", getattr(active_llm, "model_name", "unknown"))
-    active_provider = get_provider(active_model) if llm_override is not None else "gemini"
+    active_provider = active_prov or get_provider(active_model)
 
     llm_status = "error"
     response = None

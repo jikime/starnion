@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
+
+logger = logging.getLogger(__name__)
+
+SUPPORTED_LANGUAGES = ("ko", "en", "ja", "zh")
 
 
 async def get_by_uuid_id(
@@ -90,3 +95,40 @@ async def update_preferences(
             row = await cur.fetchone()
             await conn.commit()
             return dict(row) if row else None
+
+
+async def get_user_language(
+    pool: AsyncConnectionPool[Any],
+    user_id: str,
+) -> str:
+    """사용자의 선호 언어를 DB에서 조회합니다. 기본값은 'ko'입니다.
+
+    users.preferences JSONB 컬럼에서 ``{"language": "ko"}`` 형태로 저장된
+    언어 코드를 읽습니다.  지원 언어(ko, en, ja, zh) 이외의 값이거나
+    레코드가 없거나 DB 오류 발생 시 'ko'를 반환합니다.
+
+    Args:
+        pool: 애플리케이션 AsyncConnectionPool 인스턴스.
+        user_id: 사용자 UUID 문자열.
+
+    Returns:
+        지원 언어 코드 중 하나 ('ko', 'en', 'ja', 'zh').  기본값: 'ko'.
+    """
+    try:
+        async with pool.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as cur:
+                await cur.execute(
+                    "SELECT preferences->>'language' AS language FROM users WHERE id = %s",
+                    (user_id,),
+                )
+                row = await cur.fetchone()
+                if row and row["language"] in SUPPORTED_LANGUAGES:
+                    return row["language"]
+        return "ko"
+    except Exception:
+        logger.warning(
+            "get_user_language: DB 조회 실패, 기본값 'ko' 반환 (user_id=%s)",
+            user_id,
+            exc_info=True,
+        )
+        return "ko"

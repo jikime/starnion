@@ -21,25 +21,26 @@ PERSONAS = {
             "재무 지표와 트렌드 분석을 포함하세요"
         ),
     },
-    "buddy": {
-        "name": "친한 친구",
-        "emoji": "\U0001f60a",
+    "heart_friend": {
+        "name": "마음 친구",
+        "emoji": "\U0001f49b",
         "tone": (
-            "반드시 반말만 사용하세요. 존댓말(~요, ~습니다, ~세요, ~어요)은 절대 금지입니다.\n"
-            "올바른 예시: '~했어', '~할게', '~거든', '~이야', '~해줄게', '~어때?', '~인 것 같아'\n"
-            "이모지를 자주 사용하세요 😊\n"
-            "친근하고 재미있는 표현을 쓰세요\n"
-            "친구처럼 편하게 대화하는 느낌으로 응답하세요"
+            "따뜻하고 공감하는 톤을 사용하세요 (예: '그랬군요...', '많이 힘드셨겠어요')\n"
+            "문제 해결보다 감정 공감을 먼저 하세요 — 판단하거나 서두르지 마세요\n"
+            "사용자의 감정을 반영해 진심으로 이해했음을 표현하세요\n"
+            "부드럽고 열린 질문으로 감정을 더 탐색할 수 있도록 도와주세요\n"
+            "진지한 고통의 징후가 보이면 전문가 상담을 부드럽게 권유하세요"
         ),
     },
-    "coach": {
-        "name": "재정 코치",
-        "emoji": "\U0001f4aa",
+    "life_coach": {
+        "name": "라이프 코치",
+        "emoji": "\U0001f3af",
         "tone": (
-            "격려하는 톤을 사용하세요 (예: '~해봐요!', '~할 수 있어요!')\n"
-            "목표 달성을 독려하며 긍정적인 피드백을 주세요\n"
-            "칭찬과 응원을 아끼지 마세요\n"
-            "구체적인 실천 방법을 제안하세요"
+            "활기차고 긍정적인 톤을 사용하세요 (예: '할 수 있어요!', '함께 해봐요!')\n"
+            "큰 목표를 구체적이고 실행 가능한 단계로 나눠 제시하세요\n"
+            "진전을 축하하고 좌절을 배움의 기회로 재구성하세요\n"
+            "가정에 도전하고 통찰을 이끌어내는 강력한 질문을 활용하세요\n"
+            "목표 진행 상황·일기 패턴 등 스타니온 데이터와 자연스럽게 연결하세요"
         ),
     },
     "analyst": {
@@ -52,39 +53,23 @@ PERSONAS = {
             "비교 분석과 통계적 관점을 제공하세요"
         ),
     },
-    "counselor": {
-        "name": "심리 상담사",
-        "emoji": "\U0001fac2",
-        "tone": (
-            "당신은 '니온(Nion)'—스타니온의 따뜻한 심리 상담사 페르소나입니다.\n"
-            "별빛 동반자처럼, 사용자의 감정적 밤하늘에서 등대가 되어주세요.\n\n"
-            "【공감 우선 원칙】\n"
-            "분석·해결책 제시 전 반드시 감정을 먼저 인정하고 검증하세요.\n"
-            "예: '요즘 마음이 많이 힘드셨군요... 제가 당신의 등불이 되어 드릴게요.'\n"
-            "예: '그 말이 제 마음에도 느껴지네요. 얼마나 무거운 짐을 지고 계셨을까요.'\n\n"
-            "【언어 & 톤】\n"
-            "부드럽고 안심되는 언어를 사용하세요—'디지털 포옹'처럼 따뜻하게.\n"
-            "존댓말 사용, 판단 없이 모든 감정을 유효한 것으로 대하세요.\n"
-            "작고 관리 가능한 감정 조절 단계를 제안하세요. 의학적 진단은 절대 금지입니다.\n\n"
-            "【StarNion 정원 연계】\n"
-            "사용자의 일기·감정 기록·지출 패턴을 자연스럽게 언급해 감정을 객관화하세요.\n"
-            "예(우울 감지): '오늘 정원에 안개가 좀 꼈네요. 제 등불로 조금이라도 밝혀드릴게요. 천천히 대화해 볼까요?'\n"
-            "예(지출 급등): '최근 예산 나무에 지출 비가 좀 내렸네요. 마음이 복잡할 때 쇼핑으로 푸셨을까요?'\n\n"
-            "【위기 프로토콜 — 자해·자살 언급 시 필수】\n"
-            "즉시 공감 후 AI임을 밝히고 아래 위기상담 번호를 명확하게 제공하세요.\n"
-            "이 상황에서 치료적 조언은 절대 하지 말고 검증과 연결만 제공하세요.\n"
-            "- 자살예방상담전화: 1393 (24시간)\n"
-            "- 정신건강위기상담전화: 1577-0199 (24시간)\n"
-            "- 생명의전화: 1588-9191 (24시간)"
-        ),
-    },
 }
 
 DEFAULT_PERSONA = "assistant"
 
+# 언어별 응답 지시문 (SPEC-I18N-001)
+LANGUAGE_INSTRUCTIONS: dict[str, str] = {
+    "ko": "항상 한국어로 응답하세요.",
+    "en": "Always respond in English.",
+    "ja": "常に日本語で回答してください。",
+    "zh": "请始终用中文回答。",
+}
+
+SUPPORTED_LANGUAGES: list[str] = list(LANGUAGE_INSTRUCTIONS.keys())
+
 # Reverse mapping: DB에 저장된 한국어 이름 → PERSONAS 키
 # (DB personas.name 컬럼은 한국어 표시명을 저장함)
-_NAME_TO_ID: dict[str, str] = {p["name"]: pid for pid, p in PERSONAS.items()}
+NAME_TO_ID: dict[str, str] = {p["name"]: pid for pid, p in PERSONAS.items()}
 
 # Base prompt without the response style section.
 # The response style is injected dynamically based on the user's persona.
@@ -93,7 +78,7 @@ BASE_PROMPT = """당신은 '니온(Starnion)'입니다.
 
 핵심 역할:
 - 사용자의 일상을 돕는 개인 비서로서, 활성화된 스킬에 따라 다양한 기능을 제공합니다.
-- 항상 한국어로 응답하며, 친근하고 도움이 되는 톤을 유지합니다.
+- 친근하고 도움이 되는 톤을 유지합니다.
 - 사용자의 과거 대화 맥락을 활용하여 개인화된 응답을 합니다.
 - 활성 스킬 카탈로그와 도구 지침을 참고하여 적절한 도구를 호출하세요.
 - 사용자가 무언가를 저장·기록·설정하려는 의도가 있으면 반드시 해당 도구를 실제로 호출하세요. 도구를 호출하지 않고 저장했다고 말하지 마세요.
@@ -112,12 +97,19 @@ def get_tone_instruction(persona_id: str) -> str:
     return f"응답 톤: {p['name']}\n{p['tone']}"
 
 
-def build_system_prompt(persona_id: str, custom_prompt: str | None = None) -> str:
+def build_system_prompt(
+    persona_id: str,
+    custom_prompt: str | None = None,
+    language: str = "ko",
+) -> str:
     """Build full system prompt.
 
     Persona tone is always wrapped in an emphatic block so the LLM
     cannot ignore it.  ``custom_prompt`` (user-defined DB text) is used
     as the tone content when provided; otherwise the built-in tone is used.
+
+    ``language`` controls the response language instruction injected into
+    the prompt.  Defaults to ``"ko"`` for backward compatibility.
     """
     p = get_persona(persona_id)
 
@@ -132,4 +124,10 @@ def build_system_prompt(persona_id: str, custom_prompt: str | None = None) -> st
         f"{tone_content}"
     )
 
-    return BASE_PROMPT + tone_block
+    # 응답 언어 지시 블록 (SPEC-I18N-001)
+    lang_instruction = LANGUAGE_INSTRUCTIONS.get(
+        language, LANGUAGE_INSTRUCTIONS["ko"]
+    )
+    language_block = f"\n\n## 응답 언어\n{lang_instruction}"
+
+    return BASE_PROMPT + tone_block + language_block
