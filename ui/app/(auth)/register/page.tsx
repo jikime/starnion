@@ -23,13 +23,21 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"
+const SUPPORTED_LANGUAGES = ["en", "ko", "ja", "zh"] as const
 
 type FormData = { name: string; email: string; password: string; confirmPassword: string }
+
+function detectBrowserLanguage(): string {
+  if (typeof navigator === "undefined") return "en"
+  const code = navigator.language.slice(0, 2).toLowerCase()
+  return (SUPPORTED_LANGUAGES as readonly string[]).includes(code) ? code : "en"
+}
 
 export default function RegisterPage() {
   const t = useTranslations("auth")
   const router = useRouter()
   const [error, setError] = useState("")
+  const browserLanguage = useMemo(() => detectBrowserLanguage(), [])
 
   const schema = useMemo(() => z
     .object({
@@ -60,6 +68,7 @@ export default function RegisterPage() {
         name: data.name,
         email: data.email,
         password: data.password,
+        language: browserLanguage,
       }),
     })
 

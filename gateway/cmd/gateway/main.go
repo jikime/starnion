@@ -171,6 +171,7 @@ func main() {
 			Name     string `json:"name"`
 			Email    string `json:"email"`
 			Password string `json:"password"`
+			Language string `json:"language"`
 		}
 		if err := c.Bind(&req); err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
@@ -179,7 +180,7 @@ func main() {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "name, email and password are required"})
 		}
 
-		user, err := auth.Register(db, req.Name, req.Email, req.Password)
+		user, err := auth.Register(db, req.Name, req.Email, req.Password, req.Language)
 		if err != nil {
 			if err == auth.ErrEmailTaken {
 				return c.JSON(http.StatusConflict, map[string]string{"error": "email already registered"})

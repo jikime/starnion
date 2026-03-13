@@ -24,7 +24,9 @@ type CredentialUser struct {
 
 // Register creates a new credential-based user account.
 // email and password_hash are stored directly in the users table.
-func Register(db *sql.DB, name, email, password string) (*CredentialUser, error) {
+// language is an optional BCP-47 language code (e.g. "en", "ko", "ja", "zh");
+// defaults to "en" if empty or unsupported.
+func Register(db *sql.DB, name, email, password, language string) (*CredentialUser, error) {
 	var exists bool
 	if err := db.QueryRow(
 		`SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`, email,
@@ -51,10 +53,15 @@ func Register(db *sql.DB, name, email, password string) (*CredentialUser, error)
 	}
 	defer tx.Rollback()
 
+	lang := language
+	supported := map[string]bool{"en": true, "ko": true, "ja": true, "zh": true}
+	if lang == "" || !supported[lang] {
+		lang = "en"
+	}
 	if _, err = tx.Exec(
-		`INSERT INTO users (id, display_name, email, password_hash, role, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, 'user', NOW(), NOW())`,
-		userID, name, email, string(hash),
+		`INSERT INTO users (id, display_name, email, password_hash, role, preferences, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, 'user', jsonb_build_object('language', $5), NOW(), NOW())`,
+		userID, name, email, string(hash), lang,
 	); err != nil {
 		return nil, fmt.Errorf("insert user: %w", err)
 	}

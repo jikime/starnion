@@ -38,21 +38,46 @@ func RunSetup(projectRoot string) error {
 	}
 
 	cfg := DefaultConfig()
+	applyDockerEnvDefaults(&cfg, loadDockerEnvDefaults())
 
 	// ════════════════════════════════════════════════════════════════════════════
-	// [1/7] SYSTEM CHECK — tools only (PostgreSQL checked after DB details entered)
+	// [1/8] LANGUAGE — 관리자 계정 기본 언어 선택
 	// ════════════════════════════════════════════════════════════════════════════
-	PrintSectionHeader(1, 7, "SYSTEM CHECK")
+	PrintSectionHeader(1, 8, "LANGUAGE")
+	adminLanguage := "en"
+	if err := huh.NewForm(huh.NewGroup(
+		huh.NewSelect[string]().
+			Title("Language / 언어 / 言語 / 语言").
+			Description("Select the default language for the admin account.").
+			Options(
+				huh.NewOption("English (default)", "en"),
+				huh.NewOption("한국어", "ko"),
+				huh.NewOption("日本語", "ja"),
+				huh.NewOption("中文", "zh"),
+			).
+			Value(&adminLanguage),
+	)).Run(); err != nil {
+		return fmt.Errorf("language setup cancelled: %w", err)
+	}
+	PrintOK("Language", adminLanguage)
+
+	// ════════════════════════════════════════════════════════════════════════════
+	// [2/8] SYSTEM CHECK — tools only (PostgreSQL checked after DB details entered)
+	// ════════════════════════════════════════════════════════════════════════════
+	PrintSectionHeader(2, 8, "SYSTEM CHECK")
 	_ = RunSystemCheck()
 
 	// ════════════════════════════════════════════════════════════════════════════
 	// [2/6] DATABASE
 	// ════════════════════════════════════════════════════════════════════════════
-	PrintSectionHeader(2, 7, "DATABASE")
+	PrintSectionHeader(3, 8, "DATABASE")
 	PrintInfo("PostgreSQL 접속 정보를 입력해주세요.")
 	fmt.Println()
 
 	var dbPort string
+	if cfg.Database.Port > 0 {
+		dbPort = strconv.Itoa(cfg.Database.Port)
+	}
 	if err := huh.NewForm(huh.NewGroup(
 		huh.NewInput().
 			Title("Host").
@@ -107,7 +132,7 @@ func RunSetup(projectRoot string) error {
 	// ════════════════════════════════════════════════════════════════════════════
 	// [3/6] ADMIN ACCOUNT
 	// ════════════════════════════════════════════════════════════════════════════
-	PrintSectionHeader(3, 7, "ADMIN ACCOUNT")
+	PrintSectionHeader(4, 8, "ADMIN ACCOUNT")
 	PrintInfo("첫 번째 관리자 계정을 생성합니다.")
 	fmt.Println()
 
@@ -160,7 +185,7 @@ func RunSetup(projectRoot string) error {
 		break
 	}
 
-	if err := createAdminUser(cfg, adminName, adminEmail, adminPassword); err != nil {
+	if err := createAdminUser(cfg, adminName, adminEmail, adminPassword, adminLanguage); err != nil {
 		PrintFail("Admin", err.Error())
 		return err
 	}
@@ -170,7 +195,7 @@ func RunSetup(projectRoot string) error {
 	// ════════════════════════════════════════════════════════════════════════════
 	// [4/6] MINIO (FILE STORAGE)
 	// ════════════════════════════════════════════════════════════════════════════
-	PrintSectionHeader(4, 7, "FILE STORAGE (MinIO)")
+	PrintSectionHeader(5, 8, "FILE STORAGE (MinIO)")
 	PrintInfo("이미지 및 파일 저장소 정보를 입력해주세요.")
 	fmt.Println()
 
@@ -214,7 +239,7 @@ func RunSetup(projectRoot string) error {
 	// ════════════════════════════════════════════════════════════════════════════
 	// [5/6] SERVICE URLs
 	// ════════════════════════════════════════════════════════════════════════════
-	PrintSectionHeader(5, 7, "SERVICE URLs")
+	PrintSectionHeader(6, 8, "SERVICE URLs")
 	PrintInfo("서비스 URL을 설정합니다. 로컬 개발이면 그대로 Enter를 누르세요.")
 	fmt.Println()
 
@@ -234,7 +259,7 @@ func RunSetup(projectRoot string) error {
 	// ════════════════════════════════════════════════════════════════════════════
 	// [6/6] GOOGLE OAUTH (선택)
 	// ════════════════════════════════════════════════════════════════════════════
-	PrintSectionHeader(6, 7, "GOOGLE OAUTH (선택)")
+	PrintSectionHeader(7, 8, "GOOGLE OAUTH (선택)")
 	PrintInfo("Google Calendar / Gmail / Drive 연동을 위한 OAuth2 앱 자격증명입니다.")
 	PrintInfo("건너뛰려면 모든 항목을 비워두고 Enter를 누르세요.")
 	PrintInfo("나중에 설정하려면: starnion config google")
@@ -268,7 +293,7 @@ func RunSetup(projectRoot string) error {
 	// ════════════════════════════════════════════════════════════════════════════
 	// [7/7] EMBEDDING ENGINE (선택)
 	// ════════════════════════════════════════════════════════════════════════════
-	PrintSectionHeader(7, 7, "EMBEDDING ENGINE (선택)")
+	PrintSectionHeader(8, 8, "EMBEDDING ENGINE (선택)")
 	PrintInfo("검색 기록·문서 벡터 저장에 사용되는 서버 공용 임베딩 엔진입니다.")
 	PrintInfo("⚠  모든 사용자가 동일한 모델을 공유합니다. 설정 후 변경 시 DB 재색인 필요.")
 	PrintInfo("건너뛰려면 Enter. 나중에 설정: starnion config embedding")
@@ -649,6 +674,61 @@ func RunConfigEmbedding() error {
 	return nil
 }
 
+// loadDockerEnvDefaults reads ~/.starnion/docker/.env and returns key=value pairs.
+// Returns an empty map if the file does not exist or cannot be read.
+func loadDockerEnvDefaults() map[string]string {
+	home, _ := os.UserHomeDir()
+	path := filepath.Join(home, ".starnion", "docker", ".env")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return map[string]string{}
+	}
+	result := make(map[string]string)
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		idx := strings.IndexByte(line, '=')
+		if idx < 0 {
+			continue
+		}
+		result[strings.TrimSpace(line[:idx])] = strings.TrimSpace(line[idx+1:])
+	}
+	return result
+}
+
+// applyDockerEnvDefaults overwrites cfg fields with values from the docker .env map.
+// Only non-empty values from the map are applied.
+func applyDockerEnvDefaults(cfg *StarNionConfig, env map[string]string) {
+	if v := env["POSTGRES_DB"]; v != "" {
+		cfg.Database.Name = v
+	}
+	if v := env["POSTGRES_USER"]; v != "" {
+		cfg.Database.User = v
+	}
+	if v := env["POSTGRES_PASSWORD"]; v != "" {
+		cfg.Database.Password = v
+	}
+	if v := env["POSTGRES_PORT"]; v != "" {
+		if p, err := strconv.Atoi(v); err == nil && p > 0 {
+			cfg.Database.Port = p
+		}
+	}
+	if v := env["MINIO_PUBLIC_URL"]; v != "" {
+		cfg.MinIO.PublicURL = v
+	}
+	if v := env["MINIO_ACCESS_KEY"]; v != "" {
+		cfg.MinIO.AccessKey = v
+	}
+	if v := env["MINIO_SECRET_KEY"]; v != "" {
+		cfg.MinIO.SecretKey = v
+	}
+	if v := env["MINIO_BUCKET"]; v != "" {
+		cfg.MinIO.Bucket = v
+	}
+}
+
 // resizeVectorColumns alters all embedding columns to the requested dimension.
 // Called once during first-time setup when the user selects a non-default dimension.
 func resizeVectorColumns(cfg StarNionConfig, dims int) error {
@@ -845,7 +925,7 @@ func fetchUserID(cfg StarNionConfig, email string) (string, error) {
 	return id, nil
 }
 
-func createAdminUser(cfg StarNionConfig, name, email, password string) error {
+func createAdminUser(cfg StarNionConfig, name, email, password, language string) error {
 	db, err := sql.Open("postgres", cfg.Database.DSN())
 	if err != nil {
 		return err
@@ -870,12 +950,12 @@ func createAdminUser(cfg StarNionConfig, name, email, password string) error {
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	// 1) users — display_name, email, password_hash, role 삽입
+	// 1) users — display_name, email, password_hash, role, preferences 삽입
 	var userID string
 	if err := tx.QueryRow(
-		`INSERT INTO users (id, display_name, email, password_hash, role)
-		 VALUES (gen_random_uuid()::TEXT, $1, $2, $3, 'admin') RETURNING id`,
-		name, email, hash,
+		`INSERT INTO users (id, display_name, email, password_hash, role, preferences)
+		 VALUES (gen_random_uuid()::TEXT, $1, $2, $3, 'admin', jsonb_build_object('language', $4)) RETURNING id`,
+		name, email, hash, language,
 	).Scan(&userID); err != nil {
 		return fmt.Errorf("users 삽입 실패: %w", err)
 	}

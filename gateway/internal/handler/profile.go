@@ -48,7 +48,7 @@ func (h *ProfileHandler) Get(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "query failed"})
 	}
 
-	lang := "ko"
+	lang := "en"
 	if language.Valid && language.String != "" {
 		lang = language.String
 	}
