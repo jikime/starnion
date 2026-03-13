@@ -11,16 +11,8 @@ import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2 } from "lucide-react"
+import { Loader2, User, Mail, Lock } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"
 const SUPPORTED_LANGUAGES = ["en", "ko", "ja", "zh"] as const
@@ -39,17 +31,21 @@ export default function RegisterPage() {
   const [error, setError] = useState("")
   const browserLanguage = useMemo(() => detectBrowserLanguage(), [])
 
-  const schema = useMemo(() => z
-    .object({
-      name: z.string().min(1, t("register.nameRequired")).max(50),
-      email: z.string().email(t("register.emailInvalid")),
-      password: z.string().min(8, t("register.passwordTooShort")).max(100),
-      confirmPassword: z.string(),
-    })
-    .refine((d) => d.password === d.confirmPassword, {
-      message: t("register.passwordMismatch"),
-      path: ["confirmPassword"],
-    }), [t])
+  const schema = useMemo(
+    () =>
+      z
+        .object({
+          name: z.string().min(1, t("register.nameRequired")).max(50),
+          email: z.string().email(t("register.emailInvalid")),
+          password: z.string().min(8, t("register.passwordTooShort")).max(100),
+          confirmPassword: z.string(),
+        })
+        .refine((d) => d.password === d.confirmPassword, {
+          message: t("register.passwordMismatch"),
+          path: ["confirmPassword"],
+        }),
+    [t]
+  )
 
   const {
     register,
@@ -60,7 +56,6 @@ export default function RegisterPage() {
   const onSubmit = async (data: FormData) => {
     setError("")
 
-    // 1. Register via Gateway
     const res = await fetch(`${API_URL}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -78,7 +73,6 @@ export default function RegisterPage() {
       return
     }
 
-    // 2. Auto-login after successful registration
     const result = await signIn("credentials", {
       email: data.email,
       password: data.password,
@@ -86,7 +80,6 @@ export default function RegisterPage() {
     })
 
     if (result?.error) {
-      // Registration succeeded but login failed — redirect to login
       router.push("/login")
       return
     }
@@ -96,92 +89,143 @@ export default function RegisterPage() {
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="text-center space-y-1">
-        <CardTitle className="text-2xl font-bold">{t("register.title")}</CardTitle>
-        <CardDescription>{t("register.description")}</CardDescription>
-      </CardHeader>
+    <div className="flex flex-col gap-5">
+      {/* 헤더 */}
+      <div className="space-y-1">
+        <h1
+          className="text-2xl font-bold tracking-tight text-foreground"
+          style={{ fontFamily: "var(--font-sans)" }}
+        >
+          {t("register.title")}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t("register.description")}</p>
+      </div>
 
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <CardContent className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+        {error && (
+          <Alert variant="destructive" className="py-3">
+            <AlertDescription className="text-sm">{error}</AlertDescription>
+          </Alert>
+        )}
 
-          <div className="space-y-2">
-            <Label htmlFor="name">{t("register.nameLabel")}</Label>
+        {/* 이름 */}
+        <div className="space-y-1.5">
+          <Label htmlFor="name" className="text-sm font-medium">
+            {t("register.nameLabel")}
+          </Label>
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
             <Input
               id="name"
               type="text"
               placeholder={t("register.namePlaceholder")}
               autoComplete="name"
+              className="pl-10 h-11"
               {...register("name")}
             />
-            {errors.name && (
-              <p className="text-sm text-destructive">{errors.name.message}</p>
-            )}
           </div>
+          {errors.name && (
+            <p className="text-xs text-destructive">{errors.name.message}</p>
+          )}
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">{t("register.emailLabel")}</Label>
+        {/* 이메일 */}
+        <div className="space-y-1.5">
+          <Label htmlFor="email" className="text-sm font-medium">
+            {t("register.emailLabel")}
+          </Label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
             <Input
               id="email"
               type="email"
               placeholder="name@example.com"
               autoComplete="email"
+              className="pl-10 h-11"
               {...register("email")}
             />
-            {errors.email && (
-              <p className="text-sm text-destructive">{errors.email.message}</p>
-            )}
           </div>
+          {errors.email && (
+            <p className="text-xs text-destructive">{errors.email.message}</p>
+          )}
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password">{t("register.passwordLabel")}</Label>
+        {/* 비밀번호 */}
+        <div className="space-y-1.5">
+          <Label htmlFor="password" className="text-sm font-medium">
+            {t("register.passwordLabel")}
+          </Label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
             <Input
               id="password"
               type="password"
               placeholder={t("register.passwordPlaceholder")}
               autoComplete="new-password"
+              className="pl-10 h-11"
               {...register("password")}
             />
-            {errors.password && (
-              <p className="text-sm text-destructive">{errors.password.message}</p>
-            )}
           </div>
+          {errors.password && (
+            <p className="text-xs text-destructive">{errors.password.message}</p>
+          )}
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">{t("register.confirmPasswordLabel")}</Label>
+        {/* 비밀번호 확인 */}
+        <div className="space-y-1.5">
+          <Label htmlFor="confirmPassword" className="text-sm font-medium">
+            {t("register.confirmPasswordLabel")}
+          </Label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
             <Input
               id="confirmPassword"
               type="password"
               placeholder="••••••••"
               autoComplete="new-password"
+              className="pl-10 h-11"
               {...register("confirmPassword")}
             />
-            {errors.confirmPassword && (
-              <p className="text-sm text-destructive">
-                {errors.confirmPassword.message}
-              </p>
-            )}
           </div>
-        </CardContent>
+          {errors.confirmPassword && (
+            <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
+          )}
+        </div>
 
-        <CardFooter className="flex flex-col gap-3">
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-            {t("register.submit")}
-          </Button>
-          <p className="text-sm text-muted-foreground text-center">
-            {t("register.hasAccount")}{" "}
-            <Link href="/login" className="underline text-primary font-medium">
-              {t("register.login")}
-            </Link>
-          </p>
-        </CardFooter>
+        {/* 가입 버튼 */}
+        <Button
+          type="submit"
+          className="w-full h-11 font-semibold mt-1"
+          style={{
+            background: "oklch(0.48 0.20 260.47)",
+          }}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <Loader2 className="mr-2 size-4 animate-spin" />
+          ) : null}
+          {t("register.submit")}
+        </Button>
       </form>
-    </Card>
+
+      {/* 구분선 */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs">
+          <span className="bg-background px-3 text-muted-foreground">
+            {t("register.hasAccount")}
+          </span>
+        </div>
+      </div>
+
+      {/* 로그인 링크 */}
+      <Link href="/login">
+        <Button variant="outline" className="w-full h-11 font-medium">
+          {t("register.login")}
+        </Button>
+      </Link>
+    </div>
   )
 }

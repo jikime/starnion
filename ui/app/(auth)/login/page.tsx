@@ -11,16 +11,8 @@ import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2 } from "lucide-react"
+import { Loader2, Mail, Lock } from "lucide-react"
 
 type FormData = { email: string; password: string }
 
@@ -29,10 +21,14 @@ export default function LoginPage() {
   const router = useRouter()
   const [error, setError] = useState("")
 
-  const schema = useMemo(() => z.object({
-    email: z.string().email(t("login.emailInvalid")),
-    password: z.string().min(8, t("login.passwordTooShort")),
-  }), [t])
+  const schema = useMemo(
+    () =>
+      z.object({
+        email: z.string().email(t("login.emailInvalid")),
+        password: z.string().min(8, t("login.passwordTooShort")),
+      }),
+    [t]
+  )
 
   const {
     register,
@@ -58,62 +54,104 @@ export default function LoginPage() {
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="text-center space-y-1">
-        <CardTitle className="text-2xl font-bold">{t("login.title")}</CardTitle>
-        <CardDescription>{t("login.description")}</CardDescription>
-      </CardHeader>
+    <div className="flex flex-col gap-6">
+      {/* 헤더 */}
+      <div className="space-y-1">
+        <h1
+          className="text-2xl font-bold tracking-tight text-foreground"
+          style={{ fontFamily: "var(--font-sans)" }}
+        >
+          {t("login.title")}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t("login.description")}</p>
+      </div>
 
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <CardContent className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+        {error && (
+          <Alert variant="destructive" className="py-3">
+            <AlertDescription className="text-sm">{error}</AlertDescription>
+          </Alert>
+        )}
 
-          <div className="space-y-2">
-            <Label htmlFor="email">{t("login.emailLabel")}</Label>
+        {/* 이메일 */}
+        <div className="space-y-1.5">
+          <Label htmlFor="email" className="text-sm font-medium">
+            {t("login.emailLabel")}
+          </Label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
             <Input
               id="email"
               type="email"
               placeholder="name@example.com"
               autoComplete="email"
+              className="pl-10 h-11"
               {...register("email")}
             />
-            {errors.email && (
-              <p className="text-sm text-destructive">{errors.email.message}</p>
-            )}
           </div>
+          {errors.email && (
+            <p className="text-xs text-destructive">{errors.email.message}</p>
+          )}
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password">{t("login.passwordLabel")}</Label>
+        {/* 비밀번호 */}
+        <div className="space-y-1.5">
+          <Label htmlFor="password" className="text-sm font-medium">
+            {t("login.passwordLabel")}
+          </Label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
             <Input
               id="password"
               type="password"
               placeholder="••••••••"
               autoComplete="current-password"
+              className="pl-10 h-11"
               {...register("password")}
             />
-            {errors.password && (
-              <p className="text-sm text-destructive">{errors.password.message}</p>
-            )}
           </div>
-        </CardContent>
+          {errors.password && (
+            <p className="text-xs text-destructive">{errors.password.message}</p>
+          )}
+        </div>
 
-        <CardFooter className="flex flex-col gap-3">
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-            {t("login.submit")}
-          </Button>
-          <p className="text-sm text-muted-foreground text-center">
-            {t("login.noAccount")}{" "}
-            <Link href="/register" className="underline text-primary font-medium">
-              {t("login.register")}
-            </Link>
-          </p>
-        </CardFooter>
+        {/* 로그인 버튼 */}
+        <Button
+          type="submit"
+          className="w-full h-11 font-semibold mt-1"
+          style={{
+            background: "oklch(0.48 0.20 260.47)",
+          }}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <Loader2 className="mr-2 size-4 animate-spin" />
+          ) : null}
+          {t("login.submit")}
+        </Button>
       </form>
-    </Card>
+
+      {/* 구분선 */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs">
+          <span className="bg-background px-3 text-muted-foreground">
+            {t("login.noAccount")}
+          </span>
+        </div>
+      </div>
+
+      {/* 회원가입 링크 */}
+      <Link href="/register">
+        <Button
+          variant="outline"
+          className="w-full h-11 font-medium"
+        >
+          {t("login.register")}
+        </Button>
+      </Link>
+    </div>
   )
 }
