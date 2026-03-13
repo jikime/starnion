@@ -1,0 +1,73 @@
+# Skill Test Examples Template
+# Copy this file to your skill's tests/ directory and customize
+
+name: jikime-example-skill
+version: "1.0.0"
+description: "Test examples for the example skill"
+
+# Test cases
+tests:
+  # Basic functionality test
+  - name: "기본 사용"
+    description: "스킬의 핵심 기능을 테스트합니다"
+    input: |
+      [스킬 관련 질문이나 요청]
+    expected_behavior:
+      - "[예상되는 응답 요소 1]"
+      - "[예상되는 응답 요소 2]"
+    keywords_triggered:
+      - "keyword1"
+    phases: ["plan"]
+
+  # Korean input test
+  - name: "한국어 입력"
+    description: "한국어 입력에 대한 처리를 테스트합니다"
+    input: |
+      [한국어로 된 질문]
+    expected_behavior:
+      - "한국어 키워드 트리거 작동"
+      - "적절한 응답 제공"
+    keywords_triggered:
+      - "한국어키워드"
+
+  # Edge case test
+  - name: "경계 케이스"
+    description: "비정상적인 입력에 대한 처리를 테스트합니다"
+    input: |
+      [모호하거나 불완전한 입력]
+    expected_behavior:
+      - "적절한 에러 처리 또는 명확화 요청"
+    should_not:
+      - "잘못된 정보 생성"
+      - "범위를 벗어난 응답"
+
+  # Integration test
+  - name: "다른 스킬과 연계"
+    description: "연관 스킬과의 협업을 테스트합니다"
+    input: |
+      [다른 스킬과 연관된 복합 요청]
+    expected_behavior:
+      - "적절한 스킬 참조"
+      - "Works Well With 섹션의 스킬 활용"
+    related_skills:
+      - "jikime-related-skill-1"
+      - "jikime-related-skill-2"
+
+# Trigger validation
+trigger_tests:
+  # These inputs should trigger the skill
+  should_trigger:
+    - "keyword1을 사용한 입력"
+    - "keyword2가 포함된 문장"
+    - "한국어키워드로 시작하는 요청"
+
+  # These inputs should NOT trigger the skill
+  should_not_trigger:
+    - "완전히 관련 없는 주제"
+    - "다른 스킬의 키워드만 포함"
+
+# Quality criteria
+quality_criteria:
+  response_time: "< 5s"
+  token_efficiency: "< 2000 tokens per response"
+  accuracy: "> 90%"

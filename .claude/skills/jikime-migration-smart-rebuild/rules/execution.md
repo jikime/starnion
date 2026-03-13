@@ -1,0 +1,488 @@
+# Smart Rebuild Execution Guide
+
+상세 실행 절차, 코드 예시, 워크플로우 가이드.
+
+**관련 문서 (분리됨):**
+- `execution-capture.md` - Phase 1: Capture 상세
+- `execution-analyze.md` - Phase 2: Analyze 상세
+- `execution-backend.md` - Phase G: Backend 상세
+
+---
+
+## 🚨🚨🚨 UI 생성 핵심 원칙 (CRITICAL!) 🚨🚨🚨
+
+**Claude는 반드시 HTML + 스크린샷을 보고 원본과 동일한 UI를 재현해야 합니다!**
+
+### 🔴 HARD RULES
+
+| # | 규칙 | 설명 |
+|---|------|------|
+| 1 | **스크린샷 필수 분석** | 코드 작성 전 반드시 스크린샷을 Read하고 시각적으로 분석 |
+| 2 | **HTML 구조 복사** | `<header>`, `<nav>`, `<main>`, `<footer>` 구조 그대로 유지 |
+| 3 | **원본 텍스트 유지** | HTML에서 추출한 텍스트를 번역 없이 원본 그대로 사용 |
+| 4 | **원본 이미지 URL** | HTML의 `<img src="...">` URL을 그대로 사용 |
+| 5 | **원본 CSS Fetch** | 원본 사이트의 CSS를 WebFetch로 가져와 `src/styles/`에 저장 |
+| 6 | **섹션 컴포넌트 분리** | 섹션별로 `components/{route}/*-section.tsx` 파일 생성 |
+| 7 | **섹션 식별자 필수** | 모든 주요 섹션에 `data-section-id` 속성 추가 (HITL 비교용) |
+| 8 | **스크린샷 기반 스타일** | 색상, 폰트 크기, 간격은 스크린샷에서 추출 |
+| 9 | **kebab-case 네이밍** | 폴더/파일명은 반드시 kebab-case (`about-us/`, `hero-section.tsx`) |
+
+### ❌ 절대 하지 말 것
+
+- ❌ 스크린샷 안 보고 기본 템플릿으로 대충 만들기
+- ❌ HTML 내용 번역하기 (영어→한글, 한글→영어)
+- ❌ 텍스트나 이미지 내용 상상해서 창작하기
+- ❌ 원본과 다른 레이아웃이나 색상 사용하기
+- ❌ PascalCase 폴더명 사용 (`AboutUs/` ❌ → `about-us/` ✅)
+- ❌ 섹션에 `data-section-id` 빼먹기 (HITL 비교 불가!)
+
+### ✅ 반드시 해야 할 것
+
+```
+1. Read: {capture}/sitemap.json         # 페이지 정보 확인
+2. Read: {capture}/{screenshot_file}    # 🔴 스크린샷 시각 분석 (레이아웃, 색상, 간격)
+3. Read: {capture}/{html_file}          # 🔴 HTML에서 텍스트, 이미지 URL 추출
+4. Write: 코드 작성                      # 🔴 원본과 동일하게!
+```
+
+---
+
+## Core Philosophy
+
+| 계층 | 전략 | 이유 |
+|------|------|------|
+| **UI** | 스크린샷 → 새로 생성 | 레거시 프론트 코드 분석 가치 낮음 |
+| **API** | 소스 참고 → 클린 코드 | 비즈니스 로직만 추출 |
+| **DB** | 유지 + 점진적 개선 | 데이터 손실 Zero |
+
+## 2-Track Strategy
+
+### Track 1: Static Content (정적 콘텐츠)
+```
+라이브 사이트 → Playwright 스크래핑 → Next.js 정적 페이지
+```
+- 소개, About, FAQ, 이용약관 등
+- DB 연동 없음, 콘텐츠만 이동
+
+### Track 2: Dynamic Content (동적 콘텐츠)
+```
+소스 분석 → SQL 추출 → Backend API → Next.js 동적 페이지
+```
+- 회원 목록, 결제 내역, 게시판 등
+- DB 연동 필수, 비즈니스 로직 있음
+
+---
+
+## Phase 1: Capture (링크 수집)
+
+> 📄 **상세 문서:** `smart-rebuild-execution-capture.md`
+
+**목표:** Playwright로 라이브 사이트의 모든 링크를 수집하여 sitemap.json 생성
+
+> **🔴 Lazy Capture 방식**: capture 단계에서는 **링크만 수집**합니다.
+> 실제 HTML + 스크린샷 캡처는 `generate --page N` 단계에서 해당 페이지 처리 시 수행됩니다.
+
+---
+
+## Phase 2: Analyze (분석 & 매핑)
+
+> 📄 **상세 문서:** `smart-rebuild-execution-analyze.md`
+
+**목표:** 소스 코드 분석하여 캡처와 매핑, 정적/동적 분류, **API 의존성 추출**
+
+**출력 파일:**
+- `{output}/mapping.json` - 소스 ↔ 캡처 매핑
+- `{output}/api-mapping.json` - API 의존성 매핑
+
+---
+
+## Phase 3: Generate Frontend - 전체 워크플로우
+
+**CRITICAL:** Claude Code가 직접 수행합니다.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Phase A: 프로젝트 초기화 (첫 페이지만)                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Phase B: 페이지 기본 코드 생성 (🔴 HTML + 스크린샷 필수!)                     │
+│  ──────────────────────────────────────────────────────────────────────────  │
+│  1. Read: sitemap.json                                                       │
+│  2. Read: {screenshot} → 🔴 레이아웃, 색상, 간격 시각 분석                    │
+│  3. Read: {html} → 🔴 텍스트, 이미지 URL 추출 (번역 금지!)                    │
+│  4. Write: 전체 페이지 코드 (🔴 원본과 동일하게!)                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Phase C: 개발 서버 실행                                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Phase D: AskUserQuestion                                                     │
+│  "페이지 {N} 기본 코드 완료. 다음 작업은?"                                     │
+│  options: [HITL 세부 조정, 다음 페이지, 직접 입력]                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                    ┌─────────────────┼─────────────────┐
+                    ▼                 ▼                 ▼
+            [HITL 세부 조정]    [다음 페이지]     [직접 입력]
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Phase E: HITL 루프 (🔴 모든 섹션 완료까지 반복!)                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Phase F: 페이지 완료 & 다음 페이지                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Phase A: 프로젝트 초기화 (첫 페이지만)
+
+**조건**: `{output}/frontend/package.json`이 없으면 실행
+
+```bash
+# Next.js 프로젝트 생성
+npx create-next-app@latest {output}/frontend \
+  --typescript --tailwind --eslint --app --src-dir --import-alias "@/*" --use-npm
+
+# shadcn/ui 초기화
+cd {output}/frontend && npx shadcn@latest init --defaults
+cd {output}/frontend && npx shadcn@latest add button card input dialog table tabs alert badge form label textarea select
+
+# 원본 CSS 저장 폴더 생성
+mkdir -p {output}/frontend/src/styles/legacy
+```
+
+---
+
+## Phase B: 페이지 기본 코드 생성 (🔴 CRITICAL!)
+
+### Step 0: 페이지 캡처 확인 (🔴 Lazy Capture!)
+
+> **generate 시점에 해당 페이지를 캡처합니다.**
+
+```
+Read: {capture}/sitemap.json
+      ↓
+IF page.captured === false:
+  → 해당 페이지 HTML + 스크린샷 캡처 실행
+  → sitemap.json 업데이트 (captured: true)
+ELSE:
+  → Step 1로 진행
+```
+
+### Step 1-3: 파일 읽기
+
+```
+1. Read: {capture}/sitemap.json       # 페이지 정보
+2. Read: {capture}/{page.screenshot}  # 🔴 시각 분석 필수!
+3. Read: {capture}/{page.html}        # 🔴 텍스트/이미지 추출
+```
+
+### 🔴 Step 3.3: 섹션 감지 & sitemap.json 업데이트 (HITL 필수!)
+
+**HTML에서 시맨틱 섹션 자동 감지:**
+
+```
+1. HTML 분석 → 시맨틱 섹션 감지 (header, nav, main, footer 등)
+2. 각 섹션에 ID 부여 (01, 02, 03...)
+3. sitemap.json의 해당 페이지에 sections 배열 저장
+4. HITL 비교 시 이 정보를 사용!
+```
+
+**섹션 감지 우선순위:**
+
+| 우선순위 | 원본 HTML 셀렉터 | 섹션 ID | 섹션 이름 |
+|---------|-----------------|---------|----------|
+| 1 | `header`, `#header`, `.header`, `[role="banner"]` | `01` | `header` |
+| 2 | `nav`, `#nav`, `.gnb`, `[role="navigation"]` | `02` | `nav` |
+| 3 | `.hero`, `.visual`, `.banner`, `.main-visual` | `03` | `hero` |
+| 4 | `main`, `#main`, `.content`, `[role="main"]` | `04` | `main` |
+| 5 | `section`, `.section` | `05+` | `section-N` |
+| 6 | `aside`, `.sidebar`, `[role="complementary"]` | `..` | `sidebar` |
+| 7 | `footer`, `#footer`, `[role="contentinfo"]` | `..` | `footer` |
+
+**sitemap.json 업데이트 예시:**
+
+```json
+{
+  "pages": [{
+    "id": 1,
+    "url": "https://example.com/",
+    "sections": [
+      { "id": "01", "name": "header", "label": "헤더", "selector": "header" },
+      { "id": "02", "name": "nav", "label": "내비게이션", "selector": "#gnb" },
+      { "id": "03", "name": "hero", "label": "메인 비주얼", "selector": ".hero" },
+      { "id": "04", "name": "main", "label": "메인 콘텐츠", "selector": "main" },
+      { "id": "05", "name": "footer", "label": "푸터", "selector": "footer" }
+    ]
+  }]
+}
+```
+
+### Step 3.5: 원본 CSS Fetch & 저장 (첫 페이지만)
+
+```
+1. HTML에서 CSS URL 추출
+2. WebFetch로 각 CSS 파일 가져오기
+3. src/styles/legacy/ 폴더에 저장
+4. legacy-imports.css 생성
+```
+
+### Step 4: React 코드 작성
+
+**🔴 파일/폴더 네이밍 규칙 (HARD RULE!):**
+
+| 대상 | 규칙 | ✅ 올바른 예시 | ❌ 잘못된 예시 |
+|------|------|---------------|---------------|
+| **라우트 폴더** | kebab-case | `about-us/` | `aboutUs/` |
+| **페이지 파일** | page.tsx (고정) | `about-us/page.tsx` | `AboutUs.tsx` |
+| **컴포넌트 파일** | kebab-case | `hero-section.tsx` | `HeroSection.tsx` |
+
+### 🔴 섹션 식별자 규칙 (HITL 비교용 - 필수!)
+
+**Step 3.3에서 감지한 섹션 정보를 기반으로 React 컴포넌트에 `data-section-id` 추가:**
+
+| sitemap.json의 section | React 컴포넌트 |
+|------------------------|----------------|
+| `{ "id": "01", "name": "header" }` | `<header data-section-id="01-header">` |
+| `{ "id": "02", "name": "nav" }` | `<nav data-section-id="02-nav">` |
+| `{ "id": "03", "name": "hero" }` | `<section data-section-id="03-hero">` |
+| `{ "id": "04", "name": "main" }` | `<main data-section-id="04-main">` |
+| `{ "id": "05", "name": "footer" }` | `<footer data-section-id="05-footer">` |
+
+> **CRITICAL:** `data-section-id`의 형식은 반드시 `{id}-{name}`이어야 함!
+> HITL에서 `[data-section-id="01-header"]` 셀렉터로 로컬 요소를 찾음!
+
+**컴포넌트 예시:**
+
+```tsx
+// components/home/header-section.tsx
+export function HeaderSection() {
+  return (
+    <header data-section-id="01-header">  {/* 🔴 필수! sitemap.json과 일치 */}
+      <nav>...</nav>
+      <div className="logo">...</div>
+    </header>
+  );
+}
+
+// components/home/hero-section.tsx
+export function HeroSection() {
+  return (
+    <section data-section-id="03-hero">  {/* 🔴 필수! */}
+      <h1>Welcome</h1>
+      <p>...</p>
+    </section>
+  );
+}
+```
+
+### 🔴 섹션 컴포넌트 분리 규칙
+
+```
+src/
+├── app/{route}/page.tsx              # 섹션 컴포넌트 조합
+└── components/{route}/               # 🔴 kebab-case!
+    ├── hero-section.tsx              # data-section-id 포함
+    └── features-section.tsx
+```
+
+**page.tsx 템플릿:**
+```tsx
+import { HeroSection } from '@/components/{route}/hero-section';
+import { FeaturesSection } from '@/components/{route}/features-section';
+
+export default function PageName() {
+  return (
+    <div>
+      <HeroSection />
+      <FeaturesSection />
+    </div>
+  );
+}
+```
+
+---
+
+## Phase C: 개발 서버 실행
+
+```bash
+cd {output}/frontend && npm run dev &
+sleep 3  # 서버 시작 대기
+# 🔴 기본 포트: 3893 (http://localhost:3893)
+```
+
+---
+
+## Phase D: AskUserQuestion
+
+```
+AskUserQuestion:
+  question: "페이지 {N} 기본 코드 생성 완료. 다음 작업은?"
+  header: "페이지 완료"
+  options:
+    - label: "HITL 세부 조정"
+    - label: "다음 페이지"
+    - label: "직접 입력"
+```
+
+---
+
+## Phase E: HITL 루프 (🔴 핵심 워크플로우!)
+
+### 🚨🚨🚨 HITL HARD RULES (절대 위반 금지!) 🚨🚨🚨
+
+| # | 규칙 | 설명 |
+|---|------|------|
+| 1 | **🔴 혼자 결정 금지** | Claude는 절대 혼자서 승인/스킵 결정하면 안 됨! |
+| 2 | **🔴 AskUserQuestion 필수** | 모든 섹션 비교 후 반드시 사용자에게 물어봐야 함! |
+| 3 | **🔴 사용자 응답 대기** | 사용자가 선택할 때까지 다음 단계 진행 금지! |
+| 4 | **🔴 자동 skip 금지** | 일치율이 높아도 사용자 확인 없이 skip 금지! |
+| 5 | **🔴 자동 approve 금지** | 일치율 100%여도 사용자 확인 필수! |
+
+> **왜 중요한가?** HITL은 Human-in-the-Loop의 약자입니다. 사람(Human)이 루프 안에 있어야 합니다!
+> Claude가 혼자 결정하면 HITL이 아니라 그냥 자동화입니다.
+
+### 🔴 섹션 비교 셀렉터 규칙
+
+| 대상 | 셀렉터 방식 | 예시 |
+|------|------------|------|
+| **원본 페이지** | 시맨틱 셀렉터 | `header`, `.hero`, `#nav` |
+| **로컬 페이지** | data-section-id | `[data-section-id="01-header"]` |
+
+> **이유:** 원본과 로컬의 HTML 구조가 다를 수 있으므로, 로컬은 생성 시 추가한 `data-section-id`로 매칭합니다.
+
+### E-1: hitl-refine.ts 실행 (🔴 Bash 필수!)
+
+```bash
+cd "{SCRIPTS_DIR}" && npx ts-node --transpile-only \
+  generate/hitl-refine.ts --capture={capture} --page={pageId}
+```
+
+### E-2: JSON 결과 파싱
+
+`<!-- HITL_RESULT_JSON_START -->` ~ `<!-- HITL_RESULT_JSON_END -->` 사이 JSON 추출
+
+### E-3: AskUserQuestion
+
+```
+AskUserQuestion:
+  question: "{sectionName} 섹션 비교 결과: 일치율 {overallMatch}%"
+  options: ["승인", "수정 필요", "스킵"]
+```
+
+### E-4: 응답별 처리
+
+| 응답 | 처리 |
+|------|------|
+| **승인** | → E-5 (다음 섹션으로) |
+| **수정 필요** | → Edit → 🔄 **E-1로 돌아가기** |
+| **스킵** | → E-5 (다음 섹션으로) |
+
+### E-5: 섹션 완료 체크
+
+```
+IF 남은 pending 섹션 있음:
+  → E-1로 돌아가기
+ELSE:
+  → Phase F
+```
+
+---
+
+## Phase F: 페이지 완료 & 다음 페이지
+
+### F-1: sitemap.json 업데이트
+
+```json
+{ "id": 1, "status": "completed", "completedAt": "2026-02-05T10:30:00Z" }
+```
+
+### F-2: 다음 페이지 질문
+
+```
+AskUserQuestion:
+  question: "페이지 {N} 완료! 다음 페이지로 진행할까요?"
+  options: ["예", "아니오"]
+```
+
+---
+
+## Phase G: 백엔드 연동
+
+> 📄 **상세 문서:** `smart-rebuild-execution-backend.md`
+
+**조건:** 동적 페이지에서 "백엔드 연동" 선택 시
+
+**워크플로우:**
+```
+G-0: 백엔드 프로젝트 초기화 (첫 동적 페이지에서 1회)
+     ↓
+G-1: 공통 API 생성 (인증 등)
+     ↓
+G-2: 페이지 전용 API 생성
+     ↓
+G-3: Frontend Connect (Mock → Real API)
+     ↓
+G-4: 통합 테스트
+     ↓
+G-5: 연동 완료
+```
+
+---
+
+## CLI 명령어 참조
+
+### Capture
+```bash
+cd "{SCRIPTS_DIR}" && npx ts-node --transpile-only bin/smart-rebuild.ts capture {url} \
+  --output={output} [--login] [--max-pages=100]
+```
+
+### Analyze
+```bash
+cd "{SCRIPTS_DIR}" && npx ts-node --transpile-only bin/smart-rebuild.ts analyze \
+  --source={source} --capture={capture} --output={output}
+```
+
+### HITL
+```bash
+cd "{SCRIPTS_DIR}" && npx ts-node --transpile-only generate/hitl-refine.ts \
+  --capture={capture} --page={pageId}
+```
+
+---
+
+## Output Structure
+
+```
+{output}/
+├── capture/
+│   ├── sitemap.json
+│   ├── *.png / *.html
+│   └── hitl/page_{N}/
+│
+├── mapping.json
+├── api-mapping.json
+│
+├── backend/                  # Phase G
+│
+└── frontend/
+    └── src/
+        ├── app/{routes}/page.tsx
+        ├── styles/legacy/
+        └── components/{routes}/*-section.tsx
+```
+
+---
+
+Version: 2.0.0

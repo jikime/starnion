@@ -1,0 +1,201 @@
+# Workflow Configuration
+# Execution mode, team settings, and automation preferences
+# For JikiME-ADK dual orchestrator system (J.A.R.V.I.S. + F.R.I.D.A.Y.)
+
+workflow:
+  # Execution mode selection
+  # Options: auto (intelligent selection), subagent (classic mode), team (agent teams)
+  execution_mode: "auto"
+
+  # Auto-clear strategy for context management
+  auto_clear:
+    enabled: true
+    after_plan: true
+    after_run: false
+    token_threshold: 150000
+
+  # Token budget allocations per phase
+  token_budget:
+    plan: 30000
+    run: 180000
+    sync: 40000
+
+  # Agent Teams configuration (Experimental)
+  # Requires: Claude Code v2.1.32+ and CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+  team:
+    # Master switch - also requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 env var
+    enabled: true
+
+    # Maximum teammates per team (2-10 recommended)
+    max_teammates: 10
+
+    # Default model for teammates
+    # Options: inherit (use parent model), haiku (fast/cheap), sonnet (balanced), opus (powerful)
+    default_model: "inherit"
+
+    # Require teammates to get plan approved before implementing
+    require_plan_approval: true
+
+    # Team lead (J.A.R.V.I.S./F.R.I.D.A.Y.) operates in delegate mode
+    # When true: coordination only, no direct implementation
+    delegate_mode: true
+
+    # Display mode for teammate output
+    # Options: auto (tmux if available, else in-process), in-process (same terminal), tmux (split panes)
+    teammate_display: "auto"
+
+    # Auto-selection thresholds for switching to team mode
+    # When conditions are met, system automatically uses team mode
+    auto_selection:
+      # Minimum number of distinct domains to trigger team mode
+      # Domains: frontend, backend, database, testing, infrastructure, etc.
+      min_domains_for_team: 3
+
+      # Minimum number of affected files to trigger team mode
+      min_files_for_team: 10
+
+      # Minimum complexity score (1-10) to trigger team mode
+      # Based on: file count, domain breadth, dependency depth
+      min_complexity_score: 7
+
+    # File ownership patterns to prevent write conflicts during parallel execution
+    file_ownership:
+      team-backend-dev:
+        - "src/api/**"
+        - "src/services/**"
+        - "src/repositories/**"
+        - "src/models/**"
+        - "src/middleware/**"
+        - "prisma/migrations/**"
+      team-frontend-dev:
+        - "src/components/**"
+        - "src/pages/**"
+        - "src/app/**"
+        - "src/hooks/**"
+        - "src/stores/**"
+        - "src/styles/**"
+      team-designer:
+        - "design/**"
+        - "src/styles/tokens/**"
+      team-tester:
+        - "tests/**"
+        - "__tests__/**"
+        - "**/*.test.*"
+        - "**/*.spec.*"
+        - "cypress/**"
+        - "playwright/**"
+      shared:
+        - "src/types/**"
+        - "src/utils/**"
+        - "src/lib/**"
+
+    # Pre-defined team composition patterns
+    # Used by team workflow files (team-plan.md, team-run.md, etc.)
+    patterns:
+      # Plan phase research team
+      plan_research:
+        roles:
+          - researcher
+          - analyst
+          - architect
+        model: "inherit"
+        description: "Parallel SPEC research and design"
+        triggers:
+          - "/jikime:1-plan"
+          - "create spec"
+          - "plan feature"
+
+      # Standard implementation team
+      implementation:
+        roles:
+          - backend-dev
+          - frontend-dev
+          - tester
+        model: "inherit"
+        description: "Cross-layer feature implementation"
+        triggers:
+          - "/jikime:2-run"
+          - "implement feature"
+
+      # Implementation team with designer
+      design_implementation:
+        roles:
+          - designer
+          - backend-dev
+          - frontend-dev
+          - tester
+        model: "inherit"
+        description: "Full-stack implementation with UI/UX design"
+        triggers:
+          - "design and implement"
+          - "ui heavy feature"
+
+      # Quality-focused team
+      quality_gate:
+        roles:
+          - backend-dev
+          - frontend-dev
+          - tester
+          - quality
+        model: "inherit"
+        description: "Implementation with quality validation"
+        triggers:
+          - "critical feature"
+          - "production ready"
+
+      # Debug investigation team
+      investigation:
+        roles:
+          - hypothesis-1
+          - hypothesis-2
+          - hypothesis-3
+        model: "haiku"
+        description: "Competing hypothesis debugging"
+        triggers:
+          - "investigate bug"
+          - "root cause analysis"
+
+      # Migration team (F.R.I.D.A.Y. specific)
+      migration:
+        roles:
+          - researcher
+          - analyst
+          - backend-dev
+          - frontend-dev
+        model: "inherit"
+        description: "Legacy migration team"
+        triggers:
+          - "/jikime:friday"
+          - "migrate"
+          - "legacy"
+
+  # Completion markers for workflow state detection
+  completion:
+    markers:
+      jarvis_done: "<jikime>DONE</jikime>"
+      friday_done: "<jikime>MIGRATION_COMPLETE</jikime>"
+    detect_in_output: true
+
+  # Loop prevention guards
+  loop_prevention:
+    max_iterations: 100
+    max_retries_per_operation: 3
+    failure_pattern_detection: true
+    escalate_after_failures: true
+
+  # Hook events for Agent Teams
+  # These hooks run at specific team lifecycle events
+  hooks:
+    # TeammateIdle: Called when a teammate finishes their task and goes idle
+    # Exit code 2 = keep working (reject idle, assign more work)
+    # Exit code 0 = accept idle
+    teammate_idle:
+      enabled: true
+      validate_work: true
+
+    # TaskCompleted: Called when a teammate marks a task as complete
+    # Exit code 2 = reject completion (task needs more work)
+    # Exit code 0 = accept completion
+    task_completed:
+      enabled: true
+      require_quality_check: true
