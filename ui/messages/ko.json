@@ -557,9 +557,9 @@
   "cron": {
     "title": "알림 센터",
     "subtitle": "시스템 자동화 스케줄과 내 알림 일정을 관리합니다",
-    "tabSystem": "시스템 Cron",
+    "tabSystem": "시스템",
     "tabUser": "내 일정",
-    "systemJobsTitle": "시스템 Cron Jobs",
+    "systemJobsTitle": "시스템 스케줄러",
     "mySchedulesTitle": "내 일정",
     "addSchedule": "일정 추가",
     "noSchedules": "등록된 일정이 없습니다. 일정 추가를 눌러 생성하세요.",

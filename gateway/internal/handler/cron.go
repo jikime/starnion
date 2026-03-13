@@ -49,6 +49,7 @@ var systemJobs = []systemJobResponse{
 	// Level 3: Autonomous
 	{ID: "goal_evaluation", Name: "목표 평가", Description: "사용자 목표 달성 여부를 평가합니다", Schedule: "0 7 * * *", Level: "autonomous", Enabled: true},
 	{ID: "goal_status", Name: "목표 현황", Description: "매주 수요일 목표 현황 보고서를 전송합니다", Schedule: "0 12 * * 3", Level: "autonomous", Enabled: true},
+	{ID: "dday_notification", Name: "디데이 알림", Description: "D-30/7/3/1/0 임박 시 디데이 알림을 전송합니다", Schedule: "0 8 * * *", Level: "autonomous", Enabled: true},
 	// Level 4: User Schedules (runner)
 	{ID: "user_schedules", Name: "사용자 일정 실행기", Description: "15분마다 사용자 생성 일정을 확인하고 실행합니다", Schedule: "*/15 * * * *", Level: "runner", Enabled: true},
 	// Level 5: Maintenance

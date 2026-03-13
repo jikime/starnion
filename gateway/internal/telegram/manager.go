@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"hash/fnv"
+	"strconv"
 	"sync"
 	"time"
 
@@ -21,7 +22,7 @@ type managedBot struct {
 	bot      *Bot
 	cancel   context.CancelFunc
 	done     chan struct{} // closed when bot.Run() returns
-	lockConn *sql.Conn    // dedicated DB connection holding pg_advisory_lock; nil if no DB
+	lockConn *sql.Conn     // dedicated DB connection holding pg_advisory_lock; nil if no DB
 }
 
 // BotManager maintains a pool of per-user Telegram bots.
@@ -214,4 +215,32 @@ func (m *BotManager) ActiveCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return len(m.bots)
+}
+
+// SendMessage implements scheduler.TelegramSender.
+// It resolves the owning user from platform_identities and delegates to that user's bot.
+func (m *BotManager) SendMessage(chatID int64, text string) error {
+	if m.db == nil {
+		return fmt.Errorf("SendMessage: database unavailable")
+	}
+
+	// 1. platform_identities 에서 chatID → userID 역조회
+	var userID string
+	err := m.db.QueryRow(
+		`SELECT user_id FROM platform_identities WHERE platform = 'telegram' AND platform_id = $1`,
+		strconv.FormatInt(chatID, 10),
+	).Scan(&userID)
+	if err != nil {
+		return fmt.Errorf("SendMessage: no user for chatID %d: %w", chatID, err)
+	}
+
+	// 2. 해당 유저의 봇 조회
+	m.mu.RLock()
+	mb, ok := m.bots[userID]
+	m.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("SendMessage: no running bot for user %s", userID)
+	}
+
+	return mb.bot.SendMessage(chatID, text)
 }

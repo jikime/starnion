@@ -557,9 +557,9 @@
   "cron": {
     "title": "通知センター",
     "subtitle": "システム自動化スケジュールと通知スケジュールを管理します",
-    "tabSystem": "システム Cron",
+    "tabSystem": "システム",
     "tabUser": "マイスケジュール",
-    "systemJobsTitle": "システム Cron Jobs",
+    "systemJobsTitle": "システムスケジューラー",
     "mySchedulesTitle": "マイスケジュール",
     "addSchedule": "スケジュール追加",
     "noSchedules": "スケジュールがありません。追加ボタンで作成してください。",

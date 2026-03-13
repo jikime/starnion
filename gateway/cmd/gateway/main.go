@@ -143,6 +143,11 @@ func main() {
 
 	// Start cron scheduler (no single global bot — scheduler uses BotManager).
 	var sched *scheduler.Scheduler
+	if db != nil {
+		sched = scheduler.New(grpcConn, botManager, db, tracker, skillSvc)
+		sched.Start()
+		log.Info().Msg("cron scheduler started")
+	}
 
 	e := echo.New()
 	e.HideBanner = true
@@ -677,6 +682,9 @@ func main() {
 	<-quit
 
 	log.Info().Msg("shutting down server")
+	if sched != nil {
+		sched.Stop()
+	}
 	cancel() // Stop Telegram bot.
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)

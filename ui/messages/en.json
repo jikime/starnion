@@ -557,9 +557,9 @@
   "cron": {
     "title": "Notification Center",
     "subtitle": "Manage system automation schedules and your notification schedules",
-    "tabSystem": "System Cron",
+    "tabSystem": "System",
     "tabUser": "My Schedules",
-    "systemJobsTitle": "System Cron Jobs",
+    "systemJobsTitle": "System Scheduler",
     "mySchedulesTitle": "My Schedules",
     "addSchedule": "Add Schedule",
     "noSchedules": "No schedules registered. Click Add Schedule to create one.",

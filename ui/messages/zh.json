@@ -557,9 +557,9 @@
   "cron": {
     "title": "通知中心",
     "subtitle": "管理系统自动化计划和您的通知日程",
-    "tabSystem": "系统 Cron",
+    "tabSystem": "系统",
     "tabUser": "我的日程",
-    "systemJobsTitle": "系统 Cron Jobs",
+    "systemJobsTitle": "系统调度器",
     "mySchedulesTitle": "我的日程",
     "addSchedule": "添加日程",
     "noSchedules": "没有日程。点击添加日程创建。",
