@@ -82,7 +82,7 @@ Starnion currently has **34** built-in skills. Each skill is an independent modu
 | Skill ID | Skill Name | Description | Example Commands | Enabled by Default |
 |----------|------------|-------------|------------------|--------------------|
 | `google` | Google Integration | Integrates Google Calendar, Docs, Tasks, Drive, and Gmail; requires OAuth2 authentication. | `connect Google`, `add a 3 PM doctor appointment tomorrow`, `show received mail` | - |
-| `browser` | Browser Control | Automated web browser control: URL navigation, clicking, screenshots. | `search for today's weather on Naver`, `take a screenshot of this site` | - |
+| `browser` | Browser Control | Automatically controls a Chromium browser: URL navigation, clicking, text input, and screenshots. Features DOM stability detection for accurate SPA load timing, and auto-waits for Canvas/map tile rendering. Requires Playwright. | `search today's weather on Google`, `take a screenshot of Google Maps`, `click the login button` | - |
 
 ---
 

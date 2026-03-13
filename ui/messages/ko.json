@@ -110,7 +110,21 @@
     "name": "이름",
     "email": "이메일",
     "timezone": "시간대",
-    "save": "저장"
+    "save": "저장",
+    "loading": "불러오는 중...",
+    "emailReadOnly": "이메일은 변경할 수 없어요.",
+    "saved": "저장됐어요",
+    "passwordChange": "비밀번호 변경",
+    "currentPassword": "현재 비밀번호",
+    "newPassword": "새 비밀번호",
+    "confirmPassword": "새 비밀번호 확인",
+    "passwordChanged": "변경됐어요",
+    "saveFailed": "저장에 실패했어요.",
+    "passwordChangeFailed": "비밀번호 변경에 실패했어요.",
+    "passwordMismatch": "새 비밀번호가 일치하지 않아요.",
+    "passwordTooShort": "비밀번호는 8자 이상이어야 해요.",
+    "aiLanguage": "언어 설정",
+    "aiLanguageDescription": "AI와 대화할 때 사용할 언어를 선택하세요"
   },
   "common": {
     "save": "저장",
@@ -534,9 +548,9 @@
     "newConvPlaceholder": "새 대화를 시작하거나 왼쪽에서 대화를 선택하세요",
     "personas": {
       "assistant": "기본 비서",
+      "heart_friend": "마음 친구",
+      "life_coach": "라이프 코치",
       "finance": "금융 전문가",
-      "buddy": "친한 친구",
-      "coach": "재정 코치",
       "analyst": "데이터 분석가"
     }
   },
@@ -904,6 +918,33 @@
     "saving": "저장중...",
     "update": "업데이트",
     "connect": "연결",
+    "tabs": {
+      "providers": "프로바이더",
+      "assignments": "모델 할당"
+    },
+    "endpointType": {
+      "label": "엔드포인트 유형",
+      "ollama": "Ollama",
+      "openai_compatible": "OpenAI 호환",
+      "other": "기타 (직접 입력)"
+    },
+    "fetchModels": "모델 불러오기",
+    "fetching": "불러오는 중...",
+    "assignments": {
+      "subtitle": "페르소나 외 특수 용도에만 별도 모델을 지정하세요. 미설정 시 페르소나 모델이 사용됩니다.",
+      "serverDefault": "(페르소나 기본값)",
+      "noModels": "사용 가능한 모델이 없어요. 먼저 프로바이더를 연결하세요.",
+      "save": "저장",
+      "saved": "모델 할당이 저장됐어요.",
+      "saveFailed": "저장에 실패했어요.",
+      "useCases": {
+        "image": "이미지 분석",
+        "audio": "오디오 분석 (STT)",
+        "report": "리포트 / cron",
+        "image_gen": "이미지 생성",
+        "audio_gen": "음성 생성 (TTS)"
+      }
+    },
     "toast": {
       "baseUrlRequired": "Base URL을 입력해주세요.",
       "apiKeyRequired": "API 키를 입력해주세요.",
@@ -913,7 +954,9 @@
       "networkError": "네트워크 오류로 API 키를 확인할 수 없어요.",
       "saved": "{name} 저장됐어요.",
       "saveFailed": "저장에 실패했어요.",
-      "removed": "{name} 제거됐어요."
+      "removed": "{name} 제거됐어요.",
+      "fetchFailed": "모델 목록을 불러올 수 없어요.",
+      "fetchSuccess": "{count}개 모델을 불러왔어요."
     }
   },
   "personas": {
@@ -944,6 +987,7 @@
       "modelCustom": "직접 입력...",
       "modelIdPlaceholder": "모델 ID 직접 입력 (예: claude-opus-4-6)",
       "noModelsHint": "모델 페이지에서 활성화된 모델이 없어요. 위 목록에서 직접 입력을 선택하거나 먼저 모델 페이지에서 사용할 모델을 선택하세요.",
+      "noCustomEndpointModels": "모델 > Custom Endpoint에 추가된 모델이 없어요. 먼저 모델 설정에서 Custom Endpoint를 구성하세요.",
       "systemPromptLabel": "시스템 프롬프트",
       "systemPromptPlaceholder": "이 페르소나에게 부여할 역할과 지침을 작성하세요. 비워두면 기본 프롬프트가 사용됩니다.",
       "defaultLabel": "기본 페르소나로 설정",
@@ -959,7 +1003,8 @@
       "saveFailed": "저장에 실패했어요.",
       "defaultSet": "{name}을(를) 기본 페르소나로 설정했어요.",
       "defaultFailed": "기본 설정에 실패했어요.",
-      "deleted": "페르소나가 삭제됐어요."
+      "deleted": "페르소나가 삭제됐어요.",
+      "noToolsWarning": "⚠️ 이 모델은 tool calling을 지원하지 않아 스킬·도구 기능이 제한됩니다. 저장은 계속돼요."
     }
   }
 }

@@ -1,0 +1,62 @@
+# JikiME-ADK Configuration
+# Format: YAML (modular section-based configuration)
+#
+# This is the main configuration file that references modular config files.
+# Each config is stored in a separate file under .jikime/config/
+# for better maintainability and token efficiency.
+#
+# Config Files:
+# - user.yaml: User personalization settings
+# - language.yaml: Language preferences
+# - project.yaml: Project metadata
+# - git-strategy.yaml: Git workflow configuration
+# - quality.yaml: DDD and quality settings
+# - system.yaml: JikiME system settings (includes document_management)
+# - ralph.yaml: Ralph Engine settings
+#
+# CLAUDE.md automatically loads:
+# @.jikime/config/user.yaml
+# @.jikime/config/language.yaml
+#
+# Note: document_management is now available in system.yaml
+# This config.yaml is kept for legacy project support
+
+jikime:
+  version: "1.5.0"
+  initialized: true
+  initialized_at: "2025-12-19T00:00:00Z"
+
+# Document Management System
+# Prevents project root pollution by enforcing .jikime/ hierarchy for all internal files
+document_management:
+  enabled: true
+  enforce_structure: true
+  block_root_pollution: true
+
+  # Separation policy between logs and docs
+  separation_policy:
+    strict_separation: true
+    description: Clear separation between logs (runtime data) and docs (documentation content)
+    logs_scope: runtime sessions, errors, execution traces, agent transcripts
+    docs_scope: reports, analysis, validation, sync, inspection, documentation files
+
+  # Directory structure and retention policies
+  directories:
+    # Documentation files
+    docs:
+      base: .jikime/docs/
+      retention_days: null # Keep indefinitely
+    # Log files (runtime data)
+    logs:
+      base: .jikime/logs/
+      retention_days: 30
+    # Temporary files
+    temp:
+      base: .jikime/temp/
+      retention_days: 7
+      auto_cleanup: true
+    # Cache files
+    cache:
+      base: .jikime/cache/
+      retention_days: 30
+      auto_cleanup: true

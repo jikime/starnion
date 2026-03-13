@@ -19,12 +19,18 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from starnion_agent.config import settings
+
 if TYPE_CHECKING:
     from playwright.async_api import Browser, BrowserContext, Page, Playwright
 
 logger = logging.getLogger(__name__)
 
 IDLE_TIMEOUT = 300  # seconds — auto-close after inactivity
+
+# headless 모드는 환경 자동 감지로 결정됨 (config.py _detect_headless_mode 참고).
+# BROWSER_HEADLESS 환경변수 또는 starnion.yaml browser.headless 로 명시적 override 가능.
+_HEADLESS: bool = settings.browser.headless
 
 
 @dataclass
@@ -124,21 +130,29 @@ async def _create_session() -> BrowserSession:
     from playwright.async_api import async_playwright
 
     pw = await async_playwright().start()
+
+    launch_args = [
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-extensions",
+        # --disable-gpu 는 WebGL/Canvas(지도·차트 등)를 깨뜨리므로 제거.
+        # SwiftShader 소프트웨어 렌더러가 자동으로 GPU를 대체함.
+    ]
+
     browser = await pw.chromium.launch(
-        headless=True,
-        args=[
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-gpu",
-            "--disable-extensions",
-        ],
+        headless=_HEADLESS,
+        args=launch_args,
     )
+    mode = "headless" if _HEADLESS else "headed"
+    # 로그 레벨을 WARNING으로 올려 에이전트 로그에서 항상 보이도록 함
+    logger.warning("browser: launched chromium mode=%s (BROWSER_HEADLESS env=%r)", mode, _HEADLESS)
+
     context = await browser.new_context(
-        viewport={"width": 1280, "height": 800},
+        viewport={"width": 1280, "height": 900},
         user_agent=(
-            "Mozilla/5.0 (X11; Linux x86_64) "
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
+            "Chrome/124.0.0.0 Safari/537.36"
         ),
         locale="ko-KR",
         timezone_id="Asia/Seoul",

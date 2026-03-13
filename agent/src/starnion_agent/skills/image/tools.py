@@ -1,5 +1,6 @@
 """Image analysis, generation, and editing tools."""
 
+import base64
 import logging
 from io import BytesIO
 
@@ -19,9 +20,8 @@ from starnion_agent.skills.guard import skill_guard
 
 logger = logging.getLogger(__name__)
 
-# Dedicated model for image generation/editing (supports response_modalities=["IMAGE"]).
-# Kept separate from settings.gemini_model which may be a chat-only model.
-_IMAGE_MODEL = "gemini-3.1-flash-image-preview"
+# Default models — used when no model_assignment is configured.
+_IMAGE_GEN_MODEL = "gemini-3.1-flash-image-preview"
 
 _VALID_ASPECT_RATIOS = {"1:1", "3:4", "4:3", "9:16", "16:9"}
 
@@ -34,6 +34,65 @@ def _extract_image_bytes(response) -> bytes | None:
         if part.inline_data and part.inline_data.mime_type.startswith("image/"):
             return part.inline_data.data
     return None
+
+
+async def _generate_image_gemini(
+    model: str, api_key: str, prompt: str, aspect_ratio: str,
+) -> str:
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=api_key)
+    response = await client.aio.models.generate_content(
+        model=model,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_modalities=["TEXT", "IMAGE"],
+            image_config=types.ImageConfig(aspect_ratio=aspect_ratio),
+        ),
+    )
+    image_bytes = _extract_image_bytes(response)
+    if not image_bytes:
+        return "이미지를 생성할 수 없었어요. 다른 설명으로 다시 시도해주세요."
+    add_pending_file(image_bytes, "generated.png", "image/png")
+    return f"'{prompt}' 이미지를 생성했어요."
+
+
+async def _generate_image_ollama(model: str, base_url: str, prompt: str) -> str:
+    """Call Ollama image generation API (e.g. x/z-image-turbo)."""
+    import httpx
+
+    base_url = base_url.rstrip("/")
+    try:
+        async with httpx.AsyncClient(timeout=300) as client:
+            resp = await client.post(
+                f"{base_url}/api/generate",
+                json={"model": model, "prompt": prompt, "stream": False},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as e:
+        logger.error("Ollama image generation failed: %s", e)
+        return f"이미지 생성 중 오류가 발생했어요: {e}"
+
+    # Ollama image generation models return base64-encoded images in 'images' list.
+    images = data.get("images")
+    if images:
+        image_bytes = base64.b64decode(images[0])
+        add_pending_file(image_bytes, "generated.png", "image/png")
+        return f"'{prompt}' 이미지를 생성했어요."
+
+    # Some models embed image as base64 in 'response' field.
+    response_text = data.get("response", "")
+    if response_text:
+        try:
+            image_bytes = base64.b64decode(response_text)
+            add_pending_file(image_bytes, "generated.png", "image/png")
+            return f"'{prompt}' 이미지를 생성했어요."
+        except Exception:
+            pass
+
+    return "이미지를 생성할 수 없었어요. 다른 설명으로 다시 시도해주세요."
 
 
 class AnalyzeImageInput(BaseModel):
@@ -90,11 +149,9 @@ async def analyze_image(
     response = await llm.ainvoke([message])
     analysis_text = response.content if isinstance(response.content, str) else str(response.content)
 
-    # Save analyzed image to gallery so it appears in the web UI.
     if user_id:
         try:
             pool = get_pool()
-            # Derive file name from URL path.
             name = file_url.rstrip("/").split("/")[-1] or "image.png"
             await image_db_repo.create(
                 pool,
@@ -117,40 +174,47 @@ async def analyze_image(
 @skill_guard("image")
 async def generate_image(prompt: str, aspect_ratio: str = "1:1") -> str:
     """요청한 설명으로 이미지를 생성합니다."""
-    api_key = await get_gemini_api_key()
-    if not api_key:
-        return no_key_message()
-
-    from google import genai
-    from google.genai import types
+    from starnion_agent.graph.agent import get_model_config_for_use_case  # lazy
 
     if aspect_ratio not in _VALID_ASPECT_RATIOS:
         aspect_ratio = "1:1"
 
-    client = genai.Client(api_key=api_key)
+    user_id = get_current_user()
+    config = await get_model_config_for_use_case(user_id, "image_gen")
 
-    response = client.models.generate_content(
-        model=_IMAGE_MODEL,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_modalities=["TEXT", "IMAGE"],
-            image_config=types.ImageConfig(aspect_ratio=aspect_ratio),
-        ),
-    )
+    # Ollama path (e.g. x/z-image-turbo)
+    if config and config.get("endpoint_type") == "ollama":
+        return await _generate_image_ollama(
+            config["model"],
+            config.get("base_url", "http://localhost:11434"),
+            prompt,
+        )
 
-    image_bytes = _extract_image_bytes(response)
-    if not image_bytes:
-        return "이미지를 생성할 수 없었어요. 다른 설명으로 다시 시도해주세요."
+    # Gemini path — use assigned model or hardcoded default.
+    model = config["model"] if config else _IMAGE_GEN_MODEL
+    api_key = (config.get("api_key") or "") if config else ""
+    if not api_key:
+        api_key = await get_gemini_api_key()
+    if not api_key:
+        return no_key_message()
 
-    add_pending_file(image_bytes, "generated.png", "image/png")
-    return f"'{prompt}' 이미지를 생성했어요."
+    return await _generate_image_gemini(model, api_key, prompt, aspect_ratio)
 
 
 @tool(args_schema=EditImageInput)
 @skill_guard("image")
 async def edit_image(file_url: str, prompt: str) -> str:
     """첨부된 이미지를 요청에 따라 편집합니다. 배경 변경, 스타일 변환, 객체 추가/제거 등."""
-    api_key = await get_gemini_api_key()
+    from starnion_agent.graph.agent import get_model_config_for_use_case  # lazy
+
+    user_id = get_current_user()
+    config = await get_model_config_for_use_case(user_id, "image_gen")
+
+    # Edit requires Gemini multimodal — ignore Ollama assignment for edit.
+    model = config["model"] if config and config.get("endpoint_type") != "ollama" else _IMAGE_GEN_MODEL
+    api_key = (config.get("api_key") or "") if config and config.get("endpoint_type") != "ollama" else ""
+    if not api_key:
+        api_key = await get_gemini_api_key()
     if not api_key:
         return no_key_message()
 
@@ -162,9 +226,8 @@ async def edit_image(file_url: str, prompt: str) -> str:
     image = Image.open(BytesIO(image_data))
 
     client = genai.Client(api_key=api_key)
-
-    response = client.models.generate_content(
-        model=_IMAGE_MODEL,
+    response = await client.aio.models.generate_content(
+        model=model,
         contents=[prompt, image],
         config=types.GenerateContentConfig(
             response_modalities=["TEXT", "IMAGE"],

@@ -110,7 +110,21 @@
     "name": "Name",
     "email": "Email",
     "timezone": "Timezone",
-    "save": "Save"
+    "save": "Save",
+    "loading": "Loading...",
+    "emailReadOnly": "Email cannot be changed.",
+    "saved": "Saved",
+    "passwordChange": "Change Password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm New Password",
+    "passwordChanged": "Password changed",
+    "saveFailed": "Failed to save.",
+    "passwordChangeFailed": "Failed to change password.",
+    "passwordMismatch": "New passwords do not match.",
+    "passwordTooShort": "Password must be at least 8 characters.",
+    "aiLanguage": "Language Preference",
+    "aiLanguageDescription": "Select the language you use when talking with AI"
   },
   "common": {
     "save": "Save",
@@ -534,9 +548,9 @@
     "newConvPlaceholder": "Start a new conversation or select one from the left",
     "personas": {
       "assistant": "Default Assistant",
+      "heart_friend": "Heart Friend",
+      "life_coach": "Life Coach",
       "finance": "Finance Expert",
-      "buddy": "Close Friend",
-      "coach": "Financial Coach",
       "analyst": "Data Analyst"
     }
   },
@@ -904,6 +918,33 @@
     "saving": "Saving...",
     "update": "Update",
     "connect": "Connect",
+    "tabs": {
+      "providers": "Providers",
+      "assignments": "Model Assignments"
+    },
+    "endpointType": {
+      "label": "Endpoint Type",
+      "ollama": "Ollama",
+      "openai_compatible": "OpenAI Compatible",
+      "other": "Other (manual)"
+    },
+    "fetchModels": "Fetch Models",
+    "fetching": "Fetching...",
+    "assignments": {
+      "subtitle": "Assign dedicated models for special tasks. Falls back to the persona model when not set.",
+      "serverDefault": "(persona default)",
+      "noModels": "No models available. Connect a provider first.",
+      "save": "Save",
+      "saved": "Model assignments saved.",
+      "saveFailed": "Failed to save.",
+      "useCases": {
+        "image": "Image Analysis",
+        "audio": "Audio Analysis (STT)",
+        "report": "Reports / Cron",
+        "image_gen": "Image Generation",
+        "audio_gen": "Speech Generation (TTS)"
+      }
+    },
     "toast": {
       "baseUrlRequired": "Please enter a Base URL.",
       "apiKeyRequired": "Please enter an API key.",
@@ -913,7 +954,9 @@
       "networkError": "Unable to verify API key due to network error.",
       "saved": "{name} saved.",
       "saveFailed": "Failed to save.",
-      "removed": "{name} removed."
+      "removed": "{name} removed.",
+      "fetchFailed": "Failed to fetch model list.",
+      "fetchSuccess": "Fetched {count} models."
     }
   },
   "personas": {
@@ -944,6 +987,7 @@
       "modelCustom": "Enter manually...",
       "modelIdPlaceholder": "Enter model ID (e.g., claude-opus-4-6)",
       "noModelsHint": "No models enabled on the Models page. Select manual entry from the list above or enable models on the Models page first.",
+      "noCustomEndpointModels": "No models added to Custom Endpoint yet. Please configure a Custom Endpoint in Models settings first.",
       "systemPromptLabel": "System Prompt",
       "systemPromptPlaceholder": "Write the role and instructions for this persona. Leave blank to use the default prompt.",
       "defaultLabel": "Set as default persona",
@@ -959,7 +1003,8 @@
       "saveFailed": "Failed to save.",
       "defaultSet": "Set {name} as default persona.",
       "defaultFailed": "Failed to set as default.",
-      "deleted": "Persona deleted."
+      "deleted": "Persona deleted.",
+      "noToolsWarning": "⚠️ This model does not support tool calling. Skills and tools will be limited. Saving anyway."
     }
   }
 }

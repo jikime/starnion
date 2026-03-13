@@ -12,14 +12,13 @@ Session lifecycle:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from starnion_agent.context import get_current_user
-from starnion_agent.skills.browser.session import close_session, get_exec_lock, get_session
+from starnion_agent.skills.browser.session import _HEADLESS, close_session, get_exec_lock, get_session
 from starnion_agent.skills.file_context import add_pending_file
 from starnion_agent.skills.guard import skill_guard
 
@@ -61,6 +60,15 @@ class BrowserSelectInput(BaseModel):
     value: str = Field(description="선택할 옵션 value 또는 텍스트")
 
 
+class BrowserHoverInput(BaseModel):
+    selector: str = Field(
+        description=(
+            "호버할 요소 선택자. CSS 선택자(#id, .class), "
+            "텍스트('text=메뉴'), ARIA('role=menuitem[name=설정]') 모두 가능"
+        )
+    )
+
+
 class BrowserScreenshotInput(BaseModel):
     full_page: bool = Field(
         default=False,
@@ -80,8 +88,12 @@ class BrowserWaitMsInput(BaseModel):
 class BrowserOpenScreenshotInput(BaseModel):
     url: str = Field(description="열 URL (https:// 포함)")
     wait_ms: int = Field(
-        default=2000,
-        description="페이지 로딩 후 추가 대기 시간 (밀리초). 동적 콘텐츠가 많을수록 크게 설정",
+        default=0,
+        description=(
+            "DOM 안정화 후 추가 대기 시간 (밀리초). "
+            "대부분의 페이지는 0(자동 감지)으로 충분. "
+            "지도·차트 등 GPU 렌더링이 필요한 경우 2000~3000 설정"
+        ),
     )
     full_page: bool = Field(default=True, description="True면 전체 페이지 캡처 (권장), False면 현재 뷰포트만")
 
@@ -100,10 +112,13 @@ class BrowserWaitInput(BaseModel):
 
 @tool(args_schema=BrowserOpenScreenshotInput)
 @skill_guard("browser")
-async def browser_open_screenshot(url: str, wait_ms: int = 2000, full_page: bool = True) -> str:
+async def browser_open_screenshot(url: str, wait_ms: int = 0, full_page: bool = True) -> str:
     """URL을 열고 페이지가 완전히 로딩된 후 스크린샷을 찍어 이미지로 첨부합니다.
     날씨·검색결과·뉴스 등 한 번에 보고 싶을 때 이 툴 하나만 사용하세요.
-    개별 browser_navigate + browser_wait_ms + browser_screenshot + browser_close 조합 대신 이 툴을 우선 사용하세요.
+    개별 browser_navigate + browser_wait_ms + browser_screenshot 조합 대신 이 툴을 우선 사용하세요.
+
+    스크린샷 후에도 세션이 유지되므로 browser_click, browser_type 등으로 바로 이어서 인터랙션할 수 있어요.
+    작업이 모두 끝나면 browser_close()를 호출해 리소스를 해제하세요.
     """
     user_id = get_current_user()
     if not user_id:
@@ -112,22 +127,72 @@ async def browser_open_screenshot(url: str, wait_ms: int = 2000, full_page: bool
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
 
+    mode_str = "headless" if _HEADLESS else "headed"
+    logger.warning("browser_open_screenshot: mode=%s url=%s", mode_str, url)
+
     async with get_exec_lock(user_id):
         try:
             session = await get_session(user_id)
-            await session.page.goto(url, wait_until="networkidle", timeout=30000)
-            # 동적 콘텐츠(날씨 위젯, 광고 등) 렌더링 대기
+
+            # Step 1: DOM 먼저 로드
+            await session.page.goto(url, wait_until="domcontentloaded", timeout=30000)
+
+            # Step 2: networkidle 대기 (타임아웃 15초로 연장 — 검색결과 AJAX 완료 감지)
+            try:
+                await session.page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception:
+                pass
+
+            # Step 3: DOM 안정성 감지 — DOM 변화가 800ms 동안 없으면 로딩 완료로 판단.
+            # 검색결과·뉴스 등 SPA 페이지의 "로딩 스피너 → 결과 표시" 전환을 정확히 감지.
+            # MutationObserver로 실제 DOM 변화가 멈출 때까지 대기 (최대 12초).
+            _DOM_STABILITY_JS = """
+                () => new Promise(resolve => {
+                    const STABLE_MS = 800;
+                    const MAX_MS   = 12000;
+                    let timer      = setTimeout(() => { observer.disconnect(); resolve('stable'); }, STABLE_MS);
+                    const reset    = () => { clearTimeout(timer); timer = setTimeout(() => { observer.disconnect(); resolve('stable'); }, STABLE_MS); };
+                    const observer = new MutationObserver(reset);
+                    observer.observe(document.body || document.documentElement, {
+                        childList: true, subtree: true
+                    });
+                    setTimeout(() => { observer.disconnect(); clearTimeout(timer); resolve('timeout'); }, MAX_MS);
+                })
+            """
+            try:
+                result = await session.page.evaluate(_DOM_STABILITY_JS)
+                logger.warning("browser_open_screenshot: DOM stability=%s", result)
+            except Exception:
+                pass
+
+            # Step 4: 사용자 지정 추가 대기 (지도·차트 등 GPU 렌더링이 필요한 경우)
             if wait_ms > 0:
-                await asyncio.sleep(wait_ms / 1000)
-            png_bytes = await session.page.screenshot(full_page=full_page, type="png")
+                await session.page.wait_for_timeout(wait_ms)
+
+            # Step 5: Canvas/WebGL 페이지(지도 등)는 타일 렌더링에 추가 시간 필요.
+            # 지도 타일은 DOM 안정화 후에도 GPU 렌더링이 계속되므로 넉넉히 4초 대기.
+            try:
+                has_canvas: bool = await session.page.evaluate(
+                    "() => document.querySelector('canvas') !== null"
+                )
+                if has_canvas:
+                    logger.warning("browser_open_screenshot: canvas detected, waiting extra 4000ms for tile render")
+                    await session.page.wait_for_timeout(4000)
+            except Exception:
+                pass
+
+            png_bytes = await session.page.screenshot(
+                full_page=full_page, type="png", animations="disabled"
+            )
             title = await session.page.title()
+            current_url = session.page.url
             add_pending_file(png_bytes, "screenshot.png", "image/png")
-            mode = "전체 페이지" if full_page else "현재 화면"
-            return f"스크린샷 첨부 완료. ({mode} / 페이지: {title})"
+            cap_mode = "전체 페이지" if full_page else "현재 화면"
+            logger.warning("browser_open_screenshot: captured %s title=%r", cap_mode, title)
+            return f"스크린샷 첨부 완료. ({cap_mode} / 페이지: {title} / URL: {current_url})\n이어서 browser_click, browser_type 등으로 인터랙션하거나 browser_close()로 종료하세요."
         except Exception as e:
+            logger.warning("browser_open_screenshot: error=%s", e)
             return f"오류: {e}"
-        finally:
-            await close_session(user_id)
 
 
 @tool(args_schema=BrowserNavigateInput)
@@ -267,6 +332,23 @@ async def browser_select(selector: str, value: str) -> str:
             return f"드롭다운 선택 실패 ({selector}): {e}"
 
 
+@tool(args_schema=BrowserHoverInput)
+@skill_guard("browser")
+async def browser_hover(selector: str) -> str:
+    """페이지의 요소 위로 마우스를 올립니다. 드롭다운 메뉴나 툴팁을 열 때 사용하세요."""
+    user_id = get_current_user()
+    if not user_id:
+        return "사용자 정보를 확인할 수 없어요."
+
+    async with get_exec_lock(user_id):
+        try:
+            session = await get_session(user_id)
+            await session.page.hover(selector, timeout=10000)
+            return f"'{selector}' 요소에 마우스를 올렸어요."
+        except Exception as e:
+            return f"호버 실패 ({selector}): {e}"
+
+
 @tool(args_schema=BrowserScrollInput)
 @skill_guard("browser")
 async def browser_scroll(direction: str = "down", pixels: int = 500) -> str:
@@ -328,7 +410,12 @@ async def browser_wait_ms(ms: int = 1500) -> str:
         return "사용자 정보를 확인할 수 없어요."
 
     clamped = max(100, min(ms, 10000))  # 100ms ~ 10s
-    await asyncio.sleep(clamped / 1000)
+    async with get_exec_lock(user_id):
+        try:
+            session = await get_session(user_id)
+            await session.page.wait_for_timeout(clamped)
+        except Exception:
+            pass
     return f"{clamped}ms 대기 완료."
 
 

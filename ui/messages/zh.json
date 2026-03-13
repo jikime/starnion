@@ -110,7 +110,21 @@
     "name": "姓名",
     "email": "邮箱",
     "timezone": "时区",
-    "save": "保存"
+    "save": "保存",
+    "loading": "加载中...",
+    "emailReadOnly": "邮箱不可更改。",
+    "saved": "已保存",
+    "passwordChange": "修改密码",
+    "currentPassword": "当前密码",
+    "newPassword": "新密码",
+    "confirmPassword": "确认新密码",
+    "passwordChanged": "已修改",
+    "saveFailed": "保存失败。",
+    "passwordChangeFailed": "修改密码失败。",
+    "passwordMismatch": "新密码不一致。",
+    "passwordTooShort": "密码至少需要8位字符。",
+    "aiLanguage": "语言设置",
+    "aiLanguageDescription": "选择您与AI交流时使用的语言"
   },
   "common": {
     "save": "保存",
@@ -534,9 +548,9 @@
     "newConvPlaceholder": "开始新对话或从左侧选择对话",
     "personas": {
       "assistant": "默认助手",
+      "heart_friend": "心灵好友",
+      "life_coach": "生活教练",
       "finance": "金融专家",
-      "buddy": "好朋友",
-      "coach": "财务顾问",
       "analyst": "数据分析师"
     }
   },
@@ -904,6 +918,33 @@
     "saving": "保存中...",
     "update": "更新",
     "connect": "连接",
+    "tabs": {
+      "providers": "提供商",
+      "assignments": "模型分配"
+    },
+    "endpointType": {
+      "label": "端点类型",
+      "ollama": "Ollama",
+      "openai_compatible": "OpenAI兼容",
+      "other": "其他（手动输入）"
+    },
+    "fetchModels": "获取模型",
+    "fetching": "获取中...",
+    "assignments": {
+      "subtitle": "仅为特殊用途指定专用模型。未设置时使用角色模型。",
+      "serverDefault": "(角色默认)",
+      "noModels": "没有可用模型。请先连接提供商。",
+      "save": "保存",
+      "saved": "模型分配已保存。",
+      "saveFailed": "保存失败。",
+      "useCases": {
+        "image": "图像分析",
+        "audio": "音频分析 (STT)",
+        "report": "报告 / Cron",
+        "image_gen": "图像生成",
+        "audio_gen": "语音生成 (TTS)"
+      }
+    },
     "toast": {
       "baseUrlRequired": "请输入Base URL。",
       "apiKeyRequired": "请输入API密钥。",
@@ -913,7 +954,9 @@
       "networkError": "网络错误，无法验证API密钥。",
       "saved": "{name}已保存。",
       "saveFailed": "保存失败。",
-      "removed": "{name}已移除。"
+      "removed": "{name}已移除。",
+      "fetchFailed": "无法获取模型列表。",
+      "fetchSuccess": "已获取{count}个模型。"
     }
   },
   "personas": {
@@ -944,6 +987,7 @@
       "modelCustom": "手动输入...",
       "modelIdPlaceholder": "输入模型ID（例：claude-opus-4-6）",
       "noModelsHint": "模型页面未启用任何模型。请从上方列表选择手动输入，或先在模型页面启用模型。",
+      "noCustomEndpointModels": "Custom Endpoint尚未添加任何模型。请先在模型设置中配置Custom Endpoint。",
       "systemPromptLabel": "系统提示词",
       "systemPromptPlaceholder": "为此角色编写角色和指令。留空则使用默认提示词。",
       "defaultLabel": "设为默认角色",
@@ -959,7 +1003,8 @@
       "saveFailed": "保存失败。",
       "defaultSet": "已将{name}设为默认角色。",
       "defaultFailed": "设置默认失败。",
-      "deleted": "角色已删除。"
+      "deleted": "角色已删除。",
+      "noToolsWarning": "⚠️ 该模型不支持工具调用，技能和工具功能将受限。仍继续保存。"
     }
   }
 }

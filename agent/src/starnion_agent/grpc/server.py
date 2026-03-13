@@ -231,8 +231,18 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                         type=agent_pb2.TOOL_RESULT,
                         tool_result=output,
                     )
+                    # 툴 실행 직후 대기 중인 파일(예: 스크린샷)을 즉시 전송한다.
+                    # astream_events 루프가 다음 LLM 호출로 블로킹되더라도
+                    # 파일이 텔레그램에 전달되도록 보장한다.
+                    for pf in pop_pending_files():
+                        yield agent_pb2.ChatResponse(
+                            type=agent_pb2.FILE,
+                            file_data=pf["data"],
+                            file_name=pf["name"],
+                            file_mime=pf["mime"],
+                        )
 
-            # Emit any pending file responses before closing the stream.
+            # 루프 종료 후 남아있는 파일이 있으면 전송 (안전망).
             for pf in pop_pending_files():
                 yield agent_pb2.ChatResponse(
                     type=agent_pb2.FILE,

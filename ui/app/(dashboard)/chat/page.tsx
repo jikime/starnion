@@ -14,11 +14,11 @@ import { MessageCircle, PanelLeftClose, PanelLeft, WifiOff, Loader2 } from "luci
 function ChatPageInner() {
   const t = useTranslations("chat")
   const PERSONAS = [
-    { id: "assistant", name: t("personas.assistant") },
-    { id: "finance",   name: t("personas.finance") },
-    { id: "buddy",     name: t("personas.buddy") },
-    { id: "coach",     name: t("personas.coach") },
-    { id: "analyst",   name: t("personas.analyst") },
+    { id: "assistant",    name: t("personas.assistant") },
+    { id: "finance",      name: t("personas.finance") },
+    { id: "heart_friend", name: t("personas.heart_friend") },
+    { id: "life_coach",   name: t("personas.life_coach") },
+    { id: "analyst",      name: t("personas.analyst") },
   ]
   const router = useRouter()
   const searchParams = useSearchParams()

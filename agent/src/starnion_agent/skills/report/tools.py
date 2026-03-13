@@ -3,20 +3,22 @@
 from datetime import datetime, timedelta
 
 from langchain_core.messages import HumanMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
 
-from starnion_agent.config import settings
 from starnion_agent.db.pool import get_pool
-from starnion_agent.skills.gemini_key import get_gemini_api_key
 from starnion_agent.db.repositories import finance as finance_repo
 from starnion_agent.db.repositories import profile as profile_repo
-from starnion_agent.persona import DEFAULT_PERSONA, get_tone_instruction
+from starnion_agent.persona import DEFAULT_PERSONA, LANGUAGE_INSTRUCTIONS, get_tone_instruction
 
 
-async def generate_weekly_report(user_id: str) -> str:
+async def generate_weekly_report(user_id: str, language: str = "ko") -> str:
     """Generate a natural-language weekly financial report for *user_id*.
 
     This is called by the gRPC GenerateReport RPC (triggered by cron).
+
+    Args:
+        user_id: UUID of the user.
+        language: Response language code (``"ko"``, ``"en"``, ``"ja"``, ``"zh"``).
+            Defaults to ``"ko"`` for backward compatibility.
     """
     pool = get_pool()
 
@@ -86,18 +88,16 @@ async def generate_weekly_report(user_id: str) -> str:
 
     data_summary = "\n".join(data_lines)
 
-    api_key = await get_gemini_api_key(user_id)
-    if not api_key:
-        return "Gemini API 키가 설정되지 않아 주간 리포트를 생성할 수 없습니다."
-
-    llm = ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        google_api_key=api_key,
-    )
+    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    try:
+        llm = await get_llm_for_use_case(user_id, "report")
+    except RuntimeError:
+        return "AI 프로바이더가 설정되지 않아 주간 리포트를 생성할 수 없습니다."
 
     tone = get_tone_instruction(persona_id)
+    lang_instruction = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["ko"])
     prompt = (
-        f"당신은 개인 재정 AI 비서 '지기'입니다.\n{tone}\n\n"
+        f"당신은 개인 재정 AI 비서 '지기'입니다.\n{tone}\n{lang_instruction}\n\n"
         "아래 사용자의 주간 재정 데이터를 바탕으로 간결한 주간 리포트를 작성해주세요.\n\n"
         "포함할 내용:\n"
         "1. 이번 주 총 지출과 카테고리별 분석\n"
@@ -112,10 +112,15 @@ async def generate_weekly_report(user_id: str) -> str:
     return response.content
 
 
-async def generate_daily_summary(user_id: str) -> str:
+async def generate_daily_summary(user_id: str, language: str = "ko") -> str:
     """Generate a natural-language daily spending summary for *user_id*.
 
     Called by the gRPC GenerateReport RPC with report_type="daily_summary".
+
+    Args:
+        user_id: UUID of the user.
+        language: Response language code (``"ko"``, ``"en"``, ``"ja"``, ``"zh"``).
+            Defaults to ``"ko"`` for backward compatibility.
     """
     pool = get_pool()
 
@@ -161,18 +166,16 @@ async def generate_daily_summary(user_id: str) -> str:
 
     data_summary = "\n".join(data_lines)
 
-    api_key = await get_gemini_api_key(user_id)
-    if not api_key:
-        return "Gemini API 키가 설정되지 않아 일간 요약을 생성할 수 없습니다."
-
-    llm = ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        google_api_key=api_key,
-    )
+    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    try:
+        llm = await get_llm_for_use_case(user_id, "report")
+    except RuntimeError:
+        return "AI 프로바이더가 설정되지 않아 일간 요약을 생성할 수 없습니다."
 
     tone = get_tone_instruction(persona_id)
+    lang_instruction = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["ko"])
     prompt = (
-        f"당신은 개인 재정 AI 비서 '지기'입니다.\n{tone}\n\n"
+        f"당신은 개인 재정 AI 비서 '지기'입니다.\n{tone}\n{lang_instruction}\n\n"
         "아래 사용자의 오늘 하루 지출 데이터를 바탕으로 간결한 일간 요약을 작성해주세요.\n\n"
         "포함할 내용:\n"
         "1. 오늘 총 지출과 카테고리별 분석\n"
@@ -186,10 +189,15 @@ async def generate_daily_summary(user_id: str) -> str:
     return response.content
 
 
-async def generate_monthly_closing(user_id: str) -> str:
+async def generate_monthly_closing(user_id: str, language: str = "ko") -> str:
     """Generate a month-end closing report for *user_id*.
 
     Called by the gRPC GenerateReport RPC with report_type="monthly_closing".
+
+    Args:
+        user_id: UUID of the user.
+        language: Response language code (``"ko"``, ``"en"``, ``"ja"``, ``"zh"``).
+            Defaults to ``"ko"`` for backward compatibility.
     """
     pool = get_pool()
 
@@ -247,18 +255,16 @@ async def generate_monthly_closing(user_id: str) -> str:
 
     data_summary = "\n".join(data_lines)
 
-    api_key = await get_gemini_api_key(user_id)
-    if not api_key:
-        return "Gemini API 키가 설정되지 않아 월간 마감 리포트를 생성할 수 없습니다."
-
-    llm = ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        google_api_key=api_key,
-    )
+    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    try:
+        llm = await get_llm_for_use_case(user_id, "report")
+    except RuntimeError:
+        return "AI 프로바이더가 설정되지 않아 월간 마감 리포트를 생성할 수 없습니다."
 
     tone = get_tone_instruction(persona_id)
+    lang_instruction = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["ko"])
     prompt = (
-        f"당신은 개인 재정 AI 비서 '지기'입니다.\n{tone}\n\n"
+        f"당신은 개인 재정 AI 비서 '지기'입니다.\n{tone}\n{lang_instruction}\n\n"
         "아래 사용자의 월간 데이터를 바탕으로 이번 달 마감 요약 리포트를 작성해주세요.\n\n"
         "포함할 내용:\n"
         "1. 이번 달 총 지출과 카테고리별 분석\n"

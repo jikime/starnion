@@ -1,783 +1,250 @@
-# jiki (지기) - 기술 스택 상세
-
-**최종 수정일:** 2026-03-01
-**버전:** 0.1.0
-**상태:** MVP Implemented
-
----
-
-## 기술 스택 요약
-
-```
-┌─────────────────────────────────────────────────────┐
-│  Interface       │ Telegram Bot, Next.js (Phase 3)   │
-├─────────────────────────────────────────────────────┤
-│  Gateway         │ Go 1.23+ / Echo v4 / gRPC         │
-├─────────────────────────────────────────────────────┤
-│  Agent           │ Python 3.13+ / LangGraph / Gemini  │
-├─────────────────────────────────────────────────────┤
-│  Database        │ PostgreSQL 16+ / pgvector          │
-├─────────────────────────────────────────────────────┤
-│  Infrastructure  │ Docker / Docker Compose            │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
-## Gateway (Go)
-
-### 기술 선택 근거
-
-| 항목 | 기술 | 버전 | 선택 이유 |
-|------|-----|------|----------|
-| 언어 | Go | 1.23+ | 높은 동시성 처리, 낮은 메모리 사용, 빠른 빌드 |
-| 웹 프레임워크 | Echo v4 | v4.x | 경량, 고성능, 미들웨어 생태계, WebSocket/SSE 내장 |
-| RPC | gRPC | 최신 | 양방향 스트리밍, Protobuf 기반 타입 안전성, 언어 중립 |
-| 설정 관리 | config.yaml | - | 환경별 설정 분리, 직관적 구조 |
-| 인증 | JWT | - | 무상태 인증, Telegram 사용자 매핑 |
-
-### 핵심 패턴
-
-#### HTTP 핸들러 구조
-
-```go
-// handler/chat.go
-type ChatHandler struct {
-    agentClient proto.AgentServiceClient
-    authService *auth.Service
-}
-
-func (h *ChatHandler) HandleMessage(c echo.Context) error {
-    userID := c.Get("user_id").(string)
-
-    var req ChatRequest
-    if err := c.Bind(&req); err != nil {
-        return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-    }
-
-    // gRPC 양방향 스트리밍으로 Agent 호출
-    stream, err := h.agentClient.Chat(c.Request().Context())
-    if err != nil {
-        return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-    }
-
-    // 요청 전송 → 응답 스트리밍
-    // ...
-}
-```
-
-#### 미들웨어 체인
-
-```go
-// Rate Limiting (사용자별)
-e.Use(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
-    Store: middleware.NewRateLimiterMemoryStore(20), // 분당 20회
-    IdentifierExtractor: func(c echo.Context) (string, error) {
-        return c.Get("user_id").(string), nil
-    },
-}))
-
-// CORS 설정
-e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-    AllowOrigins: []string{"https://jiki.app"},
-    AllowMethods: []string{http.MethodGet, http.MethodPost},
-}))
-```
-
-#### gRPC 클라이언트 연결
-
-```go
-// Agent 서비스 gRPC 연결
-conn, err := grpc.NewClient(
-    cfg.Agent.Address,
-    grpc.WithTransportCredentials(insecure.NewCredentials()),
-    grpc.WithDefaultCallOptions(
-        grpc.MaxCallRecvMsgSize(10 * 1024 * 1024), // 10MB
-    ),
-)
-agentClient := proto.NewAgentServiceClient(conn)
-```
-
----
-
-## Agent Service (Python)
-
-### 기술 선택 근거
-
-| 항목 | 기술 | 버전 | 선택 이유 |
-|------|-----|------|----------|
-| 언어 | Python | 3.13+ | AI/ML 생태계 최대, LangChain/LangGraph 네이티브 |
-| 에이전트 | LangGraph | 최신 | 상태 관리, 복잡한 워크플로우, 조건부 분기 |
-| 도구 | LangChain | 최신 | BaseTool 추상화, @tool 데코레이터, 풍부한 통합 |
-| 모델 | Google Gemini | 최신 | 멀티모달, 한국어 성능, 비용 효율 |
-| RPC | grpcio / grpc.aio | 최신 | 비동기 gRPC 서버, 양방향 스트리밍 |
-| 스키마 | Pydantic | v2 | 데이터 검증, 직렬화, Tool 스키마 정의 |
-| 패키지 관리 | uv | 최신 | 빠른 의존성 해결, 가상환경 관리 |
-| 테스트 | pytest | 최신 | 비동기 테스트, 풍부한 픽스처, 플러그인 |
-
-### 핵심 패턴
-
-#### LangGraph ReAct 에이전트
-
-```python
-# graph/agent.py
-from langgraph.prebuilt import create_react_agent
-from langchain_google_genai import ChatGoogleGenerativeAI
-
-def create_jiki_agent(tools: list, memory_manager):
-    """jiki ReAct 에이전트를 생성한다."""
-
-    model = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
-        temperature=0.7,
-        max_output_tokens=4096,
-    )
-
-    system_prompt = """당신은 'jiki(지기)'입니다.
-    사용자의 디지털 트윈으로서, 사용자를 깊이 이해하고
-    의사결정 피로를 줄여주는 것이 핵심 역할입니다.
-
-    사용 가능한 도구를 적극적으로 활용하여
-    사용자의 요청을 처리하세요."""
-
-    agent = create_react_agent(
-        model=model,
-        tools=tools,
-        prompt=system_prompt,
-    )
-
-    return agent
-```
-
-#### Tool 정의 (@tool 데코레이터 + args_schema)
-
-```python
-# tools/finance.py
-from langchain_core.tools import tool
-from pydantic import BaseModel, Field
-
-class SaveFinanceInput(BaseModel):
-    """금융 데이터 저장 Tool의 입력 스키마."""
-    category: str = Field(description="카테고리 (식비, 교통, 카페 등)")
-    amount: int = Field(description="금액 (원 단위)")
-    description: str = Field(default="", description="설명")
-
-@tool(args_schema=SaveFinanceInput)
-async def save_finance(category: str, amount: int, description: str = "") -> str:
-    """수입 또는 지출 금액을 카테고리와 함께 기록합니다."""
-    user = get_current_user()
-    pool = get_pool()
-
-    # DB에 저장
-    record = await finance_repo.create(
-        pool, user["user_id"], amount, category, description
-    )
-
-    # 월간 누적 조회
-    monthly = await finance_repo.get_monthly_total(
-        pool, user["user_id"], category
-    )
-
-    return f"{category} {amount:,}원 기록했어요. 이번 달 {category} 누적: {monthly:,}원"
-```
-
-> **주의사항**: `@tool` 데코레이터에 `args_schema`를 명시하여 Gemini API 호환성을 확보한다. `Optional[T]` 패턴 사용 금지 (Gemini anyOf 버그 회피). 모듈 레벨 `set_current_user()`/`get_current_user()`로 Tool 실행 시 사용자 컨텍스트를 추적한다.
-
-#### 3계층 메모리 시스템
-
-```python
-# memory/manager.py
-class MemoryManager:
-    """3계층 메모리를 통합 관리하는 매니저."""
-
-    def __init__(self, short_term, long_term, entity):
-        self.short_term = short_term   # LangGraph State
-        self.long_term = long_term     # pgvector RAG
-        self.entity = entity           # Structured JSON
-
-    async def recall(self, query: str, user_id: str) -> MemoryContext:
-        """3계층 메모리에서 관련 맥락을 통합 조회한다."""
-
-        # 단기 기억: 현재 대화 맥락
-        short = self.short_term.get_recent_messages(limit=10)
-
-        # 장기 기억: 벡터 유사도 검색
-        long = await self.long_term.search(
-            query=query,
-            user_id=user_id,
-            top_k=5,
-            min_score=0.7,
-        )
-
-        # 엔티티 기억: 사용자 프로필
-        entity = await self.entity.get_profile(user_id)
-
-        return MemoryContext(
-            short_term=short,
-            long_term=long,
-            entity=entity,
-        )
-```
-
-#### Gemini anyOf 스키마 정규화
-
-```python
-# graph/tools.py
-def sanitize_tool_schemas_for_gemini(tools: list) -> list:
-    """Gemini API의 anyOf 스키마 비호환 문제를 해결한다.
-
-    Gemini는 Optional[str] 등의 anyOf 패턴이 포함된
-    Tool 스키마를 받으면 빈 응답을 반환하는 버그가 있다.
-    base type + default 값으로 변환하여 우회한다.
-    """
-
-    def _unwrap_anyof(schema: dict) -> dict:
-        if "anyOf" in schema:
-            # anyOf에서 null이 아닌 첫 번째 타입 추출
-            for variant in schema["anyOf"]:
-                if variant.get("type") != "null":
-                    return variant
-        return schema
-
-    # 각 Tool의 args_schema를 정규화
-    for tool in tools:
-        if hasattr(tool, "args_schema"):
-            schema = tool.args_schema.model_json_schema()
-            for prop_name, prop_schema in schema.get("properties", {}).items():
-                schema["properties"][prop_name] = _unwrap_anyof(prop_schema)
-
-    return tools
-```
-
----
-
-## 데이터베이스
-
-### 기술 선택 근거
-
-| 항목 | 기술 | 버전 | 선택 이유 |
-|------|-----|------|----------|
-| RDBMS | PostgreSQL | 16+ | JSONB, 확장성, 안정성, 오픈소스 |
-| 벡터 검색 | pgvector | 최신 | PostgreSQL 네이티브 확장, HNSW/IVFFlat 인덱스 |
-| 임베딩 | Gemini Embedding | 최신 | 1536차원, 한국어 성능, API 비용 효율 |
-
-### 스키마 설계
-
-```sql
--- pgvector 확장 활성화
-CREATE EXTENSION IF NOT EXISTS vector;
-
--- ============================================
--- 사용자 프로필 (온보딩 데이터)
--- ============================================
-CREATE TABLE profiles (
-    user_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    telegram_id     BIGINT UNIQUE NOT NULL,
-    user_name       VARCHAR(100) NOT NULL,
-    goals           TEXT[] DEFAULT '{}',
-    preferences     JSONB DEFAULT '{}',
-    -- preferences 구조:
-    -- {
-    --   "budget": { "food": 300000, "transport": 100000 },
-    --   "dietary": { "allergies": ["유제품"], "preference": "매운맛" },
-    --   "notification": { "weekly_report": true, "budget_alert": true }
-    -- }
-    created_at      TIMESTAMPTZ DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ DEFAULT NOW()
-);
-
--- ============================================
--- 금융 기록 (구조화 데이터)
--- ============================================
-CREATE TABLE finances (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID NOT NULL REFERENCES profiles(user_id),
-    amount          INTEGER NOT NULL,          -- 원 단위 (음수: 지출, 양수: 수입)
-    category        VARCHAR(50) NOT NULL,      -- 식비, 교통, 카페, 수입 등
-    description     TEXT DEFAULT '',
-    transaction_at  TIMESTAMPTZ DEFAULT NOW(), -- 실제 거래 시각
-    created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 월별 카테고리 조회용 인덱스
-CREATE INDEX idx_finances_user_month
-    ON finances (user_id, DATE_TRUNC('month', transaction_at));
-CREATE INDEX idx_finances_category
-    ON finances (user_id, category);
-
--- ============================================
--- 일일 로그 (벡터 임베딩 포함)
--- ============================================
-CREATE TABLE daily_logs (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID NOT NULL REFERENCES profiles(user_id),
-    content         TEXT NOT NULL,              -- 원본 텍스트
-    sentiment       VARCHAR(20),               -- positive, neutral, negative
-    embedding       vector(1536),              -- Gemini Embedding
-    metadata        JSONB DEFAULT '{}',        -- 추가 메타데이터
-    created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-
--- HNSW 벡터 인덱스 (코사인 유사도)
-CREATE INDEX idx_daily_logs_embedding
-    ON daily_logs USING hnsw (embedding vector_cosine_ops)
-    WITH (m = 16, ef_construction = 64);
-
--- ============================================
--- 문서 저장소
--- ============================================
-CREATE TABLE documents (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID NOT NULL REFERENCES profiles(user_id),
-    title           VARCHAR(255) NOT NULL,
-    file_type       VARCHAR(20) NOT NULL,      -- pdf, docx, xlsx, hwp
-    file_url        TEXT NOT NULL,              -- 스토리지 URL
-    file_size       INTEGER,                   -- 바이트 단위
-    page_count      INTEGER,
-    uploaded_at     TIMESTAMPTZ DEFAULT NOW()
-);
-
--- ============================================
--- 문서 청크 (RAG용)
--- ============================================
-CREATE TABLE document_sections (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    document_id     UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    content         TEXT NOT NULL,              -- 청크 텍스트
-    embedding       vector(1536),              -- 벡터 임베딩
-    metadata        JSONB DEFAULT '{}',        -- 페이지 번호, 섹션 제목 등
-    chunk_index     INTEGER NOT NULL,          -- 청크 순서
-    created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-
--- HNSW 벡터 인덱스
-CREATE INDEX idx_doc_sections_embedding
-    ON document_sections USING hnsw (embedding vector_cosine_ops)
-    WITH (m = 16, ef_construction = 64);
-
--- ============================================
--- 지식 베이스 (키-값 + 벡터)
--- ============================================
-CREATE TABLE knowledge_base (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID NOT NULL REFERENCES profiles(user_id),
-    key             VARCHAR(255) NOT NULL,     -- 지식 키 (예: "좋아하는_음식")
-    value           TEXT NOT NULL,              -- 지식 값
-    source          VARCHAR(100),              -- 출처 (conversation, document, manual)
-    embedding       vector(1536),
-    confidence      FLOAT DEFAULT 1.0,         -- 확신도 (0.0 ~ 1.0)
-    created_at      TIMESTAMPTZ DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ DEFAULT NOW()
-);
-
--- HNSW 벡터 인덱스
-CREATE INDEX idx_knowledge_embedding
-    ON knowledge_base USING hnsw (embedding vector_cosine_ops)
-    WITH (m = 16, ef_construction = 64);
-
--- 사용자별 키 조회 인덱스
-CREATE INDEX idx_knowledge_user_key
-    ON knowledge_base (user_id, key);
-```
-
-### 벡터 검색 패턴
-
-```sql
--- 코사인 유사도 기반 RAG 검색
-SELECT
-    content,
-    metadata,
-    1 - (embedding <=> $1::vector) AS similarity
-FROM daily_logs
-WHERE user_id = $2
-    AND 1 - (embedding <=> $1::vector) > 0.7  -- 최소 유사도
-ORDER BY embedding <=> $1::vector
-LIMIT 5;
-```
-
-### HNSW vs IVFFlat 인덱스 비교
-
-| 기준 | HNSW | IVFFlat |
-|------|------|---------|
-| 검색 정확도 | 높음 (99%+) | 중간 (95%+) |
-| 검색 속도 | 빠름 | 보통 |
-| 인덱스 빌드 | 느림 | 빠름 |
-| 메모리 사용 | 높음 | 낮음 |
-| 권장 규모 | <1M 벡터 | >1M 벡터 |
-| **jiki 선택** | **HNSW** | - |
-
-> jiki는 사용자당 데이터가 상대적으로 적으므로 (수만~수십만 건), 정확도가 높은 HNSW를 선택한다.
-
----
-
-## 통신 프로토콜
-
-### gRPC 서비스 정의
-
-```protobuf
-// proto/jiki/v1/agent.proto
-syntax = "proto3";
-package jiki.v1;
-
-service AgentService {
-    // 양방향 스트리밍 채팅
-    rpc Chat(stream ChatRequest) returns (stream ChatResponse);
-
-    // 에이전트 상태 조회
-    rpc GetStatus(StatusRequest) returns (StatusResponse);
-}
-
-// proto/jiki/v1/chat.proto
-message ChatRequest {
-    string user_id = 1;
-    string message = 2;
-    repeated Attachment attachments = 3;
-    map<string, string> metadata = 4;
-}
-
-message ChatResponse {
-    oneof response {
-        TextChunk text_chunk = 1;         // 텍스트 스트리밍 청크
-        ToolCall tool_call = 2;           // Tool 호출 알림
-        ToolResult tool_result = 3;       // Tool 실행 결과
-        FinalResponse final_response = 4; // 최종 응답
-    }
-}
-
-message Attachment {
-    string file_url = 1;
-    string file_type = 2;    // image, audio, document
-    string file_name = 3;
-    int64 file_size = 4;
-}
-
-message ToolCall {
-    string tool_name = 1;
-    string arguments_json = 2;
-}
-
-message ToolResult {
-    string tool_name = 1;
-    string result = 2;
-    bool success = 3;
-}
-
-// proto/jiki/v1/tool.proto
-service ToolRegistryService {
-    // Gateway에 위임된 Tool 등록
-    rpc RegisterTool(RegisterToolRequest) returns (RegisterToolResponse);
-
-    // 등록된 Tool 목록 조회
-    rpc ListTools(ListToolsRequest) returns (ListToolsResponse);
-
-    // Tool 실행 (Agent → Gateway 방향)
-    rpc ExecuteTool(ExecuteToolRequest) returns (ExecuteToolResponse);
-}
-```
-
-### 통신 흐름 상세
-
-```
-[Telegram 메시지 수신]
-    │
-    ▼
-Gateway: Telegram Webhook 수신
-    │
-    ├─ 인증: Telegram user_id → JWT 매핑
-    ├─ Rate Limit: 사용자별 분당 20회 체크
-    │
-    ▼
-Gateway → Agent: gRPC ChatRequest 스트리밍 시작
-    │
-    ▼
-Agent: LangGraph ReAct 실행
-    │
-    ├─ Plan: 사용자 의도 파악 + 메모리 조회
-    ├─ Execute: Tool 선택 및 실행
-    │   ├─ 로컬 Tool: DB 직접 접근
-    │   └─ Gateway Tool: gRPC ToolRegistry 호출
-    ├─ Observe: Tool 결과 분석
-    │
-    ▼
-Agent → Gateway: gRPC ChatResponse 스트리밍
-    │
-    ├─ TextChunk: 실시간 텍스트 전송
-    ├─ ToolCall: Tool 호출 상태 알림
-    ├─ ToolResult: Tool 실행 결과
-    └─ FinalResponse: 최종 응답
-    │
-    ▼
-Gateway → Telegram: sendMessage API 호출
-```
-
----
-
-## 핵심 설계 패턴
-
-### 1. Repository 패턴 (데이터 접근 추상화)
-
-```python
-# db/repositories/finance.py
-from psycopg.rows import dict_row
-
-async def create(pool, user_id: str, amount: int, category: str, description: str) -> dict:
-    """finances 테이블에 수입/지출 기록을 INSERT한다."""
-    async with pool.connection() as conn:
-        async with conn.cursor(row_factory=dict_row) as cur:
-            await cur.execute(
-                "INSERT INTO finances (user_id, amount, category, description) "
-                "VALUES (%s, %s, %s, %s) RETURNING *",
-                (user_id, amount, category, description),
-            )
-            return await cur.fetchone()
-
-async def get_monthly_total(pool, user_id: str, category: str, month: str = "") -> int:
-    """월별 카테고리 합계를 조회한다."""
-    async with pool.connection() as conn:
-        async with conn.cursor(row_factory=dict_row) as cur:
-            await cur.execute(
-                "SELECT COALESCE(SUM(amount), 0) AS total FROM finances "
-                "WHERE user_id = %s AND category = %s "
-                "AND DATE_TRUNC('month', transaction_at) = DATE_TRUNC('month', CURRENT_DATE)",
-                (user_id, category),
-            )
-            row = await cur.fetchone()
-            return row["total"] if row else 0
-```
-
-### 2. 이벤트 기반 알림 (프로액티브 시스템)
-
-```python
-# notification/triggers.py
-class BudgetAlertTrigger:
-    """예산 경고 트리거. 금융 기록 저장 후 실행된다."""
-
-    async def check(self, user_id: str, category: str) -> Alert | None:
-        monthly_total = await self.finance_repo.get_monthly_total(user_id, category)
-        budget = await self.profile_repo.get_budget(user_id, category)
-
-        if budget is None:
-            return None
-
-        ratio = monthly_total / budget
-
-        if ratio >= 0.9:
-            return Alert(
-                level="warning",
-                message=f"이번 달 {category} 예산의 {ratio*100:.0f}% 사용했어요!",
-            )
-        elif ratio >= 0.7:
-            return Alert(
-                level="info",
-                message=f"이번 달 {category} 예산의 {ratio*100:.0f}% 사용 중이에요.",
-            )
-
-        return None
-```
-
-### 3. 문서 RAG 파이프라인
-
-```python
-# knowledge/chunker.py
-class DocumentChunker:
-    """문서를 의미 단위로 청킹한다."""
-
-    def __init__(self, chunk_size: int = 800, overlap: int = 200):
-        self.chunk_size = chunk_size
-        self.overlap = overlap
-
-    def chunk(self, text: str, metadata: dict) -> list[Chunk]:
-        """텍스트를 오버랩 윈도우로 청킹한다."""
-        chunks = []
-        start = 0
-
-        while start < len(text):
-            end = min(start + self.chunk_size, len(text))
-
-            # 문장 경계에서 자르기
-            if end < len(text):
-                last_period = text.rfind('.', start, end)
-                if last_period > start + self.chunk_size // 2:
-                    end = last_period + 1
-
-            chunks.append(Chunk(
-                content=text[start:end],
-                metadata={**metadata, "chunk_index": len(chunks)},
-            ))
-
-            start = end - self.overlap
-
-        return chunks
-```
-
----
-
-## 개발 환경
-
-### Docker Compose (로컬 개발)
-
-```yaml
-# docker/docker-compose.yml
-version: '3.9'
-
-services:
-  postgres:
-    image: pgvector/pgvector:pg16
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: jiki
-      POSTGRES_USER: jiki
-      POSTGRES_PASSWORD: jiki_dev
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ../migrations:/docker-entrypoint-initdb.d
-
-  gateway:
-    build:
-      context: ../gateway
-      dockerfile: ../docker/Dockerfile.gateway
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-    environment:
-      - AGENT_GRPC_ADDRESS=agent:50051
-      - DB_HOST=postgres
-
-  agent:
-    build:
-      context: ../agent
-      dockerfile: ../docker/Dockerfile.agent
-    ports:
-      - "50051:50051"
-    depends_on:
-      - postgres
-    environment:
-      - DB_HOST=postgres
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-
-volumes:
-  postgres_data:
-```
+# Starnion 기술 스택
+
+**Last Updated:** 2026-03-13
+
+## 1. 기술 스택 요약
+
+| 계층 | 기술 | 버전 |
+|------|------|------|
+| **Web UI** | Next.js + React + TypeScript | 16.1.6 / 19.2.4 / 5.7.3 |
+| **Gateway** | Go + Echo + gRPC | 1.22+ / v4.15.1 / 1.79.1 |
+| **Agent** | Python + LangGraph + LangChain | 3.13+ / 0.4+ / latest |
+| **Database** | PostgreSQL + pgvector | 16 / latest |
+| **Storage** | MinIO (S3 호환) | latest |
+| **통신** | gRPC (protobuf) | 1.79.1 |
+| **컨테이너** | Docker + Docker Compose | latest |
+
+## 2. 레이어별 기술
+
+### Gateway (Go)
+
+게이트웨이는 모든 외부 요청의 진입점으로, HTTP API, WebSocket, Telegram 봇을 처리한다.
+
+| 패키지 | 버전 | 용도 |
+|--------|------|------|
+| **Go** | 1.22+ | 런타임 |
+| **Echo** | v4.15.1 | HTTP 웹 프레임워크 |
+| **gRPC** | 1.79.1 | Agent 서비스 통신 |
+| **go-telegram-bot-api** | v5 | Telegram 봇 통합 |
+| **lib/pq** | latest | PostgreSQL 드라이버 |
+| **MinIO Go Client** | latest | S3 호환 오브젝트 스토리지 |
+| **golang-jwt** | v5 | JWT 인증 토큰 |
+| **gorilla/websocket** | latest | WebSocket 실시간 통신 |
+| **robfig/cron** | latest | Cron 기반 스케줄링 |
+| **zerolog** | latest | 구조화된 JSON 로깅 |
+| **cobra** | latest | CLI 프레임워크 |
+| **yaml.v3** | latest | YAML 설정 파싱 |
+
+### Agent (Python)
+
+에이전트는 AI 추론과 스킬 실행을 담당하는 핵심 서비스다.
+
+| 패키지 | 버전 | 용도 |
+|--------|------|------|
+| **Python** | 3.13+ | 런타임 |
+| **LangGraph** | >= 0.4 | ReAct 에이전트 오케스트레이션 |
+| **LangChain google-genai** | latest | Google Gemini 연동 |
+| **LangChain anthropic** | latest | Anthropic Claude 연동 |
+| **LangChain openai** | latest | OpenAI GPT 연동 |
+| **LangChain ollama** | latest | Ollama 로컬 모델 연동 |
+| **psycopg3** | latest | PostgreSQL 비동기 드라이버 |
+| **Pydantic** | v2 | 데이터 검증 및 스키마 |
+| **grpcio** | latest | gRPC 서버 |
+| **docling** | latest | 문서 파싱 |
+| **pypdf** | latest | PDF 처리 |
+| **pillow** | latest | 이미지 처리 |
+| **playwright** | latest | 웹 스크래핑/자동화 |
+| **tavily-python** | latest | 웹 검색 API |
+
+### UI (Next.js)
+
+웹 UI는 풀 기능 대시보드로, SSR과 Server Actions를 활용한다.
+
+| 패키지 | 버전 | 용도 |
+|--------|------|------|
+| **Next.js** | 16.1.6 | React 프레임워크 (App Router) |
+| **React** | 19.2.4 | UI 라이브러리 |
+| **TypeScript** | 5.7.3 | 타입 안전성 |
+| **Tailwind CSS** | 4.2.0 | 유틸리티 CSS 프레임워크 |
+| **NextAuth.js** | 5.0.0-beta | 인증 (OAuth, Credentials) |
+| **next-intl** | 4.8.3 | 다국어 지원 (ko, en, ja, zh) |
+| **Radix UI** | latest | 헤드리스 UI 컴포넌트 |
+| **AI SDK (Vercel)** | latest | AI 스트리밍 응답 처리 |
+| **React Hook Form** | latest | 폼 상태 관리 |
+| **Zod** | latest | 스키마 검증 |
+| **recharts** | latest | 데이터 시각화 차트 |
+
+### 인프라
+
+| 기술 | 용도 |
+|------|------|
+| **PostgreSQL 16** | 관계형 데이터베이스 |
+| **pgvector** | 벡터 유사도 검색 (HNSW 인덱스) |
+| **MinIO** | S3 호환 오브젝트 스토리지 |
+| **Docker** | 컨테이너화 |
+| **Docker Compose** | 멀티 컨테이너 오케스트레이션 |
+| **gRPC / protobuf** | 서비스 간 고성능 통신 |
+
+## 3. 개발 환경 설정
+
+### 필수 요구사항
+
+| 도구 | 최소 버전 |
+|------|----------|
+| Go | 1.22+ |
+| Python | 3.13+ |
+| Node.js | 20+ |
+| Docker | 24+ |
+| Docker Compose | v2+ |
+| uv (Python 패키지 매니저) | latest |
+| pnpm (Node.js 패키지 매니저) | latest |
 
 ### 환경 변수
 
-| 변수명 | 용도 | 서비스 |
-|--------|------|--------|
-| `GOOGLE_API_KEY` | Gemini API 키 | Agent |
-| `TELEGRAM_BOT_TOKEN` | Telegram Bot 토큰 | Agent |
-| `DB_HOST` | PostgreSQL 호스트 | Gateway, Agent |
-| `DB_NAME` | 데이터베이스 이름 | Gateway, Agent |
-| `DB_USER` | DB 사용자 | Gateway, Agent |
-| `DB_PASSWORD` | DB 비밀번호 | Gateway, Agent |
-| `JWT_SECRET` | JWT 서명 키 | Gateway |
-| `AGENT_GRPC_ADDRESS` | Agent gRPC 주소 | Gateway |
+각 서비스별 `.env` 파일이 필요하다. 주요 설정 항목은 다음과 같다.
 
----
+```bash
+# Database
+DATABASE_URL=postgresql://user:pass@localhost:5432/starnion
 
-## 테스트 전략
+# MinIO
+MINIO_ENDPOINT=localhost:9000
+MINIO_ACCESS_KEY=...
+MINIO_SECRET_KEY=...
 
-### 테스트 피라미드
+# LLM Providers
+GOOGLE_API_KEY=...
+OPENAI_API_KEY=...
+ANTHROPIC_API_KEY=...
 
-```
-         ╱╲
-        ╱E2E╲          Telegram → Gateway → Agent → DB
-       ╱──────╲         (Playwright / pytest-asyncio)
-      ╱통합 테스트╲       Agent + DB, Gateway + Agent
-     ╱────────────╲      (pytest, testcontainers)
-    ╱  단위 테스트   ╲     Tool 로직, 청킹, 파싱
-   ╱────────────────╲    (pytest, vitest)
+# Telegram
+TELEGRAM_BOT_TOKEN=...
+
+# Auth
+JWT_SECRET=...
+NEXTAUTH_SECRET=...
 ```
 
-| 테스트 레벨 | 대상 | 프레임워크 | 커버리지 목표 |
-|------------|------|----------|-------------|
-| 단위 | Tool 로직, 청킹, 파싱, 유틸 | pytest | 90%+ |
-| 통합 | gRPC 호출, DB 연동, RAG 검색 | pytest + testcontainers | 80%+ |
-| E2E | Telegram 메시지 전체 흐름 | pytest-asyncio | 핵심 시나리오 |
+## 4. 주요 기술 결정
 
-### 테스트 예시
+### Go Gateway 선택 이유
 
-```python
-# tests/unit/test_tools_finance.py
-import pytest
-from jiki_agent.tools.finance import SaveFinanceTool, SaveFinanceInput
+- **고성능 동시성**: goroutine 기반의 경량 동시 처리로 다수의 WebSocket 연결과 HTTP 요청을 효율적으로 처리
+- **단일 바이너리 배포**: 의존성 없는 단일 실행 파일로 배포 간소화
+- **gRPC 네이티브 지원**: Protocol Buffer 기반의 타입 안전한 서비스 간 통신
 
-class TestSaveFinanceTool:
-    @pytest.fixture
-    def tool(self, mock_db):
-        return SaveFinanceTool(db=mock_db, user_id="test-user")
+### Python LangGraph Agent 선택 이유
 
-    async def test_save_expense(self, tool, mock_db):
-        """지출 기록이 올바르게 저장되는지 검증한다."""
-        result = await tool._arun(
-            amount=-10000,
-            category="식비",
-            description="점심",
-        )
+- **LangChain 생태계**: 다양한 LLM 프로바이더 통합이 용이
+- **ReAct 패턴**: LangGraph의 그래프 기반 에이전트 오케스트레이션으로 복잡한 도구 호출 흐름 관리
+- **멀티 LLM 지원**: 단일 코드베이스에서 Gemini, OpenAI, Claude, Ollama 모두 지원
 
-        assert "식비" in result
-        assert "10,000원" in result
-        mock_db.finances.create.assert_called_once()
+### Next.js App Router 선택 이유
 
-    async def test_save_income(self, tool, mock_db):
-        """수입 기록이 올바르게 저장되는지 검증한다."""
-        result = await tool._arun(
-            amount=3500000,
-            category="수입",
-            description="월급",
-        )
+- **Server Components**: 서버 사이드 렌더링으로 초기 로딩 성능 최적화
+- **Server Actions**: 별도 API 레이어 없이 서버 로직 직접 호출
+- **next-intl**: 4개 언어 (ko, en, ja, zh) 다국어 지원 내장
 
-        assert "수입" in result
-        assert "3,500,000원" in result
+### pgvector 선택 이유
+
+- **별도 벡터 DB 불필요**: PostgreSQL 확장으로 기존 인프라에서 벡터 검색 수행
+- **HNSW 인덱스**: 고속 근사 최근접 이웃 검색으로 RAG 메모리 시스템 지원
+- **트랜잭션 일관성**: 관계형 데이터와 벡터 데이터를 동일 트랜잭션에서 관리
+
+### gRPC 선택 이유
+
+- **타입 안전성**: Protocol Buffer 스키마로 Gateway-Agent 간 계약 보장
+- **양방향 스트리밍**: AI 응답 스트리밍에 적합
+- **고성능**: JSON REST 대비 직렬화/역직렬화 성능 우위
+
+## 5. 빌드 & 실행 명령어
+
+### Docker Compose (전체 서비스)
+
+```bash
+# 전체 서비스 시작
+docker compose up -d
+
+# 로그 확인
+docker compose logs -f
+
+# 서비스 중지
+docker compose down
 ```
 
----
+### Gateway (Go)
 
-## 보안 고려사항
+```bash
+cd gateway
 
-### 데이터 보호
+# 의존성 설치
+go mod download
 
-| 영역 | 조치 | 구현 |
-|------|------|------|
-| 전송 암호화 | TLS 1.3 | gRPC TLS, HTTPS |
-| 저장 암호화 | AES-256 | PostgreSQL TDE (선택) |
-| 인증 | JWT + Telegram Auth | Gateway auth 미들웨어 |
-| 인가 | 사용자별 데이터 격리 | 모든 쿼리에 user_id 조건 |
-| 비밀 관리 | 환경 변수 | .env 파일, 시크릿 매니저 |
-| API 키 보호 | 서버사이드 전용 | 클라이언트 노출 금지 |
+# 빌드
+go build -o bin/gateway cmd/gateway/main.go
 
-### Rate Limiting
+# 실행
+./bin/gateway serve
 
-| 엔드포인트 | 제한 | 단위 |
-|-----------|------|------|
-| 채팅 메시지 | 20회 | 분 |
-| 파일 업로드 | 10회 | 시간 |
-| RAG 검색 | 30회 | 분 |
-| 프로필 수정 | 5회 | 분 |
+# CLI 도구
+go run cmd/starnion/main.go --help
+```
 
-### 개인정보 보호 원칙
+### Agent (Python)
 
-1. **최소 수집**: 서비스에 필요한 최소한의 데이터만 수집
-2. **투명성**: 수집 데이터 항목과 용도를 사용자에게 명시
-3. **삭제 권리**: 사용자 요청 시 모든 데이터 완전 삭제 지원
-4. **격리**: 사용자 간 데이터 완전 격리 (멀티테넌시)
-5. **로깅 제한**: 개인 식별 정보 로깅 금지
+```bash
+cd agent
 
----
+# 의존성 설치 (uv 사용)
+uv sync
 
-## 성능 목표
+# 실행
+uv run python -m starnion_agent
 
-| 지표 | 목표값 | 측정 방법 |
-|------|--------|----------|
-| 채팅 응답 (첫 토큰) | < 1초 | gRPC 스트리밍 첫 응답 |
-| 채팅 응답 (전체) | < 5초 | Tool 호출 포함 전체 |
-| RAG 검색 | < 200ms | pgvector HNSW 쿼리 |
-| 파일 업로드 | < 10초 | 10MB PDF 기준 |
-| 동시 사용자 | 100+ | Gateway 기준 |
-| 가용성 | 99.5% | 월간 다운타임 < 3.6시간 |
+# gRPC 서버 시작
+uv run python -m starnion_agent.grpc.server
+```
 
----
+### UI (Next.js)
 
-*이 문서는 jiki 프로젝트의 기술 스택과 핵심 패턴을 정의한다. 제품 기능은 `product.md`를, 프로젝트 구조는 `structure.md`를 참고한다.*
+```bash
+cd ui
+
+# 의존성 설치
+pnpm install
+
+# 개발 서버
+pnpm dev
+
+# 프로덕션 빌드
+pnpm build
+
+# 프로덕션 실행
+pnpm start
+```
+
+### DB 마이그레이션
+
+```bash
+# 초기 스키마 적용 (Docker 환경)
+docker exec -i starnion-db psql -U postgres -d starnion < docker/init.sql
+
+# 증분 마이그레이션
+docker exec -i starnion-db psql -U postgres -d starnion < docker/migrations/incremental/v1.3.5.sql
+
+# Gateway CLI를 통한 마이그레이션
+cd gateway
+go run cmd/starnion/main.go migrate up
+```
+
+### Proto 컴파일
+
+```bash
+cd proto
+
+# Go 코드 생성
+protoc --go_out=../gateway --go-grpc_out=../gateway *.proto
+
+# Python 코드 생성
+python -m grpc_tools.protoc --python_out=../agent --grpc_python_out=../agent *.proto
+```

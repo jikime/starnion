@@ -12,12 +12,12 @@ import (
 	"sync"
 	"time"
 
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	starnionv1 "github.com/jikime/starnion/gateway/gen/starnion/v1"
 	"github.com/jikime/starnion/gateway/internal/activity"
 	"github.com/jikime/starnion/gateway/internal/identity"
 	"github.com/jikime/starnion/gateway/internal/skill"
 	"github.com/jikime/starnion/gateway/internal/storage"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 )
@@ -302,6 +302,9 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		b.tracker.RecordMessage(userID)
 	}
 
+	// Resolve the user's language preference for localized messages.
+	lang := b.getUserLanguage(userID)
+
 	// ── Policy gate ──────────────────────────────────────────────────────────
 	// Enforce DM / Group policy before processing any user message or command.
 	if !msg.IsCommand() || (msg.IsCommand() && msg.Command() != "start" && msg.Command() != "link") {
@@ -328,20 +331,20 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 				if !mentioned {
 					return
 				}
-			// "allow" — fall through, no restriction.
+				// "allow" — fall through, no restriction.
 			}
 		} else {
 			// Direct message.
 			switch dmPolicy {
 			case "deny":
-				b.SendMessage(chatID, "죄송해요, 현재 DM을 통한 메시지는 받지 않고 있어요.")
+				b.SendMessage(chatID, botMsg(lang, "dmDenied"))
 				return
 			case "pairing":
 				if !b.isApprovedContact(telegramID) {
-					b.handlePairingRequest(chatID, telegramID, displayName, msg.Text)
+					b.handlePairingRequest(chatID, telegramID, displayName, msg.Text, lang)
 					return
 				}
-			// "allow" — fall through.
+				// "allow" — fall through.
 			}
 		}
 	}
@@ -351,13 +354,13 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	if msg.IsCommand() {
 		switch msg.Command() {
 		case "start":
-			b.handleStart(chatID)
+			b.handleStart(chatID, lang)
 		case "persona":
-			b.handlePersona(chatID)
+			b.handlePersona(chatID, userID, lang)
 		case "skills":
-			b.handleSkills(chatID, userID)
+			b.handleSkills(chatID, userID, lang)
 		case "link":
-			b.handleLink(chatID, userID)
+			b.handleLink(chatID, userID, lang)
 		}
 		return
 	}
@@ -394,7 +397,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 			}
 			photoCaption := msg.Caption
 			if photoCaption == "" {
-				photoCaption = "이 이미지를 분석해주세요."
+				photoCaption = botMsg(lang, "analyzeImage")
 			}
 			imgIDCh = make(chan int64, 1)
 			go func(u, caption string) {
@@ -415,7 +418,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 				chatReq.Message = msg.Caption
 			}
 			if chatReq.Message == "" {
-				chatReq.Message = "이 이미지를 분석해주세요."
+				chatReq.Message = botMsg(lang, "analyzeImage")
 			}
 		}
 	}
@@ -441,7 +444,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 				}
 			}(fileURL, msg.Voice.Duration)
 			if chatReq.Message == "" {
-				chatReq.Message = "이 음성을 텍스트로 변환해주세요."
+				chatReq.Message = botMsg(lang, "transcribeAudio")
 			}
 		}
 	}
@@ -468,7 +471,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 				chatReq.Message = msg.Caption
 			}
 			if chatReq.Message == "" {
-				chatReq.Message = "이 비디오를 분석해주세요."
+				chatReq.Message = botMsg(lang, "analyzeVideo")
 			}
 		}
 	}
@@ -500,7 +503,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 				chatReq.Message = msg.Caption
 			}
 			if chatReq.Message == "" {
-				chatReq.Message = "이 문서를 처리해주세요."
+				chatReq.Message = botMsg(lang, "processDocument")
 			}
 		}
 	}
@@ -540,9 +543,9 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	b.setReaction(chatID, messageID, "👀")
 
 	// 3. Try streaming first, fallback to unary on error.
-	if err := b.handleMessageStream(ctx, chatID, messageID, userID, convID, chatReq, imgIDCh); err != nil {
+	if err := b.handleMessageStream(ctx, chatID, messageID, userID, convID, lang, chatReq, imgIDCh); err != nil {
 		log.Warn().Err(err).Str("user_id", userID).Msg("stream failed, falling back to unary")
-		b.handleMessageUnary(ctx, chatID, messageID, userID, convID, chatReq, imgIDCh)
+		b.handleMessageUnary(ctx, chatID, messageID, userID, convID, lang, chatReq, imgIDCh)
 	}
 }
 
@@ -550,8 +553,8 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 // Sends an initial message to Telegram and progressively edits it as tokens arrive.
 // imgIDCh (may be nil) carries the images row id for uploaded photos so
 // that the analysis column can be backfilled once the LLM response is complete.
-func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID int, userID, convID string, req *starnionv1.ChatRequest, imgIDCh chan int64) error {
-	reqCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
+func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID int, userID, convID, lang string, req *starnionv1.ChatRequest, imgIDCh chan int64) error {
+	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	stream, err := b.grpcClient.ChatStream(reqCtx, req)
@@ -570,7 +573,7 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 	const editInterval = 500 * time.Millisecond
 
 	// Send initial "thinking" status message.
-	thinkMsg := tgbotapi.NewMessage(chatID, "💭 생각중...")
+	thinkMsg := tgbotapi.NewMessage(chatID, botMsg(lang, "thinking"))
 	if sent, sendErr := b.api.Send(thinkMsg); sendErr == nil {
 		statusMsgID = sent.MessageID
 	}
@@ -753,11 +756,11 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 }
 
 // handleMessageUnary processes a chat request via unary gRPC call (fallback).
-func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID int, userID, convID string, req *starnionv1.ChatRequest, imgIDCh chan int64) {
+func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID int, userID, convID, lang string, req *starnionv1.ChatRequest, imgIDCh chan int64) {
 	typingCtx, typingCancel := context.WithCancel(ctx)
 	go b.typingLoop(typingCtx, chatID)
 
-	reqCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	resp, err := b.grpcClient.Chat(reqCtx, req)
@@ -766,7 +769,7 @@ func (b *Bot) handleMessageUnary(ctx context.Context, chatID int64, messageID in
 	if err != nil {
 		log.Error().Err(err).Str("user_id", userID).Msg("gRPC chat (unary) failed")
 		b.setReaction(chatID, messageID, "😢")
-		reply := tgbotapi.NewMessage(chatID, "잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요.")
+		reply := tgbotapi.NewMessage(chatID, botMsg(lang, "serviceError"))
 		b.api.Send(reply)
 		return
 	}
@@ -988,11 +991,8 @@ func (b *Bot) uploadFileToStorage(ctx context.Context, name, mime string, data [
 	return b.store.Upload(ctx, name, mime, data)
 }
 
-func (b *Bot) handleStart(chatID int64) {
-	text := "안녕하세요! 저는 니온(Starnion)이에요.\n" +
-		"가계부 기록, 지출 조회, 일상 기록 등을 도와드릴게요.\n" +
-		"편하게 말씀해 주세요!"
-	msg := tgbotapi.NewMessage(chatID, text)
+func (b *Bot) handleStart(chatID int64, lang string) {
+	msg := tgbotapi.NewMessage(chatID, botMsg(lang, "welcome"))
 	if _, err := b.api.Send(msg); err != nil {
 		log.Error().Err(err).Int64("chat_id", chatID).Msg("failed to send /start reply")
 	}
@@ -1000,25 +1000,20 @@ func (b *Bot) handleStart(chatID int64) {
 
 // handleLink generates a one-time pairing code and sends it to the user.
 // The user enters this code in the web app to link their accounts.
-func (b *Bot) handleLink(chatID int64, userID string) {
+func (b *Bot) handleLink(chatID int64, userID, lang string) {
 	if b.identitySvc == nil {
-		b.SendMessage(chatID, "계정 연결 기능을 사용할 수 없어요.")
+		b.SendMessage(chatID, botMsg(lang, "linkUnavailable"))
 		return
 	}
 
 	code, err := b.identitySvc.GenerateLinkCode(userID)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", userID).Msg("failed to generate link code")
-		b.SendMessage(chatID, "코드 생성에 실패했어요. 잠시 후 다시 시도해 주세요.")
+		b.SendMessage(chatID, botMsg(lang, "linkCodeFailed"))
 		return
 	}
 
-	text := fmt.Sprintf(
-		"🔗 계정 연결 코드: *%s*\n\n"+
-			"웹 앱의 채널 → 채널 설정 → 계정 연결에서 이 코드를 입력하세요.\n"+
-			"_코드는 10분 후 만료됩니다._",
-		code,
-	)
+	text := fmt.Sprintf(botMsg(lang, "linkCodeText"), code)
 	if err := b.SendMessage(chatID, text); err != nil {
 		log.Error().Err(err).Int64("chat_id", chatID).Msg("failed to send link code")
 	}
@@ -1099,6 +1094,145 @@ func getToolStatus(toolName string) string {
 	return fmt.Sprintf("⏳ %s 처리중...", toolName)
 }
 
+// getUserLanguage returns the language preference for the given userID (UUID).
+// Returns "ko" if the user is not found or has no language preference set.
+func (b *Bot) getUserLanguage(userID string) string {
+	if b.db == nil || userID == "" {
+		return "ko"
+	}
+	var lang string
+	err := b.db.QueryRowContext(context.Background(),
+		`SELECT COALESCE(preferences->>'language', 'ko') FROM users WHERE id = $1::uuid`,
+		userID,
+	).Scan(&lang)
+	if err != nil || lang == "" {
+		return "ko"
+	}
+	return lang
+}
+
+// botMessages holds localized user-facing strings for the Telegram bot.
+var botMessages = map[string]map[string]string{
+	"ko": {
+		"dmDenied":           "죄송해요, 현재 DM을 통한 메시지는 받지 않고 있어요.",
+		"analyzeImage":       "이 이미지를 분석해주세요.",
+		"transcribeAudio":    "이 음성을 텍스트로 변환해주세요.",
+		"analyzeVideo":       "이 비디오를 분석해주세요.",
+		"processDocument":    "이 문서를 처리해주세요.",
+		"thinking":           "💭 생각중...",
+		"serviceError":       "잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요.",
+		"welcome":            "안녕하세요! 저는 니온(Starnion)이에요.\n가계부 기록, 지출 조회, 일상 기록 등을 도와드릴게요.\n편하게 말씀해 주세요!",
+		"linkUnavailable":    "계정 연결 기능을 사용할 수 없어요.",
+		"linkCodeFailed":     "코드 생성에 실패했어요. 잠시 후 다시 시도해 주세요.",
+		"linkCodeText":       "🔗 계정 연결 코드: *%s*\n\n웹 앱의 채널 → 채널 설정 → 계정 연결에서 이 코드를 입력하세요.\n_코드는 10분 후 만료됩니다._",
+		"pairingError":       "연결 요청을 처리할 수 없어요. 잠시 후 다시 시도해 주세요.",
+		"pairingSent":        "연결 요청을 보냈어요. 봇 소유자가 승인하면 대화를 시작할 수 있어요.",
+		"personaUnavailable": "페르소나 목록을 불러올 수 없어요.",
+		"personaError":       "페르소나 목록을 불러오는 중 오류가 발생했어요.",
+		"personaEmpty":       "사용 가능한 페르소나가 없어요.",
+		"personaPrompt":      "어떤 스타일로 대화할까요? 선택해 주세요!",
+		"skillsUnavailable":  "스킬 관리 기능이 아직 준비되지 않았어요.",
+		"skillsError":        "스킬 목록을 불러올 수 없어요.",
+		"skillsEmpty":        "등록된 스킬이 없어요.",
+		"skillsPrompt":       "기능을 켜고 끌 수 있어요. 버튼을 눌러 토글하세요.",
+		"skillToggleError":   "토글할 수 없는 스킬이에요.",
+		"skillOff":           "꺼짐",
+		"skillOn":            "켜짐",
+	},
+	"en": {
+		"dmDenied":           "Sorry, DMs are not currently accepted.",
+		"analyzeImage":       "Please analyze this image.",
+		"transcribeAudio":    "Please transcribe this audio.",
+		"analyzeVideo":       "Please analyze this video.",
+		"processDocument":    "Please process this document.",
+		"thinking":           "💭 Thinking...",
+		"serviceError":       "Service is temporarily unavailable. Please try again later.",
+		"welcome":            "Hello! I'm Nion (Starnion).\nI can help you with budgeting, expense tracking, and daily logging.\nFeel free to ask!",
+		"linkUnavailable":    "Account linking is not available.",
+		"linkCodeFailed":     "Failed to generate a code. Please try again later.",
+		"linkCodeText":       "🔗 Account link code: *%s*\n\nEnter this code in the web app under Channel → Channel Settings → Link Account.\n_The code expires in 10 minutes._",
+		"pairingError":       "Unable to process your connection request. Please try again later.",
+		"pairingSent":        "Connection request sent. You can start chatting once the bot owner approves it.",
+		"personaUnavailable": "Unable to load the persona list.",
+		"personaError":       "An error occurred while loading the persona list.",
+		"personaEmpty":       "No personas available.",
+		"personaPrompt":      "Which style would you like to chat in? Please select!",
+		"skillsUnavailable":  "Skill management is not ready yet.",
+		"skillsError":        "Unable to load the skill list.",
+		"skillsEmpty":        "No skills registered.",
+		"skillsPrompt":       "You can toggle features on and off. Press a button to toggle.",
+		"skillToggleError":   "Unable to toggle this skill.",
+		"skillOff":           "OFF",
+		"skillOn":            "ON",
+	},
+	"ja": {
+		"dmDenied":           "申し訳ありませんが、現在DMは受け付けていません。",
+		"analyzeImage":       "この画像を分析してください。",
+		"transcribeAudio":    "この音声をテキストに変換してください。",
+		"analyzeVideo":       "この動画を分析してください。",
+		"processDocument":    "このドキュメントを処理してください。",
+		"thinking":           "💭 考え中...",
+		"serviceError":       "サービスが一時的に利用できません。しばらくしてから再試行してください。",
+		"welcome":            "こんにちは！ニオン(Starnion)です。\n家計簿の記録、支出の確認、日常の記録などをお手伝いします。\nお気軽にどうぞ！",
+		"linkUnavailable":    "アカウント連携機能は利用できません。",
+		"linkCodeFailed":     "コードの生成に失敗しました。しばらくしてから再試行してください。",
+		"linkCodeText":       "🔗 アカウント連携コード: *%s*\n\nWebアプリのチャンネル → チャンネル設定 → アカウント連携にこのコードを入力してください。\n_コードは10分後に期限切れになります。_",
+		"pairingError":       "接続リクエストを処理できません。しばらくしてから再試行してください。",
+		"pairingSent":        "接続リクエストを送信しました。ボットのオーナーが承認したらチャットを開始できます。",
+		"personaUnavailable": "ペルソナリストを読み込めません。",
+		"personaError":       "ペルソナリストの読み込み中にエラーが発生しました。",
+		"personaEmpty":       "利用可能なペルソナがありません。",
+		"personaPrompt":      "どのスタイルで会話しますか？選択してください！",
+		"skillsUnavailable":  "スキル管理機能はまだ準備されていません。",
+		"skillsError":        "スキルリストを読み込めません。",
+		"skillsEmpty":        "登録されたスキルがありません。",
+		"skillsPrompt":       "機能のオン/オフを切り替えられます。ボタンを押してトグルしてください。",
+		"skillToggleError":   "このスキルをトグルできません。",
+		"skillOff":           "オフ",
+		"skillOn":            "オン",
+	},
+	"zh": {
+		"dmDenied":           "抱歉，目前不接受私信。",
+		"analyzeImage":       "请分析这张图片。",
+		"transcribeAudio":    "请将这段音频转录为文字。",
+		"analyzeVideo":       "请分析这段视频。",
+		"processDocument":    "请处理这个文档。",
+		"thinking":           "💭 思考中...",
+		"serviceError":       "服务暂时不可用，请稍后重试。",
+		"welcome":            "你好！我是Nion(Starnion)。\n我可以帮助您记录账本、查询支出和记录日常。\n请随时告诉我！",
+		"linkUnavailable":    "账户连接功能不可用。",
+		"linkCodeFailed":     "生成代码失败，请稍后重试。",
+		"linkCodeText":       "🔗 账户连接代码：*%s*\n\n请在网页应用的频道 → 频道设置 → 账户连接中输入此代码。\n_代码将在10分钟后过期。_",
+		"pairingError":       "无法处理连接请求，请稍后重试。",
+		"pairingSent":        "连接请求已发送，机器人所有者批准后您可以开始聊天。",
+		"personaUnavailable": "无法加载角色列表。",
+		"personaError":       "加载角色列表时发生错误。",
+		"personaEmpty":       "没有可用的角色。",
+		"personaPrompt":      "您想以哪种风格聊天？请选择！",
+		"skillsUnavailable":  "技能管理功能尚未准备好。",
+		"skillsError":        "无法加载技能列表。",
+		"skillsEmpty":        "没有注册的技能。",
+		"skillsPrompt":       "您可以开关功能，按下按钮进行切换。",
+		"skillToggleError":   "无法切换此技能。",
+		"skillOff":           "关闭",
+		"skillOn":            "开启",
+	},
+}
+
+// botMsg returns the localized message for the given language and key.
+// Falls back to Korean if the language or key is not found.
+func botMsg(lang, key string) string {
+	if msgs, ok := botMessages[lang]; ok {
+		if text, ok := msgs[key]; ok {
+			return text
+		}
+	}
+	if text, ok := botMessages["ko"][key]; ok {
+		return text
+	}
+	return key
+}
+
 // isApprovedContact checks whether telegramID is in the owner's approved contacts list.
 func (b *Bot) isApprovedContact(telegramID string) bool {
 	if b.db == nil || b.ownerUserID == "" {
@@ -1119,9 +1253,9 @@ func (b *Bot) isApprovedContact(telegramID string) bool {
 }
 
 // handlePairingRequest creates or updates a pairing request and notifies the sender.
-func (b *Bot) handlePairingRequest(chatID int64, telegramID, displayName, messageText string) {
+func (b *Bot) handlePairingRequest(chatID int64, telegramID, displayName, messageText, lang string) {
 	if b.db == nil || b.ownerUserID == "" {
-		b.SendMessage(chatID, "연결 요청을 처리할 수 없어요. 잠시 후 다시 시도해 주세요.")
+		b.SendMessage(chatID, botMsg(lang, "pairingError"))
 		return
 	}
 
@@ -1141,37 +1275,73 @@ func (b *Bot) handlePairingRequest(chatID int64, telegramID, displayName, messag
 		log.Warn().Err(err).Str("telegram_id", telegramID).Msg("handlePairingRequest: upsert failed")
 	}
 
-	b.SendMessage(chatID, "연결 요청을 보냈어요. 봇 소유자가 승인하면 대화를 시작할 수 있어요.")
+	b.SendMessage(chatID, botMsg(lang, "pairingSent"))
 }
 
-// personaNames maps persona IDs to display labels with emoji.
-var personaNames = map[string]string{
-	"assistant":  "\U0001f916 기본 비서",
-	"finance":    "\U0001f4ca 금융 전문가",
-	"buddy":      "\U0001f60a 친한 친구",
-	"coach":      "\U0001f4aa 재정 코치",
-	"analyst":    "\U0001f50d 데이터 분석가",
-	"counselor":  "\U0001f49c 심리 상담사",
-}
+// handlePersona fetches the user's personas from DB and sends an inline keyboard.
+func (b *Bot) handlePersona(chatID int64, userID, lang string) {
+	if b.db == nil {
+		b.SendMessage(chatID, botMsg(lang, "personaUnavailable"))
+		return
+	}
 
-// handlePersona sends an inline keyboard for persona selection.
-func (b *Bot) handlePersona(chatID int64) {
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("\U0001f916 기본 비서", "persona:assistant"),
-			tgbotapi.NewInlineKeyboardButtonData("\U0001f4ca 금융 전문가", "persona:finance"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("\U0001f60a 친한 친구", "persona:buddy"),
-			tgbotapi.NewInlineKeyboardButtonData("\U0001f4aa 재정 코치", "persona:coach"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("\U0001f50d 데이터 분석가", "persona:analyst"),
-			tgbotapi.NewInlineKeyboardButtonData("\U0001f49c 심리 상담사", "persona:counselor"),
-		),
-	)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	msg := tgbotapi.NewMessage(chatID, "어떤 스타일로 대화할까요? 선택해 주세요!")
+	type personaRow struct {
+		name      string
+		isDefault bool
+	}
+
+	dbRows, err := b.db.QueryContext(ctx, `
+		SELECT name, is_default
+		FROM personas
+		WHERE user_id = $1
+		ORDER BY is_default DESC, created_at ASC
+	`, userID)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("handlePersona: query failed")
+		b.SendMessage(chatID, botMsg(lang, "personaError"))
+		return
+	}
+	defer dbRows.Close()
+
+	var personas []personaRow
+	for dbRows.Next() {
+		var p personaRow
+		if scanErr := dbRows.Scan(&p.name, &p.isDefault); scanErr != nil {
+			continue
+		}
+		personas = append(personas, p)
+	}
+
+	if len(personas) == 0 {
+		b.SendMessage(chatID, botMsg(lang, "personaEmpty"))
+		return
+	}
+
+	// Build inline keyboard — 2 buttons per row.
+	var kbRows [][]tgbotapi.InlineKeyboardButton
+	for i := 0; i < len(personas); i += 2 {
+		label := personas[i].name
+		if personas[i].isDefault {
+			label = "✅ " + label
+		}
+		row := []tgbotapi.InlineKeyboardButton{
+			tgbotapi.NewInlineKeyboardButtonData(label, "persona:"+personas[i].name),
+		}
+		if i+1 < len(personas) {
+			label2 := personas[i+1].name
+			if personas[i+1].isDefault {
+				label2 = "✅ " + label2
+			}
+			row = append(row, tgbotapi.NewInlineKeyboardButtonData(label2, "persona:"+personas[i+1].name))
+		}
+		kbRows = append(kbRows, row)
+	}
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(kbRows...)
+	msg := tgbotapi.NewMessage(chatID, botMsg(lang, "personaPrompt"))
 	msg.ReplyMarkup = keyboard
 	if _, err := b.api.Send(msg); err != nil {
 		log.Error().Err(err).Int64("chat_id", chatID).Msg("failed to send /persona keyboard")
@@ -1194,8 +1364,9 @@ func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQue
 		}
 	}
 
+	lang := b.getUserLanguage(userID)
 	if strings.HasPrefix(data, "skill:toggle:") {
-		b.handleSkillToggle(ctx, callback, chatID, userID)
+		b.handleSkillToggle(ctx, callback, chatID, userID, lang)
 		return
 	}
 
@@ -1203,60 +1374,54 @@ func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQue
 		return
 	}
 
-	personaID := strings.TrimPrefix(data, "persona:")
+	// callback data format: "persona:<name>" where name is the Korean persona name from DB.
+	personaName := strings.TrimPrefix(data, "persona:")
 
-	// Validate persona ID.
-	if _, ok := personaNames[personaID]; !ok {
+	if b.db == nil {
 		return
 	}
 
-	// personaNameByID maps Telegram persona IDs to the Korean names stored in personas.
-	personaNameByID := map[string]string{
-		"assistant":  "기본 비서",
-		"finance":    "금융 전문가",
-		"buddy":      "친한 친구",
-		"coach":      "재정 코치",
-		"analyst":    "데이터 분석가",
-		"counselor":  "심리 상담사",
+	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	// Validate that the persona exists in the user's personas table.
+	var exists bool
+	if err := b.db.QueryRowContext(dbCtx, `
+		SELECT EXISTS(SELECT 1 FROM personas WHERE user_id = $1 AND name = $2)
+	`, userID, personaName).Scan(&exists); err != nil || !exists {
+		log.Warn().Str("user_id", userID).Str("persona", personaName).Msg("persona not found in DB, ignoring callback")
+		return
 	}
 
-	if b.db != nil {
-		dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-
-		personaName := personaNameByID[personaID]
-
-		// Update personas: clear old default, set new default by name.
-		// This is the primary mechanism used by the Python agent.
-		tx, txErr := b.db.BeginTx(dbCtx, nil)
-		if txErr == nil {
-			_, err1 := tx.ExecContext(dbCtx,
-				`UPDATE personas SET is_default = FALSE WHERE user_id = $1`, userID)
-			_, err2 := tx.ExecContext(dbCtx,
-				`UPDATE personas SET is_default = TRUE, updated_at = NOW()
-				 WHERE user_id = $1 AND name = $2`, userID, personaName)
-			if err1 != nil || err2 != nil {
-				tx.Rollback() //nolint:errcheck
-				log.Error().Err(err1).Err(err2).Str("user_id", userID).
-					Str("persona", personaID).Msg("failed to update personas default")
-			} else if err := tx.Commit(); err != nil {
-				log.Error().Err(err).Str("user_id", userID).Msg("failed to commit persona tx")
-			}
+	// Update personas: clear old default, set new default by name.
+	tx, txErr := b.db.BeginTx(dbCtx, nil)
+	if txErr == nil {
+		_, err1 := tx.ExecContext(dbCtx,
+			`UPDATE personas SET is_default = FALSE WHERE user_id = $1`, userID)
+		_, err2 := tx.ExecContext(dbCtx,
+			`UPDATE personas SET is_default = TRUE, updated_at = NOW()
+			 WHERE user_id = $1 AND name = $2`, userID, personaName)
+		if err1 != nil || err2 != nil {
+			tx.Rollback() //nolint:errcheck
+			log.Error().Err(err1).Err(err2).Str("user_id", userID).
+				Str("persona", personaName).Msg("failed to update personas default")
+		} else if err := tx.Commit(); err != nil {
+			log.Error().Err(err).Str("user_id", userID).Msg("failed to commit persona tx")
 		}
+	}
 
-		_, err := b.db.ExecContext(dbCtx, `
-			UPDATE users
-			SET preferences = preferences || $1::jsonb,
-			    updated_at = NOW()
-			WHERE id = $2
-		`, fmt.Sprintf(`{"persona":"%s"}`, personaID), userID)
-		if err != nil {
-			log.Error().Err(err).Str("user_id", userID).Str("persona", personaID).Msg("failed to update users persona preference")
-		}
+	_, err := b.db.ExecContext(dbCtx, `
+		UPDATE users
+		SET preferences = preferences || $1::jsonb,
+		    updated_at = NOW()
+		WHERE id = $2
+	`, fmt.Sprintf(`{"persona":"%s"}`, personaName), userID)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID).Str("persona", personaName).Msg("failed to update users persona preference")
 	}
 
 	// Replace the keyboard message with a confirmation.
-	confirmText := fmt.Sprintf("%s 모드로 전환했어요!", personaNames[personaID])
+	confirmText := fmt.Sprintf("%s 모드로 전환했어요!", personaName)
 	edit := tgbotapi.NewEditMessageText(chatID, callback.Message.MessageID, confirmText)
 	if _, err := b.api.Send(edit); err != nil {
 		log.Debug().Err(err).Msg("failed to edit persona confirmation message")
@@ -1268,30 +1433,30 @@ func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQue
 		log.Debug().Err(err).Msg("failed to answer callback query")
 	}
 
-	log.Info().Str("user_id", userID).Str("persona", personaID).Msg("persona changed")
+	log.Info().Str("user_id", userID).Str("persona", personaName).Msg("persona changed")
 }
 
 // handleSkills sends an inline keyboard showing all toggleable skills.
-func (b *Bot) handleSkills(chatID int64, userID string) {
+func (b *Bot) handleSkills(chatID int64, userID, lang string) {
 	if b.skillService == nil {
-		b.SendMessage(chatID, "스킬 관리 기능이 아직 준비되지 않았어요.")
+		b.SendMessage(chatID, botMsg(lang, "skillsUnavailable"))
 		return
 	}
 
 	skills, err := b.skillService.GetUserSkills(userID)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", userID).Msg("failed to get user skills")
-		b.SendMessage(chatID, "스킬 목록을 불러올 수 없어요.")
+		b.SendMessage(chatID, botMsg(lang, "skillsError"))
 		return
 	}
 
 	if len(skills) == 0 {
-		b.SendMessage(chatID, "등록된 스킬이 없어요.")
+		b.SendMessage(chatID, botMsg(lang, "skillsEmpty"))
 		return
 	}
 
 	keyboard := b.buildSkillsKeyboard(skills)
-	msg := tgbotapi.NewMessage(chatID, "기능을 켜고 끌 수 있어요. 버튼을 눌러 토글하세요.")
+	msg := tgbotapi.NewMessage(chatID, botMsg(lang, "skillsPrompt"))
 	msg.ReplyMarkup = keyboard
 	if _, err := b.api.Send(msg); err != nil {
 		log.Error().Err(err).Int64("chat_id", chatID).Msg("failed to send /skills keyboard")
@@ -1318,7 +1483,7 @@ func (b *Bot) buildSkillsKeyboard(skills []skill.SkillView) tgbotapi.InlineKeybo
 }
 
 // handleSkillToggle processes a skill toggle callback.
-func (b *Bot) handleSkillToggle(ctx context.Context, callback *tgbotapi.CallbackQuery, chatID int64, userID string) {
+func (b *Bot) handleSkillToggle(ctx context.Context, callback *tgbotapi.CallbackQuery, chatID int64, userID, lang string) {
 	skillID := strings.TrimPrefix(callback.Data, "skill:toggle:")
 
 	if b.skillService == nil {
@@ -1328,14 +1493,14 @@ func (b *Bot) handleSkillToggle(ctx context.Context, callback *tgbotapi.Callback
 	enabled, err := b.skillService.Toggle(userID, skillID)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", userID).Str("skill_id", skillID).Msg("skill toggle failed")
-		callbackCfg := tgbotapi.NewCallback(callback.ID, "토글할 수 없는 스킬이에요.")
+		callbackCfg := tgbotapi.NewCallback(callback.ID, botMsg(lang, "skillToggleError"))
 		b.api.Request(callbackCfg)
 		return
 	}
 
-	status := "꺼짐"
+	status := botMsg(lang, "skillOff")
 	if enabled {
-		status = "켜짐"
+		status = botMsg(lang, "skillOn")
 	}
 
 	// Refresh the keyboard with updated states.
