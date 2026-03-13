@@ -61,10 +61,17 @@ type streamRequest struct {
 //	data: {"type":"finish-step"}
 //	data: [DONE]
 func (h *ChatStreamHandler) Stream(c echo.Context) error {
-	var req streamRequest
-	if err := c.Bind(&req); err != nil || req.UserID == "" || (req.Message == "" && len(req.Files) == 0) {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "user_id and message (or files) are required"})
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
+
+	var req streamRequest
+	if err := c.Bind(&req); err != nil || (req.Message == "" && len(req.Files) == 0) {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "message (or files) are required"})
+	}
+	// Always use the authenticated identity — ignore any user_id in the body.
+	req.UserID = userID
 
 	// Set SSE headers expected by AI SDK DefaultChatTransport.
 	c.Response().Header().Set("Content-Type", "text/event-stream")

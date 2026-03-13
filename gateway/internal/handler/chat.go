@@ -11,7 +11,6 @@ import (
 
 // ChatRequest represents an incoming chat message.
 type ChatRequest struct {
-	UserID  string `json:"user_id" validate:"required"`
 	Message string `json:"message" validate:"required"`
 	Model   string `json:"model,omitempty"`
 }
@@ -35,6 +34,13 @@ func NewChatHandler(conn *grpc.ClientConn) *ChatHandler {
 
 // Chat handles POST /api/v1/chat requests.
 func (h *ChatHandler) Chat(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "unauthorized",
+		})
+	}
+
 	var req ChatRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
@@ -48,19 +54,13 @@ func (h *ChatHandler) Chat(c echo.Context) error {
 		})
 	}
 
-	if req.UserID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "user_id is required",
-		})
-	}
-
 	log.Info().
-		Str("user_id", req.UserID).
+		Str("user_id", userID).
 		Str("message", req.Message).
 		Msg("chat request received")
 
 	resp, err := h.grpcClient.Chat(c.Request().Context(), &starnionv1.ChatRequest{
-		UserId:  req.UserID,
+		UserId:  userID,
 		Message: req.Message,
 		Model:   req.Model,
 	})
