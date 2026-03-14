@@ -358,7 +358,8 @@ NEXTAUTH_URL=http://localhost:%d
 }
 
 // MergeUIEnv reads the existing ui/.env and adds any keys that are present in
-// the config but missing from the file. Existing values are never overwritten.
+// the config but missing from the file. Keys that already exist with an empty
+// value are updated in-place when the config has a non-empty value.
 func MergeUIEnv(cfg StarNionConfig, projectRoot string) error {
 	path := filepath.Join(projectRoot, "ui", ".env")
 
@@ -371,8 +372,8 @@ func MergeUIEnv(cfg StarNionConfig, projectRoot string) error {
 		"NEXTAUTH_URL":    fmt.Sprintf("http://localhost:%d", cfg.UI.Port),
 	}
 
-	// Read existing file.
-	existing := map[string]bool{}
+	// Read existing file; track key→value so we can detect empty values.
+	existing := map[string]string{}
 	var lines []string
 	if data, err := os.ReadFile(path); err == nil {
 		for _, line := range strings.Split(string(data), "\n") {
@@ -380,7 +381,7 @@ func MergeUIEnv(cfg StarNionConfig, projectRoot string) error {
 			if idx := strings.IndexByte(line, '='); idx > 0 {
 				key := strings.TrimSpace(line[:idx])
 				if key != "" && !strings.HasPrefix(key, "#") {
-					existing[key] = true
+					existing[key] = strings.TrimSpace(line[idx+1:])
 				}
 			}
 		}
@@ -390,16 +391,33 @@ func MergeUIEnv(cfg StarNionConfig, projectRoot string) error {
 		}
 	}
 
-	// Append missing keys in a stable order.
+	// In-place update: replace lines where the existing value is empty but
+	// the desired value is non-empty.
+	changed := 0
+	for i, line := range lines {
+		if idx := strings.IndexByte(line, '='); idx > 0 {
+			key := strings.TrimSpace(line[:idx])
+			val := strings.TrimSpace(line[idx+1:])
+			if val == "" {
+				if dv, ok := desired[key]; ok && dv != "" {
+					lines[i] = key + "=" + dv
+					existing[key] = dv
+					changed++
+				}
+			}
+		}
+	}
+
+	// Append keys that were completely missing.
 	order := []string{"AUTH_SECRET", "API_URL", "JWT_SECRET", "AUTH_TRUST_HOST", "NEXTAUTH_URL"}
 	added := 0
 	for _, key := range order {
-		if !existing[key] {
+		if _, exists := existing[key]; !exists {
 			lines = append(lines, key+"="+desired[key])
 			added++
 		}
 	}
-	if added == 0 {
+	if changed == 0 && added == 0 {
 		return nil // nothing to do
 	}
 	lines = append(lines, "")
