@@ -9,7 +9,9 @@
 set -euo pipefail
 
 # ── Pinned version (updated automatically on release) ─────────────────────────
-STARNION_VERSION="1.4.10"
+# Use the env var if already set (e.g. by `starnion update`), otherwise fall
+# back to the pinned version so `curl … | bash` always gets the latest release.
+STARNION_VERSION="${STARNION_VERSION:-1.4.10}"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 if [[ -t 1 ]] && [[ "${NO_COLOR:-}" == "" ]]; then
