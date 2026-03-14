@@ -5,13 +5,13 @@ on:
     tags:
       - "v*"
 
-permissions:
-  contents: write
-
 jobs:
   goreleaser:
     name: GoReleaser
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,7 +33,7 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: latest
+          version: "10"  # pin major version — matches project's pnpm 10.x
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
@@ -44,33 +44,58 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Update install.sh on GitHub Pages after release
+  # Update _STARNION_PINNED in docs/install.sh after a successful release
   update-pages:
-    name: Update GitHub Pages
+    name: Update install.sh version
     needs: goreleaser
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
           ref: main
 
-      - name: Extract version from tag
+      - name: Extract and validate version from tag
         id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Update version in docs/install.sh
         run: |
-          sed -i "s/^_STARNION_PINNED=.*/_STARNION_PINNED=\"${{ steps.version.outputs.version }}\"/" docs/install.sh
+          VERSION="${GITHUB_REF_NAME#v}"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Invalid version format: '$VERSION' (expected X.Y.Z)"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Commit updated docs
+      - name: Update _STARNION_PINNED in docs/install.sh
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s/^_STARNION_PINNED=.*/_STARNION_PINNED=\"${VERSION}\"/" docs/install.sh
+          # Verify the substitution actually took effect
+          if ! grep -qF "_STARNION_PINNED=\"${VERSION}\"" docs/install.sh; then
+            echo "::error::sed did not update _STARNION_PINNED in docs/install.sh — check the pattern"
+            exit 1
+          fi
+
+      - name: Commit and push updated docs
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/install.sh
-          git diff --staged --quiet || git commit -m "chore: update docs to v${{ steps.version.outputs.version }}"
-          # Rebase onto latest main in case other commits landed while goreleaser was running.
-          git pull --rebase
-          git push
+          if git diff --staged --quiet; then
+            echo "install.sh already at v${{ steps.version.outputs.version }} — nothing to commit"
+            exit 0
+          fi
+          git commit -m "chore: update docs to v${{ steps.version.outputs.version }}"
+          # Retry push up to 3 times to handle concurrent commits landing on main
+          # while goreleaser was running (non-fast-forward race condition).
+          for attempt in 1 2 3; do
+            git pull --rebase && git push && break
+            if [[ "$attempt" == "3" ]]; then
+              echo "::error::Failed to push after 3 attempts"
+              exit 1
+            fi
+            echo "Push attempt ${attempt} failed, retrying in 5s..."
+            sleep 5
+          done
