@@ -960,7 +960,7 @@ func createAdminUser(cfg StarNionConfig, name, email, password, language string)
 	var userID string
 	if err := tx.QueryRow(
 		`INSERT INTO users (id, display_name, email, password_hash, role, preferences)
-		 VALUES (gen_random_uuid()::TEXT, $1, $2, $3, 'admin', jsonb_build_object('language', $4)) RETURNING id`,
+		 VALUES (gen_random_uuid()::TEXT, $1, $2, $3, 'admin', jsonb_build_object('language', $4::TEXT)) RETURNING id`,
 		name, email, hash, language,
 	).Scan(&userID); err != nil {
 		return fmt.Errorf("users 삽입 실패: %w", err)
