@@ -278,32 +278,6 @@ func (s *Service) MergeAndLink(fromUserID, code string) (string, error) {
 		return "", fmt.Errorf("cannot link account to itself")
 	}
 
-	// 2. email/password_hash 이전 (fromUserID → toUserID)
-	// fromUserID의 email을 먼저 NULL로 클리어하고 toUserID에 설정하는 것을
-	// 단일 CTE로 원자적으로 처리한다. 이렇게 하지 않으면 UPDATE 시점에 두
-	// 행이 동시에 같은 email을 갖게 되어 unique 제약 위반이 발생한다.
-	_, err = tx.Exec(`
-		WITH cleared AS (
-			UPDATE users
-			SET email         = NULL,
-			    password_hash = NULL,
-			    updated_at    = NOW()
-			WHERE id = $2
-			  AND email IS NOT NULL
-			RETURNING email, password_hash
-		)
-		UPDATE users
-		SET email         = cleared.email,
-		    password_hash = cleared.password_hash,
-		    updated_at    = NOW()
-		FROM cleared
-		WHERE users.id = $1
-		  AND users.email IS NULL
-	`, toUserID, fromUserID)
-	if err != nil {
-		return "", fmt.Errorf("migrate credentials: %w", err)
-	}
-
 	// 3. platform_identities 복사 (fromUserID → toUserID)
 	// ON CONFLICT DO NOTHING: toUserID에 이미 해당 플랫폼이 있으면 건너뜀
 	_, err = tx.Exec(`

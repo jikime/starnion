@@ -479,9 +479,10 @@ func main() {
 	// Google OAuth2 callback.
 	if db != nil {
 		googleCfg := handler.GoogleOAuthConfig{
-			ClientID:     cfg.Google.ClientID,
-			ClientSecret: cfg.Google.ClientSecret,
-			RedirectURI:  cfg.Google.RedirectURI,
+			ClientID:       cfg.Google.ClientID,
+			ClientSecret:   cfg.Google.ClientSecret,
+			RedirectURI:    cfg.Google.RedirectURI,
+			WebCallbackURI: cfg.Google.WebCallbackURI,
 		}
 
 		googleHandler := handler.NewGoogleCallbackHandler(db, googleCfg)
@@ -493,6 +494,7 @@ func main() {
 		integrationHandler := handler.NewIntegrationHandler(db, googleCfg)
 		api.GET("/integrations/status", integrationHandler.Status)
 		api.GET("/integrations/google/auth-url", integrationHandler.GoogleAuthURL)
+		api.POST("/integrations/google/callback", googleHandler.WebCallback) // UI OAuth callback
 		api.DELETE("/integrations/google", integrationHandler.GoogleDisconnect)
 		api.PUT("/integrations/notion", integrationHandler.NotionConnect)
 		api.DELETE("/integrations/notion", integrationHandler.NotionDisconnect)

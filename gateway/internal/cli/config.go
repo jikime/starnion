@@ -41,9 +41,10 @@ type GeminiConfig struct {
 // These are registered once in Google Cloud Console and shared by all users.
 // Per-user tokens (access_token, refresh_token) are stored in the google_tokens DB table.
 type GoogleConfig struct {
-	ClientID     string `yaml:"client_id"`
-	ClientSecret string `yaml:"client_secret"`
-	RedirectURI  string `yaml:"redirect_uri"`
+	ClientID       string `yaml:"client_id"`
+	ClientSecret   string `yaml:"client_secret"`
+	RedirectURI    string `yaml:"redirect_uri"`     // Telegram flow: points to gateway
+	WebCallbackURI string `yaml:"web_callback_uri"` // Web flow: points to UI (optional)
 }
 
 // EmbeddingConfig holds the server-level embedding configuration.

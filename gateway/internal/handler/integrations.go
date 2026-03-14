@@ -149,7 +149,10 @@ func (h *IntegrationHandler) GoogleAuthURL(c echo.Context) error {
 	}
 
 	clientID := h.googleCfg.ClientID
-	redirectURI := h.googleCfg.RedirectURI
+	redirectURI := h.googleCfg.WebCallbackURI
+	if redirectURI == "" {
+		redirectURI = h.googleCfg.RedirectURI
+	}
 
 	if clientID == "" || redirectURI == "" {
 		return c.JSON(http.StatusServiceUnavailable, map[string]string{

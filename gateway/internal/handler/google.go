@@ -18,9 +18,10 @@ import (
 // GoogleOAuthConfig holds the server-level Google OAuth2 credentials.
 // These are set once by the administrator and shared by all users.
 type GoogleOAuthConfig struct {
-	ClientID     string
-	ClientSecret string
-	RedirectURI  string
+	ClientID       string
+	ClientSecret   string
+	RedirectURI    string // Telegram flow: points to gateway callback
+	WebCallbackURI string // Web flow: points to UI callback (optional, falls back to RedirectURI)
 }
 
 // GoogleCallbackHandler handles the OAuth2 callback from Google.
@@ -43,14 +44,61 @@ type tokenResponse struct {
 	TokenType    string `json:"token_type"`
 }
 
-// Callback handles GET /auth/google/callback.
-// It exchanges the authorization code for tokens and stores them in the database.
+// exchangeCode exchanges a Google OAuth authorization code for tokens.
+func (h *GoogleCallbackHandler) exchangeCode(ctx context.Context, code, redirectURI string) (tokenResponse, error) {
+	tokenReq := fmt.Sprintf(
+		"code=%s&client_id=%s&client_secret=%s&redirect_uri=%s&grant_type=authorization_code",
+		code, h.googleCfg.ClientID, h.googleCfg.ClientSecret, redirectURI,
+	)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		"https://oauth2.googleapis.com/token",
+		strings.NewReader(tokenReq),
+	)
+	if err != nil {
+		return tokenResponse{}, fmt.Errorf("create token request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return tokenResponse{}, fmt.Errorf("token request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	var tokens tokenResponse
+	if err := json.Unmarshal(body, &tokens); err != nil {
+		return tokenResponse{}, fmt.Errorf("parse token response: %w", err)
+	}
+	if tokens.AccessToken == "" {
+		return tokenResponse{}, fmt.Errorf("no access_token in response: %s", body)
+	}
+	return tokens, nil
+}
+
+// storeTokens upserts Google tokens for the given user.
+func (h *GoogleCallbackHandler) storeTokens(ctx context.Context, userID string, tokens tokenResponse) error {
+	expiresAt := time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second)
+	_, err := h.db.ExecContext(ctx,
+		`INSERT INTO google_tokens (user_id, access_token, refresh_token, scopes, expires_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, NOW())
+		 ON CONFLICT (user_id) DO UPDATE SET
+		   access_token = EXCLUDED.access_token,
+		   refresh_token = EXCLUDED.refresh_token,
+		   scopes = EXCLUDED.scopes,
+		   expires_at = EXCLUDED.expires_at,
+		   updated_at = NOW()`,
+		userID, tokens.AccessToken, tokens.RefreshToken, tokens.Scope, expiresAt,
+	)
+	return err
+}
+
+// Callback handles GET /auth/google/callback — used only by the Telegram OAuth flow.
+// The web OAuth flow is handled by the UI (POST /api/v1/integrations/google/callback).
 func (h *GoogleCallbackHandler) Callback(c echo.Context) error {
 	code := c.QueryParam("code")
-	state := c.QueryParam("state") // state = user_id  OR  "web:{user_id}"
+	state := c.QueryParam("state") // state = user_id (Telegram) or "web:{user_id}" (legacy web)
 	errParam := c.QueryParam("error")
 
-	// Detect web-originated OAuth flow.
 	isWeb := strings.HasPrefix(state, "web:")
 
 	if errParam != "" {
@@ -70,65 +118,23 @@ func (h *GoogleCallbackHandler) Callback(c echo.Context) error {
 		userID = strings.TrimPrefix(state, "web:")
 	}
 
-	// Exchange code for tokens.
-	clientID := h.googleCfg.ClientID
-	clientSecret := h.googleCfg.ClientSecret
-	redirectURI := h.googleCfg.RedirectURI
-
-	if clientID == "" || clientSecret == "" {
+	if h.googleCfg.ClientID == "" || h.googleCfg.ClientSecret == "" {
 		log.Error().Msg("Google OAuth credentials not configured")
 		return c.HTML(http.StatusInternalServerError,
 			"<h2>서버 설정 오류</h2><p>관리자에게 Google OAuth 설정을 요청하세요.<br>"+
 				"<code>starnion config google</code></p>")
 	}
 
-	tokenReq := fmt.Sprintf(
-		"code=%s&client_id=%s&client_secret=%s&redirect_uri=%s&grant_type=authorization_code",
-		code, clientID, clientSecret, redirectURI,
-	)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
+	defer cancel()
 
-	resp, err := http.Post(
-		"https://oauth2.googleapis.com/token",
-		"application/x-www-form-urlencoded",
-		strings.NewReader(tokenReq),
-	)
+	tokens, err := h.exchangeCode(ctx, code, h.googleCfg.RedirectURI)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to exchange Google OAuth code")
 		return c.HTML(http.StatusInternalServerError, "<h2>토큰 교환 실패</h2>")
 	}
-	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-
-	var tokens tokenResponse
-	if err := json.Unmarshal(body, &tokens); err != nil {
-		log.Error().Err(err).Str("body", string(body)).Msg("Failed to parse token response")
-		return c.HTML(http.StatusInternalServerError, "<h2>토큰 파싱 실패</h2>")
-	}
-
-	if tokens.AccessToken == "" {
-		log.Error().Str("body", string(body)).Msg("No access token in response")
-		return c.HTML(http.StatusInternalServerError, "<h2>액세스 토큰이 없어요</h2>")
-	}
-
-	// Store tokens in database.
-	expiresAt := time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second)
-
-	ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
-	defer cancel()
-
-	_, err = h.db.ExecContext(ctx,
-		`INSERT INTO google_tokens (user_id, access_token, refresh_token, scopes, expires_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, NOW())
-		 ON CONFLICT (user_id) DO UPDATE SET
-		   access_token = EXCLUDED.access_token,
-		   refresh_token = EXCLUDED.refresh_token,
-		   scopes = EXCLUDED.scopes,
-		   expires_at = EXCLUDED.expires_at,
-		   updated_at = NOW()`,
-		userID, tokens.AccessToken, tokens.RefreshToken, tokens.Scope, expiresAt,
-	)
-	if err != nil {
+	if err := h.storeTokens(ctx, userID, tokens); err != nil {
 		log.Error().Err(err).Str("user_id", userID).Msg("Failed to store Google tokens")
 		return c.HTML(http.StatusInternalServerError, "<h2>토큰 저장 실패</h2>")
 	}
@@ -143,6 +149,57 @@ func (h *GoogleCallbackHandler) Callback(c echo.Context) error {
 			"<p>텔레그램으로 돌아가서 구글 서비스를 사용해보세요.</p>"+
 			"<p>이 창은 닫아도 됩니다.</p>",
 	)
+}
+
+// WebCallback handles POST /api/v1/integrations/google/callback (JWT-authenticated).
+// Called by the UI's /api/auth/google/callback route after Google redirects there.
+// Body: { "code": "...", "state": "web:{userID}" }
+func (h *GoogleCallbackHandler) WebCallback(c echo.Context) error {
+	userID, ok := c.Get("userID").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+
+	var req struct {
+		Code  string `json:"code"`
+		State string `json:"state"`
+	}
+	if err := c.Bind(&req); err != nil || req.Code == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "code is required"})
+	}
+
+	// Validate state to prevent CSRF.
+	if req.State != "web:"+userID {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "state mismatch"})
+	}
+
+	if h.googleCfg.ClientID == "" || h.googleCfg.ClientSecret == "" {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{
+			"error": "Google OAuth not configured — run: starnion config google",
+		})
+	}
+
+	redirectURI := h.googleCfg.WebCallbackURI
+	if redirectURI == "" {
+		redirectURI = h.googleCfg.RedirectURI
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
+	defer cancel()
+
+	tokens, err := h.exchangeCode(ctx, req.Code, redirectURI)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("Failed to exchange Google OAuth code (web)")
+		return c.JSON(http.StatusBadGateway, map[string]string{"error": "token exchange failed"})
+	}
+
+	if err := h.storeTokens(ctx, userID, tokens); err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("Failed to store Google tokens (web)")
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to store tokens"})
+	}
+
+	log.Info().Str("user_id", userID).Msg("Google OAuth tokens stored via UI callback")
+	return c.JSON(http.StatusOK, map[string]string{"status": "connected"})
 }
 
 // TelegramOAuthStart handles GET /auth/google/telegram?uid=<user_id>

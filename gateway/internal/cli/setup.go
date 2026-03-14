@@ -285,8 +285,19 @@ func RunSetup(projectRoot string) error {
 		cfg.Google.RedirectURI = cfg.Gateway.URL + "/auth/google/callback"
 	}
 
+	// WebCallbackURI: UI 콜백 URL 자동 생성 (Gateway URL의 포트를 UI 포트로 교체)
+	if cfg.Google.ClientID != "" && cfg.Google.WebCallbackURI == "" {
+		gwPort := fmt.Sprintf(":%d", cfg.Gateway.Port)
+		uiPort := fmt.Sprintf(":%d", cfg.UI.Port)
+		uiBase := strings.Replace(cfg.Gateway.URL, gwPort, uiPort, 1)
+		cfg.Google.WebCallbackURI = uiBase + "/auth/google/callback"
+	}
+
 	if cfg.Google.ClientID != "" {
-		PrintOK("Google OAuth", "자격증명 설정 완료 (redirect URI: "+cfg.Google.RedirectURI+")")
+		PrintOK("Google OAuth", "자격증명 설정 완료")
+		PrintInfo("  Telegram redirect URI : " + cfg.Google.RedirectURI)
+		PrintInfo("  Web redirect URI      : " + cfg.Google.WebCallbackURI)
+		PrintInfo("  ※ Google Cloud Console > OAuth 클라이언트 > 승인된 리디렉션 URI에 위 두 주소를 모두 등록하세요.")
 	} else {
 		PrintWarn("Google OAuth", "건너뜀 — 나중에 'starnion config google'로 설정 가능")
 	}
