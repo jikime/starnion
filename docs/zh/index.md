@@ -54,9 +54,17 @@ permalink: /zh/
 
 ## 集成
 
-- [Google 集成](integrations/google)
-- [Notion 集成](integrations/notion)
-- [LLM 服务商](integrations/llm-providers)
+- [Google Workspace](integrations/google)
+- [Notion](integrations/notion)
+- [GitHub](integrations/github)
+- [Tavily](integrations/tavily)
+- [Naver Search](integrations/naver-search)
+- [Gemini](integrations/gemini)
+
+## 设置
+
+- [模型设置](settings/models)
+- [角色](settings/personas)
 
 ## 技能
 

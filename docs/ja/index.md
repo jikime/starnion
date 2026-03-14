@@ -54,9 +54,17 @@ permalink: /ja/
 
 ## インテグレーション
 
-- [Google連携](integrations/google)
-- [Notion連携](integrations/notion)
-- [LLMプロバイダー](integrations/llm-providers)
+- [Google Workspace](integrations/google)
+- [Notion](integrations/notion)
+- [GitHub](integrations/github)
+- [Tavily](integrations/tavily)
+- [Naver Search](integrations/naver-search)
+- [Gemini](integrations/gemini)
+
+## 設定
+
+- [モデル設定](settings/models)
+- [ペルソナ](settings/personas)
 
 ## スキル
 

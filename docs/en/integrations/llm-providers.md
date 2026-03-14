@@ -1,11 +1,16 @@
 ---
-title: LLM Providers
+title: Model Settings (formerly LLM Providers)
 nav_order: 1
 parent: Integrations
 grand_parent: 🇺🇸 English
 ---
 
-# LLM Providers
+# Model Settings
+
+> **Notice**: This page has moved to **Settings > Model Settings**.
+> Please refer to the [Model Settings](../settings/models.md) page for the latest information.
+
+---
 
 ## Overview
 

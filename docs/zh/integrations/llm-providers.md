@@ -1,11 +1,16 @@
 ---
-title: LLM 提供商
+title: 模型设置 (原 LLM 提供商)
 nav_order: 1
 parent: 集成
 grand_parent: 🇨🇳 中文
 ---
 
-# LLM 提供商
+# 模型设置
+
+> **通知**: 本页内容已移至 **设置 > 模型设置**。
+> 请参阅 [模型设置](../settings/models.md) 页面获取最新信息。
+
+---
 
 ## 概述
 

@@ -54,9 +54,17 @@ permalink: /ko/
 
 ## 통합
 
-- [Google 연동](integrations/google)
-- [Notion 연동](integrations/notion)
-- [LLM 프로바이더](integrations/llm-providers)
+- [Google Workspace](integrations/google)
+- [Notion](integrations/notion)
+- [GitHub](integrations/github)
+- [Tavily](integrations/tavily)
+- [네이버 검색](integrations/naver-search)
+- [Gemini](integrations/gemini)
+
+## 설정
+
+- [모델 설정](settings/models)
+- [페르소나](settings/personas)
 
 ## 스킬
 

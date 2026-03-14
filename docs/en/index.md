@@ -54,9 +54,17 @@ All data is stored on your server, and you can manage your daily life more smart
 
 ## Integrations
 
-- [Google Integration](integrations/google)
-- [Notion Integration](integrations/notion)
-- [LLM Providers](integrations/llm-providers)
+- [Google Workspace](integrations/google)
+- [Notion](integrations/notion)
+- [GitHub](integrations/github)
+- [Tavily](integrations/tavily)
+- [Naver Search](integrations/naver-search)
+- [Gemini](integrations/gemini)
+
+## Settings
+
+- [Model Settings](settings/models)
+- [Personas](settings/personas)
 
 ## Skills
 

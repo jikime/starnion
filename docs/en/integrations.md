@@ -8,4 +8,13 @@ parent: 🇺🇸 English
 
 # Integrations
 
-Connect Starnion with Google, Notion, and LLM providers.
+Extend Starnion's AI capabilities by connecting external services.
+
+| Integration | Description |
+|------------|-------------|
+| [Google Workspace](integrations/google.md) | Gmail, Calendar, Drive |
+| [Notion](integrations/notion.md) | Search, create, and edit pages |
+| [GitHub](integrations/github.md) | Repositories, issues, and PRs |
+| [Tavily](integrations/tavily.md) | Real-time web search |
+| [Naver Search](integrations/naver-search.md) | Korean news and blog search |
+| [Gemini](integrations/gemini.md) | Google Gemini AI models |
