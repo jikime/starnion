@@ -50,7 +50,7 @@ func (h *DocumentHandler) ListDocuments(c echo.Context) error {
 	defer cancel()
 
 	rows, err := h.db.QueryContext(ctx, `
-		SELECT id, title, file_type, file_url, size, uploaded_at
+		SELECT id, title, file_type, file_url, COALESCE(object_key,''), size, uploaded_at
 		FROM documents
 		WHERE user_id = $1
 		ORDER BY uploaded_at DESC
@@ -65,9 +65,16 @@ func (h *DocumentHandler) ListDocuments(c echo.Context) error {
 	items := []documentItem{}
 	for rows.Next() {
 		var item documentItem
+		var objectKey string
 		var uploadedAt time.Time
-		if err := rows.Scan(&item.ID, &item.Name, &item.Mime, &item.URL, &item.Size, &uploadedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Mime, &item.URL, &objectKey, &item.Size, &uploadedAt); err != nil {
 			continue
+		}
+		// Prefer object_key for proxy URL; fall back to converting the stored MinIO URL.
+		if objectKey != "" {
+			item.URL = "/api/v1/files/" + objectKey
+		} else {
+			item.URL = minioToProxyURL(item.URL)
 		}
 		item.Format = formatFromFilename(item.Name, item.Mime)
 		item.SizeLabel = formatSize(item.Size)
@@ -132,12 +139,7 @@ func (h *DocumentHandler) UploadDocument(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "upload failed"})
 	}
 
-	// Derive the object key from the URL (last two path segments: <hex>/<name>).
-	parts := strings.Split(att.URL, "/")
-	objectKey := ""
-	if len(parts) >= 2 {
-		objectKey = parts[len(parts)-2] + "/" + parts[len(parts)-1]
-	}
+	proxyURL := "/api/v1/files/" + att.ObjectKey
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -146,13 +148,14 @@ func (h *DocumentHandler) UploadDocument(c echo.Context) error {
 	err = h.db.QueryRowContext(ctx, `
 		INSERT INTO documents (user_id, title, file_type, file_url, object_key, size)
 		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id
-	`, userID, att.Name, att.Mime, att.URL, objectKey, att.Size).Scan(&id)
+	`, userID, att.Name, att.Mime, proxyURL, att.ObjectKey, att.Size).Scan(&id)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", userID).Msg("save document metadata failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "save failed"})
 	}
 
-	// Trigger background document indexing (chunking + embedding) via agent.
+	// Pass the direct MinIO URL to the agent for indexing — the agent accesses
+	// MinIO internally and does not go through the public proxy.
 	if h.agentHTTPURL != "" {
 		go h.indexDocument(id, userID, att.URL, att.Name)
 	}
@@ -161,7 +164,7 @@ func (h *DocumentHandler) UploadDocument(c echo.Context) error {
 		ID:        id,
 		Name:      att.Name,
 		Mime:      att.Mime,
-		URL:       att.URL,
+		URL:       proxyURL,
 		Size:      att.Size,
 		Format:    formatFromFilename(att.Name, att.Mime),
 		SizeLabel: formatSize(att.Size),

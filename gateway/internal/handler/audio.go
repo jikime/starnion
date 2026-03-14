@@ -96,6 +96,7 @@ func (h *AudioHandler) ListAudios(c echo.Context) error {
 			&item.Duration, &item.Source, &item.Type, &item.Transcript, &item.Prompt, &createdAt); err != nil {
 			continue
 		}
+		item.URL = minioToProxyURL(item.URL)
 		item.SizeLabel = formatSize(item.Size)
 		item.CreatedAt = createdAt.In(kstLoc()).Format("2006-01-02 15:04")
 		items = append(items, item)

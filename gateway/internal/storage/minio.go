@@ -94,7 +94,8 @@ func (m *MinIO) Upload(ctx context.Context, name, contentType string, data []byt
 		return FileAttachment{}, fmt.Errorf("minio: upload %s: %w", objectName, err)
 	}
 
-	return FileAttachment{Name: name, Mime: contentType, ObjectKey: objectName, Size: int64(len(data))}, nil
+	directURL := fmt.Sprintf("%s/%s/%s", m.publicURL, m.bucket, objectName)
+	return FileAttachment{Name: name, Mime: contentType, URL: directURL, ObjectKey: objectName, Size: int64(len(data))}, nil
 }
 
 // PresignedURL generates a short-lived GET URL for the given object key.
