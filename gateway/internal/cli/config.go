@@ -366,11 +366,17 @@ func MergeUIEnv(cfg StarNionConfig, projectRoot string) error {
 
 	// Desired key→value pairs from current config.
 	desired := map[string]string{
-		"AUTH_SECRET":     cfg.Auth.AuthSecret,
-		"API_URL":         cfg.Gateway.URL,
-		"JWT_SECRET":      cfg.Auth.JWTSecret,
-		"AUTH_TRUST_HOST": "true",
-		"NEXTAUTH_URL":    fmt.Sprintf("http://localhost:%d", cfg.UI.Port),
+		"AUTH_SECRET":        cfg.Auth.AuthSecret,
+		"API_URL":            cfg.Gateway.URL,
+		"JWT_SECRET":         cfg.Auth.JWTSecret,
+		"AUTH_TRUST_HOST":    "true",
+		"NEXTAUTH_URL":       fmt.Sprintf("http://localhost:%d", cfg.UI.Port),
+		"MINIO_ENDPOINT":     cfg.MinIO.Endpoint,
+		"MINIO_ACCESS_KEY":   cfg.MinIO.AccessKey,
+		"MINIO_SECRET_KEY":   cfg.MinIO.SecretKey,
+		"MINIO_BUCKET":       cfg.MinIO.Bucket,
+		"MINIO_PUBLIC_URL":   cfg.MinIO.PublicURL,
+		"MINIO_USE_SSL":      fmt.Sprintf("%t", cfg.MinIO.UseSSL),
 	}
 
 	// Read existing file; track key→value so we can detect empty values.
@@ -410,7 +416,8 @@ func MergeUIEnv(cfg StarNionConfig, projectRoot string) error {
 	}
 
 	// Append keys that were completely missing.
-	order := []string{"AUTH_SECRET", "API_URL", "JWT_SECRET", "AUTH_TRUST_HOST", "NEXTAUTH_URL"}
+	order := []string{"AUTH_SECRET", "API_URL", "JWT_SECRET", "AUTH_TRUST_HOST", "NEXTAUTH_URL",
+		"MINIO_ENDPOINT", "MINIO_ACCESS_KEY", "MINIO_SECRET_KEY", "MINIO_BUCKET", "MINIO_PUBLIC_URL", "MINIO_USE_SSL"}
 	added := 0
 	for _, key := range order {
 		if _, exists := existing[key]; !exists {

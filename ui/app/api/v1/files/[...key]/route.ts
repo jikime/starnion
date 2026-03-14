@@ -1,15 +1,23 @@
 import { auth } from "@/lib/auth"
+import * as Minio from "minio"
 import { NextResponse } from "next/server"
 
-import { gatewayFetch } from "@/lib/gateway"
+const minioClient = new Minio.Client({
+  endPoint: process.env.MINIO_ENDPOINT?.split(":")[0] ?? "localhost",
+  port: parseInt(process.env.MINIO_ENDPOINT?.split(":")[1] ?? "9000"),
+  useSSL: process.env.MINIO_USE_SSL === "true",
+  accessKey: process.env.MINIO_ACCESS_KEY ?? "",
+  secretKey: process.env.MINIO_SECRET_KEY ?? "",
+})
+
+const BUCKET = process.env.MINIO_BUCKET ?? "starnion-files"
 
 /**
  * GET /api/v1/files/[...key]
  *
  * Authenticated file proxy for MinIO objects.
- * Verifies the NextAuth session, requests a short-lived presigned URL
- * from the gateway, then redirects the browser directly to MinIO.
- * MinIO handles the actual file transfer — this route is not in the data path.
+ * Verifies the NextAuth session, generates a short-lived presigned URL
+ * directly from MinIO, then redirects the browser to it.
  */
 export async function GET(
   _request: Request,
@@ -23,15 +31,10 @@ export async function GET(
   const { key } = await params
   const objectKey = key.join("/")
 
-  const res = await gatewayFetch(`/api/v1/files/${objectKey}`)
-  if (!res.ok) {
-    return NextResponse.json({ error: "file not found" }, { status: res.status })
+  try {
+    const url = await minioClient.presignedGetObject(BUCKET, objectKey, 60)
+    return NextResponse.redirect(url)
+  } catch {
+    return NextResponse.json({ error: "file not found" }, { status: 404 })
   }
-
-  const data = await res.json().catch(() => null)
-  if (!data?.url) {
-    return NextResponse.json({ error: "invalid response from storage" }, { status: 502 })
-  }
-
-  return NextResponse.redirect(data.url)
 }
