@@ -7,6 +7,10 @@
 #   STARNION_DIR      — install directory (default: /usr/local/bin or ~/.local/bin)
 #   NO_PROMPT=1       — skip all interactive prompts
 set -euo pipefail
+# When invoked via `bash -s` (e.g. starnion update), the inherited cwd may be
+# a directory that no longer exists, causing getcwd to fail inside subshells.
+# Switch to a guaranteed-valid directory immediately.
+cd "${HOME:-/tmp}"
 
 # ── Pinned version (updated automatically on release) ─────────────────────────
 # Use the env var if already set (e.g. by `starnion update`), otherwise fall
