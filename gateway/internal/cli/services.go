@@ -207,6 +207,26 @@ func ensureNodeInstalled() bool {
 	return false
 }
 
+// ensurePnpmInstalled checks that `pnpm` is available; if not, installs it
+// globally via `npm install -g pnpm` (npm ships with every Node.js release).
+func ensurePnpmInstalled() bool {
+	if _, err := exec.LookPath("pnpm"); err == nil {
+		return true
+	}
+	PrintInfo("pnpm이 없습니다. npm으로 전역 설치합니다...")
+	cmd := exec.Command("npm", "install", "-g", "pnpm")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Println()
+		PrintFail("pnpm", "pnpm 설치에 실패했습니다.")
+		PrintHint("수동으로 설치하세요: npm install -g pnpm")
+		return false
+	}
+	PrintInfo("pnpm 설치 완료.")
+	return true
+}
+
 // RunUI ensures Node deps and starts the UI.
 func RunUI(devMode bool) error {
 	if !ensureConfigured() {
@@ -218,7 +238,7 @@ func RunUI(devMode bool) error {
 
 	var cmd *exec.Cmd
 	if isInstalled() {
-		if !ensureNodeInstalled() {
+		if !ensureNodeInstalled() || !ensurePnpmInstalled() {
 			return nil
 		}
 		_ = WriteEnvFilesFromConfig(installRoot())
@@ -231,6 +251,9 @@ func RunUI(devMode bool) error {
 		root := projectRoot()
 		_ = WriteEnvFilesFromConfig(root)
 		uiDir := filepath.Join(root, "ui")
+		if !ensurePnpmInstalled() {
+			return nil
+		}
 		if err := ensureUIDeps(root); err != nil {
 			return fmt.Errorf("UI 패키지 설치 실패: %w", err)
 		}
@@ -254,7 +277,7 @@ func RunDev() error {
 
 	var cmds []*exec.Cmd
 	if isInstalled() {
-		if !ensureNodeInstalled() {
+		if !ensureNodeInstalled() || !ensurePnpmInstalled() {
 			return nil
 		}
 		_ = WriteEnvFilesFromConfig(installRoot())
@@ -273,6 +296,9 @@ func RunDev() error {
 			serviceCmd(uiDir, sGold.Render("[ui]     "), "pnpm", "start"),
 		}
 	} else {
+		if !ensurePnpmInstalled() {
+			return nil
+		}
 		_ = WriteEnvFilesFromConfig(root)
 		if err := ensureAgentDeps(root); err != nil {
 			return fmt.Errorf("agent 패키지 설치 실패: %w", err)
