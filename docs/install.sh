@@ -15,7 +15,7 @@ cd "${HOME:-/tmp}"
 # ── Pinned version (updated automatically on release) ─────────────────────────
 # Use the env var if already set (e.g. by `starnion update`), otherwise fall
 # back to the pinned version so `curl … | bash` always gets the latest release.
-STARNION_VERSION="1.4.14"
+STARNION_VERSION="1.4.15"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 if [[ -t 1 ]] && [[ "${NO_COLOR:-}" == "" ]]; then
