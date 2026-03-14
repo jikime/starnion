@@ -154,14 +154,22 @@ func RunGateway(devMode bool) error {
 }
 
 // agentCmd builds the command to run the starnion_agent module.
-// It uses the venv Python directly with PYTHONPATH=src so that the module is
-// found via the source tree regardless of how (or whether) the package was
-// installed into site-packages. This avoids Rocky Linux .pth editable-install
-// failures and removes the dependency on `uv run` implicit re-syncing.
+// It uses the venv Python directly with PYTHONPATH set appropriately:
+//   - Installed layout (~/.starnion/agent/): starnion_agent/ is directly in agentDir
+//   - Dev layout (source tree): starnion_agent/ is inside agentDir/src/
+//
+// This avoids Rocky Linux .pth editable-install failures and removes the
+// dependency on `uv run` implicit re-syncing.
 func agentCmd(agentDir, colorPrefix string) *exec.Cmd {
 	python := filepath.Join(agentDir, ".venv", "bin", "python3")
 	cmd := serviceCmd(agentDir, colorPrefix, python, "-m", "starnion_agent")
-	cmd.Env = append(os.Environ(), "PYTHONPATH="+filepath.Join(agentDir, "src"))
+	// Installed layout: starnion_agent/ lives directly under agentDir.
+	// Dev layout: starnion_agent/ lives under agentDir/src/.
+	pythonPath := agentDir
+	if _, err := os.Stat(filepath.Join(agentDir, "src")); err == nil {
+		pythonPath = filepath.Join(agentDir, "src")
+	}
+	cmd.Env = append(os.Environ(), "PYTHONPATH="+pythonPath)
 	return cmd
 }
 
