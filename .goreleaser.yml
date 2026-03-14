@@ -62,7 +62,6 @@ archives:
         dst: agent
       - src: .staging/ui/**
         dst: ui
-        strip_parent: true
       - src: .staging/docker/**
         dst: docker
         strip_parent: true
