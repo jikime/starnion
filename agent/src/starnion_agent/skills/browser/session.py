@@ -126,6 +126,27 @@ async def _close_session(user_id: str) -> bool:
     return True
 
 
+async def _ensure_chromium() -> None:
+    """Run 'playwright install chromium' if the browser executable is missing."""
+    import sys
+
+    logger.warning("browser: chromium executable not found — running 'playwright install chromium'")
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable, "-m", "playwright", "install", "chromium",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        logger.error(
+            "browser: playwright install failed (rc=%d): %s",
+            proc.returncode,
+            stderr.decode(errors="replace"),
+        )
+        raise RuntimeError("playwright install chromium failed")
+    logger.warning("browser: chromium installed successfully")
+
+
 async def _create_session() -> BrowserSession:
     from playwright.async_api import async_playwright
 
@@ -139,10 +160,20 @@ async def _create_session() -> BrowserSession:
         # SwiftShader 소프트웨어 렌더러가 자동으로 GPU를 대체함.
     ]
 
-    browser = await pw.chromium.launch(
-        headless=_HEADLESS,
-        args=launch_args,
-    )
+    try:
+        browser = await pw.chromium.launch(
+            headless=_HEADLESS,
+            args=launch_args,
+        )
+    except Exception as e:
+        if "Executable doesn't exist" in str(e):
+            await _ensure_chromium()
+            browser = await pw.chromium.launch(
+                headless=_HEADLESS,
+                args=launch_args,
+            )
+        else:
+            raise
     mode = "headless" if _HEADLESS else "headed"
     # 로그 레벨을 WARNING으로 올려 에이전트 로그에서 항상 보이도록 함
     logger.warning("browser: launched chromium mode=%s (BROWSER_HEADLESS env=%r)", mode, _HEADLESS)
