@@ -3,7 +3,7 @@ name = "starnion-agent"
 version = "0.1.0"
 description = "Starnion AI Agent - Personal assistant powered by LangGraph and Gemini"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "langgraph>=0.4",
     "langchain-google-genai>=2.1",
