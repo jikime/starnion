@@ -148,7 +148,9 @@ func runUpdate(checkOnly bool, skipDocker bool) error {
 	return nil
 }
 
-// runDockerUpdate pulls latest images and restarts if Docker services are running.
+// runDockerUpdate restarts running starnion Docker containers after a source update.
+// It does NOT rebuild images — the new binaries and source files are already
+// in place after install.sh runs, so a plain restart is sufficient.
 func runDockerUpdate() {
 	dockerDir := dockerDirPath()
 	if dockerDir == "" {
@@ -162,38 +164,17 @@ func runDockerUpdate() {
 		return // Docker not running or no starnion containers
 	}
 
-	PrintInfo("Docker 이미지 갱신 중...")
-	pullCmd := exec.Command("docker", "compose", "pull")
-	pullCmd.Dir = dockerDir
-	pullCmd.Stdout = os.Stdout
-	pullCmd.Stderr = os.Stderr
-	if err := pullCmd.Run(); err != nil {
-		PrintWarn("Docker", fmt.Sprintf("이미지 풀 실패: %v", err))
-		return
-	}
-
 	PrintInfo("Docker 서비스 재시작 중...")
-	upCmd := exec.Command("docker", "compose", "up", "-d", "--remove-orphans")
-	upCmd.Dir = dockerDir
-	upCmd.Stdout = os.Stdout
-	upCmd.Stderr = os.Stderr
-	if err := upCmd.Run(); err != nil {
+	restartCmd := exec.Command("docker", "compose", "restart")
+	restartCmd.Dir = dockerDir
+	restartCmd.Stdout = os.Stdout
+	restartCmd.Stderr = os.Stderr
+	if err := restartCmd.Run(); err != nil {
 		PrintWarn("Docker", fmt.Sprintf("서비스 재시작 실패: %v", err))
 		return
 	}
 
-	// Run migrations after update
-	PrintInfo("DB 마이그레이션 실행 중...")
-	cfg, err := LoadConfig()
-	if err == nil {
-		if err := connectAndMigrate(cfg, projectRoot()); err != nil {
-			PrintWarn("migrate", fmt.Sprintf("마이그레이션 실패: %v", err))
-		} else {
-			PrintOK("migrate", "마이그레이션 완료")
-		}
-	}
-
-	PrintOK("Docker", "이미지 갱신 및 재시작 완료")
+	PrintOK("Docker", "서비스 재시작 완료")
 }
 
 func dockerDirPath() string {
