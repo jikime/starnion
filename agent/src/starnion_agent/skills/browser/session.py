@@ -136,7 +136,7 @@ async def _ensure_chromium() -> None:
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    stdout, stderr = await proc.communicate()
+    _, stderr = await proc.communicate()
     if proc.returncode != 0:
         logger.error(
             "browser: playwright install failed (rc=%d): %s",
