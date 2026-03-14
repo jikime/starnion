@@ -46,6 +46,8 @@ permalink: /zh/
 - [报告](features/reports)
 - [日程与提醒](features/schedules)
 - [使用分析](features/analytics)
+- [模型设置](features/models)
+- [角色](features/personas)
 
 ## 频道
 
@@ -60,11 +62,6 @@ permalink: /zh/
 - [Tavily](integrations/tavily)
 - [Naver Search](integrations/naver-search)
 - [Gemini](integrations/gemini)
-
-## 设置
-
-- [模型设置](settings/models)
-- [角色](settings/personas)
 
 ## 技能
 

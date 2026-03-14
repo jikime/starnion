@@ -46,6 +46,8 @@ permalink: /ko/
 - [리포트](features/reports)
 - [일정 & 알림](features/schedules)
 - [사용 통계](features/analytics)
+- [모델 설정](features/models)
+- [페르소나](features/personas)
 
 ## 채널
 
@@ -60,11 +62,6 @@ permalink: /ko/
 - [Tavily](integrations/tavily)
 - [네이버 검색](integrations/naver-search)
 - [Gemini](integrations/gemini)
-
-## 설정
-
-- [모델 설정](settings/models)
-- [페르소나](settings/personas)
 
 ## 스킬
 

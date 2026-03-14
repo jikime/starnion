@@ -46,6 +46,8 @@ permalink: /ja/
 - [レポート](features/reports)
 - [スケジュール・リマインダー](features/schedules)
 - [利用状況分析](features/analytics)
+- [モデル設定](features/models)
+- [ペルソナ](features/personas)
 
 ## チャンネル
 
@@ -60,11 +62,6 @@ permalink: /ja/
 - [Tavily](integrations/tavily)
 - [Naver Search](integrations/naver-search)
 - [Gemini](integrations/gemini)
-
-## 設定
-
-- [モデル設定](settings/models)
-- [ペルソナ](settings/personas)
 
 ## スキル
 

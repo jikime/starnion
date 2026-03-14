@@ -46,6 +46,8 @@ All data is stored on your server, and you can manage your daily life more smart
 - [Reports](features/reports)
 - [Schedules & Reminders](features/schedules)
 - [Usage Analytics](features/analytics)
+- [Model Settings](features/models)
+- [Personas](features/personas)
 
 ## Channels
 
@@ -60,11 +62,6 @@ All data is stored on your server, and you can manage your daily life more smart
 - [Tavily](integrations/tavily)
 - [Naver Search](integrations/naver-search)
 - [Gemini](integrations/gemini)
-
-## Settings
-
-- [Model Settings](settings/models)
-- [Personas](settings/personas)
 
 ## Skills
 
