@@ -62,7 +62,7 @@ Web chat is available immediately after installing Starnion with no additional c
 
 1. Open your browser and navigate to the Starnion server address.
    ```
-   http://localhost:3000
+   http://localhost:3893
    ```
    (Use your actual domain in a production environment.)
 2. Create an account or log in.

@@ -286,7 +286,7 @@ Expected output from `starnion doctor`:
 Navigate to the following address in your browser:
 
 ```
-http://localhost:3000
+http://localhost:3893
 ```
 
 If the login page is displayed, installation is complete.

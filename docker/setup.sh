@@ -81,8 +81,8 @@ MINIO_PUBLIC_URL="${MINIO_PUBLIC_URL:-http://localhost:9000}"
 GATEWAY_PORT="${GATEWAY_PORT:-8080}"
 GATEWAY_PUBLIC_URL="${GATEWAY_PUBLIC_URL:-http://localhost:8080}"
 GRPC_PORT="${GRPC_PORT:-50051}"
-UI_PORT="${UI_PORT:-3000}"
-NEXTAUTH_URL="${NEXTAUTH_URL:-http://localhost:3000}"
+UI_PORT="${UI_PORT:-3893}"
+NEXTAUTH_URL="${NEXTAUTH_URL:-http://localhost:3893}"
 
 # ── Write .env ────────────────────────────────────────────────────────────────
 info "[2/5] docker/.env 작성 중..."

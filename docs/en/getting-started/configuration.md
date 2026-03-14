@@ -135,7 +135,7 @@ DATABASE_URL=postgres://starnion:MyPassword@db.example.com:5432/starnion?sslmode
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `UI_PORT` | `3000` | Next.js web server port |
-| `NEXTAUTH_URL` | `http://localhost:3000` | NextAuth callback base URL |
+| `NEXTAUTH_URL` | `http://localhost:3893` | NextAuth callback base URL |
 | `AUTH_SECRET` | _(required)_ | NextAuth session encryption key |
 | `JWT_SECRET` | _(required)_ | JWT token validation key (must match Gateway) |
 
@@ -287,7 +287,7 @@ GRPC_PORT=50051
 
 # ---- UI ----
 UI_PORT=3000
-NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_URL=http://localhost:3893
 
 # ---- AI Providers (at least one required) ----
 GEMINI_API_KEY=AIzaSy...
