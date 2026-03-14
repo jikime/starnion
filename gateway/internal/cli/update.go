@@ -30,21 +30,19 @@ type githubRelease struct {
 
 func newUpdateCmd() *cobra.Command {
 	var checkOnly bool
-	var skipDocker bool
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "최신 버전으로 업데이트",
-		Long:  "GitHub Releases에서 최신 starnion 바이너리를 다운로드하여 업데이트합니다.\nDocker로 실행 중인 경우 이미지도 함께 갱신합니다.",
+		Long:  "GitHub Releases에서 최신 starnion 바이너리를 다운로드하여 업데이트합니다.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUpdate(checkOnly, skipDocker)
+			return runUpdate(checkOnly)
 		},
 	}
 	cmd.Flags().BoolVar(&checkOnly, "check", false, "버전 확인만 하고 업데이트하지 않음")
-	cmd.Flags().BoolVar(&skipDocker, "skip-docker", false, "Docker 이미지 갱신 건너뜀")
 	return cmd
 }
 
-func runUpdate(checkOnly bool, skipDocker bool) error {
+func runUpdate(checkOnly bool) error {
 	PrintSectionHeader(0, 0, "UPDATE")
 
 	// ── Fetch latest release ───────────────────────────────────────────────
@@ -151,50 +149,7 @@ func runUpdate(checkOnly bool, skipDocker bool) error {
 		PrintWarn("config", fmt.Sprintf("설정 파일 로드 실패: %v", err))
 	}
 
-	// ── Docker image pull (if running) ─────────────────────────────────────
-	if !skipDocker {
-		runDockerUpdate()
-	}
-
 	return nil
-}
-
-// runDockerUpdate restarts only the starnion Docker containers that are currently
-// running. Uses `docker restart <container>` directly to avoid docker compose
-// parsing the docker-compose.yml build context (which doesn't exist in the
-// installed layout).
-func runDockerUpdate() {
-	// Collect full container names of running starnion containers
-	checkCmd := exec.Command("docker", "ps", "--filter", "name=starnion-", "--format", "{{.Names}}")
-	out, err := checkCmd.Output()
-	if err != nil || len(out) == 0 {
-		return // Docker not running or no starnion containers
-	}
-
-	var containers []string
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		name := strings.TrimSpace(line)
-		if name != "" {
-			containers = append(containers, name)
-		}
-	}
-	if len(containers) == 0 {
-		return
-	}
-
-	PrintInfo(fmt.Sprintf("Docker 컨테이너 재시작 중: %s", strings.Join(containers, ", ")))
-	// Use `docker restart` directly — does not read docker-compose.yml,
-	// so missing build contexts are not an issue.
-	args := append([]string{"restart"}, containers...)
-	restartCmd := exec.Command("docker", args...)
-	restartCmd.Stdout = os.Stdout
-	restartCmd.Stderr = os.Stderr
-	if err := restartCmd.Run(); err != nil {
-		PrintWarn("Docker", fmt.Sprintf("컨테이너 재시작 실패: %v", err))
-		return
-	}
-
-	PrintOK("Docker", "컨테이너 재시작 완료")
 }
 
 
