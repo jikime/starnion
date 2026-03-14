@@ -148,24 +148,37 @@ func runUpdate(checkOnly bool, skipDocker bool) error {
 	return nil
 }
 
-// runDockerUpdate restarts running starnion Docker containers after a source update.
-// It does NOT rebuild images — the new binaries and source files are already
-// in place after install.sh runs, so a plain restart is sufficient.
+// runDockerUpdate restarts only the starnion Docker containers that are currently
+// running. It does NOT rebuild images — the new binaries and source files are
+// already in place after install.sh runs, so a plain restart is sufficient.
 func runDockerUpdate() {
 	dockerDir := dockerDirPath()
 	if dockerDir == "" {
 		return
 	}
 
-	// Check if any starnion containers are running
+	// Collect names of running starnion containers
 	checkCmd := exec.Command("docker", "ps", "--filter", "name=starnion-", "--format", "{{.Names}}")
 	out, err := checkCmd.Output()
 	if err != nil || len(out) == 0 {
 		return // Docker not running or no starnion containers
 	}
 
-	PrintInfo("Docker 서비스 재시작 중...")
-	restartCmd := exec.Command("docker", "compose", "restart")
+	// Map container names (starnion-<svc>) to compose service names (<svc>)
+	var services []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		name := strings.TrimSpace(line)
+		if svc, ok := strings.CutPrefix(name, "starnion-"); ok && svc != "" {
+			services = append(services, svc)
+		}
+	}
+	if len(services) == 0 {
+		return
+	}
+
+	PrintInfo(fmt.Sprintf("Docker 서비스 재시작 중: %s", strings.Join(services, ", ")))
+	args := append([]string{"compose", "restart"}, services...)
+	restartCmd := exec.Command("docker", args...)
 	restartCmd.Dir = dockerDir
 	restartCmd.Stdout = os.Stdout
 	restartCmd.Stderr = os.Stderr
