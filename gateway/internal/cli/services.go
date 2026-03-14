@@ -70,6 +70,26 @@ func ensureAgentDeps(root string) error {
 		// venv exists but pyproject.toml is newer → re-sync
 		needsSync = pyprojectStat.ModTime().After(venvStat.ModTime())
 	}
+	// Also sync when the package itself is missing (e.g. editable install failed).
+	if !needsSync {
+		pkgDir := filepath.Join(venvDir, "lib")
+		if entries, err := os.ReadDir(pkgDir); err == nil {
+			found := false
+			for _, e := range entries {
+				if !e.IsDir() {
+					continue
+				}
+				siteDir := filepath.Join(pkgDir, e.Name(), "site-packages", "starnion_agent")
+				if _, err := os.Stat(siteDir); err == nil {
+					found = true
+					break
+				}
+			}
+			if !found {
+				needsSync = true
+			}
+		}
+	}
 
 	if !needsSync {
 		return nil
@@ -82,7 +102,10 @@ func ensureAgentDeps(root string) error {
 	}
 
 	PrintInfo("Python 패키지 설치 중... (uv sync)")
-	cmd := exec.Command(uvBin(), "sync")
+	// --no-editable: install the project as a proper wheel into site-packages
+	// instead of an editable .pth-based install, which can fail to register
+	// the starnion_agent module on some Linux environments (e.g. Rocky Linux).
+	cmd := exec.Command(uvBin(), "sync", "--no-editable")
 	cmd.Dir = agentDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
