@@ -6,7 +6,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -20,10 +22,11 @@ func publicReadPolicy(bucket string) string {
 
 // FileAttachment holds metadata for an uploaded file.
 type FileAttachment struct {
-	Name string `json:"name"`
-	Mime string `json:"mime"`
-	URL  string `json:"url"`
-	Size int64  `json:"size"` // bytes
+	Name      string `json:"name"`
+	Mime      string `json:"mime"`
+	URL       string `json:"url"`        // browser-accessible URL (gateway proxy path)
+	ObjectKey string `json:"object_key"` // MinIO object key, e.g. "a3f8c1d2/filename.pdf"
+	Size      int64  `json:"size"`       // bytes
 }
 
 // MinIO wraps a minio client with bucket and public URL configuration.
@@ -91,8 +94,24 @@ func (m *MinIO) Upload(ctx context.Context, name, contentType string, data []byt
 		return FileAttachment{}, fmt.Errorf("minio: upload %s: %w", objectName, err)
 	}
 
-	url := fmt.Sprintf("%s/%s/%s", m.publicURL, m.bucket, objectName)
-	return FileAttachment{Name: name, Mime: contentType, URL: url, Size: int64(len(data))}, nil
+	return FileAttachment{Name: name, Mime: contentType, ObjectKey: objectName, Size: int64(len(data))}, nil
+}
+
+// PresignedURL generates a short-lived GET URL for the given object key.
+// The host is rewritten to publicURL so browsers can reach MinIO through its
+// public address rather than the internal Docker hostname.
+func (m *MinIO) PresignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
+	u, err := m.client.PresignedGetObject(ctx, m.bucket, objectKey, expiry, nil)
+	if err != nil {
+		return "", fmt.Errorf("minio: presign %s: %w", objectKey, err)
+	}
+	// Rewrite scheme + host to the public URL.
+	pub, err := url.Parse(m.publicURL)
+	if err == nil {
+		u.Scheme = pub.Scheme
+		u.Host = pub.Host
+	}
+	return u.String(), nil
 }
 
 // uniqueName generates a collision-resistant object key in the form <uuid>/<original>

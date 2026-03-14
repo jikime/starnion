@@ -394,10 +394,13 @@ func main() {
 	streamHandler := handler.NewChatStreamHandler(grpcConn, db, minioStore)
 	api.POST("/chat/stream", streamHandler.Stream)
 
-	// File upload endpoint (requires MinIO).
+	// File upload and serving endpoints (requires MinIO).
 	if minioStore != nil {
 		uploadHandler := handler.NewUploadHandler(minioStore)
 		api.POST("/upload", uploadHandler.Upload)
+
+		filesHandler := handler.NewFilesHandler(minioStore)
+		api.GET("/files/*key", filesHandler.Get)
 	}
 
 	// Conversation management (requires DB).

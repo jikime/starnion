@@ -52,5 +52,8 @@ func (h *UploadHandler) Upload(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "upload failed: " + err.Error()})
 	}
 
+	// Return a gateway-relative URL so browsers go through the authenticated
+	// proxy instead of hitting MinIO's port directly.
+	att.URL = "/api/v1/files/" + att.ObjectKey
 	return c.JSON(http.StatusOK, att)
 }

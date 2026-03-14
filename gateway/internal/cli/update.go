@@ -183,10 +183,10 @@ func runUpdate(checkOnly bool) error {
 	cfg, err := LoadConfig()
 	if err == nil {
 		root := installRoot()
-		if wErr := WriteUIEnv(cfg, root); wErr != nil {
-			PrintWarn("ui/.env", fmt.Sprintf("재생성 실패: %v", wErr))
+		if wErr := MergeUIEnv(cfg, root); wErr != nil {
+			PrintWarn("ui/.env", fmt.Sprintf("업데이트 실패: %v", wErr))
 		} else {
-			PrintOK("ui/.env", "재생성 완료")
+			PrintOK("ui/.env", "업데이트 완료")
 		}
 		if mErr := connectAndMigrate(cfg, root); mErr != nil {
 			PrintWarn("migrate", fmt.Sprintf("마이그레이션 실패: %v", mErr))
@@ -270,20 +270,43 @@ func copyFile(src, dest string) error {
 // installRuntimeFiles copies agent/, ui/, docker/ from extractDir into starnionHome,
 // preserving any existing docker/.env.
 func installRuntimeFiles(extractDir, starnionHome string) error {
-	dirs := []string{"agent", "ui"}
-	for _, d := range dirs {
-		src := filepath.Join(extractDir, d)
-		if _, err := os.Stat(src); err != nil {
-			continue // not present in tarball
+	// agent/: replace entirely
+	agentSrc := filepath.Join(extractDir, "agent")
+	if _, err := os.Stat(agentSrc); err == nil {
+		agentDst := filepath.Join(starnionHome, "agent")
+		if err := os.RemoveAll(agentDst); err != nil {
+			return fmt.Errorf("agent 디렉토리 제거 실패: %w", err)
 		}
-		dst := filepath.Join(starnionHome, d)
-		if err := os.RemoveAll(dst); err != nil {
-			return fmt.Errorf("%s 디렉토리 제거 실패: %w", d, err)
+		if err := copyDir(agentSrc, agentDst); err != nil {
+			return fmt.Errorf("agent 디렉토리 복사 실패: %w", err)
 		}
-		if err := copyDir(src, dst); err != nil {
-			return fmt.Errorf("%s 디렉토리 복사 실패: %w", d, err)
+		PrintOK("agent", fmt.Sprintf("설치 완료 → %s", agentDst))
+	}
+
+	// ui/: preserve existing .env
+	uiSrc := filepath.Join(extractDir, "ui")
+	if _, err := os.Stat(uiSrc); err == nil {
+		uiDst := filepath.Join(starnionHome, "ui")
+
+		// Backup existing .env
+		var uiEnvBackup []byte
+		uiEnvPath := filepath.Join(uiDst, ".env")
+		if data, err := os.ReadFile(uiEnvPath); err == nil {
+			uiEnvBackup = data
 		}
-		PrintOK(d, fmt.Sprintf("설치 완료 → %s", dst))
+
+		if err := os.RemoveAll(uiDst); err != nil {
+			return fmt.Errorf("ui 디렉토리 제거 실패: %w", err)
+		}
+		if err := copyDir(uiSrc, uiDst); err != nil {
+			return fmt.Errorf("ui 디렉토리 복사 실패: %w", err)
+		}
+
+		// Restore .env
+		if len(uiEnvBackup) > 0 {
+			_ = os.WriteFile(uiEnvPath, uiEnvBackup, 0o600)
+		}
+		PrintOK("ui", fmt.Sprintf("설치 완료 → %s", uiDst))
 	}
 
 	// docker/: preserve existing .env
