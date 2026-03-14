@@ -71,4 +71,6 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/install.sh
           git diff --staged --quiet || git commit -m "chore: update docs to v${{ steps.version.outputs.version }}"
+          # Rebase onto latest main in case other commits landed while goreleaser was running.
+          git pull --rebase
           git push
