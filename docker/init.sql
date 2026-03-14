@@ -349,11 +349,23 @@ CREATE TABLE IF NOT EXISTS providers (
     api_key        TEXT        NOT NULL DEFAULT '',
     base_url       TEXT        NOT NULL DEFAULT '',   -- required for 'custom'
     enabled_models TEXT[]      NOT NULL DEFAULT '{}',
+    endpoint_type  TEXT        NOT NULL DEFAULT 'other', -- 'openai' | 'anthropic' | 'other'
     created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (user_id, provider)
 );
 CREATE INDEX IF NOT EXISTS idx_providers_user_id ON providers(user_id);
+
+CREATE TABLE IF NOT EXISTS model_assignments (
+    id         UUID        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id    TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    use_case   TEXT        NOT NULL,  -- 'default' | 'chat' | 'summary' | ...
+    provider   TEXT        NOT NULL DEFAULT '',
+    model      TEXT        NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, use_case)
+);
+CREATE INDEX IF NOT EXISTS idx_model_assignments_user_id ON model_assignments(user_id);
 
 CREATE TABLE IF NOT EXISTS personas (
     id            UUID        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
