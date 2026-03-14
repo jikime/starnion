@@ -15,9 +15,11 @@ export async function GET() {
   )
 
   if (!res.ok) {
+    const errBody = await res.json().catch(() => ({ error: "gateway error" }))
+    console.error("[channels/telegram] gateway error", res.status, errBody)
     return NextResponse.json(
-      { configured: false, enabled: false, accounts: [], status: "not-configured", dmPolicy: "allow", groupPolicy: "allow" },
-      { status: 200 }
+      { error: errBody.error ?? "gateway error" },
+      { status: res.status }
     )
   }
 

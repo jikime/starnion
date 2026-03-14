@@ -61,6 +61,7 @@ export function ChannelsView() {
   const { data: session, update } = useSession()
 
   const [status, setStatus] = useState<TelegramStatus | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Token setup
@@ -99,6 +100,7 @@ export function ChannelsView() {
 
   const fetchStatus = useCallback(async () => {
     setLoading(true)
+    setFetchError(null)
     try {
       const res = await fetch("/api/channels/telegram", { cache: "no-store" })
       if (res.ok) {
@@ -106,9 +108,12 @@ export function ChannelsView() {
         setStatus(data)
         setDmPolicy(data.dmPolicy ?? "allow")
         setGroupPolicy(data.groupPolicy ?? "allow")
+      } else {
+        const errData = await res.json().catch(() => ({}))
+        setFetchError(errData.error ?? "채널 정보를 불러올 수 없어요")
       }
     } catch {
-      // ignore
+      setFetchError("채널 정보를 불러올 수 없어요")
     } finally {
       setLoading(false)
     }
@@ -324,6 +329,8 @@ export function ChannelsView() {
             <CardContent className="space-y-5">
               {loading ? (
                 <p className="text-sm text-muted-foreground">{t("loading")}</p>
+              ) : fetchError ? (
+                <p className="text-sm text-red-500">{fetchError}</p>
               ) : (
                 <>
                   {/* ── Bot Token ── */}
