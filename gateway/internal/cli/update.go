@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -107,10 +108,21 @@ func runUpdate(checkOnly bool, skipDocker bool) error {
 	bashCmd.Stdin = strings.NewReader(sh)
 	bashCmd.Stdout = os.Stdout
 	bashCmd.Stderr = os.Stderr
-	bashCmd.Env = append(os.Environ(),
+
+	env := append(os.Environ(),
 		"STARNION_VERSION="+latest,
 		"NO_PROMPT=1",
 	)
+	// Tell install.sh to replace the binary in the same directory as the
+	// currently running starnion binary (e.g. /usr/local/bin), rather than
+	// falling back to ~/.local/bin when the user lacks write permission.
+	if exePath, err := os.Executable(); err == nil {
+		if realPath, err := filepath.EvalSymlinks(exePath); err == nil {
+			exePath = realPath
+		}
+		env = append(env, "STARNION_DIR="+filepath.Dir(exePath))
+	}
+	bashCmd.Env = env
 
 	if err := bashCmd.Run(); err != nil {
 		PrintFail("업데이트", err.Error())

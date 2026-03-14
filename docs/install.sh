@@ -122,6 +122,17 @@ else
 fi
 
 USE_SUDO="${USE_SUDO:-0}"
+
+# If INSTALL_DIR was explicitly specified (e.g. by starnion update) but is not
+# writable by the current user, fall back to sudo automatically.
+if [[ -n "${STARNION_DIR:-}" && "$USE_SUDO" == "0" && ! -w "$INSTALL_DIR" ]]; then
+  if sudo -n true 2>/dev/null || sudo true 2>/dev/null; then
+    USE_SUDO=1
+  else
+    warn "${INSTALL_DIR}에 쓰기 권한이 없습니다. sudo 없이 진행합니다 (실패할 수 있음)."
+  fi
+fi
+
 mkdir -p "$INSTALL_DIR"
 info "설치 위치: ${INSTALL_DIR}"
 
