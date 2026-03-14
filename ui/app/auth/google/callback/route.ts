@@ -17,7 +17,11 @@ export async function GET(request: Request) {
   const state = searchParams.get("state")
   const error = searchParams.get("error")
 
-  const integrationsBase = new URL("/integrations", request.url).origin + "/integrations"
+  // NEXTAUTH_URL is always the public-facing origin (e.g. https://lets.ai.kr).
+  // request.url reflects the internal host (localhost:3893) when behind a reverse proxy,
+  // so we must not use it to build the redirect target.
+  const origin = (process.env.NEXTAUTH_URL ?? "").replace(/\/$/, "")
+  const integrationsBase = `${origin}/integrations`
 
   if (error || !code || !state) {
     return NextResponse.redirect(`${integrationsBase}?error=google`)
