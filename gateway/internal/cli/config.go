@@ -337,6 +337,7 @@ func WriteUIEnv(cfg StarNionConfig, projectRoot string) error {
 AUTH_SECRET=%s
 API_URL=%s
 JWT_SECRET=%s
+AUTH_TRUST_HOST=true
 `,
 		cfg.Auth.AuthSecret,
 		cfg.Gateway.URL,
