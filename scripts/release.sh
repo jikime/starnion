@@ -10,13 +10,14 @@
 #
 # What this script does (full release):
 #   1. Validates the working tree is clean and on main
-#   2. Creates a git tag v<version>
-#   3. Pushes the tag to origin
+#   2. Updates docs/install.sh _STARNION_PINNED locally and commits+pushes to main
+#      → triggers GitHub Pages rebuild immediately (no CI race condition)
+#   3. Creates a git tag v<version> and pushes it to origin
 #   4. GitHub Actions (release.yml) takes over:
 #      - Builds Go binaries (darwin/linux × amd64/arm64) via goreleaser
 #      - Packages Next.js standalone UI + Python agent source into tarballs
 #      - Uploads to GitHub Releases
-#      - Updates docs/install.sh with new version → triggers Pages rebuild
+#      (update-pages CI job is now a no-op / safety net)
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -141,12 +142,38 @@ if [[ "$LOCAL" != "$REMOTE" ]]; then
   fail "로컬이 origin/main 과 다릅니다. git pull 또는 git push 를 먼저 실행하세요."
 fi
 
-# Tag must not already exist
+# Tag must not already exist (local + remote)
 if git tag | grep -qx "$TAG"; then
-  fail "태그 $TAG 가 이미 존재합니다."
+  fail "태그 $TAG 가 이미 로컬에 존재합니다."
+fi
+if git ls-remote --tags origin | grep -q "refs/tags/${TAG}$"; then
+  fail "태그 $TAG 가 이미 원격에 존재합니다."
 fi
 
 ok "Pre-flight 검사 통과"
+
+# ─── Update docs/install.sh ──────────────────────────────────────────────────
+# Do this BEFORE pushing the tag so the Pages site is updated atomically
+# and the CI update-pages job becomes a guaranteed no-op (no race condition).
+echo
+info "docs/install.sh 버전 업데이트 중..."
+INSTALL_SH="docs/install.sh"
+
+# perl -i works identically on macOS (BSD) and Linux (GNU)
+perl -i -pe "s/^_STARNION_PINNED=.*/_STARNION_PINNED=\"${VERSION}\"/" "$INSTALL_SH"
+
+if ! grep -qF "_STARNION_PINNED=\"${VERSION}\"" "$INSTALL_SH"; then
+  fail "docs/install.sh 업데이트 실패 — _STARNION_PINNED 패턴을 찾을 수 없습니다."
+fi
+
+git add "$INSTALL_SH"
+if ! git diff --staged --quiet; then
+  git commit -m "chore: update docs to v${VERSION}"
+  git push origin main
+  ok "docs/install.sh → v${VERSION} 업데이트 및 push 완료"
+else
+  ok "docs/install.sh 이미 v${VERSION} 상태"
+fi
 
 # ─── Confirm ─────────────────────────────────────────────────────────────────
 echo
@@ -188,8 +215,6 @@ echo -e "  GitHub Actions 가 자동으로 다음을 수행합니다:"
 echo -e "    1. Go 바이너리 빌드 (darwin/linux × amd64/arm64)"
 echo -e "    2. Next.js UI standalone 빌드"
 echo -e "    3. tarball 패키징 → GitHub Releases 업로드"
-echo -e "    4. docs/install.sh 버전 자동 업데이트"
-echo -e "    5. GitHub Pages 재빌드"
 echo
 echo -e "  Actions:  ${CYAN}https://github.com/jikime/starnion/actions${NC}"
 echo -e "  Release:  ${CYAN}https://github.com/jikime/starnion/releases/tag/${TAG}${NC}"
