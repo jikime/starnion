@@ -58,6 +58,45 @@ grand_parent: 🇨🇳 中文
 | PostgreSQL | 16+（含 pgvector） | [pgvector/pgvector](https://github.com/pgvector/pgvector) |
 | MinIO | 最新版 | [min.io](https://min.io/download) |
 
+#### Node.js 安装方法
+
+使用 `starnion dev` 或 `starnion ui` 命令时需要安装 Node.js。（pnpm 在未找到时会自动安装。）
+
+**Ubuntu / Debian**
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -
+sudo apt install -y nodejs
+```
+
+**RHEL / Rocky Linux / CentOS**
+
+```bash
+curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
+sudo dnf install -y nodejs
+```
+
+**macOS (Homebrew)**
+
+```bash
+brew install node@22
+```
+
+**macOS / Linux (nvm — 推荐用于版本管理)**
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+# 重启终端后：
+nvm install 22
+nvm use 22
+```
+
+验证安装：
+
+```bash
+node --version   # v22.x.x
+```
+
 ---
 
 ## 安装方式一：CLI 安装（推荐）

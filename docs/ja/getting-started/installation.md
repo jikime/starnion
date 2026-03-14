@@ -58,6 +58,45 @@ grand_parent: 🇯🇵 日本語
 | PostgreSQL | 16+（pgvector付き） | [pgvector/pgvector](https://github.com/pgvector/pgvector) |
 | MinIO | latest | [min.io](https://min.io/download) |
 
+#### Node.jsのインストール方法
+
+`starnion dev` または `starnion ui` コマンドを使用する際にNode.jsが必要です。（pnpmは見つからない場合、自動的にインストールされます。）
+
+**Ubuntu / Debian**
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -
+sudo apt install -y nodejs
+```
+
+**RHEL / Rocky Linux / CentOS**
+
+```bash
+curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
+sudo dnf install -y nodejs
+```
+
+**macOS (Homebrew)**
+
+```bash
+brew install node@22
+```
+
+**macOS / Linux (nvm — バージョン管理に推奨)**
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+# ターミナルを再起動後：
+nvm install 22
+nvm use 22
+```
+
+インストール確認：
+
+```bash
+node --version   # v22.x.x
+```
+
 ---
 
 ## インストール方法1：CLIインストール（推奨）

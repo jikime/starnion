@@ -58,6 +58,45 @@ grand_parent: 🇰🇷 한국어
 | PostgreSQL | 16+ (pgvector 포함) | [pgvector/pgvector](https://github.com/pgvector/pgvector) |
 | MinIO | 최신 | [min.io](https://min.io/download) |
 
+#### Node.js 설치 방법
+
+`starnion dev` 또는 `starnion ui` 명령을 사용할 때 Node.js가 필요합니다. (pnpm은 없을 경우 자동으로 설치됩니다.)
+
+**Ubuntu / Debian**
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -
+sudo apt install -y nodejs
+```
+
+**RHEL / Rocky Linux / CentOS**
+
+```bash
+curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
+sudo dnf install -y nodejs
+```
+
+**macOS (Homebrew)**
+
+```bash
+brew install node@22
+```
+
+**macOS / Linux (nvm — 버전 관리 권장)**
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+# 터미널 재시작 후:
+nvm install 22
+nvm use 22
+```
+
+설치 확인:
+
+```bash
+node --version   # v22.x.x
+```
+
 ---
 
 ## 설치 방법 1: CLI 설치 (권장)

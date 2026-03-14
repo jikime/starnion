@@ -58,6 +58,45 @@ grand_parent: 🇺🇸 English
 | PostgreSQL | 16+ (with pgvector) | [pgvector/pgvector](https://github.com/pgvector/pgvector) |
 | MinIO | latest | [min.io](https://min.io/download) |
 
+#### How to Install Node.js
+
+Node.js is required when running `starnion dev` or `starnion ui`. (pnpm is installed automatically if not found.)
+
+**Ubuntu / Debian**
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -
+sudo apt install -y nodejs
+```
+
+**RHEL / Rocky Linux / CentOS**
+
+```bash
+curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
+sudo dnf install -y nodejs
+```
+
+**macOS (Homebrew)**
+
+```bash
+brew install node@22
+```
+
+**macOS / Linux (nvm — recommended for version management)**
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+# Restart your terminal, then:
+nvm install 22
+nvm use 22
+```
+
+Verify installation:
+
+```bash
+node --version   # v22.x.x
+```
+
 ---
 
 ## Installation Method 1: CLI Installation (Recommended)
