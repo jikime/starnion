@@ -13,9 +13,10 @@ set -euo pipefail
 cd "${HOME:-/tmp}"
 
 # ── Pinned version (updated automatically on release) ─────────────────────────
-# Use the env var if already set (e.g. by `starnion update`), otherwise fall
-# back to the pinned version so `curl … | bash` always gets the latest release.
-STARNION_VERSION="1.4.15"
+# _STARNION_PINNED is the auto-bumped default; STARNION_VERSION env var overrides it.
+# Using a separate variable prevents the assignment from clobbering an env override.
+_STARNION_PINNED="1.4.15"
+STARNION_VERSION="${STARNION_VERSION:-$_STARNION_PINNED}"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 if [[ -t 1 ]] && [[ "${NO_COLOR:-}" == "" ]]; then

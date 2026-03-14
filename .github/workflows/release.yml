@@ -63,7 +63,7 @@ jobs:
 
       - name: Update version in docs/install.sh
         run: |
-          sed -i "s/^STARNION_VERSION=.*/STARNION_VERSION=\"${{ steps.version.outputs.version }}\"/" docs/install.sh
+          sed -i "s/^_STARNION_PINNED=.*/_STARNION_PINNED=\"${{ steps.version.outputs.version }}\"/" docs/install.sh
 
       - name: Commit updated docs
         run: |
