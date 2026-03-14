@@ -387,8 +387,8 @@ SKILLS: dict[str, SkillDef] = {
             "browser_current_url",
             "browser_close",
         ],
-        enabled_by_default=False,
-        permission_level=2,  # opt-in (headless browser resource)
+        enabled_by_default=True,
+        permission_level=1,
         sort_order=34,
     ),
     "naver_search": SkillDef(
