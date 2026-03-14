@@ -53,7 +53,7 @@ grand_parent: 🇰🇷 한국어
 | Go | 1.22+ | [go.dev](https://go.dev/dl/) |
 | Python | 3.13+ | [python.org](https://www.python.org/downloads/) |
 | uv | 최신 | [docs.astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/) |
-| Node.js | 22+ | [nodejs.org](https://nodejs.org/) |
+| Node.js | 18.12+ (권장: 22 LTS) | [nodejs.org](https://nodejs.org/) |
 | pnpm | 최신 | [pnpm.io](https://pnpm.io/installation) |
 | PostgreSQL | 16+ (pgvector 포함) | [pgvector/pgvector](https://github.com/pgvector/pgvector) |
 | MinIO | 최신 | [min.io](https://min.io/download) |

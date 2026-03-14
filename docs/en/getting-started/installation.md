@@ -53,7 +53,7 @@ grand_parent: 🇺🇸 English
 | Go | 1.22+ | [go.dev](https://go.dev/dl/) |
 | Python | 3.13+ | [python.org](https://www.python.org/downloads/) |
 | uv | latest | [docs.astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/) |
-| Node.js | 22+ | [nodejs.org](https://nodejs.org/) |
+| Node.js | 18.12+ (recommended: 22 LTS) | [nodejs.org](https://nodejs.org/) |
 | pnpm | latest | [pnpm.io](https://pnpm.io/installation) |
 | PostgreSQL | 16+ (with pgvector) | [pgvector/pgvector](https://github.com/pgvector/pgvector) |
 | MinIO | latest | [min.io](https://min.io/download) |
