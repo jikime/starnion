@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -398,11 +399,16 @@ func RunSetup(projectRoot string) error {
 		PrintWarn("env", fmt.Sprintf("ui/.env 생성 실패: %v", err))
 	}
 
-	// ── Write docker/.env (Docker Compose env vars, source-tree only) ────────
+	// ── Write docker/.env (Docker Compose env vars) ──────────────────────────
 	dockerDir := filepath.Join(projectRoot, "docker")
 	if _, err := os.Stat(dockerDir); err == nil {
 		if err := WriteDockerEnv(cfg, dockerDir); err != nil {
 			PrintWarn("env", fmt.Sprintf("docker/.env 생성 실패: %v", err))
+		} else {
+			// MinIO persists credentials only in env vars; if the container is
+			// already running it still holds the old credentials.  Restart it
+			// so the new access-key / secret-key take effect immediately.
+			restartMinIOIfRunning()
 		}
 	}
 
@@ -973,4 +979,21 @@ func createAdminUser(cfg StarNionConfig, name, email, password, language string)
 		return fmt.Errorf("트랜잭션 커밋 실패: %w", err)
 	}
 	return nil
+}
+
+// restartMinIOIfRunning restarts the starnion-minio container when it is
+// already running so updated credentials in docker/.env take effect without
+// requiring manual intervention.
+func restartMinIOIfRunning() {
+	out, err := exec.Command("docker", "ps", "-q", "--filter", "name=starnion-minio").Output()
+	if err != nil || len(strings.TrimSpace(string(out))) == 0 {
+		return // Docker not available or container not running
+	}
+	PrintInfo("MinIO 자격증명 변경 — starnion-minio 재시작 중...")
+	if err := exec.Command("docker", "restart", "starnion-minio").Run(); err != nil {
+		PrintWarn("MinIO", fmt.Sprintf("재시작 실패: %v", err))
+		PrintHint("수동으로 재시작하세요: docker restart starnion-minio")
+		return
+	}
+	PrintOK("MinIO", "재시작 완료 (새 자격증명 적용됨)")
 }
