@@ -1,7 +1,5 @@
 # Environment
 .env
-.env.local
-.env.*.local
 
 # Python
 __pycache__/
@@ -43,6 +41,8 @@ docker-compose.override.yml
 # Logs
 *.log
 logs/
+# Next.js app route named "logs" is not a log directory
+!ui/app/**/logs/
 
 # Secrets
 *.pem
