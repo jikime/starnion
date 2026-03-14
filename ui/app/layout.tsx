@@ -5,8 +5,6 @@ import { SessionProvider } from 'next-auth/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale, getMessages } from 'next-intl/server'
 import { ThemeProvider } from '@/components/theme-provider'
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
-import { AppSidebar } from '@/components/app-sidebar'
 import './globals.css'
 
 const pretendard = localFont({
@@ -59,20 +57,7 @@ export default async function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <NextIntlClientProvider locale={locale} messages={messages}>
             <SessionProvider>
-              <SidebarProvider
-                className="h-screen overflow-hidden"
-                style={
-                  {
-                    "--sidebar-width": "calc(var(--spacing) * 64)",
-                    "--header-height": "calc(var(--spacing) * 14)",
-                  } as React.CSSProperties
-                }
-              >
-                <AppSidebar variant="inset" />
-                <SidebarInset className="flex flex-col overflow-hidden">
-                  {children}
-                </SidebarInset>
-              </SidebarProvider>
+              {children}
             </SessionProvider>
           </NextIntlClientProvider>
         </ThemeProvider>
