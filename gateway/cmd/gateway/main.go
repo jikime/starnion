@@ -467,6 +467,15 @@ func main() {
 		})
 	}
 
+	// Agent HTTP base URL — used by logs proxy, document indexer, search embedder.
+	agentHTTPURL := fmt.Sprintf("http://%s:8082", cfg.Gateway.AgentHost)
+
+	// Log streaming endpoints — DB-independent (reads from in-memory logBuf).
+	logsHandler := handler.NewLogsHandler(logBuf, agentHTTPURL)
+	api.GET("/logs", logsHandler.List)
+	api.GET("/logs/stream", logsHandler.Stream)
+	api.GET("/logs/agent", logsHandler.AgentLogsProxy)
+
 	// Google OAuth2 callback.
 	if db != nil {
 		googleCfg := handler.GoogleOAuthConfig{
@@ -502,15 +511,6 @@ func main() {
 			api.GET("/skills", skillHandler.List)
 			api.POST("/skills/:id/toggle", skillHandler.Toggle)
 		}
-
-		// Agent HTTP base URL — used by logs proxy, document indexer, search embedder.
-		agentHTTPURL := fmt.Sprintf("http://%s:8082", cfg.Gateway.AgentHost)
-
-		// Log streaming endpoints (no auth — accessible from admin UI).
-		logsHandler := handler.NewLogsHandler(logBuf, agentHTTPURL)
-		api.GET("/logs", logsHandler.List)
-		api.GET("/logs/stream", logsHandler.Stream)
-		api.GET("/logs/agent", logsHandler.AgentLogsProxy)
 
 		// Budget management endpoints.
 		budgetHandler := handler.NewBudgetHandler(db)
