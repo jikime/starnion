@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 import { gatewayFetch } from "@/lib/gateway"
 
 /**
- * GET /api/files/[...key]
+ * GET /api/v1/files/[...key]
  *
  * Authenticated file proxy for MinIO objects.
  * Verifies the NextAuth session, requests a short-lived presigned URL
