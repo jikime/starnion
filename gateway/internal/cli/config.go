@@ -344,10 +344,12 @@ AUTH_SECRET=%s
 API_URL=%s
 JWT_SECRET=%s
 AUTH_TRUST_HOST=true
+NEXTAUTH_URL=http://localhost:%d
 `,
 		cfg.Auth.AuthSecret,
 		cfg.Gateway.URL,
 		cfg.Auth.JWTSecret,
+		cfg.UI.Port,
 	)
 	if err := os.WriteFile(path, []byte(uiEnv), 0o600); err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
@@ -362,10 +364,11 @@ func MergeUIEnv(cfg StarNionConfig, projectRoot string) error {
 
 	// Desired key→value pairs from current config.
 	desired := map[string]string{
-		"AUTH_SECRET":    cfg.Auth.AuthSecret,
-		"API_URL":        cfg.Gateway.URL,
-		"JWT_SECRET":     cfg.Auth.JWTSecret,
+		"AUTH_SECRET":     cfg.Auth.AuthSecret,
+		"API_URL":         cfg.Gateway.URL,
+		"JWT_SECRET":      cfg.Auth.JWTSecret,
 		"AUTH_TRUST_HOST": "true",
+		"NEXTAUTH_URL":    fmt.Sprintf("http://localhost:%d", cfg.UI.Port),
 	}
 
 	// Read existing file.
@@ -388,7 +391,7 @@ func MergeUIEnv(cfg StarNionConfig, projectRoot string) error {
 	}
 
 	// Append missing keys in a stable order.
-	order := []string{"AUTH_SECRET", "API_URL", "JWT_SECRET", "AUTH_TRUST_HOST"}
+	order := []string{"AUTH_SECRET", "API_URL", "JWT_SECRET", "AUTH_TRUST_HOST", "NEXTAUTH_URL"}
 	added := 0
 	for _, key := range order {
 		if !existing[key] {
