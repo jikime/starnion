@@ -144,7 +144,7 @@ curl http://localhost:8080/healthz
 ```
 ┌──────────────────────┐   ┌──────────────────────┐
 │   Web UI (Next.js)   │   │   Telegram Bot        │
-│   localhost:3000      │   │   (polling)           │
+│   localhost:3893      │   │   (polling)           │
 └──────────┬───────────┘   └──────────┬────────────┘
            │                          │
            ▼                          ▼

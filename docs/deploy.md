@@ -49,7 +49,7 @@ starnion dev     # start all services concurrently
 ```
 [gateway]  Listening on :8080
 [agent]    gRPC server listening on :50051
-[ui]       ready on http://localhost:3000
+[ui]       ready on http://localhost:3893
 ```
 
 Press `Ctrl+C` to stop all services.
@@ -139,7 +139,7 @@ cp docker/.env.example docker/.env
 | `GATEWAY_PUBLIC_URL` | `http://localhost:8080` | External gateway URL |
 | `GRPC_PORT` | `50051` | Internal gRPC port |
 | `UI_PORT` | `3000` | Web UI port |
-| `NEXTAUTH_URL` | `http://localhost:3000` | NextAuth callback URL |
+| `NEXTAUTH_URL` | `http://localhost:3893` | NextAuth callback URL |
 
 ### Production checklist
 
@@ -154,7 +154,7 @@ cp docker/.env.example docker/.env
 
 ```
 starnion.example.com {
-    reverse_proxy localhost:3000
+    reverse_proxy localhost:3893
 }
 
 api.starnion.example.com {

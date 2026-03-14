@@ -286,7 +286,7 @@ starnion doctor
 ブラウザで以下のアドレスにアクセスします。
 
 ```
-http://localhost:3000
+http://localhost:3893
 ```
 
 ログインページが表示されれば、インストール完了です。

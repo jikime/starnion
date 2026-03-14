@@ -435,7 +435,7 @@ func RunSetup(projectRoot string) error {
 	step("1", "서비스 시작",
 		"starnion dev  (또는 docker: starnion docker setup)")
 	step("2", "로그인",
-		"브라우저에서 http://localhost:3000 접속 후 회원가입 또는 로그인")
+		"브라우저에서 http://localhost:3893 접속 후 회원가입 또는 로그인")
 	step("3", "모델 설정",
 		"Settings → Model → 프로바이더(Anthropic / OpenAI 등) 선택 → 사용할 모델 선택 후 API Key 입력")
 	step("4", "페르소나 설정",

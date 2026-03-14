@@ -286,7 +286,7 @@ starnion doctor
 在浏览器中访问以下地址：
 
 ```
-http://localhost:3000
+http://localhost:3893
 ```
 
 如果显示登录页面，则安装完成。

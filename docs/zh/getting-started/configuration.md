@@ -135,7 +135,7 @@ DATABASE_URL=postgres://starnion:MyPassword@db.example.com:5432/starnion?sslmode
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `UI_PORT` | `3000` | Next.js Web 服务器端口 |
-| `NEXTAUTH_URL` | `http://localhost:3000` | NextAuth 回调基础 URL |
+| `NEXTAUTH_URL` | `http://localhost:3893` | NextAuth 回调基础 URL |
 | `AUTH_SECRET` | _（必填）_ | NextAuth 会话加密密钥 |
 | `JWT_SECRET` | _（必填）_ | JWT 令牌验证密钥（须与 Gateway 一致） |
 
@@ -287,7 +287,7 @@ GRPC_PORT=50051
 
 # ---- UI ----
 UI_PORT=3000
-NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_URL=http://localhost:3893
 
 # ---- AI 服务商（至少需要一个）----
 GEMINI_API_KEY=AIzaSy...

@@ -288,7 +288,7 @@ starnion doctor
 브라우저에서 다음 주소로 접속:
 
 ```
-http://localhost:3000
+http://localhost:3893
 ```
 
 로그인 페이지가 표시되면 설치가 완료된 것입니다.

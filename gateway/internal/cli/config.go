@@ -151,7 +151,7 @@ func DefaultConfig() StarNionConfig {
 			GRPCPort:  50051,
 			AgentHost: "localhost",
 		},
-		UI: UIConfig{Port: 3000},
+		UI: UIConfig{Port: 3893},
 		Embedding: EmbeddingConfig{
 			Provider:   "openai",
 			Model:      "text-embedding-3-small",
@@ -162,7 +162,7 @@ func DefaultConfig() StarNionConfig {
 			Format: "console",
 		},
 		CORS: CORSConfig{
-			AllowedOrigins: []string{"http://localhost:3000"},
+			AllowedOrigins: []string{"http://localhost:3893"},
 			AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 			AllowedHeaders: []string{"Authorization", "Content-Type"},
 		},
