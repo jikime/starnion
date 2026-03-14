@@ -14,7 +14,7 @@ The Personas feature lets you customize Starnion's AI name, personality, and rol
 **Key Features:**
 - Persona customization: Set name, role, personality description, and greeting
 - Multiple personas: Create several personas and switch as needed
-- Default persona: Nion — the built-in default persona
+- Built-in personas: 5 pre-configured personas included out of the box
 - In-chat switching: Change personas during a conversation
 
 ---
@@ -32,13 +32,17 @@ A persona is a **profile that defines the AI's personality and role**.
 
 ---
 
-## Default Persona
+## Built-in Personas
 
-Starnion comes with a built-in default persona called **Nion**.
+Starnion includes **5 built-in personas** ready to use out of the box — no setup required.
 
-- **Name**: Nion
-- **Role**: Personal AI assistant
-- **Personality**: Friendly and warm conversation style, uses emoji, takes interest in user's daily life
+| Persona | Role | Characteristics |
+|---------|------|-----------------|
+| **Mind Friend** | Emotional companion | Highly empathetic, warm conversational style for sharing feelings |
+| **Basic Assistant** | General-purpose AI | Friendly and helpful across all everyday tasks |
+| **Finance Expert** | Personal finance advisor | Focused on saving and investing, analyzes financial status |
+| **Data Analyst** | Data insight specialist | Clearly interprets numbers and statistics, supports data visualization |
+| **Life Coach** | Goal achievement coach | Systematic support for motivation and habit formation |
 
 ---
 
@@ -104,8 +108,8 @@ There is no limit. However, only one persona can be active at a time.
 **Q. Does switching personas erase previous conversation context?**
 No. Conversation history and memory are preserved. Only the AI's tone and style change.
 
-**Q. Can I edit the default Nion persona?**
-You can modify the personality description and greeting. The name cannot be changed.
+**Q. Can I edit the built-in personas?**
+You can modify the personality description and greeting of any built-in persona. The name cannot be changed.
 
 **Q. Any tips for creating good personas?**
 The more specific your personality description, the more consistently the AI maintains its character.
