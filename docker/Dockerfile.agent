@@ -7,6 +7,11 @@ RUN pip install --no-cache-dir uv
 COPY pyproject.toml uv.lock* ./
 RUN uv sync --no-dev
 
+# Install Playwright Chromium + all required system libraries at build time.
+# --with-deps automatically installs libnss3, libatk, libcups2, libdrm, etc.
+# that Chromium needs on the slim Debian image.
+RUN uv run playwright install --with-deps chromium
+
 COPY src/ src/
 
 EXPOSE 50051

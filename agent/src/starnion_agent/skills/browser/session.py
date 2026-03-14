@@ -127,12 +127,16 @@ async def _close_session(user_id: str) -> bool:
 
 
 async def _ensure_chromium() -> None:
-    """Run 'playwright install chromium' if the browser executable is missing."""
+    """Run 'playwright install --with-deps chromium' if the browser executable is missing.
+
+    --with-deps also installs required system libraries (libnss3, libatk, etc.)
+    so this works on both macOS and Linux slim images.
+    """
     import sys
 
-    logger.warning("browser: chromium executable not found — running 'playwright install chromium'")
+    logger.warning("browser: chromium executable not found — running 'playwright install --with-deps chromium'")
     proc = await asyncio.create_subprocess_exec(
-        sys.executable, "-m", "playwright", "install", "chromium",
+        sys.executable, "-m", "playwright", "install", "--with-deps", "chromium",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
