@@ -75,6 +75,12 @@ func ensureAgentDeps(root string) error {
 		return nil
 	}
 
+	// hatchling editable-install requires README.md; create an empty one if missing.
+	readmePath := filepath.Join(agentDir, "README.md")
+	if _, err := os.Stat(readmePath); os.IsNotExist(err) {
+		_ = os.WriteFile(readmePath, []byte("# starnion-agent\n"), 0o644)
+	}
+
 	PrintInfo("Python 패키지 설치 중... (uv sync)")
 	cmd := exec.Command(uvBin(), "sync")
 	cmd.Dir = agentDir
@@ -162,6 +168,22 @@ func RunAgent() error {
 	return runWithSignal(cmd)
 }
 
+// ensureNodeInstalled checks that `node` is available and prints a helpful
+// error with installation instructions if it is not.
+func ensureNodeInstalled() bool {
+	if _, err := exec.LookPath("node"); err == nil {
+		return true
+	}
+	fmt.Println()
+	PrintFail("Node.js", "node 명령을 찾을 수 없습니다.")
+	PrintHint("Node.js를 설치하세요:")
+	PrintHint("  Ubuntu/Debian : sudo apt install -y nodejs")
+	PrintHint("  RHEL/Rocky    : sudo dnf install -y nodejs")
+	PrintHint("  macOS (brew)  : brew install node")
+	PrintHint("  또는 https://nodejs.org 에서 최신 버전을 설치하세요.")
+	return false
+}
+
 // RunUI ensures Node deps and starts the UI.
 func RunUI(devMode bool) error {
 	if !ensureConfigured() {
@@ -173,6 +195,9 @@ func RunUI(devMode bool) error {
 
 	var cmd *exec.Cmd
 	if isInstalled() {
+		if !ensureNodeInstalled() {
+			return nil
+		}
 		// Installed: run Next.js standalone server; env vars are loaded from
 		// ~/.starnion/ui/.env which WriteEnvFilesFromConfig writes.
 		uiDir := filepath.Join(installRoot(), "ui")
@@ -205,6 +230,9 @@ func RunDev() error {
 
 	var cmds []*exec.Cmd
 	if isInstalled() {
+		if !ensureNodeInstalled() {
+			return nil
+		}
 		_ = WriteEnvFilesFromConfig(installRoot())
 		agentDir := filepath.Join(root, "agent")
 		uiDir := filepath.Join(root, "ui")
