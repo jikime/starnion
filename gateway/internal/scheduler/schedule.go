@@ -15,7 +15,7 @@ import (
 // scheduleData represents a user-created schedule stored in knowledge_base.
 type scheduleData struct {
 	Title      string       `json:"title"`
-	Type       string       `json:"type"`        // one_time / recurring
+	Type       string       `json:"type"` // one_time / recurring
 	ReportType string       `json:"report_type"`
 	Schedule   scheduleTime `json:"schedule"`
 	Status     string       `json:"status"`
@@ -34,11 +34,11 @@ type scheduleTime struct {
 
 // scheduleEntry pairs a knowledge_base row with its parsed schedule data.
 type scheduleEntry struct {
-	id         int
-	userID     string
-	key        string
-	data       scheduleData
-	rawValue   string
+	id       int
+	userID   string
+	key      string
+	data     scheduleData
+	rawValue string
 }
 
 // runUserSchedulesRule polls knowledge_base for user-created schedules and
@@ -88,13 +88,14 @@ func (s *Scheduler) runUserSchedulesRule() {
 			continue
 		}
 
-		// Fatigue check.
+		// 사용자가 직접 만든 일정은 명시적 의도이므로 fatigue 제한(조용한 시간,
+		// 일일 한도, 대화 중 유예)을 건너뛴다. 단, 전체 알림 비활성화 설정은 존중한다.
 		prefs := s.loadPreferences(entry.userID)
-		if !s.fatigue.canNotify(entry.userID, prefs) {
+		if !notificationsEnabled(prefs) {
 			log.Debug().
 				Str("user_id", entry.userID).
 				Str("schedule", entry.key).
-				Msg("user schedules: skipped by fatigue")
+				Msg("user schedules: notifications disabled by preference, skipping")
 			continue
 		}
 
@@ -118,7 +119,8 @@ func (s *Scheduler) runUserSchedulesRule() {
 			continue
 		}
 
-		s.fatigue.recordNotification(entry.userID)
+		// 사용자 일정은 시스템 proactive 알림 한도에 포함하지 않는다.
+		// (사용자가 요청한 알림이 시스템 알림 발송을 막으면 안 되므로)
 
 		// Update schedule state.
 		if entry.data.Type == "one_time" {

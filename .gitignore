@@ -48,3 +48,9 @@ logs/
 *.pem
 *.key
 credentials.json
+
+.jikime
+.claude
+.mcp.json
+CLAUDE.md
+starnion

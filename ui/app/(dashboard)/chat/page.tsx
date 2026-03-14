@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useEffect, Suspense } from "react"
+import { useRef, useState, useEffect, useCallback, useMemo, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { ChatSidebar, type Conversation } from "@/components/chat/chat-sidebar"
@@ -13,13 +13,13 @@ import { MessageCircle, PanelLeftClose, PanelLeft, WifiOff, Loader2 } from "luci
 
 function ChatPageInner() {
   const t = useTranslations("chat")
-  const PERSONAS = [
+  const personas = useMemo(() => [
     { id: "assistant",    name: t("personas.assistant") },
     { id: "finance",      name: t("personas.finance") },
     { id: "heart_friend", name: t("personas.heart_friend") },
     { id: "life_coach",   name: t("personas.life_coach") },
     { id: "analyst",      name: t("personas.analyst") },
-  ]
+  ], [t])
   const router = useRouter()
   const searchParams = useSearchParams()
   const urlId = searchParams.get("id")
@@ -35,14 +35,14 @@ function ChatPageInner() {
       .catch(() => {})
   }, [])
 
-  const handlePersonaChange = (value: string) => {
+  const handlePersonaChange = useCallback((value: string) => {
     setPersona(value)
     fetch("/api/profile/persona", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ persona: value }),
     }).catch(() => {})
-  }
+  }, [])
 
   // Initialize from URL so page refresh / sidebar toggle preserves selection.
   const [activeThreadId, setActiveThreadId] = useState<string | null>(urlId)
@@ -53,14 +53,14 @@ function ChatPageInner() {
   const { messages, sendMessage, connState, isConnected, isStreaming, isThinking, historyLoading, hasMore, loadingMore, loadMore } = useChat(activeThreadId)
 
   // Keep URL in sync whenever the active thread changes.
-  const selectThread = (id: string, platform: string) => {
+  const selectThread = useCallback((id: string, platform: string) => {
     firstMsgSent.current = platform !== "web" // existing threads already have a title
     setActiveThreadId(id)
     setIsReadonly(platform !== "web")
     router.replace(`/chat?id=${id}`)
-  }
+  }, [router])
 
-  const handleSend = (text: string, files?: AttachedFile[]) => {
+  const handleSend = useCallback((text: string, files?: AttachedFile[]) => {
     const sdkFiles = files?.map((f) => ({ url: f.url!, mime: f.mime }))
     sendMessage(text, sdkFiles)
 
@@ -80,21 +80,21 @@ function ChatPageInner() {
         })
         .catch(() => {})
     }
-  }
+  }, [activeThreadId, sendMessage])
 
-  const handleNewConversation = (conv: Conversation) => {
+  const handleNewConversation = useCallback((conv: Conversation) => {
     firstMsgSent.current = false
     setActiveThreadId(conv.id)
     setIsReadonly(false)
     router.replace(`/chat?id=${conv.id}`)
-  }
+  }, [router])
 
-  const handleSelectThread = (id: string, platform: string) => {
+  const handleSelectThread = useCallback((id: string, platform: string) => {
     selectThread(id, platform)
-  }
+  }, [selectThread])
 
   // Auto-select only when there is no conversation in the URL yet.
-  const handleSidebarLoad = (convs: Conversation[]) => {
+  const handleSidebarLoad = useCallback((convs: Conversation[]) => {
     if (activeThreadId) {
       // URL에 id가 이미 있으면 해당 대화의 platform을 확인해 readonly 설정
       const current = convs.find((c) => c.id === activeThreadId)
@@ -103,7 +103,7 @@ function ChatPageInner() {
     }
     const firstWeb = convs.find((c) => c.platform === "web")
     if (firstWeb) selectThread(firstWeb.id, firstWeb.platform)
-  }
+  }, [activeThreadId, selectThread])
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -170,7 +170,7 @@ function ChatPageInner() {
               : undefined
           }
           persona={persona}
-          personas={PERSONAS}
+          personas={personas}
           onPersonaChange={handlePersonaChange}
         />
       </div>

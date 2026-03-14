@@ -34,6 +34,7 @@ interface SystemJob {
   schedule: string
   level: string
   enabled: boolean
+  can_disable: boolean
 }
 
 interface ScheduleTime {
@@ -147,6 +148,7 @@ export default function CronPage() {
   const [cronEditTarget, setCronEditTarget] = useState<UserSchedule | null>(null)
   const [cronSaving, setCronSaving]         = useState(false)
   const [togglingId, setTogglingId]         = useState<string | null>(null)
+  const [togglingSystemId, setTogglingSystemId] = useState<string | null>(null)
   const [cronDeletingId, setCronDeletingId] = useState<string | null>(null)
   const [cronForm, setCronForm]             = useState(emptyCronForm())
 
@@ -230,6 +232,19 @@ export default function CronPage() {
     }
   }
 
+  const handleToggleSystem = async (id: string) => {
+    setTogglingSystemId(id)
+    try {
+      const res = await fetch(`/api/cron/system/${id}/toggle`, { method: "POST" })
+      if (res.ok) {
+        const { enabled } = await res.json()
+        setSystemJobs((prev) => prev.map((j) => j.id === id ? { ...j, enabled } : j))
+      }
+    } finally {
+      setTogglingSystemId(null)
+    }
+  }
+
   const handleCronDelete = async (id: string) => {
     if (!confirm(t("deleteConfirm"))) return
     setCronDeletingId(id)
@@ -283,9 +298,21 @@ export default function CronPage() {
                       </div>
                       <code className="text-xs bg-muted px-2 py-1 rounded shrink-0 hidden sm:block">{job.schedule}</code>
                       <span className="text-xs text-muted-foreground shrink-0 hidden md:block">{cronHuman(job.schedule)}</span>
-                      <Badge variant={job.enabled ? "default" : "secondary"} className="shrink-0">
-                        {job.enabled ? t("statusActive") : t("statusInactive")}
-                      </Badge>
+                      {job.can_disable ? (
+                        togglingSystemId === job.id ? (
+                          <Loader2 className="size-4 animate-spin text-muted-foreground shrink-0" />
+                        ) : (
+                          <Switch
+                            checked={job.enabled}
+                            onCheckedChange={() => handleToggleSystem(job.id)}
+                            className="shrink-0"
+                          />
+                        )
+                      ) : (
+                        <Badge variant="secondary" className="shrink-0 text-xs">
+                          {t("backgroundOnly")}
+                        </Badge>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -108,7 +108,8 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 	// The first file is sent as FileInput; additional files are appended as text annotations.
 	// Also record user-uploaded images to the gallery immediately.
 	var fileInput *starnionv1.FileInput
-	message := req.Message
+	var msgBuf strings.Builder
+	msgBuf.WriteString(req.Message)
 	for i, f := range req.Files {
 		fileType := "document"
 		if strings.HasPrefix(f.Mime, "image/") {
@@ -125,9 +126,10 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 				FileName: f.Name,
 			}
 		} else {
-			message += fmt.Sprintf("\n[파일 첨부: type=%s, name=%s, url=%s]", fileType, f.Name, f.URL)
+			fmt.Fprintf(&msgBuf, "\n[파일 첨부: type=%s, name=%s, url=%s]", fileType, f.Name, f.URL)
 		}
 	}
+	message := msgBuf.String()
 
 	stream, err := h.grpcClient.ChatStream(ctx, &starnionv1.ChatRequest{
 		UserId:   req.UserID,

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { useTranslations } from "next-intl"
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -377,6 +377,17 @@ export function PersonasView() {
     }
   }
 
+  // ── Memoized tool support map for persona cards ──────────────────────────
+
+  const personaToolsSupportMap = useMemo(() => {
+    const cardEndpointType = providerData.find(pd => pd.provider === "custom")?.endpointType
+    const map: Record<string, boolean | null> = {}
+    for (const p of personas) {
+      map[p.id] = personaModelSupportsTools(p.provider, p.model, cardEndpointType)
+    }
+    return map
+  }, [personas, providerData])
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   const models = availableModels()
@@ -426,8 +437,7 @@ export function PersonasView() {
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {personas.map(p => {
             const provMeta = PROVIDER_META[p.provider]
-            const cardEndpointType = providerData.find(pd => pd.provider === "custom")?.endpointType
-            const toolsSupport = personaModelSupportsTools(p.provider, p.model, cardEndpointType)
+            const toolsSupport = personaToolsSupportMap[p.id]
             return (
               <Card key={p.id} className={`shadow-none ${p.isDefault ? "border-primary/50" : ""}`}>
                 <CardHeader className="pb-2">

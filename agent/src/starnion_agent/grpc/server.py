@@ -28,6 +28,7 @@ from starnion_agent.skills.conversation.tools import analyze_conversation
 from starnion_agent.skills.goals.tools import evaluate_goals, generate_goal_status
 from starnion_agent.skills.pattern.tools import analyze_patterns, generate_pattern_insight
 from starnion_agent.skills.report.tools import (
+    generate_anomaly_report,
     generate_daily_summary,
     generate_monthly_closing,
     generate_weekly_report,
@@ -365,10 +366,12 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
         try:
             if report_type == "weekly":
                 content = await generate_weekly_report(user_id)
-            elif report_type == "daily_summary":
+            elif report_type in ("daily", "daily_summary"):
                 content = await generate_daily_summary(user_id)
-            elif report_type == "monthly_closing":
+            elif report_type in ("monthly", "monthly_closing"):
                 content = await generate_monthly_closing(user_id)
+            elif report_type == "anomaly":
+                content = await generate_anomaly_report(user_id)
             elif report_type == "pattern_analysis":
                 content = await analyze_patterns(user_id)
             elif report_type == "pattern_insight":

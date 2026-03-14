@@ -179,7 +179,7 @@ CREATE INDEX IF NOT EXISTS idx_audios_created_at ON audios(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS reports (
     id          BIGSERIAL   NOT NULL PRIMARY KEY,
-    user_id     TEXT        NOT NULL,
+    user_id     TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     report_type TEXT        NOT NULL,
     title       TEXT        NOT NULL DEFAULT '',
     content     TEXT        NOT NULL DEFAULT '',

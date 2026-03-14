@@ -56,6 +56,7 @@ export default function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null)
   const [loadingContent, setLoadingContent] = useState(false)
   const [generatingType, setGeneratingType] = useState<string | null>(null)
+  const [generateError, setGenerateError] = useState<string | null>(null)
 
   const fetchReports = useCallback(async () => {
     setLoading(true)
@@ -98,6 +99,7 @@ export default function ReportsPage() {
 
   async function handleGenerate(reportType: string) {
     setGeneratingType(reportType)
+    setGenerateError(null)
     try {
       const res = await fetch("/api/reports", {
         method: "POST",
@@ -108,7 +110,11 @@ export default function ReportsPage() {
       if (res.ok && data.id) {
         await fetchReports()
         setSelectedReport(data)
+      } else {
+        setGenerateError(t("generateError"))
       }
+    } catch {
+      setGenerateError(t("generateError"))
     } finally {
       setGeneratingType(null)
     }
@@ -163,6 +169,12 @@ export default function ReportsPage() {
           )
         })}
       </div>
+
+      {generateError && (
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {generateError}
+        </div>
+      )}
 
       {/* List + Viewer */}
       <div className="grid gap-6 lg:grid-cols-[1fr_420px]">

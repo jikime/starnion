@@ -210,21 +210,25 @@ function MoodCalendar({ entries }: { entries: DiaryEntry[] }) {
     }}>
       {/* Header */}
       <div className="flex items-center justify-between mb-2.5">
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={prevMon}
-          className="w-5 h-5 flex items-center justify-center rounded-full transition-all hover:bg-white/10"
+          className="w-5 h-5 rounded-full hover:bg-white/10"
           style={{ color: "rgba(255,255,255,0.70)", fontSize: "16px" }}
-        >‹</button>
+        >‹</Button>
         <span className="text-[13px] font-semibold tracking-widest"
           style={{ color: "rgba(255,255,255,0.65)" }}>
           {viewYear}년 {viewMonth + 1}월
         </span>
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={nextMon}
           disabled={isMaxMonth}
-          className="w-5 h-5 flex items-center justify-center rounded-full transition-all hover:bg-white/10 disabled:opacity-20"
+          className="w-5 h-5 rounded-full hover:bg-white/10 disabled:opacity-20"
           style={{ color: "rgba(255,255,255,0.70)", fontSize: "16px" }}
-        >›</button>
+        >›</Button>
       </div>
 
       {/* Day-of-week headers */}
@@ -602,20 +606,21 @@ function NionCenter({
       <div className="flex flex-col items-center gap-1.5">
         <div className="flex items-center gap-1.5">
           {Object.entries(MOOD_CONFIG).map(([key, cfg]) => (
-            <button
+            <Button
               key={key}
+              variant="ghost"
+              size="icon"
               onClick={() => onMoodSelect(key)}
-              className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+              className="w-9 h-9 rounded-full transition-all hover:scale-110 active:scale-95"
               style={{
                 background: displayMood === key ? `${cfg.color}28` : "transparent",
                 border: `1.5px solid ${displayMood === key ? cfg.color + "99" : "rgba(255,255,255,0.12)"}`,
                 boxShadow: displayMood === key ? `0 0 10px ${cfg.color}33` : "none",
-                cursor: "pointer",
               }}
               title={key}
             >
               <span className="text-base leading-none">{cfg.emoji}</span>
-            </button>
+            </Button>
           ))}
         </div>
         <div className="text-[11px] tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.52)" }}>

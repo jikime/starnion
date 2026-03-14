@@ -538,6 +538,7 @@ func main() {
 		if db != nil {
 			cronHandler := handler.NewCronHandler(db)
 			api.GET("/cron/system", cronHandler.ListSystemJobs)
+			api.POST("/cron/system/:id/toggle", cronHandler.ToggleSystemJob)
 			api.GET("/cron/schedules", cronHandler.ListUserSchedules)
 			api.POST("/cron/schedules", cronHandler.CreateUserSchedule)
 			api.PUT("/cron/schedules/:id", cronHandler.UpdateUserSchedule)

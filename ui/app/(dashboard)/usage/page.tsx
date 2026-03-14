@@ -1,7 +1,10 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo, memo } from "react"
 import { useTranslations } from "next-intl"
+// NOTE: Recharts is client-only. This page is already "use client", so static
+// import is fine. If bundle size becomes an issue, consider extracting chart
+// panels into a separate component and using next/dynamic with { ssr: false }.
 import {
   AreaChart,
   Area,
@@ -192,7 +195,7 @@ function Panel({
 
 // ─── Log Row (expandable) ─────────────────────────────────────────────────────
 
-function LogEntry({ row, t }: { row: LogRow; t: ReturnType<typeof useTranslations> }) {
+const LogEntry = memo(function LogEntry({ row, t }: { row: LogRow; t: ReturnType<typeof useTranslations> }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -277,7 +280,7 @@ function LogEntry({ row, t }: { row: LogRow; t: ReturnType<typeof useTranslation
       )}
     </div>
   )
-}
+})
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -483,8 +486,9 @@ export default function UsagePage() {
                     <p className="text-xs text-muted-foreground py-8 text-center">{t("noData")}</p>
                   ) : (
                     <div className="flex flex-col gap-2">
-                      {models.slice(0, 6).map((m) => {
+                      {(() => {
                         const maxCost = Math.max(...models.map((x) => x.cost_usd), 0.0001)
+                        return models.slice(0, 6).map((m) => {
                         const pct = Math.round((m.cost_usd / maxCost) * 100)
                         return (
                           <div key={`${m.model}-${m.provider}`} className="flex flex-col gap-1">
@@ -507,7 +511,8 @@ export default function UsagePage() {
                             </p>
                           </div>
                         )
-                      })}
+                      })
+                      })()}
                     </div>
                   )}
                 </Panel>
@@ -576,6 +581,7 @@ export default function UsagePage() {
               {logs.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-12 text-center">{t("noLogs")}</p>
               ) : (
+                // TODO: 로그 수가 500건 이상일 경우 react-window 가상화 적용 필요
                 logs.map((row) => <LogEntry key={row.id} row={row} t={t} />)
               )}
             </div>

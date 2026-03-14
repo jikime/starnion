@@ -472,6 +472,15 @@ export function ModelsView() {
     return opts
   }, [savedProviders])
 
+  const modelOptionGroups = useMemo(() => {
+    const groups: Record<string, typeof modelOptions> = {}
+    for (const opt of modelOptions) {
+      if (!groups[opt.group]) groups[opt.group] = []
+      groups[opt.group].push(opt)
+    }
+    return Object.entries(groups)
+  }, [modelOptions])
+
   const getAssignmentValue = (useCase: string): string => {
     const a = assignments[useCase]
     if (!a || (!a.provider && !a.model)) return ASSIGNMENT_DEFAULT
@@ -866,23 +875,16 @@ export function ModelsView() {
                             <SelectItem value={ASSIGNMENT_DEFAULT}>
                               {t("assignments.serverDefault")}
                             </SelectItem>
-                            {(() => {
-                              const groups: Record<string, typeof modelOptions> = {}
-                              for (const opt of modelOptions) {
-                                if (!groups[opt.group]) groups[opt.group] = []
-                                groups[opt.group].push(opt)
-                              }
-                              return Object.entries(groups).map(([group, opts]) => (
-                                <SelectGroup key={group}>
-                                  <SelectLabel className="text-xs">{group}</SelectLabel>
-                                  {opts.map(opt => (
-                                    <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                                      {opt.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectGroup>
-                              ))
-                            })()}
+                            {modelOptionGroups.map(([group, opts]) => (
+                              <SelectGroup key={group}>
+                                <SelectLabel className="text-xs">{group}</SelectLabel>
+                                {opts.map(opt => (
+                                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                                    {opt.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>

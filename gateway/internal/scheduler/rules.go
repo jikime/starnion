@@ -432,6 +432,10 @@ func (s *Scheduler) runGoalStatusRule() {
 // sendTemplateNotification sends a pre-formatted message with fatigue checks
 // and persists the notification to the notifications table.
 func (s *Scheduler) sendTemplateNotification(userID string, chatID int64, preferences map[string]any, message string, notifType string) error {
+	if isSystemJobDisabled(preferences, notifType) {
+		log.Debug().Str("user_id", userID).Str("job", notifType).Msg("system job disabled by user")
+		return nil
+	}
 	if !s.fatigue.canNotify(userID, preferences) {
 		return nil
 	}
@@ -450,6 +454,10 @@ func (s *Scheduler) sendTemplateNotification(userID string, chatID int64, prefer
 // and persists the notification to the notifications table.
 func (s *Scheduler) sendGeneratedNotification(user activeUser, reportType string) error {
 	prefs := s.loadPreferences(user.userID)
+	if isSystemJobDisabled(prefs, reportType) {
+		log.Debug().Str("user_id", user.userID).Str("job", reportType).Msg("system job disabled by user")
+		return nil
+	}
 	if !s.fatigue.canNotify(user.userID, prefs) {
 		return nil
 	}
@@ -508,6 +516,35 @@ func (s *Scheduler) loadPreferences(userID string) map[string]any {
 		return nil
 	}
 	return prefs
+}
+
+// isSystemJobDisabled checks if a system job is disabled in user preferences.
+func isSystemJobDisabled(preferences map[string]any, jobID string) bool {
+	if preferences == nil {
+		return false
+	}
+	schedulerRaw, ok := preferences["scheduler"]
+	if !ok {
+		return false
+	}
+	scheduler, ok := schedulerRaw.(map[string]any)
+	if !ok {
+		return false
+	}
+	disabledRaw, ok := scheduler["disabled_jobs"]
+	if !ok {
+		return false
+	}
+	disabled, ok := disabledRaw.([]any)
+	if !ok {
+		return false
+	}
+	for _, d := range disabled {
+		if s, ok := d.(string); ok && s == jobID {
+			return true
+		}
+	}
+	return false
 }
 
 // formatNumber formats an integer with Korean-style comma separators.
@@ -582,7 +619,7 @@ func (s *Scheduler) runDdayNotificationRule() {
 
 		message := "📅 디데이 알림\n\n" + strings.Join(lines, "\n")
 		prefs := s.loadPreferences(n.userID)
-		if err := s.sendTemplateNotification(n.userID, n.chatID, prefs, message, "dday"); err != nil {
+		if err := s.sendTemplateNotification(n.userID, n.chatID, prefs, message, "dday_notification"); err != nil {
 			log.Error().Err(err).Str("user_id", n.userID).Msg("dday notification: send failed")
 		}
 	}

@@ -161,12 +161,14 @@ function ImageDropZone({
       {preview ? (
         <>
           <img src={preview} alt="preview" className="max-h-64 mx-auto rounded object-contain" />
-          <button
+          <Button
+            variant="outline"
+            size="icon"
             onClick={(e) => { e.stopPropagation(); onClear() }}
-            className="absolute top-1 right-1 bg-background border rounded-full p-0.5 hover:bg-muted"
+            className="absolute top-1 right-1 rounded-full h-5 w-5 p-0"
           >
             <X className="size-3" />
-          </button>
+          </Button>
         </>
       ) : (
         <>
