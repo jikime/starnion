@@ -145,7 +145,6 @@ func RunGateway(devMode bool) error {
 		cmd = serviceCmd(installRoot(), sAntares.Render("[gateway]"), gwBin)
 	} else {
 		root := projectRoot()
-		_ = WriteEnvFilesFromConfig(root)
 		gwDir := filepath.Join(root, "gateway")
 		cmd = serviceCmd(gwDir, sAntares.Render("[gateway]"), "go", "run", "./cmd/gateway")
 	}
@@ -241,7 +240,6 @@ func RunUI(devMode bool) error {
 		if !ensureNodeInstalled() || !ensurePnpmInstalled() {
 			return nil
 		}
-		_ = WriteEnvFilesFromConfig(installRoot())
 		if err := ensureUIDeps(installRoot()); err != nil {
 			return fmt.Errorf("UI 패키지 설치 실패: %w", err)
 		}
@@ -249,7 +247,6 @@ func RunUI(devMode bool) error {
 		cmd = serviceCmd(uiDir, sGold.Render("[ui]"), "pnpm", "start")
 	} else {
 		root := projectRoot()
-		_ = WriteEnvFilesFromConfig(root)
 		uiDir := filepath.Join(root, "ui")
 		if !ensurePnpmInstalled() {
 			return nil
@@ -280,7 +277,6 @@ func RunDev() error {
 		if !ensureNodeInstalled() || !ensurePnpmInstalled() {
 			return nil
 		}
-		_ = WriteEnvFilesFromConfig(installRoot())
 		agentDir := filepath.Join(root, "agent")
 		uiDir := filepath.Join(root, "ui")
 		gwBin := filepath.Join(installRoot(), "bin", "starnion-gateway")
@@ -299,7 +295,6 @@ func RunDev() error {
 		if !ensurePnpmInstalled() {
 			return nil
 		}
-		_ = WriteEnvFilesFromConfig(root)
 		if err := ensureAgentDeps(root); err != nil {
 			return fmt.Errorf("agent 패키지 설치 실패: %w", err)
 		}
