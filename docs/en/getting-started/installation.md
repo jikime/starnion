@@ -54,13 +54,12 @@ grand_parent: 🇺🇸 English
 | Python | 3.13+ | [python.org](https://www.python.org/downloads/) |
 | uv | latest | [docs.astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/) |
 | Node.js | 18.12+ (recommended: 22 LTS) | [nodejs.org](https://nodejs.org/) |
-| pnpm | latest | [pnpm.io](https://pnpm.io/installation) |
 | PostgreSQL | 16+ (with pgvector) | [pgvector/pgvector](https://github.com/pgvector/pgvector) |
 | MinIO | latest | [min.io](https://min.io/download) |
 
 #### How to Install Node.js
 
-Node.js is required when running `starnion dev` or `starnion ui`. (pnpm is installed automatically if not found.)
+Node.js is required when running `starnion dev` or `starnion ui`. (pnpm is installed automatically after Node.js is available.)
 
 **Ubuntu / Debian**
 

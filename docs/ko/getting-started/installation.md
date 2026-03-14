@@ -54,13 +54,12 @@ grand_parent: 🇰🇷 한국어
 | Python | 3.13+ | [python.org](https://www.python.org/downloads/) |
 | uv | 최신 | [docs.astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/) |
 | Node.js | 18.12+ (권장: 22 LTS) | [nodejs.org](https://nodejs.org/) |
-| pnpm | 최신 | [pnpm.io](https://pnpm.io/installation) |
 | PostgreSQL | 16+ (pgvector 포함) | [pgvector/pgvector](https://github.com/pgvector/pgvector) |
 | MinIO | 최신 | [min.io](https://min.io/download) |
 
 #### Node.js 설치 방법
 
-`starnion dev` 또는 `starnion ui` 명령을 사용할 때 Node.js가 필요합니다. (pnpm은 없을 경우 자동으로 설치됩니다.)
+`starnion dev` 또는 `starnion ui` 명령을 사용할 때 Node.js가 필요합니다. (pnpm은 Node.js 설치 후 자동으로 설치됩니다.)
 
 **Ubuntu / Debian**
 

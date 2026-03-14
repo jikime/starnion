@@ -54,13 +54,12 @@ grand_parent: 🇨🇳 中文
 | Python | 3.13+ | [python.org](https://www.python.org/downloads/) |
 | uv | 最新版 | [docs.astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/) |
 | Node.js | 18.12+（推荐：22 LTS） | [nodejs.org](https://nodejs.org/) |
-| pnpm | 最新版 | [pnpm.io](https://pnpm.io/installation) |
 | PostgreSQL | 16+（含 pgvector） | [pgvector/pgvector](https://github.com/pgvector/pgvector) |
 | MinIO | 最新版 | [min.io](https://min.io/download) |
 
 #### Node.js 安装方法
 
-使用 `starnion dev` 或 `starnion ui` 命令时需要安装 Node.js。（pnpm 在未找到时会自动安装。）
+使用 `starnion dev` 或 `starnion ui` 命令时需要安装 Node.js。（安装 Node.js 后，pnpm 会自动安装。）
 
 **Ubuntu / Debian**
 

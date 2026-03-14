@@ -176,7 +176,6 @@ User Message
 | Docker | 24+ | Containerization |
 | Docker Compose | v2 | Orchestration |
 | uv | latest | Python package management |
-| pnpm | latest | Node.js package management |
 
 ---
 
