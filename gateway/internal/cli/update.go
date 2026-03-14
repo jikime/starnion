@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -149,55 +148,43 @@ func runUpdate(checkOnly bool, skipDocker bool) error {
 }
 
 // runDockerUpdate restarts only the starnion Docker containers that are currently
-// running. It does NOT rebuild images — the new binaries and source files are
-// already in place after install.sh runs, so a plain restart is sufficient.
+// running. Uses `docker restart <container>` directly to avoid docker compose
+// parsing the docker-compose.yml build context (which doesn't exist in the
+// installed layout).
 func runDockerUpdate() {
-	dockerDir := dockerDirPath()
-	if dockerDir == "" {
-		return
-	}
-
-	// Collect names of running starnion containers
+	// Collect full container names of running starnion containers
 	checkCmd := exec.Command("docker", "ps", "--filter", "name=starnion-", "--format", "{{.Names}}")
 	out, err := checkCmd.Output()
 	if err != nil || len(out) == 0 {
 		return // Docker not running or no starnion containers
 	}
 
-	// Map container names (starnion-<svc>) to compose service names (<svc>)
-	var services []string
+	var containers []string
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		name := strings.TrimSpace(line)
-		if svc, ok := strings.CutPrefix(name, "starnion-"); ok && svc != "" {
-			services = append(services, svc)
+		if name != "" {
+			containers = append(containers, name)
 		}
 	}
-	if len(services) == 0 {
+	if len(containers) == 0 {
 		return
 	}
 
-	PrintInfo(fmt.Sprintf("Docker 서비스 재시작 중: %s", strings.Join(services, ", ")))
-	args := append([]string{"compose", "restart"}, services...)
+	PrintInfo(fmt.Sprintf("Docker 컨테이너 재시작 중: %s", strings.Join(containers, ", ")))
+	// Use `docker restart` directly — does not read docker-compose.yml,
+	// so missing build contexts are not an issue.
+	args := append([]string{"restart"}, containers...)
 	restartCmd := exec.Command("docker", args...)
-	restartCmd.Dir = dockerDir
 	restartCmd.Stdout = os.Stdout
 	restartCmd.Stderr = os.Stderr
 	if err := restartCmd.Run(); err != nil {
-		PrintWarn("Docker", fmt.Sprintf("서비스 재시작 실패: %v", err))
+		PrintWarn("Docker", fmt.Sprintf("컨테이너 재시작 실패: %v", err))
 		return
 	}
 
-	PrintOK("Docker", "서비스 재시작 완료")
+	PrintOK("Docker", "컨테이너 재시작 완료")
 }
 
-func dockerDirPath() string {
-	root := projectRoot()
-	dir := filepath.Join(root, "docker")
-	if _, err := os.Stat(filepath.Join(dir, "docker-compose.yml")); err != nil {
-		return ""
-	}
-	return dir
-}
 
 func fetchLatestRelease() (*githubRelease, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", githubRepo)
