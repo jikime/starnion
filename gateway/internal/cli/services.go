@@ -221,11 +221,12 @@ func RunUI(devMode bool) error {
 		if !ensureNodeInstalled() {
 			return nil
 		}
-		// Installed: run Next.js standalone server; env vars are loaded from
-		// ~/.starnion/ui/.env which WriteEnvFilesFromConfig writes.
-		uiDir := filepath.Join(installRoot(), "ui")
 		_ = WriteEnvFilesFromConfig(installRoot())
-		cmd = serviceCmd(uiDir, sGold.Render("[ui]"), "node", "server.js")
+		if err := ensureUIDeps(installRoot()); err != nil {
+			return fmt.Errorf("UI 패키지 설치 실패: %w", err)
+		}
+		uiDir := filepath.Join(installRoot(), "ui")
+		cmd = serviceCmd(uiDir, sGold.Render("[ui]"), "pnpm", "start")
 	} else {
 		root := projectRoot()
 		_ = WriteEnvFilesFromConfig(root)
@@ -263,10 +264,13 @@ func RunDev() error {
 		if err := ensureAgentDeps(root); err != nil {
 			return fmt.Errorf("agent 패키지 설치 실패: %w", err)
 		}
+		if err := ensureUIDeps(installRoot()); err != nil {
+			return fmt.Errorf("UI 패키지 설치 실패: %w", err)
+		}
 		cmds = []*exec.Cmd{
 			serviceCmd(installRoot(), sAntares.Render("[gateway]"), gwBin),
 			agentCmd(agentDir, sCrimson.Render("[agent] ")),
-			serviceCmd(uiDir, sGold.Render("[ui]     "), "node", "server.js"),
+			serviceCmd(uiDir, sGold.Render("[ui]     "), "pnpm", "start"),
 		}
 	} else {
 		_ = WriteEnvFilesFromConfig(root)
