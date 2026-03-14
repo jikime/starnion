@@ -70,26 +70,6 @@ func ensureAgentDeps(root string) error {
 		// venv exists but pyproject.toml is newer → re-sync
 		needsSync = pyprojectStat.ModTime().After(venvStat.ModTime())
 	}
-	// Also sync when the package itself is missing (e.g. editable install failed).
-	if !needsSync {
-		pkgDir := filepath.Join(venvDir, "lib")
-		if entries, err := os.ReadDir(pkgDir); err == nil {
-			found := false
-			for _, e := range entries {
-				if !e.IsDir() {
-					continue
-				}
-				siteDir := filepath.Join(pkgDir, e.Name(), "site-packages", "starnion_agent")
-				if _, err := os.Stat(siteDir); err == nil {
-					found = true
-					break
-				}
-			}
-			if !found {
-				needsSync = true
-			}
-		}
-	}
 
 	if !needsSync {
 		return nil
@@ -102,10 +82,11 @@ func ensureAgentDeps(root string) error {
 	}
 
 	PrintInfo("Python 패키지 설치 중... (uv sync)")
-	// --no-editable: install the project as a proper wheel into site-packages
-	// instead of an editable .pth-based install, which can fail to register
-	// the starnion_agent module on some Linux environments (e.g. Rocky Linux).
-	cmd := exec.Command(uvBin(), "sync", "--no-editable")
+	// --no-install-project: only install dependencies, not the starnion_agent
+	// package itself. The package is found via PYTHONPATH=src at runtime,
+	// which works reliably on all Linux environments (including Rocky Linux)
+	// without relying on editable .pth files or wheel installation.
+	cmd := exec.Command(uvBin(), "sync", "--no-install-project")
 	cmd.Dir = agentDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -172,6 +153,18 @@ func RunGateway(devMode bool) error {
 	return runWithSignal(cmd)
 }
 
+// agentCmd builds the command to run the starnion_agent module.
+// It uses the venv Python directly with PYTHONPATH=src so that the module is
+// found via the source tree regardless of how (or whether) the package was
+// installed into site-packages. This avoids Rocky Linux .pth editable-install
+// failures and removes the dependency on `uv run` implicit re-syncing.
+func agentCmd(agentDir, colorPrefix string) *exec.Cmd {
+	python := filepath.Join(agentDir, ".venv", "bin", "python3")
+	cmd := serviceCmd(agentDir, colorPrefix, python, "-m", "starnion_agent")
+	cmd.Env = append(os.Environ(), "PYTHONPATH="+filepath.Join(agentDir, "src"))
+	return cmd
+}
+
 // RunAgent ensures Python deps and starts the agent.
 func RunAgent() error {
 	if !ensureConfigured() {
@@ -187,8 +180,7 @@ func RunAgent() error {
 
 	PrintInfo("에이전트를 시작합니다...")
 	agentDir := filepath.Join(root, "agent")
-	cmd := serviceCmd(agentDir, sCrimson.Render("[agent]"), uvBin(), "run", "--no-sync", "python", "-m", "starnion_agent")
-	return runWithSignal(cmd)
+	return runWithSignal(agentCmd(agentDir, sCrimson.Render("[agent]")))
 }
 
 // ensureNodeInstalled checks that `node` is available and prints a helpful
@@ -265,7 +257,7 @@ func RunDev() error {
 		}
 		cmds = []*exec.Cmd{
 			serviceCmd(installRoot(), sAntares.Render("[gateway]"), gwBin),
-			serviceCmd(agentDir, sCrimson.Render("[agent] "), uvBin(), "run", "--no-sync", "python", "-m", "starnion_agent"),
+			agentCmd(agentDir, sCrimson.Render("[agent] ")),
 			serviceCmd(uiDir, sGold.Render("[ui]     "), "node", "server.js"),
 		}
 	} else {
@@ -281,7 +273,7 @@ func RunDev() error {
 		uiDir := filepath.Join(root, "ui")
 		cmds = []*exec.Cmd{
 			serviceCmd(gwDir, sAntares.Render("[gateway]"), "go", "run", "./cmd/gateway"),
-			serviceCmd(agentDir, sCrimson.Render("[agent] "), uvBin(), "run", "--no-sync", "python", "-m", "starnion_agent"),
+			agentCmd(agentDir, sCrimson.Render("[agent] ")),
 			serviceCmd(uiDir, sGold.Render("[ui]     "), "pnpm", "dev"),
 		}
 	}
