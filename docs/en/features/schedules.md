@@ -15,6 +15,8 @@ There are also system-generated automatic notifications (budget overage warnings
 
 > Notifications are sent a maximum of 3 times per day, and are not sent during quiet hours: 10:00 PM – 8:00 AM KST.
 
+> Notifications not arriving as expected? For detailed trigger conditions including skill requirements, data thresholds, and fatigue rules for each notification, see the [Notification Trigger Conditions](./notification-conditions.md) page.
+
 ---
 
 ## Creating Reminders
