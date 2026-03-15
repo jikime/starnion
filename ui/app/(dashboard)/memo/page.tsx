@@ -132,8 +132,8 @@ export default function MemoPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold">
             <StickyNote className="size-6 text-primary" />
@@ -141,7 +141,7 @@ export default function MemoPage() {
           </h1>
           <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
-        <div className="relative w-64">
+        <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
@@ -153,8 +153,8 @@ export default function MemoPage() {
         </div>
       </div>
 
-      <div className="space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="space-y-4 sm:space-y-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-2 flex-wrap">
               {TAGS.map((tag) => (
                 <Button
@@ -167,7 +167,7 @@ export default function MemoPage() {
                 </Button>
               ))}
             </div>
-            <Button className="gap-2" onClick={openCreate}>
+            <Button className="gap-2 w-full sm:w-auto" onClick={openCreate}>
               <Plus className="size-4" />
               {t("addMemo")}
             </Button>
@@ -228,7 +228,7 @@ export default function MemoPage() {
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-lg sm:w-full">
           <DialogHeader>
             <DialogTitle>{editTarget ? t("editTitle") : t("createTitle")}</DialogTitle>
           </DialogHeader>
