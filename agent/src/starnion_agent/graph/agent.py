@@ -561,14 +561,12 @@ def _build_prompt(
     """Assemble the system prompt with progressive skill disclosure."""
     prompt_text = build_system_prompt(persona_id, custom_prompt=custom_system_prompt, language=language)
 
-    # Level 1: Skill catalog (name + description for awareness).
+    # Level 1: Skill catalog — name + tools + description per skill.
+    # The catalog already includes tool names (e.g. "**메모** (save_memo, ...):")
+    # so the LLM can directly map user intent to the correct tool call.
     if catalog_text:
         prompt_text += "\n\n" + catalog_text
-
-    # Tell LLM which tools are available.
-    if enabled_tool_names:
-        prompt_text += f"\n\n## 사용 가능한 도구\n{', '.join(enabled_tool_names)}"
-        prompt_text += "\n위 목록에 없는 도구는 절대 호출하지 마세요."
+        prompt_text += "\n위 카탈로그에 없는 도구는 절대 호출하지 마세요."
 
     # Level 2: Full instructions (tool usage guidelines).
     if instructions_text:
@@ -585,11 +583,11 @@ def _build_prompt(
     # Repeat tool-priority rules at the very END for recency effect.
     # This is the last thing the LLM reads before generating a response,
     # so it has the strongest influence on whether tool_calls are emitted.
+    # The catalog above maps each skill to its tools — use it as the guide.
     if enabled_tool_names:
         prompt_text += (
             "\n\n[도구 사용 최종 확인 — 절대 규칙]\n"
-            f"사용 가능한 도구: {', '.join(enabled_tool_names)}\n"
-            "위 도구로 처리 가능한 요청이면 반드시 도구를 호출하세요. "
+            "위 스킬 카탈로그에 나열된 도구로 처리 가능한 요청이면 반드시 해당 도구를 호출하세요. "
             "이전 실패 여부와 무관하게 지금 바로 도구를 호출하세요. "
             "도구 없이 '불가능하다'는 응답은 절대 금지입니다."
         )
