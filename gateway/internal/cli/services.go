@@ -90,7 +90,77 @@ func ensureAgentDeps(root string) error {
 	cmd.Dir = agentDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+
+	// Install Playwright Chromium browser binary + system dependencies.
+	// The sentinel file prevents re-installation on every startup; it is
+	// inside .venv/ so it is removed automatically when the venv is recreated.
+	return ensurePlaywrightChromium(agentDir)
+}
+
+// ensurePlaywrightChromium installs the Playwright Chromium browser binary
+// and required system libraries. Skips if already installed (sentinel file).
+// Handles Debian/Ubuntu (apt-get), RHEL/Rocky/Fedora (dnf/yum), and macOS.
+func ensurePlaywrightChromium(agentDir string) error {
+	sentinel := filepath.Join(agentDir, ".venv", ".playwright-ready")
+	if _, err := os.Stat(sentinel); err == nil {
+		return nil // already installed
+	}
+
+	python := filepath.Join(agentDir, ".venv", "bin", "python3")
+
+	// On RHEL/Rocky/Fedora, install system libraries first (playwright
+	// --with-deps only supports apt-get based systems).
+	if pkgMgr, err := exec.LookPath("dnf"); err == nil {
+		installRHELPlaywrightDeps(pkgMgr)
+	} else if pkgMgr, err := exec.LookPath("yum"); err == nil {
+		installRHELPlaywrightDeps(pkgMgr)
+	}
+
+	// Build playwright install command.
+	args := []string{"-m", "playwright", "install"}
+	if _, err := exec.LookPath("apt-get"); err == nil {
+		args = append(args, "--with-deps")
+	}
+	args = append(args, "chromium")
+
+	PrintInfo("Playwright Chromium 설치 중...")
+	cmd := exec.Command(python, args...)
+	cmd.Dir = agentDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("playwright install chromium: %w", err)
+	}
+
+	// Write sentinel so we don't reinstall on next startup.
+	_ = os.WriteFile(sentinel, []byte("ok\n"), 0o600)
+	PrintOK("playwright", "Chromium 설치 완료")
+	return nil
+}
+
+// rhelChromiumDeps are the RPM packages required by Playwright Chromium on
+// RHEL/Rocky/CentOS/Fedora. Matches the libraries installed by --with-deps
+// on Debian-based systems.
+var rhelChromiumDeps = []string{
+	"alsa-lib", "atk", "at-spi2-atk", "at-spi2-core", "cairo", "cups-libs",
+	"dbus-libs", "expat", "libdrm", "libgbm", "libX11", "libXcomposite",
+	"libXdamage", "libXext", "libXfixes", "libXrandr", "libxcb",
+	"libxkbcommon", "mesa-libgbm", "nspr", "nss", "pango",
+}
+
+func installRHELPlaywrightDeps(pkgMgr string) {
+	PrintInfo("Chromium 시스템 라이브러리 설치 중... (" + pkgMgr + ")")
+	args := append([]string{"install", "-y"}, rhelChromiumDeps...)
+	cmd := exec.Command(pkgMgr, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		// Non-fatal: packages may already be installed.
+		PrintWarn("playwright", "시스템 라이브러리 설치 중 경고 (이미 설치된 패키지 포함 가능)")
+	}
 }
 
 func ensureUIDeps(root string) error {
