@@ -1,6 +1,9 @@
-"""Weather tools using Open-Meteo API (free, no API key required)."""
+"""Weather tools using wttr.in API (free, no API key required)."""
+
+from __future__ import annotations
 
 import logging
+from urllib.parse import quote
 
 import httpx
 from langchain_core.tools import tool
@@ -10,38 +13,83 @@ from starnion_agent.skills.guard import skill_guard
 
 logger = logging.getLogger(__name__)
 
-_GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
-_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+_WTTR_URL = "https://wttr.in/{location}"
 
-# WMO Weather Interpretation Code → (Korean text, emoji).
-_WMO_CODES: dict[int, tuple[str, str]] = {
-    0: ("맑음", "☀️"),
-    1: ("대체로 맑음", "🌤️"),
-    2: ("부분 흐림", "⛅"),
-    3: ("흐림", "☁️"),
-    45: ("안개", "🌫️"),
-    48: ("안개", "🌫️"),
-    51: ("이슬비", "🌦️"),
-    53: ("이슬비", "🌦️"),
-    55: ("이슬비", "🌦️"),
-    61: ("비", "🌧️"),
-    63: ("비", "🌧️"),
-    65: ("폭우", "🌧️"),
-    66: ("빙결비", "🌨️"),
-    67: ("빙결비", "🌨️"),
-    71: ("눈", "🌨️"),
-    73: ("눈", "🌨️"),
-    75: ("폭설", "❄️"),
-    77: ("싸라기눈", "🌨️"),
-    80: ("소나기", "🌦️"),
-    81: ("소나기", "🌦️"),
-    82: ("강한 소나기", "⛈️"),
-    85: ("눈소나기", "🌨️"),
-    86: ("눈소나기", "🌨️"),
-    95: ("뇌우", "⛈️"),
-    96: ("우박 뇌우", "⛈️"),
-    99: ("우박 뇌우", "⛈️"),
+# wttr.in weather codes → (Korean description, emoji)
+_WEATHER_CODES: dict[int, tuple[str, str]] = {
+    113: ("맑음", "☀️"),
+    116: ("부분 흐림", "⛅"),
+    119: ("흐림", "☁️"),
+    122: ("흐림", "☁️"),
+    143: ("안개", "🌫️"),
+    176: ("가벼운 비", "🌦️"),
+    179: ("약한 눈", "🌨️"),
+    182: ("진눈깨비", "🌨️"),
+    185: ("동결 이슬비", "🌨️"),
+    200: ("뇌우", "⛈️"),
+    227: ("눈바람", "❄️"),
+    230: ("눈보라", "❄️"),
+    248: ("안개", "🌫️"),
+    260: ("동결 안개", "🌫️"),
+    263: ("이슬비", "🌦️"),
+    266: ("이슬비", "🌦️"),
+    281: ("동결 이슬비", "🌨️"),
+    284: ("동결 폭우", "🌨️"),
+    293: ("약한 비", "🌧️"),
+    296: ("약한 비", "🌧️"),
+    299: ("보통 비", "🌧️"),
+    302: ("보통 비", "🌧️"),
+    305: ("강한 비", "🌧️"),
+    308: ("폭우", "🌧️"),
+    311: ("동결비", "🌨️"),
+    314: ("동결비", "🌨️"),
+    317: ("진눈깨비", "🌨️"),
+    320: ("진눈깨비", "🌨️"),
+    323: ("약한 눈", "🌨️"),
+    326: ("약한 눈", "🌨️"),
+    329: ("보통 눈", "❄️"),
+    332: ("보통 눈", "❄️"),
+    335: ("폭설", "❄️"),
+    338: ("폭설", "❄️"),
+    350: ("우박", "❄️"),
+    353: ("소나기", "🌦️"),
+    356: ("강한 소나기", "🌦️"),
+    359: ("폭우", "⛈️"),
+    362: ("진눈깨비 소나기", "🌨️"),
+    365: ("진눈깨비 소나기", "🌨️"),
+    368: ("눈 소나기", "🌨️"),
+    371: ("눈 소나기", "🌨️"),
+    374: ("우박 소나기", "❄️"),
+    377: ("우박 소나기", "❄️"),
+    386: ("뇌우", "⛈️"),
+    389: ("폭우 뇌우", "⛈️"),
+    392: ("눈 뇌우", "⛈️"),
+    395: ("폭설 뇌우", "⛈️"),
 }
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+def _code_text(code: int) -> str:
+    """Return Korean weather description for a wttr.in weather code."""
+    return _WEATHER_CODES.get(code, ("알 수 없음", "🌈"))[0]
+
+
+def _code_emoji(code: int) -> str:
+    """Return emoji for a wttr.in weather code."""
+    return _WEATHER_CODES.get(code, ("알 수 없음", "🌈"))[1]
+
+
+def _display_name(data: dict) -> str:
+    """Extract location display name from wttr.in JSON response."""
+    try:
+        area = data["nearest_area"][0]
+        city = area["areaName"][0]["value"]
+        country = area["country"][0]["value"]
+        return f"{city}, {country}" if country else city
+    except (KeyError, IndexError):
+        return "알 수 없는 위치"
 
 
 # ---------------------------------------------------------------------------
@@ -57,44 +105,7 @@ class ForecastInput(BaseModel):
     """Input schema for get_forecast tool."""
 
     location: str = Field(default="서울", description="예보를 조회할 도시 이름")
-    days: int = Field(default=3, description="예보 일수 (1~7)")
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-def _wmo_text(code: int) -> str:
-    """Return Korean weather description for a WMO code."""
-    return _WMO_CODES.get(code, ("알 수 없음", "🌈"))[0]
-
-
-def _wmo_emoji(code: int) -> str:
-    """Return emoji for a WMO weather code."""
-    return _WMO_CODES.get(code, ("알 수 없음", "🌈"))[1]
-
-
-async def _geocode(location: str) -> tuple[float, float, str] | None:
-    """Resolve a city name to (latitude, longitude, display_name).
-
-    Returns ``None`` when the location cannot be found.
-    """
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(
-            _GEOCODE_URL,
-            params={"name": location, "count": 1, "language": "ko"},
-        )
-        resp.raise_for_status()
-
-    data = resp.json()
-    results = data.get("results")
-    if not results:
-        return None
-
-    r = results[0]
-    name = r.get("name", location)
-    country = r.get("country", "")
-    display = f"{name}, {country}" if country else name
-    return r["latitude"], r["longitude"], display
+    days: int = Field(default=3, description="예보 일수 (1~3)")
 
 
 # ---------------------------------------------------------------------------
@@ -105,36 +116,22 @@ async def _geocode(location: str) -> tuple[float, float, str] | None:
 async def get_weather(location: str = "서울") -> str:
     """현재 날씨를 조회합니다. 기온, 체감온도, 습도, 풍속, 날씨 상태를 알려줍니다."""
     try:
-        geo = await _geocode(location)
-        if not geo:
-            return f"'{location}' 도시를 찾을 수 없어요. 다른 이름으로 시도해주세요."
-
-        lat, lon, display = geo
-
+        url = _WTTR_URL.format(location=quote(location, safe=""))
         async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(
-                _FORECAST_URL,
-                params={
-                    "latitude": lat,
-                    "longitude": lon,
-                    "current": (
-                        "temperature_2m,relative_humidity_2m,"
-                        "apparent_temperature,weather_code,wind_speed_10m"
-                    ),
-                    "timezone": "auto",
-                },
-            )
+            resp = await client.get(url, params={"format": "j1"})
             resp.raise_for_status()
 
-        current = resp.json()["current"]
-        code = current["weather_code"]
+        data = resp.json()
+        cond = data["current_condition"][0]
+        display = _display_name(data)
+        code = int(cond["weatherCode"])
 
         return (
-            f"{_wmo_emoji(code)} **{display}** 현재 날씨: {_wmo_text(code)}\n"
-            f"🌡️ 기온: {current['temperature_2m']}°C "
-            f"(체감 {current['apparent_temperature']}°C)\n"
-            f"💧 습도: {current['relative_humidity_2m']}%\n"
-            f"💨 풍속: {current['wind_speed_10m']} km/h"
+            f"{_code_emoji(code)} **{display}** 현재 날씨: {_code_text(code)}\n"
+            f"🌡️ 기온: {cond['temp_C']}°C "
+            f"(체감 {cond['FeelsLikeC']}°C)\n"
+            f"💧 습도: {cond['humidity']}%\n"
+            f"💨 풍속: {cond['windspeedKmph']} km/h"
         )
     except Exception:
         logger.debug("get_weather failed", exc_info=True)
@@ -145,42 +142,28 @@ async def get_weather(location: str = "서울") -> str:
 @skill_guard("weather")
 async def get_forecast(location: str = "서울", days: int = 3) -> str:
     """일간 날씨 예보를 조회합니다. 최고/최저 기온, 날씨 상태, 강수확률을 알려줍니다."""
-    days = max(1, min(days, 7))
+    days = max(1, min(days, 3))
 
     try:
-        geo = await _geocode(location)
-        if not geo:
-            return f"'{location}' 도시를 찾을 수 없어요. 다른 이름으로 시도해주세요."
-
-        lat, lon, display = geo
-
+        url = _WTTR_URL.format(location=quote(location, safe=""))
         async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(
-                _FORECAST_URL,
-                params={
-                    "latitude": lat,
-                    "longitude": lon,
-                    "daily": (
-                        "weather_code,temperature_2m_max,"
-                        "temperature_2m_min,precipitation_probability_max"
-                    ),
-                    "timezone": "auto",
-                    "forecast_days": days,
-                },
-            )
+            resp = await client.get(url, params={"format": "j1"})
             resp.raise_for_status()
 
-        daily = resp.json()["daily"]
-        lines: list[str] = [f"📅 **{display}** {days}일 예보\n"]
+        data = resp.json()
+        display = _display_name(data)
+        forecast_days = data["weather"][:days]
 
-        for i in range(len(daily["time"])):
-            date = daily["time"][i]
-            code = daily["weather_code"][i]
-            tmax = daily["temperature_2m_max"][i]
-            tmin = daily["temperature_2m_min"][i]
-            precip = daily["precipitation_probability_max"][i]
+        lines: list[str] = [f"📅 **{display}** {days}일 예보\n"]
+        for day in forecast_days:
+            date = day["date"]
+            # index 4 = 12:00 (wttr.in provides 3-hourly: 0,3,6,9,12,15,18,21)
+            code = int(day["hourly"][4]["weatherCode"])
+            tmax = day["maxtempC"]
+            tmin = day["mintempC"]
+            precip = max(int(h.get("precipProbability", 0)) for h in day["hourly"])
             lines.append(
-                f"{_wmo_emoji(code)} **{date}**: {_wmo_text(code)}, "
+                f"{_code_emoji(code)} **{date}**: {_code_text(code)}, "
                 f"{tmin}°C ~ {tmax}°C, 강수확률 {precip}%"
             )
 
