@@ -3,13 +3,17 @@ package handler
 import "strings"
 
 // minioToProxyURL converts a direct MinIO URL (http://host:9000/bucket/uuid/file)
-// to a gateway proxy path (/api/v1/files/uuid/file).
+// to a Next.js proxy path (/api/files/uuid/file).
 // URLs that are already relative or already use the proxy prefix are returned unchanged.
 // This lets List handlers serve both legacy DB records (direct MinIO URLs) and
 // new records (proxy paths) transparently.
 func minioToProxyURL(rawURL string) string {
 	if !strings.Contains(rawURL, "://") {
-		return rawURL // already relative / proxy URL
+		// Rewrite legacy /api/v1/files/ prefix stored in older DB records.
+		if strings.HasPrefix(rawURL, "/api/v1/files/") {
+			return "/api/files/" + rawURL[len("/api/v1/files/"):]
+		}
+		return rawURL // already a current proxy URL
 	}
 
 	// Strip scheme://host to get the path.
@@ -33,5 +37,5 @@ func minioToProxyURL(rawURL string) string {
 	if objectKey == "" {
 		return rawURL
 	}
-	return "/api/v1/files/" + objectKey
+	return "/api/files/" + objectKey
 }
