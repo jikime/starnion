@@ -110,6 +110,7 @@
     "name": "Name",
     "email": "Email",
     "timezone": "Timezone",
+    "timezoneDescription": "Used for date/time-based reminders and AI responses",
     "save": "Save",
     "loading": "Loading...",
     "emailReadOnly": "Email cannot be changed.",

@@ -110,6 +110,7 @@
     "name": "名前",
     "email": "メール",
     "timezone": "タイムゾーン",
+    "timezoneDescription": "日時に関するリマインダーやAIの応答に使用されます",
     "save": "保存",
     "loading": "読み込み中...",
     "emailReadOnly": "メールアドレスは変更できません。",

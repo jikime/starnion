@@ -110,6 +110,7 @@
     "name": "姓名",
     "email": "邮箱",
     "timezone": "时区",
+    "timezoneDescription": "用于基于日期/时间的提醒和AI回复",
     "save": "保存",
     "loading": "加载中...",
     "emailReadOnly": "邮箱不可更改。",

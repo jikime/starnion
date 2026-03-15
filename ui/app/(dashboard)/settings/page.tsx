@@ -9,10 +9,35 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Settings, Loader2, CheckCircle, AlertCircle } from "lucide-react"
 
+// Common IANA timezones with UTC offset labels
+const TIMEZONES = [
+  { value: "Pacific/Honolulu",    label: "UTC-10  Hawaii" },
+  { value: "America/Anchorage",   label: "UTC-9   Alaska" },
+  { value: "America/Los_Angeles", label: "UTC-8   Los Angeles / Seattle" },
+  { value: "America/Denver",      label: "UTC-7   Denver / Phoenix" },
+  { value: "America/Chicago",     label: "UTC-6   Chicago / Mexico City" },
+  { value: "America/New_York",    label: "UTC-5   New York / Toronto" },
+  { value: "America/Sao_Paulo",   label: "UTC-3   São Paulo / Buenos Aires" },
+  { value: "Europe/London",       label: "UTC+0   London / Lisbon" },
+  { value: "Europe/Paris",        label: "UTC+1   Paris / Berlin / Rome" },
+  { value: "Europe/Helsinki",     label: "UTC+2   Helsinki / Athens / Cairo" },
+  { value: "Europe/Moscow",       label: "UTC+3   Moscow / Istanbul" },
+  { value: "Asia/Dubai",          label: "UTC+4   Dubai / Abu Dhabi" },
+  { value: "Asia/Karachi",        label: "UTC+5   Karachi / Islamabad" },
+  { value: "Asia/Kolkata",        label: "UTC+5:30 Mumbai / Delhi" },
+  { value: "Asia/Dhaka",          label: "UTC+6   Dhaka / Almaty" },
+  { value: "Asia/Bangkok",        label: "UTC+7   Bangkok / Jakarta / Hanoi" },
+  { value: "Asia/Shanghai",       label: "UTC+8   Beijing / Shanghai / Singapore" },
+  { value: "Asia/Seoul",          label: "UTC+9   Seoul / Tokyo / Pyongyang" },
+  { value: "Australia/Sydney",    label: "UTC+10  Sydney / Melbourne" },
+  { value: "Pacific/Auckland",    label: "UTC+12  Auckland / Fiji" },
+] as const
+
 interface Profile {
   name: string
   email: string
   language: string
+  timezone: string
 }
 
 type SaveStatus = "idle" | "saving" | "saved" | "error"
@@ -21,7 +46,7 @@ export default function SettingsPage() {
   const t = useTranslations("settings")
 
   // ── Account state ──────────────────────────────────────────────────────────
-  const [profile, setProfile] = useState<Profile>({ name: "", email: "", language: "ko" })
+  const [profile, setProfile] = useState<Profile>({ name: "", email: "", language: "ko", timezone: "Asia/Seoul" })
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle")
   const [saveError, setSaveError] = useState("")
@@ -38,7 +63,7 @@ export default function SettingsPage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.name !== undefined) {
-          setProfile({ name: data.name ?? "", email: data.email ?? "", language: data.language ?? "ko" })
+          setProfile({ name: data.name ?? "", email: data.email ?? "", language: data.language ?? "ko", timezone: data.timezone ?? "Asia/Seoul" })
         }
       })
       .catch(() => {})
@@ -52,7 +77,7 @@ export default function SettingsPage() {
       const res = await fetch("/api/settings/account", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: profile.name, language: profile.language }),
+        body: JSON.stringify({ name: profile.name, language: profile.language, timezone: profile.timezone }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -152,6 +177,25 @@ export default function SettingsPage() {
                       <SelectItem value="en">English</SelectItem>
                       <SelectItem value="ja">日本語</SelectItem>
                       <SelectItem value="zh">中文</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("timezone")}</Label>
+                  <p className="text-xs text-muted-foreground">{t("timezoneDescription")}</p>
+                  <Select
+                    value={profile.timezone}
+                    onValueChange={(value) => setProfile((p) => ({ ...p, timezone: value }))}
+                  >
+                    <SelectTrigger className="w-72">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIMEZONES.map((tz) => (
+                        <SelectItem key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

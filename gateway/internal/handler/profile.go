@@ -3,6 +3,7 @@ package handler
 import (
 	"database/sql"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
@@ -35,11 +36,11 @@ func (h *ProfileHandler) Get(c echo.Context) error {
 	}
 
 	var name, email sql.NullString
-	var language sql.NullString
+	var language, timezone sql.NullString
 	err := h.db.QueryRowContext(c.Request().Context(),
-		`SELECT display_name, email, preferences->>'language' FROM users WHERE id = $1`,
+		`SELECT display_name, email, preferences->>'language', preferences->>'timezone' FROM users WHERE id = $1`,
 		userID,
-	).Scan(&name, &email, &language)
+	).Scan(&name, &email, &language, &timezone)
 	if err == sql.ErrNoRows {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "user not found"})
 	}
@@ -52,11 +53,16 @@ func (h *ProfileHandler) Get(c echo.Context) error {
 	if language.Valid && language.String != "" {
 		lang = language.String
 	}
+	tz := "Asia/Seoul"
+	if timezone.Valid && timezone.String != "" {
+		tz = timezone.String
+	}
 
 	return c.JSON(http.StatusOK, map[string]string{
 		"name":     name.String,
 		"email":    email.String,
 		"language": lang,
+		"timezone": tz,
 	})
 }
 
@@ -72,6 +78,7 @@ func (h *ProfileHandler) Update(c echo.Context) error {
 	var body struct {
 		Name            string  `json:"name"`
 		Language        *string `json:"language"`
+		Timezone        *string `json:"timezone"`
 		CurrentPassword string  `json:"current_password"`
 		NewPassword     string  `json:"new_password"`
 	}
@@ -107,6 +114,24 @@ func (h *ProfileHandler) Update(c echo.Context) error {
 		)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userID).Msg("profile: update language failed")
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "update failed"})
+		}
+	}
+
+	// Update timezone preference if provided.
+	if body.Timezone != nil {
+		tz := *body.Timezone
+		if _, err := time.LoadLocation(tz); err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{
+				"error": "올바르지 않은 타임존이에요. IANA 타임존 형식을 사용하세요 (예: Asia/Seoul)",
+			})
+		}
+		_, err := h.db.ExecContext(ctx,
+			`UPDATE users SET preferences = jsonb_set(COALESCE(preferences, '{}'::jsonb), '{timezone}', to_jsonb($1::text), true), updated_at = NOW() WHERE id = $2`,
+			tz, userID,
+		)
+		if err != nil {
+			log.Error().Err(err).Str("user_id", userID).Msg("profile: update timezone failed")
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "update failed"})
 		}
 	}

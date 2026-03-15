@@ -111,6 +111,7 @@
     "name": "이름",
     "email": "이메일",
     "timezone": "시간대",
+    "timezoneDescription": "날짜/시간 기반 알림과 AI 응답에 사용됩니다",
     "save": "저장",
     "loading": "불러오는 중...",
     "emailReadOnly": "이메일은 변경할 수 없어요.",
