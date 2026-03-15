@@ -91,6 +91,14 @@ from starnion_agent.skills.notion.tools import (
     notion_page_read,
     notion_search,
 )
+from starnion_agent.skills.github.tools import (
+    github_create_issue,
+    github_get_pr,
+    github_list_issues,
+    github_list_prs,
+    github_list_repos,
+    github_search_code,
+)
 from starnion_agent.skills.websearch.tools import web_fetch, web_search
 from starnion_agent.skills.naver_search.tools import naver_search
 from starnion_agent.skills.browser.tools import (
@@ -255,6 +263,12 @@ ALL_TOOLS = [
     notion_page_create,
     notion_page_read,
     notion_block_append,
+    github_list_repos,
+    github_list_issues,
+    github_create_issue,
+    github_list_prs,
+    github_get_pr,
+    github_search_code,
     web_search,
     web_fetch,
     get_weather,

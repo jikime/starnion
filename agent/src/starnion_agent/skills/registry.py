@@ -192,6 +192,24 @@ SKILLS: dict[str, SkillDef] = {
         permission_level=2,  # opt-in (API key required)
         sort_order=14,
     ),
+    "github": SkillDef(
+        id="github",
+        name="GitHub 연동",
+        emoji="🐙",
+        description="저장소 조회, 이슈/PR 관리, 코드 검색",
+        category="integration",
+        tools=[
+            "github_list_repos",
+            "github_list_issues",
+            "github_create_issue",
+            "github_list_prs",
+            "github_get_pr",
+            "github_search_code",
+        ],
+        enabled_by_default=False,
+        permission_level=2,  # opt-in (PAT required)
+        sort_order=14,
+    ),
     "websearch": SkillDef(
         id="websearch",
         name="웹 검색",
