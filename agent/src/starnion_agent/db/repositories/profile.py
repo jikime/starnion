@@ -97,6 +97,42 @@ async def update_preferences(
             return dict(row) if row else None
 
 
+async def get_user_timezone(
+    pool: AsyncConnectionPool[Any],
+    user_id: str,
+) -> str:
+    """사용자의 IANA 타임존을 DB에서 조회합니다. 기본값은 'Asia/Seoul'입니다.
+
+    users.preferences JSONB 컬럼에서 ``{"timezone": "Asia/Seoul"}`` 형태로
+    저장된 값을 읽습니다.  값이 없거나 DB 오류 발생 시 'Asia/Seoul'을 반환합니다.
+
+    Args:
+        pool: 애플리케이션 AsyncConnectionPool 인스턴스.
+        user_id: 사용자 UUID 문자열.
+
+    Returns:
+        IANA 타임존 문자열.  기본값: 'Asia/Seoul'.
+    """
+    try:
+        async with pool.connection() as conn:
+            async with conn.cursor(row_factory=dict_row) as cur:
+                await cur.execute(
+                    "SELECT preferences->>'timezone' AS timezone FROM users WHERE id = %s",
+                    (user_id,),
+                )
+                row = await cur.fetchone()
+                if row and row["timezone"]:
+                    return row["timezone"]
+        return "Asia/Seoul"
+    except Exception:
+        logger.warning(
+            "get_user_timezone: DB 조회 실패, 기본값 'Asia/Seoul' 반환 (user_id=%s)",
+            user_id,
+            exc_info=True,
+        )
+        return "Asia/Seoul"
+
+
 async def get_user_language(
     pool: AsyncConnectionPool[Any],
     user_id: str,

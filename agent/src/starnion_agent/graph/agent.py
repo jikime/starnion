@@ -4,9 +4,12 @@ Uses a custom StateGraph instead of create_react_agent to support
 dynamic tool binding — LLM only sees tools for enabled skills.
 """
 
+import asyncio
 import hashlib
 import logging
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -19,7 +22,7 @@ from starnion_agent.db.pool import get_pool
 from starnion_agent.db.repositories import skill as skill_repo
 from starnion_agent.db.repositories import provider as provider_repo
 from starnion_agent.db.repositories import usage as usage_repo
-from starnion_agent.db.repositories.profile import get_user_language
+from starnion_agent.db.repositories.profile import get_user_language, get_user_timezone
 from starnion_agent.pricing import calculate_cost, get_provider
 from starnion_agent.persona import DEFAULT_PERSONA, NAME_TO_ID, build_system_prompt, get_persona
 from starnion_agent.skills.audio.tools import generate_audio, transcribe_audio
@@ -557,9 +560,15 @@ def _build_prompt(
     instructions_text: str,
     custom_system_prompt: str | None = None,
     language: str = "ko",
+    now_str: str = "",
 ) -> str:
     """Assemble the system prompt with progressive skill disclosure."""
     prompt_text = build_system_prompt(persona_id, custom_prompt=custom_system_prompt, language=language)
+
+    # Inject current datetime as the first context block so the LLM always has
+    # an accurate time reference — prevents stale date/time answers.
+    if now_str:
+        prompt_text = now_str + "\n\n" + prompt_text
 
     # Level 1: Skill catalog — name + tools + description per skill.
     # The catalog already includes tool names (e.g. "**메모** (save_memo, ...):")
@@ -647,11 +656,42 @@ async def _agent_node(state: MessagesState) -> dict:
         _model_tag(_llm_provider, _llm_model, "(chat)"),
     )
 
-    # 사용자 선호 언어 조회 (DB 오류 시 기본값 'ko' 반환).
+    # 사용자 선호 언어 및 타임존 조회 (DB 오류 시 기본값 반환).
     user_language = "ko"
+    user_tz_str = "Asia/Seoul"
     if user_id:
         pool = get_pool()
-        user_language = await get_user_language(pool, user_id)
+        user_language, user_tz_str = await asyncio.gather(
+            get_user_language(pool, user_id),
+            get_user_timezone(pool, user_id),
+        )
+
+    # Compute current datetime in user's timezone for system prompt injection.
+    try:
+        tz = ZoneInfo(user_tz_str)
+    except (ZoneInfoNotFoundError, KeyError):
+        tz = ZoneInfo("Asia/Seoul")
+
+    _now = datetime.now(tz)
+    _weekdays = {
+        "ko": ["월", "화", "수", "목", "금", "토", "일"],
+        "en": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        "ja": ["月", "火", "水", "木", "金", "土", "日"],
+        "zh": ["一", "二", "三", "四", "五", "六", "日"],
+    }
+    _wd = _weekdays.get(user_language, _weekdays["en"])[_now.weekday()]
+    _labels = {
+        "ko": "현재 날짜/시간",
+        "en": "Current datetime",
+        "ja": "現在の日時",
+        "zh": "当前日期/时间",
+    }
+    _label = _labels.get(user_language, _labels["en"])
+    _tz_abbr = _now.strftime("%Z") or user_tz_str
+    now_str = (
+        f"[{_label}: {_now.strftime('%Y-%m-%d')} ({_wd}) "
+        f"{_now.strftime('%H:%M')} {_tz_abbr}]"
+    )
 
     # Build system prompt (custom_system_prompt takes priority over persona_id tone).
     prompt_text = _build_prompt(
@@ -661,6 +701,7 @@ async def _agent_node(state: MessagesState) -> dict:
         instructions_text,
         custom_system_prompt=custom_system_prompt,
         language=user_language,
+        now_str=now_str,
     )
     messages = [SystemMessage(content=prompt_text)] + _filter_stale_tool_errors(state["messages"])
 
