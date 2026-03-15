@@ -34,6 +34,18 @@ You can toggle each skill individually under **Settings > Skills**.
 
 ---
 
+## Skill Detail Panel
+
+Each skill card in **Settings > Skills** has an **ⓘ** button. Clicking it opens a side panel showing:
+
+- **Description** — what the skill does
+- **Trigger Keywords** — words in your message that activate this skill automatically
+- **Usage Examples** — copy-and-paste examples you can send directly to the chat
+
+You can also enable or disable a skill directly from the detail panel.
+
+---
+
 ## Full Skill List
 
 ### Finance
@@ -55,7 +67,7 @@ You can toggle each skill individually under **Settings > Skills**.
 | `goals` | Goal Manager | Set financial goals, to-dos, habits, and personal goals; track progress | ✓ |
 | `dday` | D-Day | Track days remaining until important dates; supports yearly recurrence | ✓ |
 | `reminder` | Reminder | Schedule a one-time alert at a specific time. "Remind me of my meeting tomorrow at 9 AM" | ✓ |
-| `schedule` | Schedule Alerts | Create and manage regular or one-time alert schedules; supports recurring alerts | ✓ |
+| `schedule` | Schedule | Create and manage regular or one-time alert schedules; supports recurring alerts | ✓ |
 | `memory` | Memory Search | Unified semantic search across past conversations, expense records, diary entries, and documents | ✓ |
 
 ### Media
@@ -99,12 +111,26 @@ You can toggle each skill individually under **Settings > Skills**.
 |----------|------------|-------------|--------------------|
 | `google` | Google Integration | Integrates Google Calendar, Docs, Tasks, Drive, and Gmail; requires OAuth2 authentication | - |
 | `browser` | Browser Control | Automated web browser control: URL navigation, clicking, screenshots, page reading | - |
+| `notion` | Notion Integration | Search, create, and read Notion pages; append blocks; query databases; update properties. Requires Integration Token. | - |
+| `github` | GitHub Integration | Browse repositories, issues, and PRs; create issues; search code. Requires Personal Access Token. | - |
 
 ### Misc
 
 | Skill ID | Skill Name | Description | Enabled by Default |
 |----------|------------|-------------|--------------------|
 | `horoscope` | Horoscope | View today's horoscope for any of the 12 zodiac signs | ✓ |
+
+### System
+
+| Skill ID | Skill Name | Description | Enabled by Default |
+|----------|------------|-------------|--------------------|
+| `usage` | Usage Summary | View AI usage statistics — request count, tokens, cost, per-model or daily breakdown | ✓ |
+
+### Development
+
+| Skill ID | Skill Name | Description | Enabled by Default |
+|----------|------------|-------------|--------------------|
+| `coding_agent` | Coding Agent | Delegate coding tasks to Claude Code CLI: implement features, refactor, write tests, generate README | - |
 
 ---
 
@@ -146,6 +172,9 @@ Some skills require external API keys or OAuth authentication.
 | `google` | Google OAuth2 authentication complete |
 | `image` | OpenAI API key (for image generation) |
 | `currency` | Exchange rate API key |
+| `notion` | Notion Integration Token |
+| `github` | GitHub Personal Access Token |
+| `coding_agent` | Claude Code CLI (server environment) |
 
 API key configuration is handled by the server administrator in the `.env` file.
 
@@ -157,9 +186,7 @@ The following skills are in the development roadmap:
 
 | Skill | Description |
 |-------|-------------|
-| `browser` | More advanced web automation and scraping |
 | `video` | Real-time streaming analysis |
-| `notion` | Notion workspace integration |
 | `slack` | Slack channel integration |
 
 ---

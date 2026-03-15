@@ -26,13 +26,14 @@ GitHub 연동을 사용하면:
 
 ## 지원 기능 목록
 
-| 기능 | 설명 |
+| 도구 | 설명 |
 |------|------|
-| 저장소 목록 조회 | 사용자의 저장소 목록 확인 |
-| 이슈 생성 | 새 이슈 작성 |
-| 이슈 조회 | 이슈 목록 및 상세 내용 확인 |
-| PR 상태 확인 | Pull Request 목록 및 리뷰 상태 확인 |
-| 코드 검색 | 저장소 내 코드 키워드 검색 |
+| `github_list_repos` | 저장소 목록 조회 (공개·비공개, 정렬·필터 지원) |
+| `github_list_issues` | 이슈 목록 조회 (open/closed/all) |
+| `github_create_issue` | 새 이슈 생성 (레이블 지원) |
+| `github_list_prs` | Pull Request 목록 조회 |
+| `github_get_pr` | PR 상세 조회 (변경 파일 목록 + CI 검사 상태) |
+| `github_search_code` | GitHub 전체 코드 검색 (한정자 지원) |
 
 ---
 
@@ -49,7 +50,8 @@ GitHub 연동을 사용하면:
    | 스코프 | 목적 |
    |--------|------|
    | `repo` | 저장소 읽기/쓰기 (비공개 저장소 포함) |
-   | `read:org` | 조직 정보 읽기 |
+   | `read:user` | 사용자 정보 읽기 |
+   | `read:org` | 조직 정보 읽기 (선택) |
 
 6. **Generate token** 클릭 후 토큰을 복사합니다 (`ghp_...` 형식).
 
@@ -108,25 +110,54 @@ GitHub 연동이 설정되면 AI에게 자연어로 요청합니다.
     - #39: fix: 메모리 누수 해결 (Merged)
 ```
 
-### 최근 커밋 확인
+### PR 상세 조회
+
+변경 파일 목록과 CI 검사 상태를 함께 확인합니다.
 
 ```
-나: starnion 저장소 최근 커밋 보여줘
-봇: starnion/starnion 최근 커밋:
-    - c29a8d8: config: embedding 설정 통합 (2시간 전)
-    - a3a6fc0: 가든: 상담 공간 요소 정렬 (5시간 전)
+나: starnion/api PR #42 상세 내용 알려줘
+봇: PR #42: feat: 사용자 설정 타임존 저장 기능
+    상태: open | 작성자: devteam
+    브랜치: feat/timezone → main
+    변경: +127 -34 (6개 파일)
+    URL: https://github.com/starnion/api/pull/42
+
+    변경 파일 (6개):
+      modified gateway/internal/handler/profile.go (+45 -8)
+      modified ui/app/(dashboard)/settings/page.tsx (+62 -12)
+      ...
+
+    CI 검사 (3개):
+      ✅ build: success
+      ✅ lint: success
+      🔄 test: in_progress
+```
+
+### 코드 검색
+
+저장소 내에서 특정 코드를 검색합니다.
+
+```
+나: starnion/api에서 timezone 관련 코드 찾아줘
+봇: 코드 검색 결과: 'timezone repo:starnion/api' (총 8개 중 5개 표시)
+    📄 gateway/internal/handler/profile.go
+       https://github.com/starnion/api/blob/main/gateway/...
+    📄 agent/src/starnion_agent/db/repositories/profile.py
+       https://github.com/starnion/api/blob/main/agent/...
+    ...
 ```
 
 ---
 
 ## 필요 권한 (Scopes)
 
-| 스코프 | 목적 |
-|--------|------|
-| `repo` | 저장소 읽기/쓰기 (비공개 포함) |
-| `read:org` | 조직 정보 읽기 |
+| 스코프 | 목적 | 필요 여부 |
+|--------|------|----------|
+| `repo` | 저장소 읽기/쓰기 (비공개 포함) | 필수 |
+| `read:user` | 사용자 정보 읽기 | 필수 |
+| `read:org` | 조직 저장소 접근 | 선택 |
 
-> **팁:** 읽기 전용으로만 사용하려면 `repo` 대신 `public_repo` 스코프만 선택할 수 있지만, 비공개 저장소에는 접근할 수 없습니다.
+> **팁:** 읽기 전용으로만 사용하려면 `repo` 대신 `public_repo` 스코프를 선택할 수 있지만, 비공개 저장소에는 접근할 수 없습니다.
 
 ---
 

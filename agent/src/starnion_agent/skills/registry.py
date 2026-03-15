@@ -70,7 +70,7 @@ SKILLS: dict[str, SkillDef] = {
     ),
     "schedule": SkillDef(
         id="schedule",
-        name="일정",
+        name="스케줄",
         emoji="📅",
         description="알림 일정 생성 및 관리",
         category="productivity",

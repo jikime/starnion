@@ -7,7 +7,7 @@ grand_parent: 🇺🇸 English
 
 # Skill List
 
-Starnion currently has **34** built-in skills. Each skill is an independent module that can be individually enabled or disabled as needed.
+Starnion currently has **38** built-in skills. Each skill is an independent module that can be individually enabled or disabled as needed.
 
 ---
 
@@ -32,7 +32,7 @@ Starnion currently has **34** built-in skills. Each skill is an independent modu
 | `goals` | Goal Manager | Set financial goals, to-dos, habits, and personal goals; track progress. | `keep food spending under 300,000 this month`, `I achieved my goal!` | ✓ |
 | `dday` | D-Day | Track the number of days remaining until important dates; supports yearly recurrence. | `set a D-Day for Christmas`, `show my D-Days` | ✓ |
 | `reminder` | Reminder | Schedule a one-time alert at a specific time. | `remind me about my meeting tomorrow at 9 AM` | ✓ |
-| `schedule` | Schedule Alerts | Create and manage regular or one-time alert schedules. | `remind me of weekly spending every Friday at 8 PM` | ✓ |
+| `schedule` | Schedule | Create and manage regular or one-time alert schedules. | `remind me of weekly spending every Friday at 8 PM` | ✓ |
 | `memory` | Memory Search | Unified semantic search across past conversations, expense records, diary entries, and documents. | `what did I eat last week?`, `remember what I said last time?` | ✓ |
 
 ---
@@ -83,6 +83,8 @@ Starnion currently has **34** built-in skills. Each skill is an independent modu
 |----------|------------|-------------|------------------|--------------------|
 | `google` | Google Integration | Integrates Google Calendar, Docs, Tasks, Drive, and Gmail; requires OAuth2 authentication. | `connect Google`, `add a 3 PM doctor appointment tomorrow`, `show received mail` | - |
 | `browser` | Browser Control | Automatically controls a Chromium browser: URL navigation, clicking, text input, and screenshots. Features DOM stability detection for accurate SPA load timing, and auto-waits for Canvas/map tile rendering. Requires Playwright. | `search today's weather on Google`, `take a screenshot of Google Maps`, `click the login button` | - |
+| `notion` | Notion Integration | Search, create, and read Notion pages; append blocks; query databases; update properties. Requires Integration Token. | `find my project page in Notion`, `show completed items in Task DB`, `add a note to reading log` | - |
+| `github` | GitHub Integration | Browse repositories, issues, and PRs; create issues; view PR details with file diffs and CI status; search code. Requires Personal Access Token. | `show my GitHub repos`, `list open issues in starnion`, `get details of PR #42` | - |
 
 ---
 
@@ -94,13 +96,29 @@ Starnion currently has **34** built-in skills. Each skill is an independent modu
 
 ---
 
+## System
+
+| Skill ID | Skill Name | Description | Example Commands | Enabled by Default |
+|----------|------------|-------------|------------------|--------------------|
+| `usage` | Usage Summary | View AI usage statistics — request count, tokens, cost, and per-model or daily breakdown. | `how much did AI cost this month?`, `which model did I use most?`, `show daily usage for the past 7 days` | ✓ |
+
+---
+
+## Development
+
+| Skill ID | Skill Name | Description | Example Commands | Enabled by Default |
+|----------|------------|-------------|------------------|--------------------|
+| `coding_agent` | Coding Agent | Delegate coding tasks to Claude Code CLI: implement features, refactor, write tests, generate README. | `build a todo CLI in Python`, `refactor this code`, `add unit tests`, `write a README` | - |
+
+---
+
 ## Skill Activation Summary
 
 | Status | Number of Skills |
 |--------|-----------------|
-| Enabled by default (✓) | 29 |
-| Opt-in required | 5 (`video`, `naver_search`, `google`, `browser`, + some skills requiring external APIs) |
-| **Total** | **34** |
+| Enabled by default (✓) | 31 |
+| Opt-in required | 7 (`video`, `naver_search`, `google`, `browser`, `notion`, `github`, `coding_agent`) |
+| **Total** | **38** |
 
 ---
 
@@ -118,6 +136,9 @@ Some skills require external API keys or OAuth authentication.
 | `audio` | Gemini API key (for TTS) | **Settings > Models** |
 | `currency` | Exchange rate API (Frankfurter, free) | Automatic |
 | `browser` | Playwright installation required | Server environment |
+| `notion` | Notion Integration Token | **Settings > Integrations** |
+| `github` | GitHub Personal Access Token | **Settings > Integrations** |
+| `coding_agent` | Claude Code CLI installation required | Server environment |
 
 ---
 
@@ -167,6 +188,4 @@ A single message can trigger multiple skills in sequence.
 
 | Skill | Description | Status |
 |-------|-------------|--------|
-| `notion` | Notion workspace integration | In development |
 | `slack` | Slack channel message integration | Planned |
-| `github` | GitHub issues, PRs, and code search | Planned |
