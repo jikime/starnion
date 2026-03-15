@@ -127,16 +127,37 @@ async def _close_session(user_id: str) -> bool:
 
 
 async def _ensure_chromium() -> None:
-    """Run 'playwright install --with-deps chromium' if the browser executable is missing.
+    """Install Playwright Chromium and its system dependencies.
 
-    --with-deps also installs required system libraries (libnss3, libatk, etc.)
-    so this works on both macOS and Linux slim images.
+    On Debian/Ubuntu: playwright install --with-deps handles everything.
+    On RHEL/Rocky/Fedora: dnf/yum installs system libs first, then playwright
+    installs the browser binary (--with-deps uses apt-get and would fail).
+    On macOS or unknown systems: install browser binary only and hope system
+    libs are already present.
     """
+    import shutil
     import sys
 
-    logger.warning("browser: chromium executable not found — running 'playwright install --with-deps chromium'")
+    # ── Detect package manager ────────────────────────────────────────────────
+    if shutil.which("apt-get"):
+        await _playwright_install(sys.executable, with_deps=True)
+    elif shutil.which("dnf") or shutil.which("yum"):
+        await _install_rhel_deps(shutil.which("dnf") or shutil.which("yum"))
+        await _playwright_install(sys.executable, with_deps=False)
+    else:
+        # macOS or other — just install the binary
+        await _playwright_install(sys.executable, with_deps=False)
+
+
+async def _playwright_install(python: str, *, with_deps: bool) -> None:
+    args = [python, "-m", "playwright", "install"]
+    if with_deps:
+        args.append("--with-deps")
+    args.append("chromium")
+    flag = "--with-deps " if with_deps else ""
+    logger.warning("browser: running 'playwright install %schromium'", flag)
     proc = await asyncio.create_subprocess_exec(
-        sys.executable, "-m", "playwright", "install", "--with-deps", "chromium",
+        *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -149,6 +170,34 @@ async def _ensure_chromium() -> None:
         )
         raise RuntimeError("playwright install chromium failed")
     logger.warning("browser: chromium installed successfully")
+
+
+# Packages required by Playwright Chromium on RHEL/Rocky/CentOS/Fedora.
+_RHEL_CHROMIUM_DEPS = [
+    "alsa-lib", "atk", "at-spi2-atk", "at-spi2-core", "cairo", "cups-libs",
+    "dbus-libs", "expat", "libdrm", "libgbm", "libX11", "libXcomposite",
+    "libXdamage", "libXext", "libXfixes", "libXrandr", "libxcb",
+    "libxkbcommon", "mesa-libgbm", "nspr", "nss", "pango",
+]
+
+
+async def _install_rhel_deps(pkg_manager: str) -> None:
+    logger.warning("browser: installing Chromium system deps via %s", pkg_manager)
+    proc = await asyncio.create_subprocess_exec(
+        pkg_manager, "install", "-y", *_RHEL_CHROMIUM_DEPS,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        # Non-fatal: some packages may already be installed or unavailable.
+        logger.warning(
+            "browser: dnf/yum install finished with rc=%d: %s",
+            proc.returncode,
+            stderr.decode(errors="replace"),
+        )
+    else:
+        logger.warning("browser: RHEL system deps installed")
 
 
 async def _create_session() -> BrowserSession:
