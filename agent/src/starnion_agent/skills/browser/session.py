@@ -141,8 +141,8 @@ async def _ensure_chromium() -> None:
     # ── Detect package manager ────────────────────────────────────────────────
     if shutil.which("apt-get"):
         await _playwright_install(sys.executable, with_deps=True)
-    elif shutil.which("dnf") or shutil.which("yum"):
-        await _install_rhel_deps(shutil.which("dnf") or shutil.which("yum"))
+    elif pkg_manager := (shutil.which("dnf") or shutil.which("yum")):
+        await _install_rhel_deps(pkg_manager)
         await _playwright_install(sys.executable, with_deps=False)
     else:
         # macOS or other — just install the binary
