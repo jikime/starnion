@@ -402,6 +402,17 @@ SKILLS: dict[str, SkillDef] = {
         permission_level=2,
         sort_order=35,
     ),
+    "coding_agent": SkillDef(
+        id="coding_agent",
+        name="코딩 에이전트",
+        emoji="💻",
+        description="Claude Code CLI로 코딩 작업을 위임합니다. 새 기능 구현, 리팩토링, 테스트 작성, README 생성에 사용하세요.",
+        category="development",
+        tools=["run_coding_agent"],
+        enabled_by_default=False,
+        permission_level=2,
+        sort_order=36,
+    ),
 }
 
 # tool_name -> skill_id reverse mapping (fast guard lookup)

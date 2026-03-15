@@ -62,6 +62,7 @@ from starnion_agent.skills.schedule.tools import (
     list_schedules,
 )
 from starnion_agent.skills.video.tools import analyze_video, generate_video
+from starnion_agent.skills.coding_agent.tools import run_coding_agent
 from starnion_agent.skills.weather.tools import get_forecast, get_weather
 from starnion_agent.skills.summarize.tools import summarize_text, summarize_url
 from starnion_agent.skills.translate.tools import translate_text
@@ -285,6 +286,7 @@ ALL_TOOLS = [
     get_horoscope,
     lookup_ip,
     naver_search,
+    run_coding_agent,
     # browser
     browser_open_screenshot,
     browser_navigate,
