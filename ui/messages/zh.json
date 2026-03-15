@@ -824,7 +824,18 @@
     "title": "技能管理",
     "subtitle": "启用或禁用您想使用的技能",
     "active": "已启用: {n}/{total}",
-    "required": "必要"
+    "required": "必要",
+    "detail": "技能详情",
+    "triggers": "触发关键词",
+    "triggersDesc": "当您的消息包含以下关键词时，此技能将自动激活。",
+    "examples": "使用示例",
+    "examplesDesc": "复制以下示例并粘贴到聊天中进行测试。",
+    "copy": "复制",
+    "copied": "已复制！",
+    "noKeywords": "没有关键词信息。",
+    "noExamples": "没有使用示例。",
+    "enable": "启用",
+    "disable": "禁用"
   },
   "channels": {
     "title": "频道",

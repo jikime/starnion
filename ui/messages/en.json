@@ -824,7 +824,18 @@
     "title": "Skill Management",
     "subtitle": "Enable or disable the skills you want to use",
     "active": "Active: {n}/{total}",
-    "required": "Required"
+    "required": "Required",
+    "detail": "Skill Details",
+    "triggers": "Trigger Keywords",
+    "triggersDesc": "This skill activates automatically when your message contains these keywords.",
+    "examples": "Usage Examples",
+    "examplesDesc": "Copy any example below and paste it into the chat to try it out.",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "noKeywords": "No keyword information available.",
+    "noExamples": "No examples available.",
+    "enable": "Enable",
+    "disable": "Disable"
   },
   "channels": {
     "title": "Channels",

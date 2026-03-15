@@ -824,7 +824,18 @@
     "title": "スキル管理",
     "subtitle": "使用するスキルを有効化または無効化してください",
     "active": "有効: {n}/{total}",
-    "required": "必須"
+    "required": "必須",
+    "detail": "スキル詳細",
+    "triggers": "トリガーキーワード",
+    "triggersDesc": "これらのキーワードを含むメッセージでスキルが自動的に起動します。",
+    "examples": "使用例",
+    "examplesDesc": "以下の例をコピーしてチャットに貼り付けてテストできます。",
+    "copy": "コピー",
+    "copied": "コピーしました！",
+    "noKeywords": "キーワード情報がありません。",
+    "noExamples": "使用例がありません。",
+    "enable": "有効化",
+    "disable": "無効化"
   },
   "channels": {
     "title": "チャンネル",

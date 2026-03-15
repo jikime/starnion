@@ -856,7 +856,18 @@
     "title": "스킬 관리",
     "subtitle": "사용할 스킬을 활성화하거나 비활성화하세요",
     "active": "활성: {n}/{total}",
-    "required": "필수"
+    "required": "필수",
+    "detail": "스킬 상세",
+    "triggers": "트리거 키워드",
+    "triggersDesc": "다음 키워드가 포함된 메시지에서 이 스킬이 자동으로 실행됩니다.",
+    "examples": "사용 예시",
+    "examplesDesc": "아래 예시를 복사해서 채팅에 직접 입력해 테스트해 보세요.",
+    "copy": "복사",
+    "copied": "복사됨!",
+    "noKeywords": "키워드 정보가 없습니다.",
+    "noExamples": "예시가 없습니다.",
+    "enable": "활성화",
+    "disable": "비활성화"
   },
   "channels": {
     "title": "채널",

@@ -20,6 +20,8 @@ type SkillView struct {
 	Enabled     bool
 	Permission  int // 0=system, 1=default, 2=opt-in, 3=admin
 	SortOrder   int
+	Keywords    []string
+	Examples    []string
 }
 
 type cacheEntry struct {
@@ -164,6 +166,7 @@ func (s *Service) GetUserSkills(userID string) ([]SkillView, error) {
 			&sv.Emoji, &sv.Enabled, &sv.Permission, &sv.SortOrder); err != nil {
 			return nil, fmt.Errorf("scan skill: %w", err)
 		}
+		sv.Keywords, sv.Examples = GetMeta(sv.ID)
 		skills = append(skills, sv)
 	}
 	return skills, rows.Err()

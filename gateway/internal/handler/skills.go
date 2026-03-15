@@ -34,18 +34,28 @@ func (h *SkillHandler) List(c echo.Context) error {
 	}
 
 	type skillResponse struct {
-		ID          string `json:"id"`
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		Category    string `json:"category"`
-		Emoji       string `json:"emoji"`
-		Enabled     bool   `json:"enabled"`
-		Permission  int    `json:"permission"`
-		SortOrder   int    `json:"sort_order"`
+		ID          string   `json:"id"`
+		Name        string   `json:"name"`
+		Description string   `json:"description"`
+		Category    string   `json:"category"`
+		Emoji       string   `json:"emoji"`
+		Enabled     bool     `json:"enabled"`
+		Permission  int      `json:"permission"`
+		SortOrder   int      `json:"sort_order"`
+		Keywords    []string `json:"keywords"`
+		Examples    []string `json:"examples"`
 	}
 
 	resp := make([]skillResponse, 0, len(skills))
 	for _, s := range skills {
+		keywords := s.Keywords
+		if keywords == nil {
+			keywords = []string{}
+		}
+		examples := s.Examples
+		if examples == nil {
+			examples = []string{}
+		}
 		resp = append(resp, skillResponse{
 			ID:          s.ID,
 			Name:        s.Name,
@@ -55,6 +65,8 @@ func (h *SkillHandler) List(c echo.Context) error {
 			Enabled:     s.Enabled,
 			Permission:  s.Permission,
 			SortOrder:   s.SortOrder,
+			Keywords:    keywords,
+			Examples:    examples,
 		})
 	}
 	return c.JSON(http.StatusOK, resp)
