@@ -1,6 +1,7 @@
 ---
 name: summarize
 description: URL 웹페이지나 텍스트를 AI로 요약합니다. 간결/상세/항목별 스타일을 지원합니다.
+keywords: ["요약", "요약해줘", "summarize", "summary", "要約して", "摘要", "总结"]
 ---
 
 # 요약 (summarize)

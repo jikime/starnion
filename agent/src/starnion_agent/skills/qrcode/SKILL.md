@@ -1,8 +1,9 @@
 ---
-skill_id: qrcode
-version: "1.0"
+name: QR코드
+description: QR 코드 이미지 생성
 tools:
   - generate_qrcode
+keywords: ["QR코드", "QR 만들어", "qr code", "generate qr", "QRコード", "二维码", "生成二维码"]
 ---
 
 # QR코드 스킬

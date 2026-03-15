@@ -1,6 +1,7 @@
 ---
 name: ip
 description: IP 주소 또는 도메인의 위치, ISP 등 정보를 조회합니다.
+keywords: ["IP", "IP주소", "ip address", "lookup", "IPアドレス", "IP地址"]
 ---
 
 # IP 조회 (ip)

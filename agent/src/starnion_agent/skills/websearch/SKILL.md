@@ -1,6 +1,7 @@
 ---
 name: websearch
 description: 인터넷에서 최신 정보를 검색하고 웹페이지 내용을 가져옵니다.
+keywords: ["검색", "찾아봐", "검색해줘", "search", "look up", "検索", "搜索", "查一查"]
 ---
 
 # 웹 검색 (websearch)

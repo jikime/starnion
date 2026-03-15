@@ -1,8 +1,9 @@
 ---
-skill_id: color
-version: "1.0"
+name: 색상변환
+description: HEX, RGB, HSL 색상 코드 변환
 tools:
   - convert_color
+keywords: ["색상", "HEX", "RGB", "color", "hex to rgb", "色変換", "颜色转换"]
 ---
 
 # 색상변환 스킬

@@ -1,8 +1,9 @@
 ---
-skill_id: encode
-version: "1.0"
+name: 인코딩
+description: Base64, URL, HTML 인코딩/디코딩
 tools:
   - encode_decode
+keywords: ["인코딩", "디코딩", "base64", "encode", "decode", "エンコード", "编码", "解码"]
 ---
 
 # 인코딩 스킬

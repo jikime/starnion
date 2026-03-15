@@ -1,6 +1,7 @@
 ---
 name: google
 description: 구글 캘린더, 문서, 태스크, 드라이브, 메일을 연동합니다. OAuth2 인증 후 사용 가능합니다.
+keywords: ["구글", "캘린더", "드라이브", "google", "calendar", "drive", "グーグル", "谷歌"]
 ---
 
 # 구글 연동 (google)

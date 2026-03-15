@@ -1,6 +1,7 @@
 ---
 name: video
 description: 비디오를 분석하여 내용 요약, 장면 설명을 하고, AI 이미지 슬라이드쇼 영상을 생성합니다.
+keywords: ["비디오", "영상", "video", "clip", "ビデオ", "视频"]
 ---
 
 # 비디오 (video)

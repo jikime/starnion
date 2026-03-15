@@ -40,6 +40,7 @@ class SkillDoc:
     name: str
     description: str
     body: str
+    keywords: tuple[str, ...] = ()  # multilingual trigger keywords from frontmatter
 
 
 def parse_skill_md(skill_id: str) -> SkillDoc | None:
@@ -85,11 +86,19 @@ def parse_skill_md(skill_id: str) -> SkillDoc | None:
     name = meta.get("name") or (skill_def.name if skill_def else skill_id)
     description = meta.get("description") or (skill_def.description if skill_def else "")
 
+    # Parse multilingual keywords (list of strings) if present.
+    raw_kw = meta.get("keywords")
+    if isinstance(raw_kw, list):
+        keywords: tuple[str, ...] = tuple(str(k) for k in raw_kw if k)
+    else:
+        keywords = ()
+
     return SkillDoc(
         skill_id=skill_id,
         name=name,
         description=description,
         body=body.strip(),
+        keywords=keywords,
     )
 
 
@@ -122,6 +131,7 @@ def load_all_skill_docs(skill_ids: list[str]) -> dict[str, SkillDoc]:
                     name=skill_def.name,
                     description=skill_def.description,
                     body="",
+                    keywords=(),
                 )
     return docs
 
@@ -151,11 +161,12 @@ def build_skill_catalog(docs: dict[str, SkillDoc]) -> str:
     lines = ["## 활성 스킬 카탈로그\n"]
     for doc in docs.values():
         skill_def = SKILLS.get(doc.skill_id)
+        kw_suffix = f" [{', '.join(doc.keywords)}]" if doc.keywords else ""
         if skill_def and skill_def.tools:
             tools_str = ", ".join(skill_def.tools)
-            lines.append(f"- **{doc.name}** ({tools_str}): {doc.description}")
+            lines.append(f"- **{doc.name}** ({tools_str}): {doc.description}{kw_suffix}")
         else:
-            lines.append(f"- **{doc.name}**: {doc.description}")
+            lines.append(f"- **{doc.name}**: {doc.description}{kw_suffix}")
     return "\n".join(lines)
 
 

@@ -1,8 +1,9 @@
 ---
-skill_id: horoscope
-version: "1.0"
+name: 운세
+description: 오늘의 별자리 운세 조회
 tools:
   - get_horoscope
+keywords: ["운세", "별자리", "오늘의 운세", "horoscope", "zodiac", "fortune", "占い", "星座运势", "占卜"]
 ---
 
 # 운세 스킬

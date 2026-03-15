@@ -1,10 +1,11 @@
 ---
-skill_id: memo
-version: "1.0"
+name: 메모
+description: 간편 메모 저장, 조회, 삭제
 tools:
   - save_memo
   - list_memos
   - delete_memo
+keywords: ["메모", "적어줘", "기록해줘", "memo", "note", "jot down", "メモ", "メモして", "备忘录", "记下来"]
 ---
 
 # 메모 스킬

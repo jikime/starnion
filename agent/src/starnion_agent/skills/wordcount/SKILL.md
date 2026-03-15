@@ -1,8 +1,9 @@
 ---
-skill_id: wordcount
-version: "1.0"
+name: 글자수
+description: 글자수, 단어수, 문장수 분석
 tools:
   - count_text
+keywords: ["글자수", "몇 글자", "word count", "character count", "文字数", "字数统计"]
 ---
 
 # 글자수 스킬

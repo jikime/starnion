@@ -1,6 +1,7 @@
 ---
 name: documents
 description: 다양한 형식의 문서를 파싱하여 벡터 DB에 저장하고, 요청한 내용으로 문서를 생성하여 파일로 전달합니다.
+keywords: ["문서", "PDF", "DOCX", "파싱", "document", "parse", "ドキュメント", "文档", "解析"]
 ---
 
 # 문서 처리 (documents)

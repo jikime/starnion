@@ -1,9 +1,10 @@
 ---
-skill_id: timezone
-version: "1.0"
+name: 세계시간
+description: 세계 시간대 조회 및 변환
 tools:
   - get_world_time
   - convert_timezone
+keywords: ["세계시간", "시간대", "몇시야", "world time", "timezone", "タイムゾーン", "世界时间", "时区"]
 ---
 
 # 세계시간 스킬

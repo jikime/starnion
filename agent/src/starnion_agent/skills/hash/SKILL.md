@@ -1,8 +1,9 @@
 ---
-skill_id: hash
-version: "1.0"
+name: 해시
+description: MD5, SHA256 등 해시값 생성
 tools:
   - generate_hash
+keywords: ["해시", "MD5", "SHA", "hash", "md5", "sha256", "ハッシュ", "哈希", "散列"]
 ---
 
 # 해시 스킬

@@ -1,6 +1,7 @@
 ---
 name: weather
 description: 현재 날씨와 일기예보를 조회합니다.
+keywords: ["날씨", "오늘 날씨", "weather", "forecast", "天気予報", "天气", "天气预报"]
 ---
 
 # 날씨 (weather)

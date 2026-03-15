@@ -1,6 +1,7 @@
 ---
 name: proactive
 description: 예산 경고, 이상 소비 감지, 패턴 인사이트 등 AI가 먼저 사용자에게 알림을 보내는 기능을 제어합니다. 비활성화하면 모든 능동 알림이 중지됩니다.
+keywords: ["알림", "리마인더", "notification", "reminder", "通知", "通知推送"]
 ---
 
 # 능동 알림 (proactive)

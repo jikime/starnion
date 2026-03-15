@@ -1,10 +1,11 @@
 ---
-skill_id: dday
-version: "1.0"
+name: 디데이
+description: 중요한 날짜까지 남은 일수 추적
 tools:
   - set_dday
   - list_ddays
   - delete_dday
+keywords: ["디데이", "며칠 남았", "d-day", "countdown", "days until", "あと何日", "倒计时", "还有几天"]
 ---
 
 # 디데이 스킬

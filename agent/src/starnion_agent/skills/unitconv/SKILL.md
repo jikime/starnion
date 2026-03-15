@@ -1,8 +1,9 @@
 ---
-skill_id: unitconv
-version: "1.0"
+name: 단위변환
+description: 길이, 무게, 온도, 부피, 면적, 데이터 단위 변환
 tools:
   - convert_unit
+keywords: ["단위변환", "km", "마일", "unit convert", "convert", "単位変換", "单位换算"]
 ---
 
 # 단위변환 스킬

@@ -1,8 +1,9 @@
 ---
-skill_id: translate
-version: "1.0"
+name: 번역
+description: 텍스트를 다국어로 번역 (한/영/일/중 등)
 tools:
   - translate_text
+keywords: ["번역", "번역해줘", "영어로", "translate", "translation", "翻訳して", "翻译", "翻译一下"]
 ---
 
 # 번역 스킬

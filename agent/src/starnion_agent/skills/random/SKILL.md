@@ -1,8 +1,9 @@
 ---
-skill_id: random
-version: "1.0"
+name: 랜덤
+description: 랜덤 선택, 숫자 뽑기, 동전/주사위
 tools:
   - random_pick
+keywords: ["랜덤", "골라줘", "뭐먹을까", "주사위", "random", "pick", "choose", "ランダム", "选一个"]
 ---
 
 # 랜덤 스킬

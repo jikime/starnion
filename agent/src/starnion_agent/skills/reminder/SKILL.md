@@ -1,10 +1,11 @@
 ---
-skill_id: reminder
-version: "1.0"
+name: 알림
+description: 간편 알림 예약 및 관리
 tools:
   - set_reminder
   - list_reminders
   - delete_reminder
+keywords: ["알림", "알려줘", "리마인더", "remind me", "reminder", "alert", "リマインダー", "提醒", "提醒我"]
 ---
 
 # 알림 스킬

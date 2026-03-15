@@ -1,6 +1,7 @@
 ---
 name: pattern
 description: 사용자의 소비 패턴을 자동으로 분석합니다. 요일별 소비 경향, 반복 결제, 소비 속도 등을 백그라운드에서 분석하며 결과는 knowledge_base에 저장됩니다.
+keywords: ["패턴", "분석", "소비 패턴", "pattern", "analysis", "パターン", "模式分析"]
 ---
 
 # 패턴 분석 (pattern)

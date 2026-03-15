@@ -1,9 +1,10 @@
 ---
-skill_id: currency
-version: "1.0"
+name: 환율
+description: 실시간 환율 조회 및 통화 변환
 tools:
   - convert_currency
   - get_exchange_rate
+keywords: ["환율", "달러", "원화", "exchange rate", "convert currency", "為替", "汇率", "换算"]
 ---
 
 # 환율 스킬

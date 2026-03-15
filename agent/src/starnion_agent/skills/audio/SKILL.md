@@ -1,6 +1,7 @@
 ---
 name: audio
 description: 음성 메시지를 텍스트로 변환(STT)하고, 텍스트를 음성으로 변환(TTS)합니다.
+keywords: ["음성", "오디오", "녹음", "audio", "voice", "speech", "音声", "录音", "语音"]
 ---
 
 # 오디오 (audio)

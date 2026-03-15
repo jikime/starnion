@@ -1,8 +1,9 @@
 ---
-skill_id: calculator
-version: "1.0"
+name: 계산기
+description: 수학 수식 계산 (사칙연산, 함수, 상수)
 tools:
   - calculate
+keywords: ["계산", "계산해줘", "수식", "calculate", "math", "compute", "計算して", "计算", "算一算"]
 ---
 
 # 계산기 스킬
