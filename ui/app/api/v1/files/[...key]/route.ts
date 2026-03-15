@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth"
 import * as Minio from "minio"
-import { NextResponse } from "next/server"
 
 const minioClient = new Minio.Client({
   endPoint: process.env.MINIO_ENDPOINT?.split(":")[0] ?? "localhost",
@@ -16,8 +15,8 @@ const BUCKET = process.env.MINIO_BUCKET ?? "starnion-files"
  * GET /api/v1/files/[...key]
  *
  * Authenticated file proxy for MinIO objects.
- * Verifies the NextAuth session, generates a short-lived presigned URL
- * directly from MinIO, then redirects the browser to it.
+ * Next.js fetches the object from MinIO (internal network) and streams
+ * it directly to the browser — MinIO never needs to be publicly exposed.
  */
 export async function GET(
   _request: Request,
@@ -25,16 +24,38 @@ export async function GET(
 ) {
   const session = await auth()
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    })
   }
 
   const { key } = await params
   const objectKey = key.join("/")
 
   try {
-    const url = await minioClient.presignedGetObject(BUCKET, objectKey, 60)
-    return NextResponse.redirect(url)
+    const stat = await minioClient.statObject(BUCKET, objectKey)
+    const stream = await minioClient.getObject(BUCKET, objectKey)
+
+    const body = new ReadableStream({
+      start(controller) {
+        stream.on("data", (chunk) => controller.enqueue(chunk))
+        stream.on("end", () => controller.close())
+        stream.on("error", (err) => controller.error(err))
+      },
+    })
+
+    return new Response(body, {
+      headers: {
+        "Content-Type": stat.metaData?.["content-type"] ?? "application/octet-stream",
+        "Content-Length": String(stat.size),
+        "Cache-Control": "private, max-age=3600",
+      },
+    })
   } catch {
-    return NextResponse.json({ error: "file not found" }, { status: 404 })
+    return new Response(JSON.stringify({ error: "file not found" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    })
   }
 }
