@@ -420,6 +420,17 @@ SKILLS: dict[str, SkillDef] = {
         permission_level=2,
         sort_order=35,
     ),
+    "usage": SkillDef(
+        id="usage",
+        name="사용량 조회",
+        emoji="📊",
+        description="AI 사용 통계 — 요청 수, 토큰, 비용, 모델별/일별 분석",
+        category="system",
+        tools=["get_usage_summary"],
+        enabled_by_default=True,
+        permission_level=0,  # system — always available
+        sort_order=37,
+    ),
     "coding_agent": SkillDef(
         id="coding_agent",
         name="코딩 에이전트",
