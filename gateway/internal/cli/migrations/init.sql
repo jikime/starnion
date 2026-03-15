@@ -1,5 +1,5 @@
 -- =============================================================
--- StarNion Database Schema — v1.0.0 Baseline
+-- StarNion Database Schema — v1.4.2 Baseline
 -- Fresh-install baseline: run this on a new database.
 -- For upgrades, use docker/migrations/incremental/*.sql instead.
 -- PostgreSQL 16 + pgvector
@@ -179,11 +179,12 @@ CREATE INDEX IF NOT EXISTS idx_audios_created_at ON audios(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS reports (
     id          BIGSERIAL   NOT NULL PRIMARY KEY,
-    user_id     TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id     TEXT        NOT NULL,
     report_type TEXT        NOT NULL,
     title       TEXT        NOT NULL DEFAULT '',
     content     TEXT        NOT NULL DEFAULT '',
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_reports_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_reports_user_id    ON reports(user_id);
 CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at DESC);
@@ -788,3 +789,13 @@ CREATE TRIGGER trg_searches_tsv
 INSERT INTO schema_migrations (version) VALUES ('1.3.1') ON CONFLICT DO NOTHING;
 INSERT INTO schema_migrations (version) VALUES ('1.3.2') ON CONFLICT DO NOTHING;
 INSERT INTO schema_migrations (version) VALUES ('1.3.3') ON CONFLICT DO NOTHING;
+-- v1.3.5: personas redesign (trigger fn_seed_default_personas already reflects new personas)
+INSERT INTO schema_migrations (version) VALUES ('1.3.5') ON CONFLICT DO NOTHING;
+-- v1.3.6: reports FK is defined as fk_reports_user_id in CREATE TABLE above
+INSERT INTO schema_migrations (version) VALUES ('1.3.6') ON CONFLICT DO NOTHING;
+-- v1.4.0: language preference default handled at INSERT time (preferences JSONB default '{}')
+INSERT INTO schema_migrations (version) VALUES ('1.4.0') ON CONFLICT DO NOTHING;
+-- v1.4.1: endpoint_type column and model_assignments table included above
+INSERT INTO schema_migrations (version) VALUES ('1.4.1') ON CONFLICT DO NOTHING;
+-- v1.4.2: channel_settings, telegram_approved_contacts, telegram_pairing_requests included above
+INSERT INTO schema_migrations (version) VALUES ('1.4.2') ON CONFLICT DO NOTHING;
