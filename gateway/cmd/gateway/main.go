@@ -598,6 +598,11 @@ func main() {
 		api.PUT("/memos/:id", memoHandler.UpdateMemo)
 		api.DELETE("/memos/:id", memoHandler.DeleteMemo)
 
+		// Knowledge (AI memory) endpoints.
+		knowledgeHandler := handler.NewKnowledgeHandler(db)
+		api.GET("/knowledge", knowledgeHandler.ListKnowledge)
+		api.DELETE("/knowledge/:id", knowledgeHandler.DeleteKnowledge)
+
 		// D-Day endpoints.
 		ddayHandler := handler.NewDdayHandler(db)
 		api.GET("/ddays", ddayHandler.ListDdays)

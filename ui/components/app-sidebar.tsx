@@ -61,9 +61,10 @@ const lifeNavItems = [
   { key: "garden",   icon: Sprout,         href: "/garden" },
   { key: "wellness", icon: HeartHandshake, href: "/wellness" },
   { key: "diary",    icon: BookOpen,       href: "/diary" },
-  { key: "goals", icon: Target, href: "/goals" },
-  { key: "dday", icon: Clock, href: "/dday" },
-  { key: "memo", icon: StickyNote, href: "/memo" },
+  { key: "goals",    icon: Target,         href: "/goals" },
+  { key: "dday",     icon: Clock,          href: "/dday" },
+  { key: "memo",     icon: StickyNote,     href: "/memo" },
+  { key: "memory",   icon: BrainCircuit,   href: "/memory" },
 ] as const
 
 const reportsNavItems = [

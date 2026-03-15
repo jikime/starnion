@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
   DialogContent,
@@ -15,7 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Search, Edit, Trash2, Brain, StickyNote, Loader2 } from "lucide-react"
+import { Plus, Search, Edit, Trash2, StickyNote, Loader2 } from "lucide-react"
 
 // DB values for tags (kept as Korean for API compatibility)
 const TAGS = ["전체", "업무", "개인", "쇼핑", "아이디어"]
@@ -154,19 +153,7 @@ export default function MemoPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="memos" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="memos">
-            <StickyNote className="mr-2 size-4" />
-            {t("tabMemo")}
-          </TabsTrigger>
-          <TabsTrigger value="aiMemory">
-            <Brain className="mr-2 size-4" />
-            {t("tabAiMemory")}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="memos" className="space-y-6">
+      <div className="space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex gap-2 flex-wrap">
               {TAGS.map((tag) => (
@@ -237,24 +224,7 @@ export default function MemoPage() {
               ))}
             </div>
           )}
-        </TabsContent>
-
-        <TabsContent value="aiMemory" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="size-5" />
-                {t("aiMemoryTitle")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                {t("aiMemoryDesc")}
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      </div>
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
