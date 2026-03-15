@@ -17,7 +17,7 @@ The memo feature is a simple note system for quickly saving information you need
 - AI automatically finds relevant memos for you
 - Simple title + content structure for clean management
 
-> Memos are different from the memory skill. A memo is a structured information store that you explicitly save and retrieve. Memory is the AI's long-term learning system that automatically absorbs conversational context.
+> Memos are different from AI Memory. A memo is a structured information store that you explicitly save and retrieve. [AI Memory](/en/features/memory) is the AI's long-term learning system that automatically generates insights by analyzing conversational context.
 
 ---
 
