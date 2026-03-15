@@ -10,6 +10,13 @@ Parses SKILL.md files using the Claude Code SKILL.md format:
 Progressive disclosure:
   - Level 1 (catalog): name + description (~100 tokens per skill, always in prompt)
   - Level 2 (body): Full markdown instructions (loaded for enabled skills)
+
+Fallback policy
+---------------
+Many SKILL.md files use ``skill_id:`` instead of ``name:`` and omit
+``description:``.  When those keys are absent, values are pulled from the
+central SKILLS registry (``registry.py``) so the LLM always gets a useful
+catalog entry with the correct Korean display name.
 """
 
 from __future__ import annotations
@@ -38,6 +45,10 @@ class SkillDoc:
 def parse_skill_md(skill_id: str) -> SkillDoc | None:
     """Parse a SKILL.md file into frontmatter metadata and body content.
 
+    Falls back to the SKILLS registry for ``name`` and ``description`` when
+    the SKILL.md frontmatter uses ``skill_id:`` instead of ``name:``, or
+    omits ``description:`` entirely.
+
     Args:
         skill_id: The skill directory name (e.g. "finance", "budget").
 
@@ -45,6 +56,10 @@ def parse_skill_md(skill_id: str) -> SkillDoc | None:
         A SkillDoc with parsed name, description, and body, or None if
         the file doesn't exist or has no valid frontmatter.
     """
+    # Lazy import to avoid circular dependency at module load time.
+    from starnion_agent.skills.registry import SKILLS  # noqa: PLC0415
+    skill_def = SKILLS.get(skill_id)
+
     doc_path = SKILLS_DIR / skill_id / "SKILL.md"
     if not doc_path.exists():
         return None
@@ -65,8 +80,10 @@ def parse_skill_md(skill_id: str) -> SkillDoc | None:
         logger.warning("SKILL.md for '%s' frontmatter is not a mapping", skill_id)
         return None
 
-    name = meta.get("name", skill_id)
-    description = meta.get("description", "")
+    # Use registry name/description as fallback when SKILL.md frontmatter
+    # uses the legacy ``skill_id:`` key or omits ``description:``.
+    name = meta.get("name") or (skill_def.name if skill_def else skill_id)
+    description = meta.get("description") or (skill_def.description if skill_def else "")
 
     return SkillDoc(
         skill_id=skill_id,
@@ -79,25 +96,46 @@ def parse_skill_md(skill_id: str) -> SkillDoc | None:
 def load_all_skill_docs(skill_ids: list[str]) -> dict[str, SkillDoc]:
     """Load and parse SKILL.md for a list of skill IDs.
 
+    Skills without a SKILL.md file (or with unparseable frontmatter) still
+    receive a minimal SkillDoc built from the SKILLS registry so the catalog
+    is always complete.
+
     Args:
         skill_ids: List of skill directory names to load.
 
     Returns:
         Dict mapping skill_id to its parsed SkillDoc.
     """
+    from starnion_agent.skills.registry import SKILLS  # noqa: PLC0415
+
     docs: dict[str, SkillDoc] = {}
     for sid in skill_ids:
         doc = parse_skill_md(sid)
         if doc is not None:
             docs[sid] = doc
+        else:
+            # No SKILL.md (or unparseable) — build minimal doc from registry.
+            skill_def = SKILLS.get(sid)
+            if skill_def:
+                docs[sid] = SkillDoc(
+                    skill_id=sid,
+                    name=skill_def.name,
+                    description=skill_def.description,
+                    body="",
+                )
     return docs
 
 
 def build_skill_catalog(docs: dict[str, SkillDoc]) -> str:
     """Build a concise skill catalog string for the system prompt.
 
-    Level 1 (progressive disclosure): Only name + description per skill,
-    giving the LLM awareness of available skills without full instructions.
+    Level 1 (progressive disclosure): name + description + tool names per
+    skill.  Including tool names lets the LLM directly map a user intent
+    (e.g. "메모해줘") to the correct tool (``save_memo``) without having
+    to scan the full instructions section.
+
+    Format per entry:
+        - **{name}** ({tool1}, {tool2}, ...): {description}
 
     Args:
         docs: Dict of parsed SkillDocs.
@@ -108,9 +146,16 @@ def build_skill_catalog(docs: dict[str, SkillDoc]) -> str:
     if not docs:
         return ""
 
+    from starnion_agent.skills.registry import SKILLS  # noqa: PLC0415
+
     lines = ["## 활성 스킬 카탈로그\n"]
     for doc in docs.values():
-        lines.append(f"- **{doc.name}**: {doc.description}")
+        skill_def = SKILLS.get(doc.skill_id)
+        if skill_def and skill_def.tools:
+            tools_str = ", ".join(skill_def.tools)
+            lines.append(f"- **{doc.name}** ({tools_str}): {doc.description}")
+        else:
+            lines.append(f"- **{doc.name}**: {doc.description}")
     return "\n".join(lines)
 
 
