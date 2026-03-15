@@ -115,7 +115,7 @@ function NavGroup({
         <SidebarMenu>
           {items.map((item) => {
             const isActive = pathname === item.href ||
-              (item.href !== "/" && pathname.startsWith(item.href))
+              (item.href !== "/" && pathname.startsWith(item.href + "/"))
             return (
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton asChild isActive={isActive}>
