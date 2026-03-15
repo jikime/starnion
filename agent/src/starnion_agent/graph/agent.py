@@ -88,8 +88,10 @@ from starnion_agent.skills.horoscope.tools import get_horoscope
 from starnion_agent.skills.ip.tools import lookup_ip
 from starnion_agent.skills.notion.tools import (
     notion_block_append,
+    notion_database_query,
     notion_page_create,
     notion_page_read,
+    notion_page_update,
     notion_search,
 )
 from starnion_agent.skills.github.tools import (
@@ -264,6 +266,8 @@ ALL_TOOLS = [
     notion_page_create,
     notion_page_read,
     notion_block_append,
+    notion_database_query,
+    notion_page_update,
     github_list_repos,
     github_list_issues,
     github_create_issue,

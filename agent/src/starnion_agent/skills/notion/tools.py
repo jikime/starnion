@@ -18,7 +18,7 @@ from starnion_agent.skills.guard import skill_guard
 
 logger = logging.getLogger(__name__)
 
-_NOTION_VERSION = "2022-06-28"
+_NOTION_VERSION = "2025-09-03"
 _BASE_URL = "https://api.notion.com/v1"
 
 
@@ -128,6 +128,45 @@ class NotionSearchInput(BaseModel):
     )
 
 
+class NotionDatabaseQueryInput(BaseModel):
+    data_source_id: str = Field(
+        description=(
+            "조회할 데이터베이스의 data_source_id (notion_search로 확인). "
+            "대시 포함/미포함 UUID 형식 모두 지원."
+        )
+    )
+    filter_json: str = Field(
+        default="",
+        description=(
+            "Notion 필터 JSON 문자열 (선택). "
+            "예: '{\"property\": \"Status\", \"select\": {\"equals\": \"Done\"}}'"
+        ),
+    )
+    sort_by: str = Field(
+        default="",
+        description=(
+            "정렬 기준 속성명 (선택). "
+            "direction과 함께 사용 — 예: sort_by='Date', sort_direction='descending'"
+        ),
+    )
+    sort_direction: str = Field(
+        default="descending",
+        description="정렬 방향: 'ascending' 또는 'descending' (기본 'descending')",
+    )
+    limit: int = Field(default=10, ge=1, le=50, description="반환할 최대 항목 수 (1~50)")
+
+
+class NotionPageUpdateInput(BaseModel):
+    page_id: str = Field(description="업데이트할 페이지 ID 또는 URL")
+    properties_json: str = Field(
+        description=(
+            "업데이트할 속성을 Notion 형식 JSON 문자열로 지정. "
+            "예: '{\"Status\": {\"select\": {\"name\": \"Done\"}}, "
+            "\"Due\": {\"date\": {\"start\": \"2025-01-15\"}}}'"
+        )
+    )
+
+
 class NotionPageCreateInput(BaseModel):
     title: str = Field(description="생성할 페이지 제목")
     content: str = Field(default="", description="페이지 본문 내용 (선택)")
@@ -159,8 +198,11 @@ async def notion_search(query: str, filter_type: str = "") -> str:
         return _not_linked()
 
     body: dict = {"query": query, "page_size": 10}
-    if filter_type in ("page", "database"):
-        body["filter"] = {"value": filter_type, "property": "object"}
+    if filter_type == "page":
+        body["filter"] = {"value": "page", "property": "object"}
+    elif filter_type == "database":
+        # 2025-09-03: databases are now "data_source" in the API
+        body["filter"] = {"value": "data_source", "property": "object"}
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:
@@ -193,10 +235,12 @@ async def notion_search(query: str, filter_type: str = "") -> str:
             title_parts = title_prop.get("title", []) if "title" in title_prop else title_prop.get("rich_text", [])
             title = "".join(t.get("plain_text", "") for t in title_parts) or "(제목 없음)"
             lines.append(f"  📄 [페이지] {title} | ID: {rid}")
-        elif obj_type == "database":
+        elif obj_type in ("database", "data_source"):
+            # 2025-09-03: databases return as "data_source" with data_source_id
             db_title = r.get("title", [])
             title = "".join(t.get("plain_text", "") for t in db_title) or "(제목 없음)"
-            lines.append(f"  🗄️ [데이터베이스] {title} | ID: {rid}")
+            ds_id = r.get("data_source_id", "").replace("-", "") or rid
+            lines.append(f"  🗄️ [데이터베이스] {title} | ID: {rid} | data_source_id: {ds_id}")
 
     return "\n".join(lines)
 
@@ -361,3 +405,168 @@ async def notion_block_append(page_id: str, content: str) -> str:
         return "노션 블록 추가 중 오류가 발생했어요."
 
     return f"✅ 노션 페이지에 내용이 추가됐어요."
+
+
+@tool(args_schema=NotionDatabaseQueryInput)
+@skill_guard("notion")
+async def notion_database_query(
+    data_source_id: str,
+    filter_json: str = "",
+    sort_by: str = "",
+    sort_direction: str = "descending",
+    limit: int = 10,
+) -> str:
+    """노션 데이터베이스(데이터소스)의 항목을 필터/정렬하여 조회합니다.
+    data_source_id는 notion_search로 확인할 수 있습니다."""
+    import json as _json
+
+    api_key = await _get_notion_key()
+    if not api_key:
+        return _not_linked()
+
+    # Normalize data_source_id to UUID format
+    dsid = data_source_id.strip().replace("-", "")
+    if len(dsid) == 32:
+        dsid = f"{dsid[:8]}-{dsid[8:12]}-{dsid[12:16]}-{dsid[16:20]}-{dsid[20:]}"
+
+    body: dict = {"page_size": min(limit, 50)}
+
+    if filter_json.strip():
+        try:
+            body["filter"] = _json.loads(filter_json)
+        except _json.JSONDecodeError:
+            return "filter_json이 올바른 JSON 형식이 아니에요."
+
+    if sort_by.strip():
+        direction = sort_direction if sort_direction in ("ascending", "descending") else "descending"
+        body["sorts"] = [{"property": sort_by.strip(), "direction": direction}]
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            # 2025-09-03: use /data_sources/{id}/query endpoint
+            resp = await client.post(
+                f"{_BASE_URL}/data_sources/{dsid}/query",
+                headers=_headers(api_key),
+                json=body,
+            )
+            if resp.status_code == 401:
+                return "Notion API 키가 유효하지 않아요. 설정 → 연동에서 키를 다시 등록해주세요."
+            if resp.status_code == 404:
+                return (
+                    "데이터베이스를 찾을 수 없어요. "
+                    "notion_search로 data_source_id를 확인하고, "
+                    "Integration에 데이터베이스를 공유했는지 확인해주세요."
+                )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPStatusError as e:
+        return f"데이터베이스 조회에 실패했어요. (HTTP {e.response.status_code})"
+    except Exception:
+        logger.debug("notion_database_query failed", exc_info=True)
+        return "데이터베이스 조회 중 오류가 발생했어요."
+
+    results = data.get("results", [])
+    if not results:
+        return "조건에 해당하는 항목이 없어요."
+
+    lines = [f"데이터베이스 조회 결과 ({len(results)}개):"]
+    for r in results:
+        props = r.get("properties", {})
+        # Find title property
+        title = "(제목 없음)"
+        for prop in props.values():
+            ptype = prop.get("type", "")
+            if ptype == "title":
+                parts = prop.get("title", [])
+                title = "".join(t.get("plain_text", "") for t in parts) or "(제목 없음)"
+                break
+
+        # Collect other simple property values for context
+        extra: list[str] = []
+        for pname, prop in props.items():
+            ptype = prop.get("type", "")
+            if ptype == "title":
+                continue
+            val = None
+            if ptype == "select":
+                val = (prop.get("select") or {}).get("name")
+            elif ptype == "status":
+                val = (prop.get("status") or {}).get("name")
+            elif ptype == "checkbox":
+                val = "✅" if prop.get("checkbox") else "☐"
+            elif ptype == "date":
+                val = (prop.get("date") or {}).get("start")
+            elif ptype == "number":
+                val = prop.get("number")
+            elif ptype == "rich_text":
+                parts = prop.get("rich_text", [])
+                val = "".join(t.get("plain_text", "") for t in parts[:1])
+            if val is not None:
+                extra.append(f"{pname}: {val}")
+
+        extra_str = "  |  ".join(extra[:4])
+        page_id = r.get("id", "").replace("-", "")
+        line = f"  • {title}  (ID: {page_id})"
+        if extra_str:
+            line += f"\n    {extra_str}"
+        lines.append(line)
+
+    if data.get("has_more"):
+        lines.append(f"\n... 더 많은 항목이 있어요. limit을 늘려서 조회하세요.")
+
+    return "\n".join(lines)
+
+
+@tool(args_schema=NotionPageUpdateInput)
+@skill_guard("notion")
+async def notion_page_update(page_id: str, properties_json: str) -> str:
+    """노션 페이지의 속성(Status, Date 등)을 업데이트합니다.
+    properties_json은 Notion API 형식의 JSON 문자열이어야 합니다."""
+    import json as _json
+
+    api_key = await _get_notion_key()
+    if not api_key:
+        return _not_linked()
+
+    pid = page_id.strip()
+    if "notion.so" in pid:
+        pid = pid.split("/")[-1].split("?")[0]
+        if "-" in pid:
+            pid = pid.split("-")[-1]
+    pid = pid.replace("-", "")
+    if len(pid) == 32:
+        pid = f"{pid[:8]}-{pid[8:12]}-{pid[12:16]}-{pid[16:20]}-{pid[20:]}"
+
+    try:
+        properties = _json.loads(properties_json)
+    except _json.JSONDecodeError:
+        return "properties_json이 올바른 JSON 형식이 아니에요."
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.patch(
+                f"{_BASE_URL}/pages/{pid}",
+                headers=_headers(api_key),
+                json={"properties": properties},
+            )
+            if resp.status_code == 401:
+                return "Notion API 키가 유효하지 않아요."
+            if resp.status_code == 404:
+                return "페이지를 찾을 수 없어요. ID를 확인해주세요."
+            if resp.status_code == 400:
+                detail = ""
+                try:
+                    detail = resp.json().get("message", "")
+                except Exception:
+                    pass
+                return f"속성 업데이트에 실패했어요. {detail}".strip()
+            resp.raise_for_status()
+            page = resp.json()
+    except httpx.HTTPStatusError as e:
+        return f"페이지 업데이트에 실패했어요. (HTTP {e.response.status_code})"
+    except Exception:
+        logger.debug("notion_page_update failed", exc_info=True)
+        return "페이지 업데이트 중 오류가 발생했어요."
+
+    url = page.get("url", "")
+    return f"✅ 노션 페이지 속성이 업데이트됐어요.\nURL: {url}"
