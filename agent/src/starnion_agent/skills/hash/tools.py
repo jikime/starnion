@@ -28,7 +28,7 @@ class GenerateHashInput(BaseModel):
 @tool(args_schema=GenerateHashInput)
 @skill_guard("hash")
 async def generate_hash(text: str, algorithm: str = "sha256") -> str:
-    """텍스트의 해시값을 생성합니다. MD5, SHA1, SHA256, SHA512를 지원합니다."""
+    """해시값 생성이 필요할 때 호출. ('해시', 'MD5', 'SHA256', 'hash value', '해시 생성', 'ハッシュ', '哈希值')"""
     if not text:
         return "해시할 텍스트를 입력해 주세요."
 

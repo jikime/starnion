@@ -67,7 +67,7 @@ async def translate_text(
     target_lang: str = "en",
     source_lang: str = "auto",
 ) -> str:
-    """텍스트를 지정된 언어로 번역합니다. 한국어, 영어, 일본어, 중국어 등 7개 언어를 지원합니다."""
+    """텍스트 번역이 필요할 때 호출. ('번역해줘', '영어로', '한국어로', 'translate', 'translate to English', '翻訳して', '翻译成中文')"""
     api_key = await get_gemini_api_key()
     if not api_key:
         return no_key_message()

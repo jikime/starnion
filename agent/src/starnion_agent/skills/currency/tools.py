@@ -73,7 +73,7 @@ async def convert_currency(
     from_currency: str = "USD",
     to_currency: str = "KRW",
 ) -> str:
-    """통화를 환전합니다. 실시간 환율 기반으로 금액을 변환합니다."""
+    """통화 환전이 필요할 때 호출. ('달러로 바꿔줘', '환전', '원화로 변환', 'convert currency', 'exchange', '換算して', '换算')"""
     if amount <= 0:
         return "변환할 금액은 0보다 커야 해요."
 

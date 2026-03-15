@@ -40,7 +40,7 @@ async def encode_decode(
     format: str = "base64",
     action: str = "encode",
 ) -> str:
-    """텍스트를 Base64, URL, HTML 형식으로 인코딩 또는 디코딩합니다."""
+    """텍스트 인코딩·디코딩이 필요할 때 호출. ('base64 인코딩', 'url encode', 'html 이스케이프', 'encode', 'decode', 'エンコード', '编码解码')"""
     if not text:
         return "인코딩/디코딩할 텍스트를 입력해 주세요."
 

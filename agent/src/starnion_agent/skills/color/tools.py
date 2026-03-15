@@ -150,7 +150,7 @@ class ConvertColorInput(BaseModel):
 @tool(args_schema=ConvertColorInput)
 @skill_guard("color")
 async def convert_color(color: str) -> str:
-    """색상 코드를 HEX, RGB, HSL 형식으로 변환합니다."""
+    """색상 코드 변환이 필요할 때 호출. ('HEX를 RGB로', '색상 변환', 'hex to rgb', 'color convert', '色変換', '颜色转换')"""
     if not color or not color.strip():
         return "색상 값을 입력해 주세요. (예: #FF5733, rgb(255,87,51), red, 빨강)"
 

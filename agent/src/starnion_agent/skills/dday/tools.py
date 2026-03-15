@@ -82,7 +82,7 @@ async def set_dday(
     icon: str = "📅",
     description: str = "",
 ) -> str:
-    """디데이를 설정합니다. 중요한 날짜까지 남은 일수를 추적합니다."""
+    """디데이(D-Day) 설정이 필요할 때 호출. ('디데이 설정', '며칠 남았어', 'd-day', 'countdown', 'how many days until', 'あと何日', '倒计时')"""
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요."

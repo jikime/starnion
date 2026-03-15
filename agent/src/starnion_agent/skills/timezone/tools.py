@@ -116,7 +116,7 @@ class ConvertTimezoneInput(BaseModel):
 @tool(args_schema=GetWorldTimeInput)
 @skill_guard("timezone")
 async def get_world_time(city: str) -> str:
-    """세계 각 도시의 현재 시간을 조회합니다."""
+    """세계 각 도시의 현재 시간 조회 시 호출. ('뉴욕 지금 몇시', '세계시간', 'what time in Tokyo', 'world time', 'タイムゾーン', '世界时间')"""
     if not city or not city.strip():
         return "도시 이름 또는 타임존을 입력해 주세요."
 

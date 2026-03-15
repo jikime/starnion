@@ -78,7 +78,7 @@ class GetHoroscopeInput(BaseModel):
 @tool(args_schema=GetHoroscopeInput)
 @skill_guard("horoscope")
 async def get_horoscope(sign: str) -> str:
-    """오늘의 별자리 운세를 조회합니다."""
+    """별자리 운세 조회가 필요할 때 호출. ('운세', '오늘 운세', '별자리', 'horoscope', 'zodiac', '占い', '星座运势')"""
     if not sign or not sign.strip():
         return f"별자리를 입력해 주세요.\n\n{_sign_list_text()}"
 

@@ -143,7 +143,7 @@ async def convert_unit(
     from_unit: str,
     to_unit: str,
 ) -> str:
-    """단위를 변환합니다. 길이, 무게, 온도, 부피, 면적, 데이터 단위를 지원합니다."""
+    """단위 변환이 필요할 때 호출. ('km를 마일로', '온도 변환', '단위 바꿔줘', 'unit convert', 'convert km to miles', '単位変換', '单位换算')"""
     from_u = from_unit.strip()
     to_u = to_unit.strip()
 

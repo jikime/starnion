@@ -65,7 +65,7 @@ async def random_pick(
     length: int = 16,
     charset: str = "alphanumeric",
 ) -> str:
-    """랜덤 선택, 숫자 뽑기, 동전 던지기, 주사위 굴리기, 문자열 생성 등을 수행합니다."""
+    """랜덤 선택·뽑기가 필요할 때 호출. ('골라줘', '뭐 먹을까', '주사위', '동전', 'pick one', 'random choice', 'ランダム', '随机选')"""
     mode = mode.strip().lower()
 
     if mode not in _VALID_MODES:

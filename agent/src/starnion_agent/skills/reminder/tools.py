@@ -64,7 +64,7 @@ async def set_reminder(
     remind_at: str,
     title: str = "",
 ) -> str:
-    """알림을 예약합니다. 지정된 시간에 메시지를 보내드립니다."""
+    """특정 시간에 알림을 예약할 때 호출. ('알려줘', '알림 설정', '분 후에 알림', 'remind me at', 'set a reminder', 'リマインダー', '提醒我')"""
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요."

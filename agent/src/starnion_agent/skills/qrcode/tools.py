@@ -27,7 +27,7 @@ class GenerateQrcodeInput(BaseModel):
 @tool(args_schema=GenerateQrcodeInput)
 @skill_guard("qrcode")
 async def generate_qrcode(content: str, size: int = 10) -> str:
-    """텍스트나 URL로 QR 코드 이미지를 생성합니다."""
+    """QR 코드 생성이 필요할 때 호출. ('QR코드 만들어', 'QR 만들어줘', 'qr code', 'generate qr', 'QRコード', '生成二维码')"""
     if not content or not content.strip():
         return "QR 코드에 담을 내용을 입력해 주세요."
 

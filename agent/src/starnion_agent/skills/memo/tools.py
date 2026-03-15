@@ -51,7 +51,7 @@ async def save_memo(
     title: str = "",
     tag: str = "개인",
 ) -> str:
-    """메모를 저장합니다."""
+    """사용자가 메모·노트·기록 저장을 요청할 때 반드시 호출. ('메모해줘', '적어줘', '기억해줘', '기록해줘', 'note this', 'save a memo', 'メモして', '记下来')"""
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요."
@@ -99,7 +99,7 @@ async def save_memo(
 @tool(args_schema=ListMemosInput)
 @skill_guard("memo")
 async def list_memos(tag: str = "", limit: int = 10) -> str:
-    """저장된 메모 목록을 조회합니다."""
+    """저장된 메모 목록을 조회·검색할 때 호출. ('메모 보여줘', '메모 목록', '메모 뭐 있어', 'list memos', 'show notes', 'メモ一覧')"""
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요."
@@ -133,7 +133,7 @@ async def list_memos(tag: str = "", limit: int = 10) -> str:
 @tool(args_schema=DeleteMemoInput)
 @skill_guard("memo")
 async def delete_memo(memo_id: int) -> str:
-    """메모를 삭제합니다."""
+    """저장된 메모를 ID로 삭제할 때 호출. ('메모 삭제', '메모 지워줘', 'delete memo')"""
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요."
