@@ -548,7 +548,7 @@ export default function MemoryPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="w-full sm:w-auto">
+        <TabsList className="w-full sm:w-auto justify-start">
           <TabsTrigger value="insights" className="flex-1 sm:flex-none gap-1.5">
             <MessageSquare className="size-4" />
             <span className="hidden sm:inline">{t("tabInsights")}</span>
