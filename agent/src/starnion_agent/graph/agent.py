@@ -112,17 +112,18 @@ logger = logging.getLogger(__name__)
 
 
 def _filter_stale_tool_errors(messages: list) -> list:
-    """Remove tool call + tool result pairs that ended in an error.
+    """Remove failed tool interactions — including the LLM's follow-up response.
 
-    When a tool previously failed (e.g. browser crash, X server missing),
-    the LLM tends to avoid calling the same tool again even after the
-    underlying issue is fixed.  Removing stale error pairs gives the LLM
-    a clean slate so it will retry on the next user request.
+    A failed tool interaction consists of three parts that all get removed:
+      1. AIMessage with tool_calls (the invocation)
+      2. ToolMessage with '오류:' content (the error result)
+      3. AIMessage without tool_calls immediately after (the LLM's "I can't do
+         this" follow-up) — this is the part that previously remained in history
+         and caused the LLM to self-judge and skip retrying the tool.
 
-    Only pairs where the ToolMessage content starts with '오류:' are removed.
-    Successful tool results are kept as-is for context.
+    Successful tool results and their surrounding messages are kept as-is.
     """
-    # Collect tool_call_ids of failed tool results.
+    # Step 1: collect failed tool_call_ids from error ToolMessages.
     failed_ids: set[str] = set()
     for msg in messages:
         if isinstance(msg, ToolMessage):
@@ -133,24 +134,43 @@ def _filter_stale_tool_errors(messages: list) -> list:
     if not failed_ids:
         return messages
 
-    filtered: list = []
-    for msg in messages:
-        # Drop ToolMessage for failed calls.
+    # Step 2: mark indices to remove.
+    # Also track whether the previous "slot" was a fully-failed AI tool call
+    # so we can remove its follow-up plain AIMessage as well.
+    remove: set[int] = set()
+    last_fully_failed_ai_idx: int | None = None
+
+    for i, msg in enumerate(messages):
         if isinstance(msg, ToolMessage) and msg.tool_call_id in failed_ids:
-            continue
-        # Drop AIMessage tool_calls that triggered failed results.
-        if isinstance(msg, AIMessage) and msg.tool_calls:
-            clean_calls = [tc for tc in msg.tool_calls if tc["id"] not in failed_ids]
-            if len(clean_calls) == len(msg.tool_calls):
-                filtered.append(msg)
-            elif clean_calls:
-                # Keep AIMessage but strip the failed tool_calls.
-                filtered.append(msg.model_copy(update={"tool_calls": clean_calls}))
-            # If all tool_calls were failures and there's no text content, drop entirely.
-            elif msg.content:
-                filtered.append(msg.model_copy(update={"tool_calls": []}))
+            remove.add(i)
+
+        elif isinstance(msg, AIMessage) and msg.tool_calls:
+            failed_calls = [tc for tc in msg.tool_calls if tc["id"] in failed_ids]
+            all_failed = len(failed_calls) == len(msg.tool_calls)
+
+            if all_failed and not msg.content:
+                # Entire AIMessage is just a failed tool invocation — remove it
+                # and flag so the follow-up plain AIMessage is removed too.
+                remove.add(i)
+                last_fully_failed_ai_idx = i
+            elif failed_calls:
+                # Mixed: strip only the failed tool_calls, keep the rest.
+                clean_calls = [tc for tc in msg.tool_calls if tc["id"] not in failed_ids]
+                messages[i] = msg.model_copy(update={"tool_calls": clean_calls})
+
+        elif isinstance(msg, AIMessage) and not msg.tool_calls:
+            # Remove this plain AIMessage if it is the immediate follow-up to a
+            # fully-failed tool invocation (with only removed messages in between).
+            if last_fully_failed_ai_idx is not None:
+                between = range(last_fully_failed_ai_idx + 1, i)
+                if all(j in remove for j in between):
+                    remove.add(i)
+            last_fully_failed_ai_idx = None
+
         else:
-            filtered.append(msg)
+            last_fully_failed_ai_idx = None
+
+    filtered = [msg for i, msg in enumerate(messages) if i not in remove]
 
     removed = len(messages) - len(filtered)
     if removed:
