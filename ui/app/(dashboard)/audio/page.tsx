@@ -2,12 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useTranslations } from "next-intl"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AudioRecorder } from "@/components/chat/audio-recorder"
-import { Download, FileAudio, Mic, Music, RefreshCw, Square, Trash2, Upload } from "lucide-react"
+import {
+  AlertTriangle,
+  Download,
+  FileAudio,
+  Mic,
+  Music,
+  RefreshCw,
+  Square,
+  Trash2,
+  Upload,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -29,6 +38,40 @@ interface AudioItem {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Color maps
+// ────────────────────────────────────────────────────────────────────────────
+
+const TYPE_BADGE: Record<string, string> = {
+  uploaded:  "bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800",
+  recorded:  "bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800",
+  generated: "bg-violet-100 text-violet-700 border border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800",
+}
+
+const TYPE_LEFT_BORDER: Record<string, string> = {
+  uploaded:  "border-l-blue-400",
+  recorded:  "border-l-emerald-400",
+  generated: "border-l-violet-400",
+}
+
+const TYPE_ICON_BG: Record<string, string> = {
+  uploaded:  "bg-blue-100 dark:bg-blue-950/50",
+  recorded:  "bg-emerald-100 dark:bg-emerald-950/50",
+  generated: "bg-violet-100 dark:bg-violet-950/50",
+}
+
+const TYPE_ICON_COLOR: Record<string, string> = {
+  uploaded:  "text-blue-500",
+  recorded:  "text-emerald-500",
+  generated: "text-violet-500",
+}
+
+const SOURCE_BADGE: Record<string, string> = {
+  web:      "bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700",
+  telegram: "bg-sky-100 text-sky-700 border border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800",
+  webchat:  "bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800",
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -39,7 +82,6 @@ function fmtDuration(s: number): string {
   return `${m}:${String(sec).padStart(2, "0")}`
 }
 
-/** Upload a Blob to MinIO and return {url, name, mime, size}. */
 async function uploadBlob(blob: Blob, mimeType: string) {
   const ext = mimeType.split("/")[1]?.split(";")[0] ?? "webm"
   const name = `voice-${Date.now()}.${ext}`
@@ -52,7 +94,6 @@ async function uploadBlob(blob: Blob, mimeType: string) {
   return { url: data.url as string, name: data.name as string, mime: mimeType, size: blob.size }
 }
 
-/** Upload a File to MinIO and return {url, name, mime, size}. */
 async function uploadFile(file: File) {
   const fd = new FormData()
   fd.append("file", file)
@@ -62,7 +103,6 @@ async function uploadFile(file: File) {
   return { url: data.url as string, name: data.name as string, mime: file.type, size: file.size }
 }
 
-/** Save audio metadata to DB. Returns the new row id. */
 async function saveAudioMeta(params: {
   url: string; name: string; mime: string; size: number
   type: "recorded" | "uploaded" | "generated"; duration?: number
@@ -77,7 +117,6 @@ async function saveAudioMeta(params: {
   return data.id as number
 }
 
-/** Patch transcript on an existing audio row. */
 async function patchTranscript(id: number, transcript: string) {
   await fetch(`/api/audios/${id}`, {
     method: "PATCH",
@@ -86,10 +125,6 @@ async function patchTranscript(id: number, transcript: string) {
   })
 }
 
-/**
- * Stream STT from the action endpoint.
- * Calls onText with each delta; returns the full transcript string.
- */
 async function streamTranscript(
   fileUrl: string, fileName: string, fileMime: string,
   onText: (delta: string) => void
@@ -131,34 +166,23 @@ async function streamTranscript(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Badges
+// TranscriptBox
 // ────────────────────────────────────────────────────────────────────────────
 
-function SourceBadge({ source }: { source: string }) {
-  const map: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
-    web:      { label: "Web",      variant: "default" },
-    telegram: { label: "Telegram", variant: "secondary" },
-    webchat:  { label: "Webchat",  variant: "outline" },
-  }
-  const { label, variant } = map[source] ?? { label: source, variant: "outline" }
-  return <Badge variant={variant} className="text-xs">{label}</Badge>
-}
-
-function TypeBadge({ type }: { type: string }) {
-  const t = useTranslations("audio")
-  const map: Record<string, { labelKey: string; className: string }> = {
-    uploaded:  { labelKey: "typeBadges.uploaded",  className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
-    recorded:  { labelKey: "typeBadges.recorded",  className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
-    generated: { labelKey: "typeBadges.generated", className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
-  }
-  const entry = map[type]
-  const label = entry ? t(entry.labelKey as Parameters<typeof t>[0]) : type
-  const className = entry?.className ?? ""
-  return <Badge variant="outline" className={`text-xs ${className}`}>{label}</Badge>
+function TranscriptBox({ label, text }: { label: string; text: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-muted/30 overflow-hidden">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border/50">
+        <span className="size-1.5 rounded-full bg-emerald-400 shrink-0" />
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      </div>
+      <p className="px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed">{text}</p>
+    </div>
+  )
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// RecordTab  –  uses the WaveSurfer AudioRecorder from webchat
+// RecordTab
 // ────────────────────────────────────────────────────────────────────────────
 
 function RecordTab({ onSaved }: { onSaved: () => void }) {
@@ -181,23 +205,17 @@ function RecordTab({ onSaved }: { onSaved: () => void }) {
     setTranscript("")
 
     try {
-      // 1. Upload to MinIO
       setStatus("uploading")
       const { url, name, mime, size } = await uploadBlob(blob, mimeType)
-
-      // 2. Save metadata to DB as 'recorded'
       const audioId = await saveAudioMeta({ url, name, mime, size, type: "recorded" })
 
-      // 3. Stream STT
       setStatus("transcribing")
       let full = ""
       full = await streamTranscript(url, name, mime, (delta) => {
-        setTranscript((t) => t + delta)
+        setTranscript((prev) => prev + delta)
       })
 
-      // 4. Patch transcript
       if (full) await patchTranscript(audioId, full)
-
       setStatus("done")
       onSaved()
     } catch (e) {
@@ -206,28 +224,35 @@ function RecordTab({ onSaved }: { onSaved: () => void }) {
     }
   }, [onSaved, t])
 
-  const handleCancel = useCallback(() => {
-    setShowRecorder(false)
-  }, [])
+  const handleCancel = useCallback(() => setShowRecorder(false), [])
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("recordTitle")}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6 py-6">
-        {/* Recorder widget */}
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-5 py-4 border-b border-border/60">
+        <div className="rounded-lg p-1.5 bg-red-100 dark:bg-red-950/50">
+          <Mic className="size-4 text-red-600 dark:text-red-400" />
+        </div>
+        <p className="font-semibold text-sm">{t("recordTitle")}</p>
+      </div>
+
+      <div className="p-5 space-y-6">
         {showRecorder ? (
           <AudioRecorder onAttach={handleAttach} onCancel={handleCancel} />
         ) : (
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-5 py-4">
             {status === "idle" && (
               <>
-                <div className="size-24 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Mic className="size-12 text-primary" />
+                {/* Mic button with pulse ring */}
+                <div className="relative flex items-center justify-center">
+                  <span className="absolute size-28 rounded-full bg-red-100 dark:bg-red-950/30 animate-ping opacity-30" />
+                  <span className="absolute size-24 rounded-full bg-red-100 dark:bg-red-950/40 opacity-50" />
+                  <div className="relative size-20 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center ring-4 ring-red-200/50 dark:ring-red-800/30">
+                    <Mic className="size-9 text-red-500" />
+                  </div>
                 </div>
                 <p className="text-sm text-muted-foreground">{t("micPrompt")}</p>
-                <Button size="lg" className="gap-2" onClick={() => setShowRecorder(true)}>
+                <Button size="lg" className="gap-2 bg-red-500 hover:bg-red-600 text-white border-0" onClick={() => setShowRecorder(true)}>
                   <Mic className="size-5" />
                   {t("startRecording")}
                 </Button>
@@ -235,39 +260,66 @@ function RecordTab({ onSaved }: { onSaved: () => void }) {
             )}
 
             {(status === "uploading" || status === "transcribing") && (
-              <div className="flex flex-col items-center gap-3">
-                <RefreshCw className="size-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">
-                  {status === "uploading" ? t("uploading") : t("transcribing")}
-                </p>
+              <div className="flex flex-col items-center gap-4">
+                {/* Step indicators */}
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-medium transition-colors",
+                    status === "uploading"
+                      ? "border-sky-300 bg-sky-50 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-700"
+                      : "border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-700"
+                  )}>
+                    <RefreshCw className="size-3 animate-spin" />
+                    {status === "uploading" ? t("uploading") : t("transcribing")}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {["uploading", "transcribing"].map((step) => (
+                    <div
+                      key={step}
+                      className={cn(
+                        "h-1.5 w-16 rounded-full transition-colors",
+                        status === step
+                          ? "bg-primary animate-pulse"
+                          : status === "transcribing" && step === "uploading"
+                          ? "bg-emerald-400"
+                          : "bg-muted"
+                      )}
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
             {status === "done" && (
-              <Button variant="outline" size="sm" className="gap-2" onClick={reset}>
-                <Mic className="size-4" />
-                {t("reRecord")}
-              </Button>
+              <div className="flex flex-col items-center gap-3">
+                <div className="size-14 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center">
+                  <span className="text-2xl">✓</span>
+                </div>
+                <Button variant="outline" size="sm" className="gap-2" onClick={reset}>
+                  <Mic className="size-4" />
+                  {t("reRecord")}
+                </Button>
+              </div>
             )}
 
             {status === "error" && (
-              <div className="flex flex-col items-center gap-3">
-                <p className="text-sm text-destructive">{error}</p>
+              <div className="flex flex-col items-center gap-3 w-full">
+                <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive w-full">
+                  <AlertTriangle className="size-4 shrink-0" />
+                  {error}
+                </div>
                 <Button variant="outline" size="sm" onClick={reset}>{t("retry")}</Button>
               </div>
             )}
           </div>
         )}
 
-        {/* Live transcript */}
         {transcript && (
-          <div className="rounded-lg border border-border bg-muted/30 p-4">
-            <p className="text-xs text-muted-foreground mb-1">{t("transcriptResult")}</p>
-            <p className="text-sm whitespace-pre-wrap">{transcript}</p>
-          </div>
+          <TranscriptBox label={t("transcriptResult")} text={transcript} />
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
@@ -278,6 +330,7 @@ function RecordTab({ onSaved }: { onSaved: () => void }) {
 function TranscribeTab({ onSaved }: { onSaved: () => void }) {
   const t = useTranslations("audio")
   const [file, setFile] = useState<File | null>(null)
+  const [drag, setDrag] = useState(false)
   const [status, setStatus] = useState<"idle" | "uploading" | "transcribing" | "done" | "error">("idle")
   const [transcript, setTranscript] = useState("")
   const [error, setError] = useState("")
@@ -292,6 +345,7 @@ function TranscribeTab({ onSaved }: { onSaved: () => void }) {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
+    setDrag(false)
     const f = e.dataTransfer.files[0]
     if (f) handleFile(f)
   }
@@ -302,23 +356,17 @@ function TranscribeTab({ onSaved }: { onSaved: () => void }) {
     setTranscript("")
 
     try {
-      // 1. Upload
       setStatus("uploading")
       const { url, name, mime, size } = await uploadFile(file)
-
-      // 2. Save metadata
       const audioId = await saveAudioMeta({ url, name, mime, size, type: "uploaded" })
 
-      // 3. Stream STT
       setStatus("transcribing")
       let full = ""
       full = await streamTranscript(url, name, mime, (delta) => {
-        setTranscript((t) => t + delta)
+        setTranscript((prev) => prev + delta)
       })
 
-      // 4. Patch transcript
       if (full) await patchTranscript(audioId, full)
-
       setStatus("done")
       onSaved()
     } catch (e) {
@@ -330,14 +378,26 @@ function TranscribeTab({ onSaved }: { onSaved: () => void }) {
   const busy = status === "uploading" || status === "transcribing"
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("transcribeTitle")}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-5 py-4 border-b border-border/60">
+        <div className="rounded-lg p-1.5 bg-sky-100 dark:bg-sky-950/50">
+          <FileAudio className="size-4 text-sky-600 dark:text-sky-400" />
+        </div>
+        <p className="font-semibold text-sm">{t("transcribeTitle")}</p>
+      </div>
+
+      <div className="p-5 space-y-5">
+        {/* Drop zone */}
         <div
-          className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
-          onDragOver={(e) => e.preventDefault()}
+          className={cn(
+            "border-2 border-dashed rounded-xl p-10 text-center transition-colors",
+            drag ? "border-primary bg-primary/5" : "border-border hover:border-sky-400/60 hover:bg-sky-50/20 dark:hover:bg-sky-950/10",
+            busy && "pointer-events-none opacity-60",
+            !busy && "cursor-pointer"
+          )}
+          onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
+          onDragLeave={() => setDrag(false)}
           onDrop={handleDrop}
           onClick={() => !busy && inputRef.current?.click()}
         >
@@ -348,32 +408,49 @@ function TranscribeTab({ onSaved }: { onSaved: () => void }) {
             className="hidden"
             onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]) }}
           />
-          <Upload className="mx-auto size-10 text-muted-foreground mb-3" />
           {file ? (
-            <p className="font-medium">{file.name}</p>
+            <div className="flex flex-col items-center gap-3">
+              <div className="size-12 rounded-full bg-sky-100 dark:bg-sky-950/50 flex items-center justify-center">
+                <FileAudio className="size-6 text-sky-500" />
+              </div>
+              <p className="font-medium text-sm truncate max-w-xs">{file.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {(file.size / 1024 / 1024).toFixed(2)} MB
+              </p>
+            </div>
           ) : (
             <>
-              <p className="font-medium mb-1">{t("uploadAudio")}</p>
-              <p className="text-sm text-muted-foreground">{t("audioFormats")}</p>
+              <div className={cn(
+                "mx-auto size-12 rounded-full flex items-center justify-center mb-3 transition-colors",
+                drag ? "bg-primary/10" : "bg-sky-100 dark:bg-sky-950/50"
+              )}>
+                <Upload className={cn("size-6 transition-colors", drag ? "text-primary" : "text-sky-500")} />
+              </div>
+              <p className="font-medium text-sm mb-1">{t("uploadAudio")}</p>
+              <p className="text-xs text-muted-foreground">{t("audioFormats")}</p>
             </>
           )}
         </div>
 
         <Button className="w-full gap-2" disabled={!file || busy} onClick={handleTranscribe}>
-          {busy ? <RefreshCw className="size-4 animate-spin" /> : <FileAudio className="size-4" />}
-          {status === "uploading" ? t("uploading") : status === "transcribing" ? t("converting") : t("convertButton")}
+          {busy
+            ? <><RefreshCw className="size-4 animate-spin" />{status === "uploading" ? t("uploading") : t("converting")}</>
+            : <><FileAudio className="size-4" />{t("convertButton")}</>
+          }
         </Button>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
-
-        {transcript && (
-          <div className="rounded-lg border border-border bg-muted/30 p-4">
-            <p className="text-xs text-muted-foreground mb-1">{t("transcriptResult")}</p>
-            <p className="text-sm whitespace-pre-wrap">{transcript}</p>
+        {error && (
+          <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertTriangle className="size-4 shrink-0" />
+            {error}
           </div>
         )}
-      </CardContent>
-    </Card>
+
+        {transcript && (
+          <TranscriptBox label={t("transcriptResult")} text={transcript} />
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -420,102 +497,146 @@ function FileListTab({ refreshKey }: { refreshKey: number }) {
     setPlayingId(item.id)
   }
 
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="flex justify-center py-12">
-          <RefreshCw className="size-6 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
-    )
-  }
-
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>{t("filesTitle")}</CardTitle>
-        <Button variant="ghost" size="sm" onClick={load} className="gap-1">
-          <RefreshCw className="size-4" />
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
+        <div className="flex items-center gap-2">
+          <div className="rounded-lg p-1.5 bg-violet-100 dark:bg-violet-950/50">
+            <Music className="size-4 text-violet-600 dark:text-violet-400" />
+          </div>
+          <p className="font-semibold text-sm">{t("filesTitle")}</p>
+          {items.length > 0 && (
+            <span className="text-xs text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+              {items.length}
+            </span>
+          )}
+        </div>
+        <Button variant="ghost" size="sm" onClick={load} className="gap-1.5 text-xs" disabled={loading}>
+          <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
           {t("refresh")}
         </Button>
-      </CardHeader>
-      <CardContent>
-        {items.length === 0 ? (
-          <div className="flex flex-col items-center py-12 text-muted-foreground gap-2">
-            <FileAudio className="size-10" />
+      </div>
+
+      <div className="p-5">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <RefreshCw className="size-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+            <div className="rounded-full p-4 bg-muted/50">
+              <FileAudio className="size-8 opacity-40" />
+            </div>
             <p className="text-sm">{t("noFiles")}</p>
           </div>
         ) : (
           <div className="space-y-3">
             {items.map((item) => (
-              <div key={item.id} className="flex flex-col gap-2 rounded-lg border border-border p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <FileAudio className="size-5 text-primary shrink-0" />
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {[
-                          item.size_label,
-                          item.duration ? fmtDuration(item.duration) : null,
-                          item.created_at,
-                        ].filter(Boolean).join(" · ")}
-                      </p>
+              <div
+                key={item.id}
+                className={cn(
+                  "group flex flex-col gap-2.5 rounded-xl border border-border bg-background overflow-hidden",
+                  "border-l-4 transition-colors hover:border-border/80",
+                  TYPE_LEFT_BORDER[item.type] ?? "border-l-border"
+                )}
+              >
+                <div className="px-4 pt-4 pb-3 border-b border-border/50">
+                  <div className="flex items-center justify-between gap-2">
+                    {/* Icon + name */}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={cn(
+                        "rounded-lg p-1.5 shrink-0",
+                        TYPE_ICON_BG[item.type] ?? "bg-muted"
+                      )}>
+                        <FileAudio className={cn("size-3.5", TYPE_ICON_COLOR[item.type] ?? "text-muted-foreground")} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {[
+                            item.size_label,
+                            item.duration ? fmtDuration(item.duration) : null,
+                            item.created_at,
+                          ].filter(Boolean).join(" · ")}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 opacity-50 group-hover:opacity-100 transition-opacity"
+                        title={playingId === item.id ? t("stop") : t("play")}
+                        onClick={() => handlePlay(item)}
+                      >
+                        {playingId === item.id
+                          ? <Square className="size-4 text-primary" />
+                          : <span className="text-primary text-xs font-bold">▶</span>
+                        }
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 opacity-50 group-hover:opacity-100 transition-opacity"
+                        title={t("download")}
+                        asChild
+                      >
+                        <a href={item.url} download={item.name} target="_blank" rel="noreferrer">
+                          <Download className="size-4" />
+                        </a>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 opacity-50 group-hover:opacity-100 hover:text-destructive transition-opacity"
+                        title={t("delete")}
+                        onClick={() => handleDelete(item.id)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      title={playingId === item.id ? t("stop") : t("play")}
-                      onClick={() => handlePlay(item)}
-                    >
-                      {playingId === item.id
-                        ? <Square className="size-4 text-primary" />
-                        : <span className="text-primary text-xs font-bold">▶</span>
-                      }
-                    </Button>
-                    <a href={item.url} download={item.name} target="_blank" rel="noreferrer">
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title={t("download")}>
-                        <Download className="size-4" />
-                      </Button>
-                    </a>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                      title={t("delete")}
-                      onClick={() => handleDelete(item.id)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
                 </div>
 
-                <div className="flex gap-1.5 flex-wrap">
-                  <SourceBadge source={item.source} />
-                  <TypeBadge type={item.type} />
-                </div>
+                {/* Badges + transcript */}
+                <div className="px-4 pb-3 space-y-2">
+                  <div className="flex gap-1.5 flex-wrap">
+                    <span className={cn(
+                      "text-xs font-medium px-2 py-0.5 rounded-full",
+                      SOURCE_BADGE[item.source] ?? SOURCE_BADGE.web
+                    )}>
+                      {item.source}
+                    </span>
+                    <span className={cn(
+                      "text-xs font-medium px-2 py-0.5 rounded-full",
+                      TYPE_BADGE[item.type] ?? TYPE_BADGE.uploaded
+                    )}>
+                      {item.type}
+                    </span>
+                  </div>
 
-                {item.transcript && (
-                  <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{t("transcript")}: </span>
-                    {item.transcript}
-                  </div>
-                )}
-                {item.prompt && (
-                  <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{t("prompt")}: </span>
-                    {item.prompt}
-                  </div>
-                )}
+                  {item.transcript && (
+                    <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{t("transcript")}: </span>
+                      {item.transcript}
+                    </div>
+                  )}
+                  {item.prompt && (
+                    <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{t("prompt")}: </span>
+                      {item.prompt}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 

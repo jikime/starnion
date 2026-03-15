@@ -372,7 +372,8 @@
     "aiLabel": "AI",
     "peakHour": "最も活発な時間",
     "dailyTrend": "日次メッセージトレンド",
-    "dailyTrendSub": "直近30日"
+    "dailyTrendSub": "直近30日",
+    "days": "日"
   },
   "usage": {
     "title": "使用量",

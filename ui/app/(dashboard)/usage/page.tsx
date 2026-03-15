@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useMemo, memo } from "react"
+import { useEffect, useState, useCallback, memo } from "react"
 import { useTranslations } from "next-intl"
 // NOTE: Recharts is client-only. This page is already "use client", so static
 // import is fine. If bundle size becomes an issue, consider extracting chart
@@ -32,7 +32,6 @@ import {
   Loader2,
   BarChart3,
 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   Select,
@@ -208,16 +207,13 @@ const LogEntry = memo(function LogEntry({ row, t }: { row: LogRow; t: ReturnType
         <span className="text-xs text-muted-foreground w-32 shrink-0 truncate">
           {fmtDate(row.created_at)}
         </span>
-        <Badge
-          variant="outline"
-          className={`text-xs shrink-0 ${
-            row.status === "success"
-              ? "border-emerald-500/40 text-emerald-600"
-              : "border-rose-500/40 text-rose-600"
-          }`}
-        >
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border shrink-0 ${
+          row.status === "success"
+            ? "border-emerald-500/40 text-emerald-600"
+            : "border-rose-500/40 text-rose-600"
+        }`}>
           {row.status}
-        </Badge>
+        </span>
         <span
           className="text-xs font-medium truncate flex-1"
           style={{ color: providerColor(row.provider) }}

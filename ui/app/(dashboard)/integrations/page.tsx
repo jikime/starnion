@@ -3,9 +3,7 @@
 import { useEffect, useState, Suspense, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import { useTranslations } from "next-intl"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
@@ -16,7 +14,28 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { CheckCircle2, XCircle, Link2, Loader2, ExternalLink, Unlink } from "lucide-react"
+import { CheckCircle2, XCircle, Link2, Loader2, ExternalLink, Unlink, Search } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { siGoogle, siNotion, siGithub, siNaver, siGooglegemini } from "simple-icons"
+
+// ── Integration brand icons ──────────────────────────────────────────────────
+
+function SiIcon({ path, className, label }: { path: string; className?: string; label: string }) {
+  return (
+    <svg role="img" viewBox="0 0 24 24" className={className} fill="currentColor" aria-label={label}>
+      <path d={path} />
+    </svg>
+  )
+}
+
+const INTEGRATION_ICONS: Record<string, { icon: React.ReactNode; color: string }> = {
+  google:       { icon: <SiIcon path={siGoogle.path}       label="Google"  className="size-4" />, color: "text-blue-500"   },
+  notion:       { icon: <SiIcon path={siNotion.path}       label="Notion"  className="size-4" />, color: "text-gray-600 dark:text-gray-300" },
+  github:       { icon: <SiIcon path={siGithub.path}       label="GitHub"  className="size-4" />, color: "text-slate-700 dark:text-slate-300" },
+  tavily:       { icon: <Search className="size-4" />,                                             color: "text-purple-500" },
+  naver_search: { icon: <SiIcon path={siNaver.path}        label="Naver"   className="size-4" />, color: "text-green-500"  },
+  gemini:       { icon: <SiIcon path={siGooglegemini.path} label="Gemini"  className="size-4" />, color: "text-violet-500" },
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -299,80 +318,79 @@ function IntegrationsPageInner() {
           const isConnected = st?.connected ?? false
           const isBusy = busy === integration.id
 
+          const iconCfg = INTEGRATION_ICONS[integration.id]
           return (
-            <Card key={integration.id} className={`border ${integration.border} ${integration.color}`}>
-              <CardContent className="p-5">
-                <div className="flex items-start gap-4">
-                  {/* Logo */}
-                  <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white dark:bg-white/10 text-2xl shadow-sm border border-black/5">
-                    {integration.logo}
+            <div key={integration.id} className={cn(
+              "rounded-xl border bg-card overflow-hidden",
+              isConnected ? "border-border" : "border-border"
+            )}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
+                <div className="flex items-center gap-3">
+                  <div className={cn("size-8 flex items-center justify-center shrink-0", iconCfg.color)}>
+                    {iconCfg.icon}
                   </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold">{integration.name}</h3>
-                      {loading ? (
-                        <Loader2 className="size-3 animate-spin text-muted-foreground" />
-                      ) : isConnected ? (
-                        <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-0 text-xs gap-1">
-                          <CheckCircle2 className="size-3" /> {t("connected")}
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">{t("disconnected")}</Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">{integration.description}</p>
-                    <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5">
-                      {integration.capabilities.map((cap) => (
-                        <li key={cap} className="text-xs text-muted-foreground flex items-center gap-1">
-                          <span className="size-1 rounded-full bg-muted-foreground/50 shrink-0 inline-block" />
-                          {cap}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex shrink-0 flex-col gap-2 items-end">
-                    {isConnected ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={isBusy}
-                        onClick={() =>
-                          integration.id === "google"
-                            ? disconnectGoogle()
-                            : disconnect(integration.id as "notion" | "github" | "tavily" | "naver_search" | "gemini")
-                        }
-                      >
-                        {isBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Unlink className="size-3.5" />}
-                        {t("disconnect")}
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={isBusy || loading}
-                        onClick={() =>
-                          integration.id === "google"
-                            ? connectGoogle()
-                            : openApiKeyDialog(integration.id as "notion" | "github" | "tavily" | "naver_search" | "gemini")
-                        }
-                      >
-                        {isBusy ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : integration.authType === "oauth" ? (
-                          <ExternalLink className="size-3.5" />
-                        ) : null}
-                        {t("connect")}
-                      </Button>
-                    )}
-                  </div>
+                  <h3 className="font-semibold text-sm">{integration.name}</h3>
                 </div>
-              </CardContent>
-            </Card>
+                {loading ? (
+                  <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+                ) : isConnected ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border bg-green-100 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800">
+                    <CheckCircle2 className="size-3" /> {t("connected")}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-border text-muted-foreground bg-muted">
+                    {t("disconnected")}
+                  </span>
+                )}
+              </div>
+
+              {/* Body */}
+              <div className="px-5 py-4 space-y-3">
+                <p className="text-sm text-muted-foreground">{integration.description}</p>
+                <ul className="flex flex-wrap gap-x-4 gap-y-0.5">
+                  {integration.capabilities.map((cap) => (
+                    <li key={cap} className="text-xs text-muted-foreground flex items-center gap-1">
+                      <span className="size-1 rounded-full bg-muted-foreground/50 shrink-0 inline-block" />
+                      {cap}
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex justify-end">
+                  {isConnected ? (
+                    <Button
+                      variant="outline" size="sm" className="gap-1.5"
+                      disabled={isBusy}
+                      onClick={() =>
+                        integration.id === "google"
+                          ? disconnectGoogle()
+                          : disconnect(integration.id as "notion" | "github" | "tavily" | "naver_search" | "gemini")
+                      }
+                    >
+                      {isBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Unlink className="size-3.5" />}
+                      {t("disconnect")}
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm" className="gap-1.5"
+                      disabled={isBusy || loading}
+                      onClick={() =>
+                        integration.id === "google"
+                          ? connectGoogle()
+                          : openApiKeyDialog(integration.id as "notion" | "github" | "tavily" | "naver_search" | "gemini")
+                      }
+                    >
+                      {isBusy ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : integration.authType === "oauth" ? (
+                        <ExternalLink className="size-3.5" />
+                      ) : null}
+                      {t("connect")}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
           )
         })}
       </div>

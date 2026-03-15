@@ -2,16 +2,18 @@
 
 import { useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
-import { Card, CardContent } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
   SheetContent,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Cog, Info, Loader2, Copy, Check, Zap, MessageSquare, ToggleLeft, ToggleRight } from "lucide-react"
+import { cn } from "@/lib/utils"
+import {
+  Cog, Info, Loader2, Copy, Check, Zap, MessageSquare,
+  ToggleLeft, ToggleRight,
+} from "lucide-react"
 
 interface Skill {
   id: string
@@ -41,6 +43,22 @@ const CATEGORY_LABELS: Record<string, string> = {
   development:  "DEVELOPMENT",
 }
 
+const CATEGORY_DOT: Record<string, string> = {
+  finance:      "bg-emerald-400",
+  productivity: "bg-blue-400",
+  media:        "bg-violet-400",
+  integration:  "bg-orange-400",
+  information:  "bg-sky-400",
+  utility:      "bg-zinc-400",
+  lifestyle:    "bg-pink-400",
+  analysis:     "bg-indigo-400",
+  notification: "bg-amber-400",
+  core:         "bg-slate-400",
+  system:       "bg-red-400",
+  development:  "bg-cyan-400",
+}
+
+// ── CopyButton ──────────────────────────────────────────────────────────────
 function CopyButton({ text, label, copiedLabel }: { text: string; label: string; copiedLabel: string }) {
   const [copied, setCopied] = useState(false)
 
@@ -62,6 +80,7 @@ function CopyButton({ text, label, copiedLabel }: { text: string; label: string;
   )
 }
 
+// ── SkillDetailSheet ─────────────────────────────────────────────────────────
 function SkillDetailSheet({
   skill,
   open,
@@ -88,9 +107,8 @@ function SkillDetailSheet({
 
         {/* ── Hero header ── */}
         <div className="relative bg-gradient-to-br from-primary/10 via-primary/5 to-background px-6 pt-8 pb-6 border-b border-border/60">
-          {/* Emoji + title row */}
           <div className="flex items-start gap-4 pr-8">
-            <div className="flex-shrink-0 size-14 rounded-2xl bg-background shadow-sm border border-border/60 flex items-center justify-center text-3xl">
+            <div className="flex-shrink-0 size-14 rounded-2xl bg-background border border-border/60 flex items-center justify-center text-3xl">
               {skill.emoji}
             </div>
             <div className="flex-1 min-w-0 pt-1">
@@ -99,17 +117,19 @@ function SkillDetailSheet({
               </SheetTitle>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {isOptIn && (
-                  <Badge variant="outline" className="text-xs border-amber-400/60 text-amber-600 bg-amber-50 dark:bg-amber-950/30">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30">
                     opt-in
-                  </Badge>
+                  </span>
                 )}
                 {isSystem && (
-                  <Badge variant="secondary" className="text-xs">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-border text-muted-foreground bg-muted">
                     {t("required")}
-                  </Badge>
+                  </span>
                 )}
-                {/* Enabled indicator */}
-                <span className={`inline-flex items-center gap-1 text-xs font-medium ${skill.enabled ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                <span className={cn(
+                  "inline-flex items-center gap-1 text-xs font-medium",
+                  skill.enabled ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                )}>
                   {skill.enabled
                     ? <ToggleRight className="size-3.5" />
                     : <ToggleLeft className="size-3.5" />}
@@ -119,22 +139,21 @@ function SkillDetailSheet({
             </div>
           </div>
 
-          {/* Description */}
           <p className="mt-4 text-sm text-muted-foreground leading-relaxed">
             {skill.description}
           </p>
 
-          {/* Toggle button — bottom right of hero, only if not system */}
           {!isSystem && (
             <div className="mt-4 flex justify-end">
               <button
                 disabled={isToggling}
                 onClick={() => onToggle(skill.id)}
-                className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold border transition-all
-                  ${skill.enabled
+                className={cn(
+                  "inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold border transition-all",
+                  skill.enabled
                     ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
                     : "bg-muted border-border text-muted-foreground hover:bg-muted/80"
-                  }`}
+                )}
               >
                 {isToggling
                   ? <Loader2 className="size-3 animate-spin" />
@@ -151,7 +170,7 @@ function SkillDetailSheet({
         {/* ── Scrollable body ── */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
-          {/* Trigger keywords section */}
+          {/* Trigger keywords */}
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className="size-5 rounded-md bg-blue-100 dark:bg-blue-950 flex items-center justify-center">
@@ -180,10 +199,9 @@ function SkillDetailSheet({
             )}
           </div>
 
-          {/* Divider */}
           <div className="border-t border-border/50" />
 
-          {/* Usage examples section */}
+          {/* Usage examples */}
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className="size-5 rounded-md bg-violet-100 dark:bg-violet-950 flex items-center justify-center">
@@ -226,6 +244,7 @@ function SkillDetailSheet({
   )
 }
 
+// ── SkillsPage ────────────────────────────────────────────────────────────────
 export default function SkillsPage() {
   const t = useTranslations("skills")
   const [skills, setSkills] = useState<Skill[]>([])
@@ -262,7 +281,6 @@ export default function SkillsPage() {
         setSkills((prev) =>
           prev.map((s) => (s.id === skillId ? { ...s, enabled } : s))
         )
-        // Sync selected skill state if sheet is open
         if (selectedSkill?.id === skillId) {
           setSelectedSkill((prev) => prev ? { ...prev, enabled } : prev)
         }
@@ -282,94 +300,161 @@ export default function SkillsPage() {
 
   return (
     <div className="p-6 space-y-6">
+
+      {/* ── Page header ── */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold">
-            <Cog className="size-6 text-primary" />
-            {t("title")}
-          </h1>
-          <p className="text-muted-foreground">{t("subtitle")}</p>
+        <div className="flex items-center gap-3">
+          <div className="size-10 rounded-xl bg-violet-100 dark:bg-violet-950/60 flex items-center justify-center shrink-0">
+            <Cog className="size-5 text-violet-500" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold leading-tight">{t("title")}</h1>
+            <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
+          </div>
         </div>
+
         {loading ? (
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
         ) : (
-          <Badge variant="secondary" className="text-sm">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/30">
+            <span className="size-1.5 rounded-full bg-emerald-400 shrink-0" />
             {t("active", { n: activeCount, total: totalCount })}
-          </Badge>
+          </span>
         )}
       </div>
 
-      <Card>
-        <CardContent className="pt-6 space-y-8">
+      {/* ── Main panel ── */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        {/* Panel header */}
+        <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border bg-muted/30">
+          <Cog className="size-4 text-violet-500" />
+          <span className="text-sm font-medium">{t("title")}</span>
+          {!loading && (
+            <span className="ml-auto text-xs text-muted-foreground">
+              {totalCount}
+            </span>
+          )}
+        </div>
+
+        <div className="p-5">
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="size-6 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            Object.entries(grouped).map(([category, catSkills]) => (
-              <div key={category}>
-                <h4 className="font-medium mb-4 text-xs text-muted-foreground uppercase tracking-wider">
-                  {CATEGORY_LABELS[category] ?? category.toUpperCase()}
-                </h4>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {catSkills.map((skill) => {
-                    const isSystem = skill.permission === 0
-                    const isOptIn = skill.permission === 2
-                    const isToggling = togglingId === skill.id
+            <div className="space-y-8">
+              {Object.entries(grouped).map(([category, catSkills]) => (
+                <div key={category}>
+                  {/* Category header */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className={cn(
+                      "size-2 rounded-full shrink-0",
+                      CATEGORY_DOT[category] ?? "bg-muted-foreground"
+                    )} />
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      {CATEGORY_LABELS[category] ?? category.toUpperCase()}
+                    </h4>
+                    <span className="text-xs text-muted-foreground/60">
+                      ({catSkills.length})
+                    </span>
+                    <div className="flex-1 h-px bg-border/50 ml-1" />
+                  </div>
 
-                    return (
-                      <div
-                        key={skill.id}
-                        className="flex flex-col rounded-lg border border-border p-3 gap-2"
-                      >
-                        {/* Top row: emoji + name + badges + toggle */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-base shrink-0">{skill.emoji}</span>
-                            <span className="text-sm font-medium truncate">{skill.name}</span>
-                            {isOptIn && (
-                              <Badge variant="outline" className="text-xs shrink-0">opt-in</Badge>
-                            )}
-                            {isSystem && (
-                              <Badge variant="secondary" className="text-xs shrink-0">
-                                {t("required")}
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="size-6 text-muted-foreground hover:text-foreground"
-                              onClick={() => openDetail(skill)}
-                            >
-                              <Info className="size-3.5" />
-                            </Button>
-                            {isToggling ? (
-                              <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                            ) : (
-                              <Switch
-                                checked={skill.enabled}
-                                disabled={isSystem}
-                                onCheckedChange={() => toggleSkill(skill.id)}
-                              />
-                            )}
+                  {/* Skill cards */}
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {catSkills.map((skill) => {
+                      const isSystem = skill.permission === 0
+                      const isOptIn = skill.permission === 2
+                      const isToggling = togglingId === skill.id
+
+                      return (
+                        <div
+                          key={skill.id}
+                          className={cn(
+                            "group flex flex-col rounded-xl border bg-background overflow-hidden transition-colors",
+                            skill.enabled
+                              ? "border-border hover:border-violet-300 dark:hover:border-violet-700"
+                              : "border-border/60 opacity-75 hover:opacity-100 hover:border-border"
+                          )}
+                        >
+                          <div className="p-3 flex flex-col gap-2">
+                            {/* Top row */}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                {/* Emoji box */}
+                                <span className="flex-shrink-0 size-8 rounded-lg bg-muted flex items-center justify-center text-base">
+                                  {skill.emoji}
+                                </span>
+                                <div className="min-w-0">
+                                  <span className="text-sm font-medium leading-tight line-clamp-1">
+                                    {skill.name}
+                                  </span>
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    {isOptIn && (
+                                      <span className="inline-flex items-center px-1.5 py-px rounded text-[10px] font-medium border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 leading-tight">
+                                        opt-in
+                                      </span>
+                                    )}
+                                    {isSystem && (
+                                      <span className="inline-flex items-center px-1.5 py-px rounded text-[10px] font-medium border border-border text-muted-foreground bg-muted leading-tight">
+                                        {t("required")}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                                  onClick={() => openDetail(skill)}
+                                >
+                                  <Info className="size-3.5" />
+                                </Button>
+                                {isToggling ? (
+                                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                                ) : (
+                                  <Switch
+                                    checked={skill.enabled}
+                                    disabled={isSystem}
+                                    onCheckedChange={() => toggleSkill(skill.id)}
+                                  />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Description */}
+                            <p className="text-xs text-muted-foreground leading-snug line-clamp-2 pl-10">
+                              {skill.description}
+                            </p>
+
+                            {/* Footer: enabled status */}
+                            <div className="flex items-center gap-1.5 pl-10">
+                              <span className={cn(
+                                "size-1.5 rounded-full shrink-0",
+                                skill.enabled ? "bg-emerald-400" : "bg-muted-foreground/40"
+                              )} />
+                              <span className={cn(
+                                "text-[10px] font-medium",
+                                skill.enabled ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/60"
+                              )}>
+                                {skill.enabled ? "ON" : "OFF"}
+                              </span>
+                            </div>
                           </div>
                         </div>
-
-                        {/* Description row */}
-                        <p className="text-xs text-muted-foreground leading-snug line-clamp-2 pl-6">
-                          {skill.description}
-                        </p>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <SkillDetailSheet
         skill={selectedSkill}

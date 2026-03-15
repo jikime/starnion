@@ -404,7 +404,8 @@
     "aiLabel": "AI",
     "peakHour": "가장 활발한 시간",
     "dailyTrend": "일별 메시지 추이",
-    "dailyTrendSub": "최근 30일"
+    "dailyTrendSub": "최근 30일",
+    "days": "일"
   },
   "usage": {
     "title": "사용량",

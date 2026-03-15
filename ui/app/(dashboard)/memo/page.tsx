@@ -2,10 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useTranslations } from "next-intl"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
@@ -15,9 +13,25 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus, Search, Edit, Trash2, StickyNote, Loader2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 // DB values for tags (kept as Korean for API compatibility)
 const TAGS = ["전체", "업무", "개인", "쇼핑", "아이디어"]
+
+
+const TAG_BADGE: Record<string, string> = {
+  "업무":    "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800",
+  "개인":    "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800",
+  "쇼핑":    "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800",
+  "아이디어": "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800",
+}
+
+const TAG_ICON: Record<string, string> = {
+  "업무":    "💼",
+  "개인":    "🙂",
+  "쇼핑":    "🛍️",
+  "아이디어": "💡",
+}
 
 interface Memo {
   id: number
@@ -133,6 +147,7 @@ export default function MemoPage() {
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold">
@@ -154,76 +169,104 @@ export default function MemoPage() {
       </div>
 
       <div className="space-y-4 sm:space-y-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex gap-2 flex-wrap">
-              {TAGS.map((tag) => (
-                <Button
-                  key={tag}
-                  variant={selectedTag === tag ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedTag(tag)}
-                >
-                  {tagLabel(tag)}
-                </Button>
-              ))}
-            </div>
-            <Button className="gap-2 w-full sm:w-auto" onClick={openCreate}>
-              <Plus className="size-4" />
+        {/* Tag filter + Add button */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-2 flex-wrap">
+            {TAGS.map((tag) => (
+              <Button
+                key={tag}
+                variant={selectedTag === tag ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedTag(tag)}
+              >
+                {tag !== "전체" && <span className="mr-1">{TAG_ICON[tag]}</span>}
+                {tagLabel(tag)}
+              </Button>
+            ))}
+          </div>
+          <Button className="gap-2 w-full sm:w-auto" onClick={openCreate}>
+            <Plus className="size-4" />
+            {t("addMemo")}
+          </Button>
+        </div>
+
+        {/* Content area */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : memos.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-4 border-2 border-dashed border-border rounded-xl text-muted-foreground">
+            <StickyNote className="size-10 opacity-40" />
+            <p className="text-sm">{t("empty")}</p>
+            <Button variant="outline" size="sm" onClick={openCreate}>
+              <Plus className="size-3.5 mr-1.5" />
               {t("addMemo")}
             </Button>
           </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {memos.map((memo) => (
+              <div
+                key={memo.id}
+                className="group flex flex-col rounded-xl border border-border bg-card overflow-hidden transition-colors hover:border-border/80"
+              >
+                {/* Card header */}
+                <div className="px-4 pt-4 pb-3 border-b border-border/50">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-base shrink-0">{TAG_ICON[memo.tag] ?? "📝"}</span>
+                      <p className="text-sm font-semibold truncate leading-snug">{memo.title}</p>
+                    </div>
+                    <span
+                      className={cn(
+                        "shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium",
+                        TAG_BADGE[memo.tag] ?? "bg-muted text-muted-foreground border-border"
+                      )}
+                    >
+                      {tagLabel(memo.tag)}
+                    </span>
+                  </div>
+                </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="size-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : memos.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
-              <StickyNote className="size-8" />
-              <p>{t("empty")}</p>
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {memos.map((memo) => (
-                <Card key={memo.id}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <StickyNote className="size-4 text-primary shrink-0" />
-                        <CardTitle className="text-base truncate">{memo.title}</CardTitle>
-                      </div>
-                      <Badge variant="secondary" className="ml-2 shrink-0">{tagLabel(memo.tag)}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <pre className="whitespace-pre-wrap text-sm text-muted-foreground mb-4 line-clamp-4">
-                      {memo.content}
-                    </pre>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">{memo.updated_at}</span>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(memo)}>
-                          <Edit className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(memo.id)}
-                          disabled={deleteId === memo.id}
-                        >
-                          {deleteId === memo.id ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="size-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+                {/* Card body */}
+                <div className="px-4 py-3 flex-1">
+                  <pre className="whitespace-pre-wrap font-sans text-sm text-muted-foreground line-clamp-4 leading-relaxed">
+                    {memo.content}
+                  </pre>
+                </div>
+
+                {/* Card footer */}
+                <div className="px-4 pb-3 flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground/70">{memo.updated_at}</span>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="size-7 p-0 opacity-50 hover:opacity-100 transition-opacity"
+                      onClick={() => openEdit(memo)}
+                    >
+                      <Edit className="size-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="size-7 p-0 opacity-50 hover:opacity-100 hover:text-destructive transition-opacity"
+                      onClick={() => handleDelete(memo.id)}
+                      disabled={deleteId === memo.id}
+                    >
+                      {deleteId === memo.id ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="size-3.5" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Create / Edit Dialog */}
@@ -262,6 +305,7 @@ export default function MemoPage() {
                     size="sm"
                     onClick={() => setForm((f) => ({ ...f, tag }))}
                   >
+                    <span className="mr-1">{TAG_ICON[tag]}</span>
                     {tagLabel(tag)}
                   </Button>
                 ))}

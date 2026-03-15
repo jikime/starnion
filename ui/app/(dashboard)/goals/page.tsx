@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useTranslations } from "next-intl"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -480,8 +479,8 @@ export default function GoalsPage() {
             const isHabit = isHabitGoal(goal)
 
             return (
-              <Card key={goal.id}>
-                <CardContent className="pt-6">
+              <div key={goal.id} className="rounded-xl border border-border bg-card">
+                <div className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">{goal.icon}</span>
@@ -614,8 +613,8 @@ export default function GoalsPage() {
                       </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )
           })}
         </TabsContent>
@@ -626,8 +625,8 @@ export default function GoalsPage() {
             <p className="text-center text-muted-foreground py-12">{t("emptyCompleted")}</p>
           )}
           {completed.map((goal) => (
-            <Card key={goal.id}>
-              <CardContent className="pt-6">
+            <div key={goal.id} className="rounded-xl border border-border bg-card">
+              <div className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">{goal.icon}</span>
@@ -650,8 +649,8 @@ export default function GoalsPage() {
                     </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
         </TabsContent>
 
@@ -663,8 +662,8 @@ export default function GoalsPage() {
           {abandoned.map((goal) => {
             const isMutating = mutating === goal.id
             return (
-              <Card key={goal.id}>
-                <CardContent className="pt-6">
+              <div key={goal.id} className="rounded-xl border border-border bg-card">
+                <div className="p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl opacity-50">{goal.icon}</span>
@@ -699,8 +698,8 @@ export default function GoalsPage() {
                       </Button>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )
           })}
         </TabsContent>

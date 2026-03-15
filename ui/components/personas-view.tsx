@@ -2,14 +2,11 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react"
 import { useTranslations } from "next-intl"
-import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle,
-} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
+import { cn } from "@/lib/utils"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -427,87 +424,92 @@ export function PersonasView() {
       {loading ? (
         <p className="text-sm text-muted-foreground">{t("loading")}</p>
       ) : personas.length === 0 ? (
-        <Card className="shadow-none border-dashed">
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+        <div className="rounded-xl border border-dashed border-border bg-card overflow-hidden">
+          <div className="py-10 text-center text-sm text-muted-foreground">
             <p>{t("empty")}</p>
             <p className="mt-1">{t("emptyHint")}</p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {personas.map(p => {
             const provMeta = PROVIDER_META[p.provider]
             const toolsSupport = personaToolsSupportMap[p.id]
             return (
-              <Card key={p.id} className={`shadow-none ${p.isDefault ? "border-primary/50" : ""}`}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-2">
+              <div key={p.id} className={cn(
+                "rounded-xl border bg-card overflow-hidden",
+                p.isDefault ? "border-primary/50" : "border-border"
+              )}>
+                {/* Card header */}
+                <div className="flex items-start justify-between gap-2 px-4 py-3 border-b border-border/60">
+                  <div className="flex items-center gap-2 min-w-0">
                     <div className="min-w-0">
-                      <CardTitle className="flex items-center gap-1.5 text-sm">
+                      <p className="flex items-center gap-1.5 text-sm font-semibold">
                         {p.isDefault && (
                           <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400 shrink-0" />
                         )}
                         <span className="truncate">{p.name}</span>
-                      </CardTitle>
+                      </p>
                       {p.description && (
-                        <CardDescription className="text-xs mt-0.5 truncate">
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
                           {p.description}
-                        </CardDescription>
+                        </p>
                       )}
-                    </div>
-                    <div className="flex gap-1 shrink-0">
-                      {!p.isDefault && (
-                        <Button
-                          variant="ghost" size="sm"
-                          className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                          disabled={settingDefaultId === p.id}
-                          onClick={() => setAsDefault(p)}
-                          title={t("setDefaultTitle")}
-                        >
-                          <Star className="h-3.5 w-3.5" />
-                          {t("setDefault")}
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost" size="icon" className="h-7 w-7"
-                        onClick={() => openEdit(p)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost" size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                        disabled={deletingId === p.id}
-                        onClick={() => deletePersona(p.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent className="pt-0 space-y-2">
+                  <div className="flex gap-1 shrink-0">
+                    {!p.isDefault && (
+                      <Button
+                        variant="ghost" size="sm"
+                        className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                        disabled={settingDefaultId === p.id}
+                        onClick={() => setAsDefault(p)}
+                        title={t("setDefaultTitle")}
+                      >
+                        <Star className="h-3.5 w-3.5" />
+                        {t("setDefault")}
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost" size="icon" className="h-7 w-7"
+                      onClick={() => openEdit(p)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost" size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      disabled={deletingId === p.id}
+                      onClick={() => deletePersona(p.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+                {/* Card body */}
+                <div className="px-4 py-3 space-y-2">
                   <div className="flex flex-wrap gap-1.5">
                     {p.provider && (
-                      <Badge variant="secondary" className="text-xs gap-1">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border bg-secondary text-secondary-foreground border-border">
                         {provMeta ? <span>{provMeta.icon}</span> : null}
                         {provMeta?.name ?? p.provider}
-                      </Badge>
+                      </span>
                     )}
                     {p.model && (
-                      <Badge variant="outline" className="text-xs font-mono">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-border font-mono">
                         {p.model}
-                      </Badge>
+                      </span>
                     )}
                     {p.isDefault && (
-                      <Badge className="text-xs bg-primary/10 text-primary border-primary/20">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-primary/10 text-primary border-primary/20">
                         {t("defaultBadge")}
-                      </Badge>
+                      </span>
                     )}
                     {toolsSupport === false && (
-                      <Badge variant="outline" className="text-xs text-amber-500 border-amber-300 gap-0.5">
+                      <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium border text-amber-500 border-amber-300">
                         <AlertTriangle className="h-3 w-3" />
                         tools 불가
-                      </Badge>
+                      </span>
                     )}
                   </div>
                   {p.systemPrompt && (
@@ -515,8 +517,8 @@ export function PersonasView() {
                       {p.systemPrompt}
                     </p>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )
           })}
         </div>

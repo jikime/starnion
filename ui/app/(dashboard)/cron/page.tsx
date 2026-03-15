@@ -2,11 +2,9 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react"
 import { useTranslations } from "next-intl"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -23,7 +21,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { Bell, Loader2, Plus, Trash2, Pencil } from "lucide-react"
+import { Bell, Loader2, Plus, Trash2, Pencil, Server, CalendarClock } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -134,10 +132,10 @@ export default function CronPage() {
   }, [t, DOW_OPTIONS])
 
   const statusBadge = useCallback((status: string) => {
-    if (status === "active")    return <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 border-0">{t("statusActive")}</Badge>
-    if (status === "paused")    return <Badge variant="secondary">{t("statusPaused")}</Badge>
-    if (status === "completed") return <Badge variant="outline">{t("statusCompleted")}</Badge>
-    return <Badge variant="outline">{status}</Badge>
+    if (status === "active")    return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-green-300 dark:border-green-700 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">{t("statusActive")}</span>
+    if (status === "paused")    return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-border bg-muted text-muted-foreground">{t("statusPaused")}</span>
+    if (status === "completed") return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-border text-muted-foreground">{t("statusCompleted")}</span>
+    return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-border text-muted-foreground">{status}</span>
   }, [t])
 
   const [systemJobs, setSystemJobs]         = useState<SystemJob[]>([])
@@ -276,9 +274,14 @@ export default function CronPage() {
 
         {/* ── System Jobs ──────────────────────────────────────────────────── */}
         <TabsContent value="system">
-          <Card>
-            <CardHeader><CardTitle>{t("systemJobsTitle")}</CardTitle></CardHeader>
-            <CardContent>
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
+              <div className="size-8 rounded-lg bg-sky-100 dark:bg-sky-950/60 flex items-center justify-center shrink-0">
+                <Server className="size-4 text-sky-500" />
+              </div>
+              <h2 className="text-sm font-semibold">{t("systemJobsTitle")}</h2>
+            </div>
+            <div className="p-5">
               {loadingSystem ? (
                 <div className="flex justify-center py-12">
                   <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -309,28 +312,31 @@ export default function CronPage() {
                           />
                         )
                       ) : (
-                        <Badge variant="secondary" className="shrink-0 text-xs">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-border bg-muted text-muted-foreground shrink-0">
                           {t("backgroundOnly")}
-                        </Badge>
+                        </span>
                       )}
                     </div>
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
 
         {/* ── User Schedules ───────────────────────────────────────────────── */}
         <TabsContent value="user">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>{t("mySchedulesTitle")}</CardTitle>
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
+              <div className="size-8 rounded-lg bg-violet-100 dark:bg-violet-950/60 flex items-center justify-center shrink-0">
+                <CalendarClock className="size-4 text-violet-500" />
+              </div>
+              <h2 className="text-sm font-semibold flex-1">{t("mySchedulesTitle")}</h2>
               <Button size="sm" onClick={openCronCreate} className="gap-1">
                 <Plus className="size-4" />{t("addSchedule")}
               </Button>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div className="p-5">
               {loadingUser ? (
                 <div className="flex justify-center py-12">
                   <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -378,8 +384,8 @@ export default function CronPage() {
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 

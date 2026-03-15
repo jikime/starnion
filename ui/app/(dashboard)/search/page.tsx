@@ -4,12 +4,20 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { useTranslations } from "next-intl"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { Bookmark, BookmarkCheck, Clock, RefreshCw, Search, Trash2, X } from "lucide-react"
+import {
+  AlertTriangle,
+  Bookmark,
+  BookmarkCheck,
+  Clock,
+  RefreshCw,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -116,17 +124,17 @@ function Md({ content }: { content: string }) {
 export default function SearchPage() {
   const t = useTranslations("search")
 
-  const [query, setQuery] = useState("")
-  const [result, setResult] = useState("")
+  const [query, setQuery]               = useState("")
+  const [result, setResult]             = useState("")
   const [currentQuery, setCurrentQuery] = useState("")
-  const [status, setStatus] = useState<"idle" | "searching" | "done" | "error">("idle")
-  const [error, setError] = useState("")
-  const [saved, setSaved] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [status, setStatus]             = useState<"idle" | "searching" | "done" | "error">("idle")
+  const [error, setError]               = useState("")
+  const [saved, setSaved]               = useState(false)
+  const [saving, setSaving]             = useState(false)
 
-  const [history, setHistory] = useState<SavedSearch[]>([])
+  const [history, setHistory]               = useState<SavedSearch[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
-  const [showHistory, setShowHistory] = useState(true)
+  const [showHistory, setShowHistory]       = useState(true)
 
   const abortRef = useRef<AbortController | null>(null)
 
@@ -150,7 +158,6 @@ export default function SearchPage() {
     const searchQuery = (q ?? query).trim()
     if (!searchQuery || status === "searching") return
 
-    // Cancel any in-flight request
     abortRef.current?.abort()
     const ctrl = new AbortController()
     abortRef.current = ctrl
@@ -164,7 +171,6 @@ export default function SearchPage() {
     try {
       const fullResult = await streamSearch(searchQuery, (delta) => setResult((r) => r + delta), ctrl.signal)
       setStatus("done")
-      // Auto-save the AI summary so history always has the full response
       if (fullResult) {
         setSaved(true)
         fetch("/api/search", {
@@ -202,23 +208,18 @@ export default function SearchPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: currentQuery, result }),
       })
-      if (res.ok) {
-        setSaved(true)
-        loadHistory()
-      }
+      if (res.ok) { setSaved(true); loadHistory() }
     } finally {
       setSaving(false)
     }
   }
 
-  // ── Delete history item ──────────────────────────────────────────────────
+  // ── Delete / Re-search ────────────────────────────────────────────────────
 
   const handleDelete = async (id: number) => {
     await fetch(`/api/search/${id}`, { method: "DELETE" })
     setHistory((prev) => prev.filter((h) => h.id !== id))
   }
-
-  // ── Load cached result from history ───────────────────────────────────────
 
   const handleReSearch = (item: SavedSearch) => {
     setQuery(item.query)
@@ -229,14 +230,10 @@ export default function SearchPage() {
     setStatus("done")
   }
 
-  // ── Cleanup on unmount ────────────────────────────────────────────────────
-
   useEffect(() => () => abortRef.current?.abort(), [])
 
   const searching = status === "searching"
 
-  // Deduplicate history: keep only the most recent entry per unique query
-  // (auto-save from tool + manual save can create duplicates; latest = AI summary)
   const uniqueHistory = history.reduce<SavedSearch[]>((acc, item) => {
     if (!acc.some(h => h.query === item.query)) acc.push(item)
     return acc
@@ -262,7 +259,9 @@ export default function SearchPage() {
           <Clock className="size-4" />
           {t("savedSearches")}
           {uniqueHistory.length > 0 && (
-            <Badge variant="secondary" className="text-xs px-1.5">{uniqueHistory.length}</Badge>
+            <span className="text-xs px-1.5 py-0 rounded-full bg-muted text-muted-foreground font-medium">
+              {uniqueHistory.length}
+            </span>
           )}
         </Button>
       </div>
@@ -270,9 +269,16 @@ export default function SearchPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         {/* ── Main panel ──────────────────────────────────────────────────── */}
         <div className="space-y-4">
+
           {/* Search input */}
-          <Card>
-            <CardContent className="pt-5 pb-4">
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-border/60">
+              <div className="rounded-lg p-1.5 bg-indigo-100 dark:bg-indigo-950/50">
+                <Search className="size-4 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <p className="font-semibold text-sm">{t("webTitle")}</p>
+            </div>
+            <div className="p-4">
               <form onSubmit={handleSubmit} className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -297,72 +303,82 @@ export default function SearchPage() {
                   </Button>
                 )}
               </form>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* Result */}
+          {/* Result panel */}
           {(result || searching || status === "error") && (
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    {searching && <RefreshCw className="size-4 animate-spin text-primary" />}
-                    {currentQuery && (
-                      <span className="truncate">
-                        {searching ? t("searchingPrefix") : ""}{currentQuery}
-                      </span>
-                    )}
-                  </CardTitle>
-
-                  {/* Save indicator / manual save button for stopped searches */}
-                  {status === "done" && result && (
-                    saved ? (
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-                        <BookmarkCheck className="size-3.5" />
-                        {t("saved")}
-                      </span>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 shrink-0"
-                        onClick={handleSave}
-                        disabled={saving}
-                      >
-                        {saving ? (
-                          <RefreshCw className="size-3.5 animate-spin" />
-                        ) : (
-                          <Bookmark className="size-3.5" />
-                        )}
-                        {t("save")}
-                      </Button>
-                    )
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              {/* Result header */}
+              <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-border/60">
+                <div className="flex items-center gap-2 min-w-0">
+                  {searching ? (
+                    <RefreshCw className="size-4 animate-spin text-indigo-500 shrink-0" />
+                  ) : status === "error" ? (
+                    <AlertTriangle className="size-4 text-destructive shrink-0" />
+                  ) : (
+                    <div className="size-2 rounded-full bg-emerald-400 shrink-0" />
+                  )}
+                  <p className="font-medium text-sm truncate">{currentQuery}</p>
+                  {searching && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800 font-medium shrink-0">
+                      {t("searchingPrefix")}
+                    </span>
                   )}
                 </div>
-              </CardHeader>
-              <Separator />
-              <CardContent className="pt-4">
+
+                {status === "done" && result && (
+                  saved ? (
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 px-2 py-1 rounded-lg bg-muted/50">
+                      <BookmarkCheck className="size-3.5 text-emerald-500" />
+                      {t("saved")}
+                    </span>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 shrink-0 h-7 text-xs"
+                      onClick={handleSave}
+                      disabled={saving}
+                    >
+                      {saving
+                        ? <RefreshCw className="size-3.5 animate-spin" />
+                        : <Bookmark className="size-3.5" />
+                      }
+                      {t("save")}
+                    </Button>
+                  )
+                )}
+              </div>
+
+              {/* Result body */}
+              <div className="px-5 py-4">
                 {status === "error" ? (
-                  <p className="text-sm text-destructive">{error}</p>
+                  <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                    <AlertTriangle className="size-4 shrink-0" />
+                    {error}
+                  </div>
                 ) : (
                   <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
                     <Md content={result} />
                     {searching && (
-                      <span className="inline-block h-4 w-0.5 animate-pulse bg-foreground align-middle" />
+                      <span className="inline-block h-4 w-0.5 animate-pulse bg-foreground align-middle ml-0.5" />
                     )}
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
 
           {/* Empty state */}
           {status === "idle" && (
-            <div className="flex flex-col items-center py-16 text-muted-foreground gap-3">
-              <Search className="size-12 opacity-20" />
+            <div className="flex flex-col items-center py-16 text-muted-foreground gap-3 rounded-xl border-2 border-dashed border-border">
+              <div className="rounded-full p-5 bg-muted/50">
+                <Search className="size-8 opacity-30" />
+              </div>
               <p className="text-sm">{t("webEmptyState")}</p>
               {uniqueHistory.length > 0 && (
-                <p className="text-xs">{t("historyHint")}</p>
+                <p className="text-xs opacity-70">{t("historyHint")}</p>
               )}
             </div>
           )}
@@ -370,43 +386,70 @@ export default function SearchPage() {
 
         {/* ── History sidebar ──────────────────────────────────────────────── */}
         {showHistory && (
-          <div className="space-y-3">
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm">{t("savedSearches")}</CardTitle>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowHistory(false)}>
-                    <X className="size-3.5" />
-                  </Button>
+          <div>
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              {/* Sidebar header */}
+              <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/60">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg p-1.5 bg-amber-100 dark:bg-amber-950/50">
+                    <Clock className="size-3.5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <p className="font-semibold text-sm">{t("savedSearches")}</p>
+                  {uniqueHistory.length > 0 && (
+                    <span className="text-xs text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                      {uniqueHistory.length}
+                    </span>
+                  )}
                 </div>
-              </CardHeader>
-              <CardContent className="pt-0 pb-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7"
+                  onClick={() => setShowHistory(false)}
+                >
+                  <X className="size-3.5" />
+                </Button>
+              </div>
+
+              {/* Sidebar body */}
+              <div className="p-2">
                 {historyLoading ? (
-                  <div className="flex justify-center py-6">
+                  <div className="flex justify-center py-8">
                     <RefreshCw className="size-4 animate-spin text-muted-foreground" />
                   </div>
-                ) : history.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-6">
-                    {t("noSavedSearches")}
-                  </p>
+                ) : uniqueHistory.length === 0 ? (
+                  <div className="flex flex-col items-center py-8 gap-2 text-muted-foreground">
+                    <Clock className="size-6 opacity-30" />
+                    <p className="text-xs">{t("noSavedSearches")}</p>
+                  </div>
                 ) : (
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {uniqueHistory.map((item) => (
                       <div
                         key={item.id}
-                        className="group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50 transition-colors"
+                        className={cn(
+                          "group flex items-center gap-2 rounded-lg px-3 py-2",
+                          "hover:bg-muted/50 transition-colors",
+                          currentQuery === item.query && "bg-primary/5"
+                        )}
                       >
+                        <Clock className="size-3 text-muted-foreground/40 shrink-0" />
                         <button
                           className="flex-1 text-left min-w-0"
                           onClick={() => handleReSearch(item)}
                         >
-                          <p className="text-sm truncate">{item.query}</p>
+                          <p className={cn(
+                            "text-sm truncate leading-snug",
+                            currentQuery === item.query && "text-primary font-medium"
+                          )}>
+                            {item.query}
+                          </p>
                           <p className="text-xs text-muted-foreground">{item.created_at}</p>
                         </button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive shrink-0"
+                          className="size-6 opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity shrink-0"
                           onClick={() => handleDelete(item.id)}
                         >
                           <Trash2 className="size-3" />
@@ -415,8 +458,8 @@ export default function SearchPage() {
                     ))}
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         )}
       </div>

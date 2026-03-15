@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Settings, Loader2, CheckCircle, AlertCircle } from "lucide-react"
+import { Settings, Loader2, CheckCircle, AlertCircle, UserCircle, KeyRound } from "lucide-react"
 
 // Common IANA timezones with UTC offset labels
 const TIMEZONES = [
@@ -137,11 +136,14 @@ export default function SettingsPage() {
 
       <div className="space-y-6">
         {/* Profile info */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("accountSettings")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
+            <div className="size-8 rounded-lg bg-blue-100 dark:bg-blue-950/60 flex items-center justify-center shrink-0">
+              <UserCircle className="size-4 text-blue-500" />
+            </div>
+            <h2 className="text-sm font-semibold">{t("accountSettings")}</h2>
+          </div>
+          <div className="px-6 py-5 space-y-6">
             {loading ? (
               <div className="flex items-center gap-2 text-muted-foreground py-4">
                 <Loader2 className="size-4 animate-spin" />
@@ -218,15 +220,18 @@ export default function SettingsPage() {
                 </div>
               </>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Password change */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("passwordChange")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
+            <div className="size-8 rounded-lg bg-amber-100 dark:bg-amber-950/60 flex items-center justify-center shrink-0">
+              <KeyRound className="size-4 text-amber-500" />
+            </div>
+            <h2 className="text-sm font-semibold">{t("passwordChange")}</h2>
+          </div>
+          <div className="px-6 py-5 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="current-pw">{t("currentPassword")}</Label>
               <Input
@@ -278,8 +283,8 @@ export default function SettingsPage() {
                 {t("passwordChange")}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   )

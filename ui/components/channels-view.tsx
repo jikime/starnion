@@ -3,17 +3,11 @@
 import { useEffect, useState, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useTranslations } from "next-intl"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
+import { siTelegram } from "simple-icons"
 import {
   Select,
   SelectContent,
@@ -264,9 +258,11 @@ export function ChannelsView() {
 
   const statusBadge = () => {
     if (!status) return null
-    if (status.status === "running") return <Badge className="bg-green-500 text-white">{t("statusRunning")}</Badge>
-    if (status.status === "configured") return <Badge variant="secondary">{t("statusConfigured")}</Badge>
-    return <Badge variant="outline">{t("statusNotConfigured")}</Badge>
+    if (status.status === "running")
+      return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-green-100 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800">{t("statusRunning")}</span>
+    if (status.status === "configured")
+      return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-secondary text-secondary-foreground border-border">{t("statusConfigured")}</span>
+    return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-border text-muted-foreground">{t("statusNotConfigured")}</span>
   }
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -300,16 +296,20 @@ export function ChannelsView() {
 
         {/* ── Telegram Card ── */}
         <div className="space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-start justify-between gap-4">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <span>Telegram</span>
-                  {statusBadge()}
-                </CardTitle>
-                <CardDescription className="mt-1">
-                  {t("telegram.description")}
-                </CardDescription>
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
+              <div className="flex items-center gap-3">
+                <svg role="img" viewBox="0 0 24 24" className="size-5 text-sky-500" fill="currentColor" aria-label="Telegram">
+                  <path d={siTelegram.path} />
+                </svg>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold">Telegram</h2>
+                    {statusBadge()}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("telegram.description")}</p>
+                </div>
               </div>
               {status?.configured && (
                 <div className="flex items-center gap-2 shrink-0">
@@ -324,9 +324,9 @@ export function ChannelsView() {
                   />
                 </div>
               )}
-            </CardHeader>
+            </div>
 
-            <CardContent className="space-y-5">
+            <div className="px-5 py-5 space-y-5">
               {loading ? (
                 <p className="text-sm text-muted-foreground">{t("loading")}</p>
               ) : fetchError ? (
@@ -370,7 +370,7 @@ export function ChannelsView() {
                       <Label>{t("linkedAccounts")}</Label>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {status.accounts.map(a => (
-                          <Badge key={a} variant="secondary">{a}</Badge>
+                          <span key={a} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-secondary text-secondary-foreground border-border">{a}</span>
                         ))}
                       </div>
                     </div>
@@ -475,24 +475,28 @@ export function ChannelsView() {
                   )}
                 </>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* ── Pairing Requests Card (별도 카드, lg 이상에서 메인 컬럼 하단) ── */}
+          {/* ── Pairing Requests Card ── */}
           {status?.enabled && dmPolicy === "pairing" && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <div>
-                  <CardTitle className="text-base">{t("pairing.title")}</CardTitle>
-                  <CardDescription className="text-xs mt-0.5">
-                    {t("pairing.description")}
-                  </CardDescription>
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
+                <div className="flex items-center gap-3">
+                  <svg role="img" viewBox="0 0 24 24" className={cn("size-4 text-sky-500")} fill="currentColor" aria-label="Telegram">
+                    <path d={siTelegram.path} />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-semibold">{t("pairing.title")}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{t("pairing.description")}</p>
+                  </div>
                 </div>
                 <Button variant="ghost" size="sm" onClick={fetchPairing} disabled={pairingLoading} className="text-xs h-7">
                   {pairingLoading ? t("pairing.refreshing") : t("pairing.refresh")}
                 </Button>
-              </CardHeader>
-              <CardContent>
+              </div>
+              <div className="px-5 py-4">
                 {pairingRequests.length === 0 ? (
                   <p className="text-xs text-muted-foreground">{t("pairing.empty")}</p>
                 ) : (
@@ -528,8 +532,8 @@ export function ChannelsView() {
                     ))}
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
         </div>
 

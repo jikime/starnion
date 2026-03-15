@@ -372,7 +372,8 @@
     "aiLabel": "AI",
     "peakHour": "最活跃时段",
     "dailyTrend": "每日消息趋势",
-    "dailyTrendSub": "近30天"
+    "dailyTrendSub": "近30天",
+    "days": "天"
   },
   "usage": {
     "title": "使用量",

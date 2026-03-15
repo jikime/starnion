@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
 import Link from "next/link"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import {
@@ -153,22 +152,20 @@ function SectionCard({
   className?: string
 }) {
   return (
-    <Card className={className}>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-            <Icon className="size-4 text-primary" />
-            {title}
-          </CardTitle>
-          <Link href={href}>
-            <Button variant="ghost" size="icon" className="size-6">
-              <ArrowRight className="size-3.5 text-muted-foreground" />
-            </Button>
-          </Link>
-        </div>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
+    <div className={cn("rounded-xl border border-border bg-card overflow-hidden", className)}>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          <Icon className="size-4 text-primary" />
+          {title}
+        </h2>
+        <Link href={href}>
+          <Button variant="ghost" size="icon" className="size-6">
+            <ArrowRight className="size-3.5 text-muted-foreground" />
+          </Button>
+        </Link>
+      </div>
+      <div className="px-5 py-4">{children}</div>
+    </div>
   )
 }
 
@@ -222,8 +219,8 @@ function KpiRow({ summary, goalCount, nearestDday, memoCount }: {
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {items.map(({ label, value, sub, icon: Icon, color, href }) => (
         <Link key={label} href={href}>
-          <Card className="hover:bg-muted/30 transition-colors cursor-pointer">
-            <CardContent className="p-4">
+          <div className="rounded-xl border border-border bg-card overflow-hidden hover:bg-muted/30 transition-colors cursor-pointer">
+            <div className="p-4">
               <div className="flex items-start justify-between">
                 <div className="min-w-0 space-y-0.5">
                   <p className="text-xs text-muted-foreground">{label}</p>
@@ -234,8 +231,8 @@ function KpiRow({ summary, goalCount, nearestDday, memoCount }: {
                   <Icon className="size-4 text-primary" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </Link>
       ))}
     </div>
@@ -286,9 +283,9 @@ function DiaryCard({ entry }: { entry: DiaryEntry | null }) {
       ) : (
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" className={`px-1.5 py-0 text-[10px] ${MOOD_COLOR[entry.mood] ?? ""}`}>
+            <span className={cn("inline-flex items-center px-1.5 py-0 rounded-full text-[10px] font-medium", MOOD_COLOR[entry.mood] ?? "bg-secondary text-secondary-foreground")}>
               {MOOD_EMOJI[entry.mood] ?? ""} {entry.mood}
-            </Badge>
+            </span>
             <span className="text-[11px] text-muted-foreground">{entry.entry_date}</span>
           </div>
           <p className="line-clamp-1 text-sm font-medium">{entry.title || entry.content}</p>
@@ -315,7 +312,7 @@ function MemoCard({ memos }: { memos: Memo[] }) {
               {m.tags?.length > 0 && (
                 <div className="flex flex-wrap gap-1 pt-0.5">
                   {m.tags.slice(0, 3).map((tag) => (
-                    <Badge key={tag} variant="outline" className="px-1 py-0 text-[10px]">#{tag}</Badge>
+                    <span key={tag} className="inline-flex items-center px-1 py-0 rounded-full text-[10px] font-medium border border-border">#{tag}</span>
                   ))}
                 </div>
               )}
@@ -339,12 +336,9 @@ function DocumentsCard({ documents }: { documents: DocItem[] }) {
         <div className="space-y-2">
           {documents.slice(0, 5).map((doc) => (
             <div key={doc.id} className="flex items-center gap-2.5">
-              <Badge
-                variant="secondary"
-                className={`w-10 shrink-0 justify-center px-1.5 py-0 text-[10px] font-bold ${FORMAT_COLOR[doc.format] ?? "bg-muted text-muted-foreground"}`}
-              >
+              <span className={cn("inline-flex w-10 shrink-0 justify-center items-center px-1.5 py-0.5 rounded text-[10px] font-bold", FORMAT_COLOR[doc.format] ?? "bg-muted text-muted-foreground")}>
                 {doc.format}
-              </Badge>
+              </span>
               <span className="min-w-0 flex-1 truncate text-sm">{doc.name}</span>
               <span className="shrink-0 text-[11px] text-muted-foreground">{doc.size_label}</span>
             </div>
@@ -368,7 +362,7 @@ function ImagesCard({ images }: { images: ImageItem[] }) {
           {images.slice(0, 10).map((img) => (
             <div
               key={img.id}
-              className="relative aspect-square overflow-hidden rounded-md bg-muted"
+              className="relative aspect-square overflow-hidden rounded-md bg-muted border border-border"
             >
               <NextImage
                 src={img.url}
@@ -436,12 +430,16 @@ function DDayCard({ ddays }: { ddays: DDay[] }) {
                 <span className="shrink-0">{d.icon}</span>
                 <span className="truncate">{d.title}</span>
               </span>
-              <Badge
-                variant={d.dday_value === 0 ? "default" : d.dday_value > 0 && d.dday_value <= 7 ? "destructive" : "secondary"}
-                className="shrink-0 text-xs font-bold"
-              >
+              <span className={cn(
+                "shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold",
+                d.dday_value === 0
+                  ? "bg-primary text-primary-foreground"
+                  : d.dday_value > 0 && d.dday_value <= 7
+                  ? "bg-destructive text-destructive-foreground"
+                  : "bg-secondary text-secondary-foreground border border-border"
+              )}>
                 {d.dday_label}
-              </Badge>
+              </span>
             </div>
           ))}
         </div>
@@ -463,9 +461,9 @@ function TransactionsCard({ transactions }: { transactions: Transaction[] }) {
           {transactions.map((tx) => (
             <div key={tx.id} className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-1.5">
-                <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[10px]">
+                <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium border border-border">
                   {tx.category}
-                </Badge>
+                </span>
                 <span className="truncate text-sm text-muted-foreground">{tx.description}</span>
               </div>
               <span className={`shrink-0 text-sm font-medium ${tx.amount >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
