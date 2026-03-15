@@ -8,7 +8,7 @@ import hashlib
 import logging
 from typing import Any
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import MessagesState, StateGraph
@@ -109,6 +109,54 @@ from starnion_agent.skills.browser.tools import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _filter_stale_tool_errors(messages: list) -> list:
+    """Remove tool call + tool result pairs that ended in an error.
+
+    When a tool previously failed (e.g. browser crash, X server missing),
+    the LLM tends to avoid calling the same tool again even after the
+    underlying issue is fixed.  Removing stale error pairs gives the LLM
+    a clean slate so it will retry on the next user request.
+
+    Only pairs where the ToolMessage content starts with '오류:' are removed.
+    Successful tool results are kept as-is for context.
+    """
+    # Collect tool_call_ids of failed tool results.
+    failed_ids: set[str] = set()
+    for msg in messages:
+        if isinstance(msg, ToolMessage):
+            content = msg.content if isinstance(msg.content, str) else str(msg.content)
+            if content.startswith("오류:"):
+                failed_ids.add(msg.tool_call_id)
+
+    if not failed_ids:
+        return messages
+
+    filtered: list = []
+    for msg in messages:
+        # Drop ToolMessage for failed calls.
+        if isinstance(msg, ToolMessage) and msg.tool_call_id in failed_ids:
+            continue
+        # Drop AIMessage tool_calls that triggered failed results.
+        if isinstance(msg, AIMessage) and msg.tool_calls:
+            clean_calls = [tc for tc in msg.tool_calls if tc["id"] not in failed_ids]
+            if len(clean_calls) == len(msg.tool_calls):
+                filtered.append(msg)
+            elif clean_calls:
+                # Keep AIMessage but strip the failed tool_calls.
+                filtered.append(msg.model_copy(update={"tool_calls": clean_calls}))
+            # If all tool_calls were failures and there's no text content, drop entirely.
+            elif msg.content:
+                filtered.append(msg.model_copy(update={"tool_calls": []}))
+        else:
+            filtered.append(msg)
+
+    removed = len(messages) - len(filtered)
+    if removed:
+        logger.debug("_filter_stale_tool_errors: removed %d stale error message(s)", removed)
+    return filtered
+
 
 # ── ANSI colour helpers ──────────────────────────────────────────────────────
 _ANSI_RESET  = "\033[0m"
@@ -584,7 +632,7 @@ async def _agent_node(state: MessagesState) -> dict:
         custom_system_prompt=custom_system_prompt,
         language=user_language,
     )
-    messages = [SystemMessage(content=prompt_text)] + state["messages"]
+    messages = [SystemMessage(content=prompt_text)] + _filter_stale_tool_errors(state["messages"])
 
     # Dynamic tool binding: LLM only sees enabled tools.
     if enabled_tool_names:
