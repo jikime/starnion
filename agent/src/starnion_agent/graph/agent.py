@@ -582,6 +582,18 @@ def _build_prompt(
         f"{p['tone'].split(chr(10))[0]}"  # first line (the most critical rule)
     )
 
+    # Repeat tool-priority rules at the very END for recency effect.
+    # This is the last thing the LLM reads before generating a response,
+    # so it has the strongest influence on whether tool_calls are emitted.
+    if enabled_tool_names:
+        prompt_text += (
+            "\n\n[도구 사용 최종 확인 — 절대 규칙]\n"
+            f"사용 가능한 도구: {', '.join(enabled_tool_names)}\n"
+            "위 도구로 처리 가능한 요청이면 반드시 도구를 호출하세요. "
+            "이전 실패 여부와 무관하게 지금 바로 도구를 호출하세요. "
+            "도구 없이 '불가능하다'는 응답은 절대 금지입니다."
+        )
+
     return prompt_text
 
 
