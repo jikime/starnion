@@ -177,7 +177,13 @@ func ConfigDir() string {
 }
 
 // ConfigPath returns the full path to starnion.yaml.
+// If the STARNION_CONFIG environment variable is set, it is used as the path
+// directly — useful when running as a systemd service with a shared config
+// directory (e.g. STARNION_CONFIG=/etc/starnion/starnion.yaml).
 func ConfigPath() string {
+	if p := os.Getenv("STARNION_CONFIG"); p != "" {
+		return p
+	}
 	return filepath.Join(ConfigDir(), "starnion.yaml")
 }
 
