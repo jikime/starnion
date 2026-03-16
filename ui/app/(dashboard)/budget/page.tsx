@@ -72,11 +72,6 @@ const CATEGORY_COLORS: Record<string, string> = {
 const KRW = (v: number) =>
   new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" }).format(v)
 
-const KRW_SHORT = (v: number) => {
-  if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}억`
-  if (v >= 10_000) return `${(v / 10_000).toFixed(0)}만`
-  return `${v.toLocaleString()}`
-}
 
 // ── mini sparkline bar ──────────────────────────────────────────────────────
 
@@ -364,7 +359,7 @@ export default function BudgetPage() {
       <div className="grid sm:grid-cols-3 gap-4">
         <MetricCard
           label={t("totalBudget")}
-          value={KRW_SHORT(data?.total_budget ?? 0) + "원"}
+          value={KRW(data?.total_budget ?? 0)}
           sub={t("totalBudgetSub")}
           delta={undefined}
           chart={
@@ -376,7 +371,7 @@ export default function BudgetPage() {
         />
         <MetricCard
           label={t("thisMonthExpense")}
-          value={KRW_SHORT(curMonthSpent) + "원"}
+          value={KRW(curMonthSpent)}
           sub={t("prevMonthCompare")}
           delta={spentDelta}
           deltaLabel={t("lastMonthCompare")}
@@ -389,7 +384,7 @@ export default function BudgetPage() {
         />
         <MetricCard
           label={t("remainingBudget")}
-          value={KRW_SHORT(data?.total_remaining ?? 0) + "원"}
+          value={KRW(data?.total_remaining ?? 0)}
           sub={t("remainingBudgetSub")}
           delta={
             data?.total_budget

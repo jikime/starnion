@@ -361,14 +361,14 @@ export default function StatisticsPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label={t("totalExpense")}
-          value={`₩${formatKRW(s?.total_expense ?? 0)}`}
+          value={formatKRWFull(s?.total_expense ?? 0)}
           sub={t("totalExpenseSub", { months })}
           icon={CreditCard}
           color="rose"
         />
         <StatCard
           label={t("thisMonthExpense")}
-          value={`₩${formatKRW(s?.this_month_expense ?? 0)}`}
+          value={formatKRWFull(s?.this_month_expense ?? 0)}
           trend={s?.mom}
           sub={t("prevMonthCompare")}
           icon={Wallet}
@@ -376,7 +376,7 @@ export default function StatisticsPage() {
         />
         <StatCard
           label={t("avgDailyExpense")}
-          value={`₩${formatKRW(s?.avg_daily ?? 0)}`}
+          value={formatKRWFull(s?.avg_daily ?? 0)}
           icon={CalendarDays}
           color="violet"
         />

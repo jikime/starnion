@@ -183,7 +183,7 @@ function KpiRow({ summary, goalCount, nearestDday, memoCount }: {
     {
       label: t("net"),
       value: summary ? KRW(summary.net) : "-",
-      sub: summary ? `↑ ${shortKRW(summary.income)}  ↓ ${shortKRW(summary.expense)}` : "",
+      sub: summary ? `↑ ${KRW(summary.income)}  ↓ ${KRW(summary.expense)}` : "",
       icon: Wallet,
       color: net >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400",
       href: "/finance",
@@ -495,7 +495,7 @@ function BudgetCard({ budgets }: { budgets: BudgetItem[] }) {
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium">{b.category}</span>
                   <span className={`text-xs ${over ? "text-red-500" : "text-muted-foreground"}`}>
-                    {shortKRW(b.spent)} / {shortKRW(b.budget)}
+                    {KRW(b.spent)} / {KRW(b.budget)}
                   </span>
                 </div>
                 <Progress value={pct} className={`h-1.5 ${over ? "[&>div]:bg-red-500" : ""}`} />
