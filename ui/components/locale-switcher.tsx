@@ -21,7 +21,14 @@ export function LocaleSwitcher() {
 
   function handleChange(value: string) {
     startTransition(async () => {
-      await setLocale(value)
+      try {
+        await setLocale(value)
+      } catch {
+        // Server Action ID mismatch after a new deployment — reload to get
+        // the latest bundle, which will also re-run setLocale on the new server.
+        window.location.reload()
+        return
+      }
       window.location.reload()
     })
   }
