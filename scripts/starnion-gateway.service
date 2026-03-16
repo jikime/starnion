@@ -6,12 +6,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=starnion
-Group=starnion
+User=root
+Group=root
 
 # Binary and working directory — adjust paths to match your deployment
-ExecStart=/usr/local/bin/starnion-gateway
-WorkingDirectory=/var/lib/starnion
+ExecStart=/root/.starnion/bin/starnion-gateway
+WorkingDirectory=/root/.starnion
 
 # Environment file containing all config (DB DSN, JWT_SECRET, API keys, etc.)
 # Each line: KEY=value   (no export keyword, no quotes required)

@@ -8,25 +8,26 @@ PartOf=starnion.target
 
 [Service]
 Type=simple
-User=starnion
-Group=starnion
+User=root
+Group=root
 
 # ── 실행 경로 ────────────────────────────────────────────────────────────────
-# `pnpm start` = `next start -p 3893` (package.json scripts.start 참고)
-# 실행 전에 반드시 `pnpm build` 가 완료되어야 한다.
-#
-# standalone 빌드를 사용하는 경우 (NEXT_STANDALONE=1 pnpm build):
+# standalone 빌드 사용 (starnion install 기본값):
 #   ExecStart=/usr/bin/node .next/standalone/server.js
 #   Environment=PORT=3893
 #   Environment=HOSTNAME=0.0.0.0
 #
-# 아래는 pnpm start(non-standalone) 기본 설정.
-WorkingDirectory=/home/starnion/.starnion/ui
-ExecStart=/usr/bin/pnpm start
+# pnpm start(non-standalone) 사용 시:
+#   ExecStart=/usr/bin/pnpm start
+#   (pnpm 경로는 `which pnpm` 으로 확인)
+WorkingDirectory=/root/.starnion/ui
+ExecStart=/usr/bin/node .next/standalone/server.js
 
 # ── 환경 변수 ────────────────────────────────────────────────────────────────
-Environment=HOME=/home/starnion
+Environment=HOME=/root
 Environment=NODE_ENV=production
+Environment=PORT=3893
+Environment=HOSTNAME=0.0.0.0
 
 # Next.js / NextAuth 환경 변수는 빌드 시 .env 에서 번들됨.
 # 런타임에 바꿔야 할 값만 여기에 추가.

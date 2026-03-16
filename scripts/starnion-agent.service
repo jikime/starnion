@@ -10,15 +10,15 @@ PartOf=starnion.target
 
 [Service]
 Type=simple
-User=starnion
-Group=starnion
+User=root
+Group=root
 
 # ── 실행 경로 ────────────────────────────────────────────────────────────────
 # isInstalled() 기준 설치 경로: ~/.starnion/agent/
 # .venv는 `uv sync --no-install-project`로 생성됨.
 # PYTHONPATH 대신 패키지를 직접 설치(editable)하면 이 줄 불필요.
-WorkingDirectory=/home/starnion/.starnion/agent
-ExecStart=/home/starnion/.starnion/agent/.venv/bin/python3 -m starnion_agent
+WorkingDirectory=/root/.starnion/agent
+ExecStart=/root/.starnion/agent/.venv/bin/python3 -m starnion_agent
 
 # ── 환경 변수 ────────────────────────────────────────────────────────────────
 # HOME — systemd는 Type=simple에서 HOME을 자동으로 설정하지 않음.
@@ -26,8 +26,8 @@ ExecStart=/home/starnion/.starnion/agent/.venv/bin/python3 -m starnion_agent
 # PYTHONPATH — 설치 레이아웃에서 starnion_agent 패키지 위치.
 #   릴리즈 tarball: agentDir 바로 아래에 starnion_agent/ 가 있음.
 #   소스 트리 (dev): agentDir/src/ 아래에 있음 → 아래 주석 참고.
-Environment=HOME=/home/starnion
-Environment=PYTHONPATH=/home/starnion/.starnion/agent
+Environment=HOME=/root
+Environment=PYTHONPATH=/root/.starnion/agent
 
 # 소스 트리(dev 레이아웃)를 직접 실행할 경우 아래 두 줄로 교체:
 # WorkingDirectory=/opt/starnion/agent
