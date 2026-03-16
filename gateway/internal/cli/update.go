@@ -267,7 +267,7 @@ func copyFile(src, dest string) error {
 	return os.Rename(tmpName, dest)
 }
 
-// installRuntimeFiles copies agent/, ui/, docker/ from extractDir into starnionHome,
+// installRuntimeFiles copies agent/, ui/, docker/, scripts/ from extractDir into starnionHome,
 // preserving any existing docker/.env.
 func installRuntimeFiles(extractDir, starnionHome string) error {
 	// agent/: replace entirely
@@ -333,6 +333,19 @@ func installRuntimeFiles(extractDir, starnionHome string) error {
 			_ = os.WriteFile(envPath, envBackup, 0o600)
 		}
 		PrintOK("docker", fmt.Sprintf("설치 완료 → %s", dockerDst))
+	}
+
+	// scripts/: replace entirely
+	scriptsSrc := filepath.Join(extractDir, "scripts")
+	if _, err := os.Stat(scriptsSrc); err == nil {
+		scriptsDst := filepath.Join(starnionHome, "scripts")
+		if err := os.RemoveAll(scriptsDst); err != nil {
+			return fmt.Errorf("scripts 디렉토리 제거 실패: %w", err)
+		}
+		if err := copyDir(scriptsSrc, scriptsDst); err != nil {
+			return fmt.Errorf("scripts 디렉토리 복사 실패: %w", err)
+		}
+		PrintOK("scripts", fmt.Sprintf("설치 완료 → %s", scriptsDst))
 	}
 
 	return nil
