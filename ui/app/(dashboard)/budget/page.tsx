@@ -339,15 +339,24 @@ export default function BudgetPage() {
             {t("title")}
           </h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={prevMonth}>
-            <ChevronLeft className="size-4" />
-          </Button>
-          <span className="text-sm font-medium w-20 text-center">{monthLabel}</span>
-          <Button variant="outline" size="icon" onClick={nextMonth}>
-            <ChevronRight className="size-4" />
-          </Button>
-          <Button variant="outline" className="gap-2 ml-2" onClick={openSettings}>
+        <div className="flex items-center w-full sm:w-auto">
+          <div className="flex-1 sm:hidden" />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={prevMonth}>
+              <ChevronLeft className="size-4" />
+            </Button>
+            <span className="text-sm font-medium w-20 text-center">{monthLabel}</span>
+            <Button variant="outline" size="icon" onClick={nextMonth}>
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+          <div className="flex-1 flex justify-end sm:hidden">
+            <Button variant="outline" className="gap-2 ml-2" onClick={openSettings}>
+              <Settings className="size-4" />
+              {t("settings")}
+            </Button>
+          </div>
+          <Button variant="outline" className="gap-2 ml-2 hidden sm:flex" onClick={openSettings}>
             <Settings className="size-4" />
             {t("settings")}
           </Button>

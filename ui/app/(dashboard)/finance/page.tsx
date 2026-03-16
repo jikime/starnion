@@ -331,15 +331,24 @@ export default function FinancePage() {
             {t("title")}
           </h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={prevMonth}>
-            <ChevronLeft className="size-4" />
-          </Button>
-          <span className="text-sm font-medium w-20 text-center">{monthLabel}</span>
-          <Button variant="outline" size="icon" onClick={nextMonth}>
-            <ChevronRight className="size-4" />
-          </Button>
-          <Button className="gap-2 ml-2" onClick={openNew}>
+        <div className="flex items-center w-full sm:w-auto">
+          <div className="flex-1 sm:hidden" />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={prevMonth}>
+              <ChevronLeft className="size-4" />
+            </Button>
+            <span className="text-sm font-medium w-20 text-center">{monthLabel}</span>
+            <Button variant="outline" size="icon" onClick={nextMonth}>
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+          <div className="flex-1 flex justify-end sm:hidden">
+            <Button className="gap-2 ml-2" onClick={openNew}>
+              <Plus className="size-4" />
+              {t("addRecord")}
+            </Button>
+          </div>
+          <Button className="gap-2 ml-2 hidden sm:flex" onClick={openNew}>
             <Plus className="size-4" />
             {t("addRecord")}
           </Button>
