@@ -31,19 +31,21 @@ type githubRelease struct {
 
 func newUpdateCmd() *cobra.Command {
 	var checkOnly bool
+	var force bool
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "최신 버전으로 업데이트",
 		Long:  "GitHub Releases에서 최신 starnion 바이너리를 다운로드하여 업데이트합니다.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUpdate(checkOnly)
+			return runUpdate(checkOnly, force)
 		},
 	}
 	cmd.Flags().BoolVar(&checkOnly, "check", false, "버전 확인만 하고 업데이트하지 않음")
+	cmd.Flags().BoolVar(&force, "force", false, "이미 최신 버전이어도 강제 재설치")
 	return cmd
 }
 
-func runUpdate(checkOnly bool) error {
+func runUpdate(checkOnly, force bool) error {
 	PrintSectionHeader(0, 0, "UPDATE")
 
 	// ── Fetch latest release ───────────────────────────────────────────────
@@ -61,9 +63,14 @@ func runUpdate(checkOnly bool) error {
 	PrintInfo(fmt.Sprintf("최신 버전: %s", sGold.Render("v"+latest)))
 
 	// ── Compare versions ───────────────────────────────────────────────────
-	if current == latest {
+	if current == latest && !force {
 		PrintOK("버전", "이미 최신 버전입니다.")
+		PrintHint("런타임 파일을 재설치하려면: " + sStar.Render("starnion update --force"))
 		return nil
+	}
+
+	if current == latest && force {
+		PrintInfo("--force: 최신 버전이지만 재설치합니다.")
 	}
 
 	if current == "dev" {
