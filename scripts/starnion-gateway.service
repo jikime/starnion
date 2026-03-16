@@ -1,0 +1,47 @@
+[Unit]
+Description=Starnion Gateway
+Documentation=https://github.com/jikime/starnion
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=starnion
+Group=starnion
+
+# Binary and working directory — adjust paths to match your deployment
+ExecStart=/usr/local/bin/starnion-gateway
+WorkingDirectory=/var/lib/starnion
+
+# Environment file containing all config (DB DSN, JWT_SECRET, API keys, etc.)
+# Each line: KEY=value   (no export keyword, no quotes required)
+EnvironmentFile=/etc/starnion/gateway.env
+
+# Restart policy: always restart on crash, wait 5 s between attempts.
+# Stops retrying after 3 failures within 30 s to prevent a tight crash-loop.
+Restart=always
+RestartSec=5
+StartLimitBurst=3
+StartLimitIntervalSec=30
+
+# File descriptor limit — default Rocky Linux is 1024 which is too low for
+# a gateway handling many WebSocket / DB / gRPC connections simultaneously.
+LimitNOFILE=65536
+
+# Process limit — prevents runaway goroutine spawning from consuming all PIDs.
+LimitNPROC=4096
+
+# Prevent the process from gaining new privileges via setuid/capabilities.
+NoNewPrivileges=true
+
+# Give systemd 15 s to wait for the process to exit gracefully on SIGTERM
+# before sending SIGKILL. The gateway's own shutdown timeout is 10 s.
+TimeoutStopSec=15
+
+# Journal logging — stdout/stderr are captured automatically by journald.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=starnion-gateway
+
+[Install]
+WantedBy=multi-user.target

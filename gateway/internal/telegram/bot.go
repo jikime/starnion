@@ -32,6 +32,11 @@ type policyCache struct {
 
 const policyCacheTTL = 30 * time.Second
 
+// maxConcurrentHandlers limits the number of goroutines processing Telegram
+// updates concurrently per bot instance. Prevents goroutine accumulation under
+// heavy message load (e.g. group chats or burst traffic).
+const maxConcurrentHandlers = 50
+
 // Bot wraps the Telegram bot API and forwards messages to the agent via gRPC.
 type Bot struct {
 	api          *tgbotapi.BotAPI
@@ -46,6 +51,8 @@ type Bot struct {
 	ownerUserID string
 	// policy is an in-memory cache for DM/Group policy values.
 	policy policyCache
+	// sem is a semaphore that limits concurrent update handler goroutines.
+	sem chan struct{}
 }
 
 // NewBot creates a new Telegram bot connected to the agent gRPC service.
@@ -67,6 +74,7 @@ func NewBot(token, ownerUserID string, grpcConn *grpc.ClientConn, tracker *activ
 		skillService: skillSvc,
 		identitySvc:  identitySvc,
 		ownerUserID:  ownerUserID,
+		sem:          make(chan struct{}, maxConcurrentHandlers),
 	}, nil
 }
 
@@ -170,13 +178,31 @@ func (b *Bot) Run(ctx context.Context) {
 				Msg("telegram: raw update received")
 
 			if update.CallbackQuery != nil {
-				go b.handleCallback(ctx, update.CallbackQuery)
+				cq := update.CallbackQuery
+				select {
+				case b.sem <- struct{}{}:
+					go func() {
+						defer func() { <-b.sem }()
+						b.handleCallback(ctx, cq)
+					}()
+				default:
+					log.Warn().Str("owner", b.ownerUserID).Msg("telegram: callback handler dropped — semaphore full")
+				}
 				continue
 			}
 			if update.Message == nil {
 				continue
 			}
-			go b.handleMessage(ctx, update.Message)
+			msg := update.Message
+			select {
+			case b.sem <- struct{}{}:
+				go func() {
+					defer func() { <-b.sem }()
+					b.handleMessage(ctx, msg)
+				}()
+			default:
+				log.Warn().Int64("chat_id", msg.Chat.ID).Str("owner", b.ownerUserID).Msg("telegram: message handler dropped — semaphore full")
+			}
 		}
 	}
 }

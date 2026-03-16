@@ -101,6 +101,10 @@ func main() {
 		opened.Close()
 	} else {
 		db = opened
+		db.SetMaxOpenConns(25)
+		db.SetMaxIdleConns(5)
+		db.SetConnMaxLifetime(5 * time.Minute)
+		db.SetConnMaxIdleTime(2 * time.Minute)
 		defer db.Close()
 		log.Info().Msg("database connected")
 	}
@@ -276,11 +280,17 @@ func main() {
 		}
 
 		// Upsert platform_identities for cli platform so login activity is tracked.
-		go db.Exec(`
-			INSERT INTO platform_identities (user_id, platform, platform_id, display_name, last_active_at, created_at)
-			VALUES ($1, 'cli', $2, $3, NOW(), NOW())
-			ON CONFLICT (platform, platform_id) DO UPDATE SET last_active_at = NOW()
-		`, user.UserID, user.Email, user.Name)
+		go func(userID, email, name string) {
+			upsertCtx, upsertCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer upsertCancel()
+			if _, err := db.ExecContext(upsertCtx, `
+				INSERT INTO platform_identities (user_id, platform, platform_id, display_name, last_active_at, created_at)
+				VALUES ($1, 'cli', $2, $3, NOW(), NOW())
+				ON CONFLICT (platform, platform_id) DO UPDATE SET last_active_at = NOW()
+			`, userID, email, name); err != nil {
+				log.Warn().Err(err).Str("user_id", userID).Msg("cli-token: failed to upsert platform identity")
+			}
+		}(user.UserID, user.Email, user.Name)
 
 		expiresAt := time.Now().UTC().Add(30 * 24 * time.Hour)
 		return c.JSON(http.StatusOK, map[string]any{
@@ -691,16 +701,23 @@ func main() {
 
 	// Start HTTP server.
 	addr := fmt.Sprintf("%s:%d", cfg.Gateway.Host, cfg.Gateway.Port)
+	serverErr := make(chan error, 1)
 	go func() {
 		log.Info().Str("addr", addr).Msg("starting gateway server")
 		if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
-			log.Fatal().Err(err).Msg("server error")
+			serverErr <- err
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+
+	select {
+	case sig := <-quit:
+		log.Info().Str("signal", sig.String()).Msg("shutdown signal received")
+	case err := <-serverErr:
+		log.Error().Err(err).Msg("server error — initiating shutdown")
+	}
 
 	log.Info().Msg("shutting down server")
 	if sched != nil {
