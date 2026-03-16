@@ -30,6 +30,7 @@ All data is stored on your server, and you can manage your daily life more smart
 - [Quick Start (5 minutes)](getting-started/quickstart)
 - [Installation Guide](getting-started/installation)
 - [Configuration](getting-started/configuration)
+- [Production Deployment (nginx + systemd)](getting-started/production)
 
 ## Features
 

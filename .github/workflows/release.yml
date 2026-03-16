@@ -78,11 +78,25 @@ jobs:
             exit 1
           fi
 
+      - name: Update version in docs/_config.yml
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Update starnion_version field
+          sed -i "s/^starnion_version:.*/starnion_version: \"${VERSION}\"/" docs/_config.yml
+          # Update the version number and tag link in footer_content
+          sed -i "s|/releases/tag/v[0-9]*\.[0-9]*\.[0-9]*|/releases/tag/v${VERSION}|g" docs/_config.yml
+          sed -i "s|>v[0-9]*\.[0-9]*\.[0-9]*<|>v${VERSION}<|g" docs/_config.yml
+          # Verify
+          if ! grep -qF "starnion_version: \"${VERSION}\"" docs/_config.yml; then
+            echo "::error::sed did not update starnion_version in docs/_config.yml — check the pattern"
+            exit 1
+          fi
+
       - name: Commit and push updated docs
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/install.sh
+          git add docs/install.sh docs/_config.yml
           if git diff --staged --quiet; then
             echo "install.sh already at v${{ steps.version.outputs.version }} — nothing to commit"
             exit 0

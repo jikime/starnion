@@ -1,0 +1,40 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# starnion.target — Starnion 전체 스택 (= starnion dev)
+#
+# 이 target을 시작/중지하면 세 서비스가 함께 올라오고 내려간다.
+#
+# ─── 설치 ─────────────────────────────────────────────────────────────────────
+# sudo cp starnion-gateway.service starnion-agent.service \
+#         starnion-ui.service starnion.target \
+#         /etc/systemd/system/
+# sudo systemctl daemon-reload
+#
+# # 부팅 시 자동 시작 (선택)
+# sudo systemctl enable starnion.target
+#
+# # 지금 바로 시작
+# sudo systemctl start starnion.target
+#
+# # 상태 확인
+# systemctl status starnion.target
+# systemctl status starnion-gateway starnion-agent starnion-ui
+#
+# # 전체 로그 (최근 200줄)
+# journalctl -u starnion-gateway -u starnion-agent -u starnion-ui -n 200 -f
+#
+# # 중지
+# sudo systemctl stop starnion.target
+#
+# # 재시작
+# sudo systemctl restart starnion.target
+# ─────────────────────────────────────────────────────────────────────────────
+
+[Unit]
+Description=Starnion Stack (Gateway + Agent + UI)
+Documentation=https://github.com/jikime/starnion
+# 세 서비스를 원하고, 모두 올라온 뒤 target이 active 상태가 된다.
+Wants=starnion-gateway.service starnion-agent.service starnion-ui.service
+After=starnion-gateway.service starnion-agent.service starnion-ui.service
+
+[Install]
+WantedBy=multi-user.target

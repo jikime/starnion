@@ -30,6 +30,7 @@ permalink: /ko/
 - [빠른 시작 (5분)](getting-started/quickstart)
 - [설치 가이드](getting-started/installation)
 - [환경 설정](getting-started/configuration)
+- [프로덕션 배포 (nginx + systemd)](getting-started/production)
 
 ## 기능 가이드
 

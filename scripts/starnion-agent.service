@@ -1,0 +1,79 @@
+[Unit]
+Description=Starnion Agent (LangGraph gRPC server)
+Documentation=https://github.com/jikime/starnion
+# Agent must be reachable before the gateway tries to open its gRPC stream.
+# PostgreSQL must also be up because the agent opens a DB pool on startup.
+After=network-online.target postgresql.service
+Wants=network-online.target
+# Declare that this unit is part of the starnion stack.
+PartOf=starnion.target
+
+[Service]
+Type=simple
+User=starnion
+Group=starnion
+
+# ── 실행 경로 ────────────────────────────────────────────────────────────────
+# isInstalled() 기준 설치 경로: ~/.starnion/agent/
+# .venv는 `uv sync --no-install-project`로 생성됨.
+# PYTHONPATH 대신 패키지를 직접 설치(editable)하면 이 줄 불필요.
+WorkingDirectory=/home/starnion/.starnion/agent
+ExecStart=/home/starnion/.starnion/agent/.venv/bin/python3 -m starnion_agent
+
+# ── 환경 변수 ────────────────────────────────────────────────────────────────
+# HOME — systemd는 Type=simple에서 HOME을 자동으로 설정하지 않음.
+#         ~/.starnion/starnion.yaml 을 찾기 위해 반드시 지정.
+# PYTHONPATH — 설치 레이아웃에서 starnion_agent 패키지 위치.
+#   릴리즈 tarball: agentDir 바로 아래에 starnion_agent/ 가 있음.
+#   소스 트리 (dev): agentDir/src/ 아래에 있음 → 아래 주석 참고.
+Environment=HOME=/home/starnion
+Environment=PYTHONPATH=/home/starnion/.starnion/agent
+
+# 소스 트리(dev 레이아웃)를 직접 실행할 경우 아래 두 줄로 교체:
+# WorkingDirectory=/opt/starnion/agent
+# Environment=PYTHONPATH=/opt/starnion/agent/src
+
+# EnvironmentFile로 추가 변수 주입 가능 (선택)
+# EnvironmentFile=/etc/starnion/agent.env
+
+# ── 재시작 정책 ──────────────────────────────────────────────────────────────
+Restart=always
+RestartSec=5
+StartLimitBurst=3
+StartLimitIntervalSec=30
+
+# ── 리소스 제한 ──────────────────────────────────────────────────────────────
+# 파일 디스크립터: DB 커넥션 풀 + gRPC 스트림 + Playwright 소켓 합산.
+LimitNOFILE=65536
+# 프로세스 수: Python 멀티프로세싱 / Playwright 브라우저 자식 프로세스 포함.
+LimitNPROC=4096
+
+# ── 종료 ─────────────────────────────────────────────────────────────────────
+# 에이전트는 SIGTERM 수신 후 asyncio 이벤트 루프를 정리하고 종료.
+# __main__.py 의 graceful shutdown 타임아웃(체크포인터·풀 닫기)에 여유를 준다.
+TimeoutStopSec=20
+KillMode=control-group
+KillSignal=SIGTERM
+
+# ── 보안 ─────────────────────────────────────────────────────────────────────
+NoNewPrivileges=true
+# Playwright Chromium이 /tmp, /proc/self, /dev/shm 을 필요로 하므로
+# PrivateTmp/ProtectSystem 을 엄격하게 설정하면 브라우저가 실행되지 않음.
+# Playwright를 사용하지 않는다면 아래 두 줄 활성화 가능.
+# PrivateTmp=true
+# ProtectSystem=strict
+
+# ── Rocky Linux SELinux 주의사항 ─────────────────────────────────────────────
+# 홈 디렉터리에서 실행 파일을 기동하면 SELinux가 차단할 수 있음.
+# 아래 명령으로 실행 권한 부여 (초기 1회):
+#   sudo chcon -R -t bin_t /home/starnion/.starnion/agent/.venv/bin/
+# 또는 SELinux boolean 허용:
+#   sudo setsebool -P allow_user_exec_content 1
+
+# ── 로그 ─────────────────────────────────────────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=starnion-agent
+
+[Install]
+WantedBy=starnion.target multi-user.target
