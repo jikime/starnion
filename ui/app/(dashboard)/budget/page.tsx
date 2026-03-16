@@ -338,7 +338,6 @@ export default function BudgetPage() {
             <PieChart className="size-6 text-primary" />
             {t("title")}
           </h1>
-          <p className="text-sm text-muted-foreground">{monthLabel}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={prevMonth}>
