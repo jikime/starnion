@@ -11,22 +11,41 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  4096,
-	WriteBufferSize: 4096,
-	// Allow any origin; production should restrict this.
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
-
 // WebSocketHandler handles WebSocket upgrade requests.
 type WebSocketHandler struct {
-	hub     *wschat.Hub
-	authSvc *auth.Service
+	hub      *wschat.Hub
+	authSvc  *auth.Service
+	upgrader websocket.Upgrader
 }
 
 // NewWebSocketHandler creates a WebSocketHandler.
-func NewWebSocketHandler(hub *wschat.Hub, authSvc *auth.Service) *WebSocketHandler {
-	return &WebSocketHandler{hub: hub, authSvc: authSvc}
+// allowedOrigins should come from the same CORS config used by the HTTP server
+// (cfg.CORS.AllowedOrigins). An empty slice falls back to allowing any origin,
+// which is acceptable for local dev but should not be used in production.
+func NewWebSocketHandler(hub *wschat.Hub, authSvc *auth.Service, allowedOrigins []string) *WebSocketHandler {
+	originSet := make(map[string]struct{}, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		originSet[strings.TrimRight(o, "/")] = struct{}{}
+	}
+
+	checkOrigin := func(r *http.Request) bool {
+		if len(originSet) == 0 {
+			return true // dev mode: no restrictions
+		}
+		origin := strings.TrimRight(r.Header.Get("Origin"), "/")
+		_, ok := originSet[origin]
+		return ok
+	}
+
+	return &WebSocketHandler{
+		hub:     hub,
+		authSvc: authSvc,
+		upgrader: websocket.Upgrader{
+			ReadBufferSize:  4096,
+			WriteBufferSize: 4096,
+			CheckOrigin:     checkOrigin,
+		},
+	}
 }
 
 // Connect handles GET /ws — upgrades the HTTP connection to WebSocket.
@@ -43,7 +62,7 @@ func (h *WebSocketHandler) Connect(c echo.Context) error {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid token"})
 	}
 
-	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
+	conn, err := h.upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		log.Warn().Err(err).Str("user_id", claims.UserID).Msg("ws: upgrade failed")
 		return nil // upgrader already wrote the error response

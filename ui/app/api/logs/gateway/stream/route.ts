@@ -10,18 +10,28 @@ export async function GET(req: NextRequest) {
     headers: { Accept: "text/event-stream" },
     // @ts-expect-error -- Node.js fetch supports duplex
     duplex: "half",
+    signal: req.signal, // propagate disconnect; also bypasses the 30s timeout
   }).catch(() => null)
 
   if (!upstreamRes || !upstreamRes.ok || !upstreamRes.body) {
     return new Response("upstream unavailable", { status: 503 })
   }
 
-  // Pipe SSE stream from Go gateway → browser
+  // Pipe SSE stream from Go gateway → browser.
+  // When the browser disconnects (req.signal aborts) we must cancel the
+  // upstream body *and* close the writable side of the TransformStream.
+  // Cancelling only the source leaves the writable writer open, which
+  // prevents the readable from signalling EOF to the browser.
   const { readable, writable } = new TransformStream()
-  upstreamRes.body.pipeTo(writable).catch(() => {})
+  const writer = writable.getWriter()
+
+  upstreamRes.body
+    .pipeTo(writable)
+    .catch(() => writer.close().catch(() => {}))
 
   req.signal.addEventListener("abort", () => {
     upstreamRes.body?.cancel().catch(() => {})
+    writer.close().catch(() => {})
   })
 
   return new Response(readable, {

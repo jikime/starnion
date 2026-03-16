@@ -58,6 +58,9 @@ export async function POST(request: Request) {
   const threadId: string = body.thread_id ?? ""
 
   // Forward to Go gateway SSE stream endpoint.
+  // Pass request.signal so the gateway connection is cancelled when the
+  // browser disconnects, and use AbortSignal.any() to avoid the default
+  // 30-second gatewayFetch timeout (streaming responses can take minutes).
   const upstream = await gatewayFetch(`/api/v1/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -66,6 +69,7 @@ export async function POST(request: Request) {
       thread_id: threadId,
       ...(files.length > 0 && { files }),
     }),
+    signal: request.signal,
   }).catch(() => null)
 
   if (!upstream || !upstream.ok || !upstream.body) {

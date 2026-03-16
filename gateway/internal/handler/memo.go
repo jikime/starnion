@@ -55,7 +55,7 @@ func (h *MemoHandler) ListMemos(c echo.Context) error {
 		idx++
 	}
 	_ = idx
-	query += ` ORDER BY updated_at DESC`
+	query += ` ORDER BY updated_at DESC LIMIT 500`
 
 	rows, err := h.db.QueryContext(c.Request().Context(), query, args...)
 	if err != nil {

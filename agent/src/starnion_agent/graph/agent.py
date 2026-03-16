@@ -138,6 +138,10 @@ def _filter_stale_tool_errors(messages: list) -> list:
 
     Successful tool results and their surrounding messages are kept as-is.
     """
+    # Work on a shallow copy so we never mutate the caller's list (which may be
+    # a direct reference to LangGraph's checkpoint state).
+    messages = list(messages)
+
     # Step 1: collect failed tool_call_ids from error ToolMessages.
     failed_ids: set[str] = set()
     for msg in messages:

@@ -163,16 +163,19 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 		sseEvent(map[string]any{"type": "finish", "finishReason": reason})
 		fmt.Fprintf(w, "data: [DONE]\n\n")
 		flusher.Flush()
-		// Use a fresh context: the request context is already canceled by the time
-		// the HTTP response has been fully written.
-		bg := context.Background()
-		h.persistAssistant(bg, req.ThreadID, assistantBuf.String(), attachments)
+		// Use a fresh context with a timeout: the request context is already
+		// canceled by the time the HTTP response has been fully written.
+		// Without a timeout, a slow/hung DB would block this goroutine forever,
+		// eventually exhausting the connection pool.
+		saveCtx, saveCancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer saveCancel()
+		h.persistAssistant(saveCtx, req.ThreadID, assistantBuf.String(), attachments)
 		// Backfill analysis column for any image files uploaded in this request.
 		// The LLM analyzed them via multimodal vision — the response IS the analysis.
 		if assistantBuf.Len() > 0 {
 			for _, f := range req.Files {
 				if strings.HasPrefix(f.Mime, "image/") {
-					h.updateImageAnalysis(bg, req.UserID, f.URL, assistantBuf.String())
+					h.updateImageAnalysis(saveCtx, req.UserID, f.URL, assistantBuf.String())
 				}
 			}
 		}

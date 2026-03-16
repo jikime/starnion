@@ -390,7 +390,7 @@ func main() {
 	})
 
 	// WebSocket endpoint.
-	wsHandler := handler.NewWebSocketHandler(wsHub, authSvc)
+	wsHandler := handler.NewWebSocketHandler(wsHub, authSvc, cfg.CORS.AllowedOrigins)
 	e.GET("/ws", wsHandler.Connect)
 
 	// API routes
