@@ -163,7 +163,14 @@ func (c *Client) readPump() {
 
 		switch frame.Method {
 		case "chat":
-			go c.handleChatMessage(frame)
+			go func(f InFrame) {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Error().Interface("panic", r).Str("user_id", c.userID).Msg("ws: handleChatMessage panic recovered")
+					}
+				}()
+				c.handleChatMessage(f)
+			}(frame)
 		default:
 			c.sendError(frame.ID, fmt.Sprintf("unknown method: %s", frame.Method))
 		}
@@ -256,22 +263,22 @@ func (c *Client) handleChatMessage(frame InFrame) {
 		resp, err := stream.Recv()
 		if err != nil {
 			// gRPC stream ended unexpectedly — send "done" event.
-			c.send <- OutFrame{Type: FrameEvent, ID: frame.ID, Event: EventDone}
+			c.trySend(OutFrame{Type: FrameEvent, ID: frame.ID, Event: EventDone})
 			break
 		}
 
 		switch resp.Type {
 		case starnionv1.ResponseType_TEXT:
 			assistantBuf.WriteString(resp.Content)
-			c.send <- OutFrame{
+			c.trySend(OutFrame{
 				Type:    FrameEvent,
 				ID:      frame.ID,
 				Event:   EventText,
 				Payload: map[string]any{"text": resp.Content},
-			}
+			})
 
 		case starnionv1.ResponseType_TOOL_CALL:
-			c.send <- OutFrame{
+			c.trySend(OutFrame{
 				Type:  FrameEvent,
 				ID:    frame.ID,
 				Event: EventToolCall,
@@ -279,10 +286,10 @@ func (c *Client) handleChatMessage(frame InFrame) {
 					"tool": resp.ToolName,
 					"text": resp.Content,
 				},
-			}
+			})
 
 		case starnionv1.ResponseType_TOOL_RESULT:
-			c.send <- OutFrame{
+			c.trySend(OutFrame{
 				Type:  FrameEvent,
 				ID:    frame.ID,
 				Event: EventToolResult,
@@ -290,7 +297,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 					"tool":   resp.ToolName,
 					"result": resp.ToolResult,
 				},
-			}
+			})
 
 		case starnionv1.ResponseType_FILE:
 			att, uploadErr := c.hub.uploadFile(ctx, resp.FileName, resp.FileMime, resp.FileData)
@@ -305,7 +312,7 @@ func (c *Client) handleChatMessage(frame InFrame) {
 			} else if strings.HasPrefix(att.Mime, "audio/") {
 				recordAudio(c.hub.db, c.userID, att.URL, att.Name, att.Mime, att.Size, 0, "webchat", "generated", "", message)
 			}
-			c.send <- OutFrame{
+			c.trySend(OutFrame{
 				Type:  FrameEvent,
 				ID:    frame.ID,
 				Event: EventFile,
@@ -315,22 +322,22 @@ func (c *Client) handleChatMessage(frame InFrame) {
 					"url":  att.URL,
 					"size": att.Size,
 				},
-			}
+			})
 
 		case starnionv1.ResponseType_ERROR:
-			c.send <- OutFrame{
+			c.trySend(OutFrame{
 				Type:    FrameEvent,
 				ID:      frame.ID,
 				Event:   EventError,
 				Payload: map[string]any{"message": resp.Content},
-			}
+			})
 
 		case starnionv1.ResponseType_STREAM_END:
 			// Save completed assistant message with any file attachments.
 			if assistantBuf.Len() > 0 || len(attachments) > 0 {
 				c.hub.saveMessage(threadID, "assistant", assistantBuf.String(), attachments)
 			}
-			c.send <- OutFrame{Type: FrameEvent, ID: frame.ID, Event: EventDone}
+			c.trySend(OutFrame{Type: FrameEvent, ID: frame.ID, Event: EventDone})
 			return
 		}
 	}
@@ -381,12 +388,33 @@ func recordAudio(db *sql.DB, userID, url, name, mime string, size int64, duratio
 	}
 }
 
+// trySend delivers a frame to the client's send buffer.
+// If the channel is closed (client disconnected and replaced by a reconnect) or
+// the buffer is full, the frame is silently dropped and false is returned.
+// Using recover() prevents the "send on closed channel" panic that would
+// otherwise crash the process when a browser reconnects mid-stream.
+func (c *Client) trySend(frame OutFrame) (sent bool) {
+	defer func() {
+		if recover() != nil {
+			log.Warn().Str("user_id", c.userID).Str("event", frame.Event).Msg("ws: drop frame — client channel closed")
+			sent = false
+		}
+	}()
+	select {
+	case c.send <- frame:
+		sent = true
+	default:
+		log.Warn().Str("user_id", c.userID).Str("event", frame.Event).Msg("ws: send buffer full, dropping frame")
+	}
+	return
+}
+
 // sendError delivers an error response frame to the browser.
 func (c *Client) sendError(requestID, message string) {
-	c.send <- OutFrame{
+	c.trySend(OutFrame{
 		Type:    FrameResponse,
 		ID:      requestID,
 		OK:      false,
 		Payload: map[string]any{"message": message},
-	}
+	})
 }

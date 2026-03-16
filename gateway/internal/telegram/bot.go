@@ -183,6 +183,11 @@ func (b *Bot) Run(ctx context.Context) {
 				case b.sem <- struct{}{}:
 					go func() {
 						defer func() { <-b.sem }()
+						defer func() {
+							if r := recover(); r != nil {
+								log.Error().Interface("panic", r).Str("owner", b.ownerUserID).Msg("telegram: callback handler panic recovered")
+							}
+						}()
 						b.handleCallback(ctx, cq)
 					}()
 				default:
@@ -198,6 +203,11 @@ func (b *Bot) Run(ctx context.Context) {
 			case b.sem <- struct{}{}:
 				go func() {
 					defer func() { <-b.sem }()
+					defer func() {
+						if r := recover(); r != nil {
+							log.Error().Interface("panic", r).Int64("chat_id", msg.Chat.ID).Str("owner", b.ownerUserID).Msg("telegram: message handler panic recovered")
+						}
+					}()
 					b.handleMessage(ctx, msg)
 				}()
 			default:
