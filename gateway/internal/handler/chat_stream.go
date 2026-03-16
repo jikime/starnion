@@ -203,7 +203,7 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 
 		case starnionv1.ResponseType_FILE:
 			if h.minio != nil && len(resp.FileData) > 0 {
-				att, uploadErr := h.minio.Upload(context.Background(), resp.FileName, resp.FileMime, resp.FileData)
+				att, uploadErr := h.minio.Upload(ctx, resp.FileName, resp.FileMime, resp.FileData)
 				if uploadErr != nil {
 					log.Warn().Err(uploadErr).Str("file", resp.FileName).Msg("chat_stream: MinIO upload failed")
 					// Fallback: embed as text reference.
