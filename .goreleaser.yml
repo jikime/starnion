@@ -15,6 +15,7 @@ before:
     - sh -c "cp -r ui/.next .staging/ui/.next && rm -rf .staging/ui/.next/cache && cp ui/package.json ui/pnpm-lock.yaml .staging/ui/ && cp -r ui/public .staging/ui/public && find ui -maxdepth 1 -name 'next.config.*' -exec cp {} .staging/ui/ \\;"
     - sh -c "cp docker/docker-compose.yml docker/docker-compose.prod.yml docker/Dockerfile.agent docker/Dockerfile.gateway docker/Dockerfile.ui docker/.env.example docker/init.sql docker/setup.sh .staging/docker/"
     - sh -c "cp -r docker/migrations/incremental/. .staging/docker/migrations/incremental/ 2>/dev/null || true"
+    - sh -c "cp -r scripts .staging/scripts"
 
 builds:
   - id: starnion
@@ -64,6 +65,9 @@ archives:
         dst: ui
       - src: .staging/docker/**
         dst: docker
+        strip_parent: true
+      - src: .staging/scripts/**
+        dst: scripts
         strip_parent: true
 
 checksum:
