@@ -94,6 +94,14 @@ func ensureAgentDeps(root string) error {
 		return err
 	}
 
+	// Apply SELinux bin_t context to the real Python binary so systemd can
+	// execute it from a home directory (admin_home_t). Must run after uv sync
+	// because the venv (and its Python symlink chain) is created above.
+	venvPy := filepath.Join(agentDir, ".venv", "bin", "python3")
+	if real, err := filepath.EvalSymlinks(venvPy); err == nil {
+		selinuxFixup([]string{real})
+	}
+
 	// Install Playwright Chromium browser binary + system dependencies.
 	// The sentinel file prevents re-installation on every startup; it is
 	// inside .venv/ so it is removed automatically when the venv is recreated.
