@@ -48,11 +48,20 @@ class CodingAgentInput(BaseModel):
             "is created automatically."
         ),
     )
+    permission_mode: str = Field(
+        default="acceptEdits",
+        description=(
+            "Claude Code permission mode. "
+            "'default': asks confirmation for risky operations (shell commands, deletions). "
+            "'acceptEdits': auto-approves file read/write/edit, asks for shell commands. "
+            "'bypassPermissions': auto-approves all operations including shell execution (use with caution)."
+        ),
+    )
 
 
 @tool(args_schema=CodingAgentInput)
 @skill_guard("coding_agent")
-async def run_coding_agent(task: str, workdir: str = "") -> str:
+async def run_coding_agent(task: str, workdir: str = "", permission_mode: str = "acceptEdits") -> str:
     """Execute coding tasks using Claude Code SDK.
 
     Use for complex coding tasks that require reading and writing files:
@@ -81,8 +90,8 @@ async def run_coding_agent(task: str, workdir: str = "") -> str:
         resolved_workdir = _ensure_workdir(user_id)
 
     logger.info(
-        "coding_agent: user=%s workdir=%s task_len=%d",
-        user_id, resolved_workdir, len(task),
+        "coding_agent: user=%s workdir=%s task_len=%d permission_mode=%s",
+        user_id, resolved_workdir, len(task), permission_mode,
     )
 
     output_parts: list[str] = []
@@ -93,7 +102,7 @@ async def run_coding_agent(task: str, workdir: str = "") -> str:
                 prompt=task,
                 options=ClaudeCodeOptions(
                     cwd=resolved_workdir,
-                    permission_mode="acceptEdits",
+                    permission_mode=permission_mode,
                 ),
             ):
                 logger.debug("coding_agent event: %s", type(event).__name__)
