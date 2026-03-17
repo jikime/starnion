@@ -12,7 +12,7 @@ before:
     # Use .staging/ (not dist/) to avoid conflict with goreleaser --clean
     - sh -c "rm -rf .staging && mkdir -p .staging/agent .staging/ui .staging/docker/migrations/incremental"
     - sh -c "cp -r agent/src/starnion_agent .staging/agent/starnion_agent && cp agent/pyproject.toml agent/README.md .staging/agent/ && (test -f agent/.python-version && cp agent/.python-version .staging/agent/ || true) && (test -f agent/uv.lock && cp agent/uv.lock .staging/agent/ || true)"
-    - sh -c "cp -rL ui/.next/standalone/. .staging/ui/ && mkdir -p .staging/ui/.next && cp -r ui/.next/static .staging/ui/.next/static && cp -r ui/public .staging/ui/public"
+    - sh -c "cp -r ui/.next/standalone/. .staging/ui/ && mkdir -p .staging/ui/.next && cp -r ui/.next/static .staging/ui/.next/static && cp -r ui/public .staging/ui/public"
     - sh -c "cp docker/docker-compose.yml docker/docker-compose.prod.yml docker/Dockerfile.agent docker/Dockerfile.gateway docker/Dockerfile.ui docker/.env.example docker/init.sql docker/setup.sh .staging/docker/"
     - sh -c "cp -r docker/migrations/incremental/. .staging/docker/migrations/incremental/ 2>/dev/null || true"
     - sh -c "cp -r scripts .staging/scripts"
