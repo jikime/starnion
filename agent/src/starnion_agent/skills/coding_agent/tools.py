@@ -126,6 +126,19 @@ async def run_coding_agent(task: str, workdir: str = "") -> str:
             exit_code = getattr(e, "exit_code", "?")
             stderr = getattr(e, "stderr", "") or ""
             return f"❌ Process error (exit {exit_code}):\n{stderr or str(e)}"
+        if err_type == "MessageParseError":
+            # SDK doesn't handle all Claude Code event types (e.g. rate_limit_event).
+            # Return any partial output collected before the error.
+            partial = "".join(output_parts).strip()
+            if partial:
+                if len(partial) > _MAX_OUTPUT:
+                    partial = partial[:_MAX_OUTPUT] + f"\n\n… (output truncated at {_MAX_OUTPUT} chars)"
+                return partial
+            msg = str(e)
+            if "rate_limit" in msg:
+                return "⚠️ Claude Code API 호출 한도 초과. 잠시 후 다시 시도해주세요."
+            logger.warning("run_coding_agent MessageParseError: %s", msg)
+            return f"⚠️ SDK 파싱 오류 ({msg}). 잠시 후 다시 시도해주세요."
         logger.exception("run_coding_agent failed: %s: %s", err_type, e)
         return f"❌ Coding agent error ({err_type}): {e}"
 
