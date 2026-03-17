@@ -1,46 +1,46 @@
 ---
 name: finance
-description: 사용자가 지출이나 수입을 언급할 때 금액을 기록하고 월별 총액을 조회합니다. "점심 만원", "월급 300만원", "이번 달 얼마 썼어?" 같은 메시지에 반응합니다.
+description: Records income or expenses when the user mentions an amount, and retrieves monthly totals. Responds to messages like "lunch 10,000 won", "salary 3 million won", "how much did I spend this month?"
 keywords: ["가계부", "지출", "수입", "결제", "expense", "income", "spending", "家計簿", "记账"]
 ---
 
-# 가계부 (finance)
+# Finance Skill
 
-## 도구 사용 지침
+## Tool Usage Guidelines
 
-- 수입이나 지출 내용이 포함된 메시지 → `save_finance` 호출
-- 월별 합계 또는 지출 현황 질문 → `get_monthly_total` 호출
-- 카테고리가 불명확하면 사용자에게 확인 후 기록
-- 수입은 amount를 양수, 지출은 음수로 기록
-- 금액 없이 지출 언급만 있는 경우 → 금액을 물어보세요
+- Message contains income or expense → call `save_finance`
+- Question about monthly total or spending summary → call `get_monthly_total`
+- If the category is unclear, confirm with the user before recording.
+- Record income as a positive `amount`, expenses as negative.
+- If a spending mention has no amount → ask the user for the amount.
 
-## 금액 파싱 규칙
+## Amount Parsing Rules (Korean)
 
-- "만원" = 10,000원, "천원" = 1,000원
-- "삼만오천원" = 35,000원
-- "350만원" = 3,500,000원
-- 금액이 명확하지 않으면 사용자에게 확인
+- "만원" = 10,000, "천원" = 1,000
+- "삼만오천원" = 35,000
+- "350만원" = 3,500,000
+- If the amount is ambiguous, ask the user to confirm.
 
-## 카테고리 분류 기준
+## Category Classification
 
-- 식비: 식당, 카페, 배달, 간식, 장보기, 편의점
-- 교통: 택시, 버스, 지하철, 주유, 주차, 톨비
-- 쇼핑: 의류, 전자기기, 생활용품, 인터넷 쇼핑
-- 문화: 영화, 공연, 도서, 게임, 스트리밍
-- 의료: 병원, 약국, 건강검진, 치과
-- 구독: 정기 결제, 멤버십, 구독 서비스
-- 수입: 월급, 용돈, 보너스, 부수입, 이자
-- 기타: 위 분류에 해당하지 않는 지출
+- food: restaurant, cafe, delivery, snacks, groceries, convenience store
+- transport: taxi, bus, subway, fuel, parking, toll
+- shopping: clothing, electronics, household goods, online shopping
+- culture: movies, performances, books, games, streaming
+- medical: hospital, pharmacy, health check, dental
+- subscription: recurring payments, memberships, subscription services
+- income: salary, allowance, bonus, side income, interest
+- other: expenses not covered by the above categories
 
-## 응답 스타일
+## Response Style
 
-- 기록 완료 시 카테고리와 금액을 자연스럽게 확인
-- 큰 지출(10만원+)에는 가볍게 코멘트
-- 반복 지출 감지 시 참고 정보 제공
-- 일상 기록(감정, 일기)과 혼동하지 말 것 — 금액이 포함된 경우만 가계부
+- Naturally confirm the category and amount after recording.
+- Add a light comment for large expenses (100,000+).
+- Provide context when a recurring expense is detected.
+- Do not confuse with daily logs (emotions, diary) — finance only when an amount is present.
 
-## 도구 결과 처리 원칙
+## Tool Result Handling
 
-- 도구가 **성공** 메시지를 반환하면 그 결과를 사용자에게 전달합니다.
-- 도구가 **오류·실패** 메시지를 반환하면 반드시 그 내용을 정직하게 사용자에게 전달합니다.
-- 도구를 호출하지 않고 저장·완료됐다고 응답하지 마세요.
+- If the tool returns a **success** message, relay that result to the user.
+- If the tool returns an **error or failure** message, honestly relay that message to the user.
+- Never respond that a record was saved or completed without actually calling the tool.

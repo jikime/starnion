@@ -1,48 +1,48 @@
 ---
-name: 노션 연동
-description: 노션 페이지/데이터베이스 검색, 생성, 읽기, 블록 추가, DB 쿼리, 속성 업데이트
+name: notion
+description: Search, create, read, append blocks, query databases, and update properties in Notion pages/databases.
 keywords: ["노션", "notion", "페이지", "page", "데이터베이스", "database", "블록", "block", "메모", "노트"]
 ---
 
-# 노션 연동 (notion)
+# Notion Skill
 
-Notion API `2025-09-03` 기준.
+Notion API version `2025-09-03`.
 
-## 도구 목록
+## Tool List
 
-| 도구 | 설명 |
-|------|------|
-| `notion_search` | 페이지·데이터베이스 검색 |
-| `notion_page_create` | 새 페이지 생성 |
-| `notion_page_read` | 페이지 내용 읽기 |
-| `notion_block_append` | 페이지에 텍스트 블록 추가 |
-| `notion_database_query` | 데이터베이스 항목 필터/정렬 조회 |
-| `notion_page_update` | 페이지 속성(Status, Date 등) 업데이트 |
+| Tool | Description |
+|------|-------------|
+| `notion_search` | Search pages and databases |
+| `notion_page_create` | Create a new page |
+| `notion_page_read` | Read page content |
+| `notion_block_append` | Append text blocks to a page |
+| `notion_database_query` | Filter and sort database entries |
+| `notion_page_update` | Update page properties (Status, Date, etc.) |
 
-## 사용 전 필수: 노션 연동
+## Prerequisite: Notion Integration
 
-설정 → 연동 메뉴에서 **Notion Integration Token** 등록 후 대상 페이지/DB에 Integration 공유 필요.
+Register a **Notion Integration Token** in Settings → Integrations, then share the Integration with the target pages/databases.
 
-## 도구별 사용 지침
+## Tool-Specific Guidelines
 
 ### `notion_search`
-- `query`: 검색어
-- `filter_type`: `'page'` | `'database'` | `''`(전체)
-- 데이터베이스 검색 시 **ID**와 **data_source_id** 두 가지를 함께 반환
-  - 페이지 생성: `database_id` 사용
-  - 항목 쿼리: `data_source_id` 사용
+- `query`: search term
+- `filter_type`: `'page'` | `'database'` | `''` (all)
+- When searching a database, two IDs are returned: **ID** and **data_source_id**
+  - Page creation: use `database_id`
+  - Entry query: use `data_source_id`
 
 ### `notion_database_query`
-- `data_source_id`: `notion_search`로 확인한 data_source_id
-- `filter_json`: Notion 필터 JSON 문자열 (선택)
-- `sort_by` + `sort_direction`: 정렬 기준 속성명 + ascending/descending
-- `limit`: 1~50 (기본 10)
+- `data_source_id`: the data_source_id obtained from `notion_search`
+- `filter_json`: Notion filter JSON string (optional)
+- `sort_by` + `sort_direction`: property name to sort by + ascending/descending
+- `limit`: 1–50 (default 10)
 
 ### `notion_page_update`
-- `page_id`: 업데이트할 페이지 ID 또는 URL
-- `properties_json`: Notion API 속성 형식의 JSON 문자열
+- `page_id`: page ID or URL to update
+- `properties_json`: JSON string in Notion API property format
 
-### 속성 JSON 형식 참고
+### Property JSON Format Reference
 
 ```json
 // Select
@@ -52,32 +52,32 @@ Notion API `2025-09-03` 기준.
 {"Due": {"date": {"start": "2025-01-15"}}}
 
 // Checkbox
-{"완료": {"checkbox": true}}
+{"Done": {"checkbox": true}}
 
-// 숫자
+// Number
 {"Priority": {"number": 1}}
 ```
 
-## 사용 시나리오
+## Usage Scenarios
 
 ```
-"내 노션에서 프로젝트 페이지 찾아줘"
-→ notion_search(query="프로젝트")
+"Find my project page in Notion"
+→ notion_search(query="project")
 
-"Task DB에서 완료된 항목만 보여줘"
-→ notion_search(query="Task")로 data_source_id 확인
+"Show only completed items in the Task DB"
+→ notion_search(query="Task") to get data_source_id
 → notion_database_query(data_source_id="...", filter_json='{"property":"Status","select":{"equals":"Done"}}')
 
-"이 할일 상태를 완료로 바꿔줘"
-→ notion_page_update(page_id="...", properties_json='{"Status":{"select":{"name":"완료"}}}')
+"Change this task's status to Done"
+→ notion_page_update(page_id="...", properties_json='{"Status":{"select":{"name":"Done"}}}')
 
-"독서 기록 노트에 내용 추가해줘"
-→ notion_search(query="독서 기록")으로 ID 확인
-→ notion_block_append(page_id="...", content="추가할 내용")
+"Add content to the reading log note"
+→ notion_search(query="reading log") to get ID
+→ notion_block_append(page_id="...", content="content to add")
 ```
 
-## 도구 결과 처리 원칙
+## Tool Result Handling
 
-- 도구가 **성공** 메시지를 반환하면 그 결과를 사용자에게 전달합니다.
-- 도구가 **오류·실패** 메시지를 반환하면 반드시 그 내용을 정직하게 사용자에게 전달합니다.
-- 도구를 호출하지 않고 생성·추가·업데이트·완료됐다고 응답하지 마세요.
+- If the tool returns a **success** message, relay that result to the user.
+- If the tool returns an **error or failure** message, honestly relay that message to the user.
+- Never respond that a page was created, appended, updated, or completed without actually calling the tool.

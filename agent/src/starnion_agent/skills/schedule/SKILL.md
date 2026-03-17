@@ -1,33 +1,33 @@
 ---
 name: schedule
-description: 정기 또는 일회성 알림 일정을 생성하고 관리합니다. "매주 금요일 저녁 8시에 주간 지출 알려줘", "알림 목록 보여줘" 같은 메시지에 반응합니다.
+description: Creates and manages recurring or one-time scheduled notifications. Responds to messages like "notify me of weekly expenses every Friday at 8 PM" or "show my schedule list."
 keywords: ["일정", "일정등록", "알림설정", "schedule", "event", "スケジュール", "日程", "日程安排"]
 ---
 
-# 스케줄 (schedule)
+# Schedule Skill
 
-## 도구 사용 지침
+## Tool Usage Guidelines
 
-- 알림 생성 요청 시 `create_schedule` 호출
-- 알림 목록 조회 시 `list_schedules` 호출
-- 알림 취소 요청 시 `cancel_schedule` 호출
-- 시간 형식은 HH:MM (24시간제) — "저녁 8시"는 20:00으로 변환
+- Schedule creation request → call `create_schedule`
+- Schedule list request → call `list_schedules`
+- Schedule cancellation request → call `cancel_schedule`
+- Time format is HH:MM (24-hour) — "8 PM" becomes 20:00.
 
-## 반복 주기 분류 기준
+## Recurrence Classification
 
-- daily: 매일 반복 ("매일 아침 9시에")
-- weekly: 매주 특정 요일 ("매주 금요일에")
-- monthly: 매월 특정 날짜 ("매월 1일에")
-- one-time: 일회성 ("다음 주 월요일에")
+- daily: repeats every day ("every morning at 9")
+- weekly: specific day each week ("every Friday")
+- monthly: specific date each month ("on the 1st of every month")
+- one-time: one-off occurrence ("next Monday")
 
-## 응답 스타일
+## Response Style
 
-- 알림 생성 완료 시 예약 시간과 내용을 확인
-- 알림 취소 시 어떤 알림인지 확인 후 처리
-- 리포트 유형: weekly(주간 지출), daily_summary(일일 요약), budget(예산), custom_reminder(커스텀 알림)
+- Confirm the scheduled time and content after creation.
+- Confirm which schedule is being cancelled before processing.
+- Report types: weekly (weekly spending), daily_summary (daily summary), budget (budget), custom_reminder (custom reminder)
 
-## 도구 결과 처리 원칙
+## Tool Result Handling
 
-- 도구가 **성공** 메시지를 반환하면 그 결과를 사용자에게 전달합니다.
-- 도구가 **오류·실패** 메시지를 반환하면 반드시 그 내용을 정직하게 사용자에게 전달합니다.
-- 도구를 호출하지 않고 생성·취소·완료됐다고 응답하지 마세요.
+- If the tool returns a **success** message, relay that result to the user.
+- If the tool returns an **error or failure** message, honestly relay that message to the user.
+- Never respond that a schedule was created, cancelled, or completed without actually calling the tool.

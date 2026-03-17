@@ -1,6 +1,6 @@
 ---
-name: 메모
-description: 간편 메모 저장, 조회, 삭제
+name: memo
+description: Save, list, and delete quick memos.
 tools:
   - save_memo
   - list_memos
@@ -8,45 +8,45 @@ tools:
 keywords: ["메모", "적어줘", "기록해줘", "memo", "note", "jot down", "メモ", "メモして", "备忘录", "记下来"]
 ---
 
-# 메모 스킬
+# Memo Skill
 
-## 도구
+## Tools
 
 ### save_memo
-메모를 저장합니다.
+Saves a memo.
 
-**파라미터:**
-- `content` (필수): 메모 내용
-- `title` (선택): 메모 제목
-- `tag` (선택): 메모 태그 (예: 업무, 개인, 아이디어)
+**Parameters:**
+- `content` (required): Memo content
+- `title` (optional): Memo title
+- `tag` (optional): Memo tag (e.g., work, personal, idea)
 
-**사용 시나리오:**
-- "우유 사야 해 메모해줘" → save_memo(content="우유 사기", title="장보기")
-- "회의록: 다음 주 출시 예정" → save_memo(content="다음 주 출시 예정", title="회의록", tag="업무")
+**Usage scenarios:**
+- "Remind me to buy milk" → save_memo(content="Buy milk", title="Shopping")
+- "Meeting note: launch planned for next week" → save_memo(content="Launch planned for next week", title="Meeting note", tag="work")
 
 ### list_memos
-저장된 메모 목록을 조회합니다.
+Lists saved memos.
 
-**파라미터:**
-- `tag` (선택): 특정 태그로 필터링
-- `limit` (선택, 기본값 10): 조회 개수 (1-50)
+**Parameters:**
+- `tag` (optional): Filter by tag
+- `limit` (optional, default 10): Number of results (1–50)
 
-**사용 시나리오:**
-- "메모 보여줘" → list_memos()
-- "업무 메모만 보여줘" → list_memos(tag="업무")
+**Usage scenarios:**
+- "Show my memos" → list_memos()
+- "Show only work memos" → list_memos(tag="work")
 
 ### delete_memo
-메모를 삭제합니다.
+Deletes a memo.
 
-**파라미터:**
-- `memo_id` (필수): 삭제할 메모 ID
+**Parameters:**
+- `memo_id` (required): ID of the memo to delete
 
-**주의사항:**
-- 메모는 최대 100개까지 저장할 수 있습니다.
-- memory 스킬과 다르게, 명시적으로 저장/삭제하는 간편 메모입니다.
+**Notes:**
+- Up to 100 memos can be stored.
+- Unlike the memory skill, this is an explicit save/delete quick-memo feature.
 
-## 도구 결과 처리 원칙
+## Tool Result Handling
 
-- 도구가 **성공** 메시지를 반환하면 그 결과를 사용자에게 전달합니다.
-- 도구가 **오류·실패** 메시지를 반환하면 반드시 그 내용을 정직하게 사용자에게 전달합니다.
-- 도구를 호출하지 않고 저장·삭제·완료됐다고 응답하지 마세요.
+- If the tool returns a **success** message, relay that result to the user.
+- If the tool returns an **error or failure** message, honestly relay that message to the user.
+- Never respond that a memo was saved, deleted, or completed without actually calling the tool.

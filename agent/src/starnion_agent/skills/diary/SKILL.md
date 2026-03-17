@@ -1,34 +1,34 @@
 ---
 name: diary
-description: 사용자의 일상, 감정, 생각을 기록합니다. "오늘 기분이 좋아", "회의가 길었어" 같은 비금전적 메시지에 반응합니다.
+description: Records the user's daily life, emotions, and thoughts. Responds to non-financial messages like "I'm feeling good today" or "the meeting ran long."
 keywords: ["일기", "오늘 일기", "diary", "journal", "日記", "日记", "写日记"]
 ---
 
-# 일기 (diary)
+# Diary Skill
 
-## 도구 사용 지침
+## Tool Usage Guidelines
 
-- 일상, 감정, 생각이 담긴 메시지에 `save_daily_log` 호출
-- content에 사용자 메시지를 요약하여 기록
-- 감정이 감지되면 sentiment 필드를 설정
+- Call `save_daily_log` for messages containing daily life, emotions, or thoughts.
+- Summarize the user's message in the `content` field.
+- Set the `sentiment` field when an emotion is detected.
 
-## 감정 분류 기준
+## Sentiment Classification
 
-- 좋음: 행복, 만족, 즐거움, 감사
-- 보통: 평범한 일상, 특별한 감정 없음
-- 나쁨: 슬픔, 화남, 실망, 스트레스
-- 피곤: 지침, 졸림, 체력 소진
-- 기쁨: 성취감, 흥분, 설렘
+- good: happy, satisfied, joyful, grateful
+- neutral: ordinary day, no particular emotion
+- bad: sad, angry, disappointed, stressed
+- tired: exhausted, sleepy, drained
+- excited: sense of achievement, thrilled, anticipating
 
-## 응답 스타일
+## Response Style
 
-- 사용자의 감정에 공감하는 따뜻한 응답
-- 기록 완료 시 자연스럽게 확인
-- 금액이 포함된 메시지는 가계부(finance)로 분류 — 일기가 아님
-- 기록된 내용은 기억 검색(memory)으로 나중에 조회 가능함을 안내
+- Respond with warm empathy matching the user's emotion.
+- Naturally confirm after recording.
+- Messages containing monetary amounts belong to finance — not diary.
+- Let the user know that recorded entries can be retrieved later via the memory skill.
 
-## 도구 결과 처리 원칙
+## Tool Result Handling
 
-- 도구가 **성공** 메시지를 반환하면 그 결과를 사용자에게 전달합니다.
-- 도구가 **오류·실패** 메시지를 반환하면 반드시 그 내용을 정직하게 사용자에게 전달합니다.
-- 도구를 호출하지 않고 저장·완료됐다고 응답하지 마세요.
+- If the tool returns a **success** message, relay that result to the user.
+- If the tool returns an **error or failure** message, honestly relay that message to the user.
+- Never respond that an entry was saved or completed without actually calling the tool.

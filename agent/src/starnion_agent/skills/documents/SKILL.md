@@ -1,96 +1,96 @@
 ---
 name: documents
-description: 다양한 형식의 문서를 파싱하여 벡터 DB에 저장하고, 요청한 내용으로 문서를 생성하여 파일로 전달합니다.
+description: Parses documents of various formats and stores them in the vector DB, and generates document files from requested content.
 keywords: ["문서", "PDF", "DOCX", "파싱", "document", "parse", "ドキュメント", "文档", "解析"]
 ---
 
-# 문서 처리 (documents)
+# Documents Skill
 
-## 도구 목록
+## Tool List
 
-| 도구 | 설명 |
-|------|------|
-| `parse_document` | 문서 파일을 텍스트로 추출하고 벡터 DB에 저장 |
-| `generate_document` | 요청한 내용으로 문서 파일을 생성하여 전달 |
+| Tool | Description |
+|------|-------------|
+| `parse_document` | Extracts text from a document file and stores it in the vector DB |
+| `generate_document` | Generates a document file from requested content and delivers it |
 
-## parse_document 사용 지침
+## parse_document Usage
 
-- 문서가 첨부된 메시지에 호출
-- 추출된 텍스트는 청크 단위로 벡터 DB에 자동 저장
-- 문서가 첨부되지 않은 상태에서는 호출하지 않음
+- Call when a document is attached to the message.
+- Extracted text is automatically stored in the vector DB in chunks.
+- Do not call when no document is attached.
 
-## 문서 내용 질문 처리 (중요!)
+## Handling Questions About Document Content (Important!)
 
-사용자가 **이전에 업로드한 문서의 내용**에 대해 질문하거나 요약을 요청하면:
+When the user asks about or requests a summary of a **previously uploaded document**:
 
-1. **반드시 `retrieve_memory`를 먼저 호출**하여 관련 청크를 검색하세요.
-2. 검색 결과를 바탕으로 답변하세요.
-3. `retrieve_memory` 없이 직접 답변하지 마세요 — 문서 전체 내용이 메모리에 없으므로 할루시네이션이 발생합니다.
+1. **Always call `retrieve_memory` first** to search for relevant chunks.
+2. Answer based on the search results.
+3. Do not answer directly without `retrieve_memory` — the full document content is not in memory, so hallucination will occur.
 
-**트리거 패턴** (다음 표현이 나오면 `retrieve_memory` 호출):
-- "이 문서에서 ~", "업로드한 파일에서 ~", "방금 보낸 문서 ~"
-- "문서 요약해줘", "파일 내용이 뭐야?", "어떤 내용이야?"
-- "~라고 나와 있어?", "문서에서 ~를 찾아줘"
+**Trigger patterns** (call `retrieve_memory` when these expressions appear):
+- "from this document ~", "from the uploaded file ~", "the document I just sent ~"
+- "summarize the document", "what's in the file?", "what does it say?"
+- "does it say ~?", "find ~ in the document"
 
-**쿼리 설정**: 사용자 질문의 핵심 키워드를 `query`로 전달하세요.
-예: "계약서에서 납품 일정이 언제야?" → `retrieve_memory(query="납품 일정")`
+**Query setting**: Pass the core keywords from the user's question as `query`.
+Example: "When is the delivery date in the contract?" → `retrieve_memory(query="delivery date")`
 
-### 지원 포맷
+### Supported Formats
 
-| 확장자 | 형식 | 설명 |
-|--------|------|------|
-| `.pdf` | PDF | 텍스트 추출 (pypdf) |
-| `.docx` / `.doc` | Word | 단락 텍스트 추출 |
-| `.xlsx` / `.xls` | Excel | 시트별 셀 데이터 추출 |
-| `.pptx` / `.ppt` | PowerPoint | 슬라이드 텍스트 추출 |
-| `.hwp` | 한글 | 기본 텍스트 추출 (제한적) |
-| `.md` | Markdown | 원문 그대로 |
-| `.txt` / `.csv` | 텍스트 | 원문 그대로 |
+| Extension | Format | Notes |
+|-----------|--------|-------|
+| `.pdf` | PDF | Text extraction (pypdf) |
+| `.docx` / `.doc` | Word | Paragraph text extraction |
+| `.xlsx` / `.xls` | Excel | Cell data extraction per sheet |
+| `.pptx` / `.ppt` | PowerPoint | Slide text extraction |
+| `.hwp` | Hangul | Basic text extraction (limited) |
+| `.md` | Markdown | Raw content |
+| `.txt` / `.csv` | Text | Raw content |
 
-## generate_document 사용 지침
+## generate_document Usage
 
-**중요**: 사용자가 문서/파일 생성을 요청하면 텍스트로 답하지 말고 반드시 `generate_document`를 호출하세요.
+**Important**: When the user requests a document or file creation, always call `generate_document` instead of responding with plain text.
 
-### 트리거 키워드 → format 매핑
+### Trigger Keywords → format Mapping
 
-| 사용자 표현 | format 값 |
-|-------------|-----------|
-| 워드, 워드문서, Word, doc, docx | `docx` |
-| 엑셀, 엑셀파일, Excel, xls, xlsx | `xlsx` |
-| PPT, ppt, pptx, 발표자료, 프레젠테이션, 슬라이드 | `pptx` |
-| PDF, pdf, 피디에프 | `pdf` |
-| 마크다운, Markdown, md | `md` |
-| 텍스트, 텍스트파일, txt | `txt` |
+| User expression | format value |
+|----------------|--------------|
+| Word, word document, doc, docx | `docx` |
+| Excel, spreadsheet, xls, xlsx | `xlsx` |
+| PPT, ppt, pptx, presentation, slides | `pptx` |
+| PDF, pdf | `pdf` |
+| Markdown, md | `md` |
+| text, txt, text file | `txt` |
 
-### 사용 예시
+### Usage Examples
 
-- "~에 대해 조사한 후 워드문서로 만들어줘" → 내용 작성 후 `generate_document(content=..., format="docx", title="...")`
-- "이걸 엑셀로 정리해줘" → `generate_document(content=..., format="xlsx", title="...")`
-- "보고서 PDF로 생성해줘" → `generate_document(content=..., format="pdf", title="...")`
-- "발표자료 만들어줘" → `generate_document(content=..., format="pptx", title="...")`
-- "~를 문서로 만들어줘" (포맷 미지정) → 기본값 `pdf`로 생성
+- "Research X and make a Word document" → compose content then `generate_document(content=..., format="docx", title="...")`
+- "Organize this into Excel" → `generate_document(content=..., format="xlsx", title="...")`
+- "Generate a report as PDF" → `generate_document(content=..., format="pdf", title="...")`
+- "Create a presentation" → `generate_document(content=..., format="pptx", title="...")`
+- "Make this into a document" (no format specified) → generate with default `pdf`
 
-### 파라미터
+### Parameters
 
-- `content`: 문서에 들어갈 내용 (마크다운 또는 일반 텍스트). 먼저 내용을 충분히 작성한 뒤 전달
-- `format`: 위 매핑표 참고 (기본값: pdf)
-- `title`: 문서 제목 (파일명에 사용). 주제에 맞게 자동 설정
+- `content`: Content to include in the document (Markdown or plain text). Fully compose the content before passing it.
+- `format`: See mapping table above (default: pdf)
+- `title`: Document title (used for the filename). Set automatically based on the topic.
 
-### 포맷별 참고
+### Format-Specific Notes
 
-- **xlsx**: content의 첫 줄은 쉼표로 구분된 헤더, 이후 줄은 데이터 행
-- **pdf/docx**: title이 제목으로, content가 본문으로 들어감
-- **pptx**: title이 제목 슬라이드, content의 각 문단이 내용 슬라이드의 bullet으로 생성 (6개마다 새 슬라이드)
-- **md/txt**: 내용 그대로 파일로 저장
+- **xlsx**: First line of content is comma-separated headers; subsequent lines are data rows.
+- **pdf/docx**: `title` becomes the heading, `content` becomes the body.
+- **pptx**: `title` becomes the title slide; each paragraph in `content` becomes a bullet on content slides (new slide every 6 paragraphs).
+- **md/txt**: Content is saved as-is to the file.
 
-## 응답 스타일
+## Response Style
 
-- parse_document: 문서 내용을 요약하여 전달, "나중에 기억 검색으로 조회할 수 있어요" 안내
-- generate_document: "문서를 생성했어요" 간단히 안내 (파일이 자동 전달됨)
-- 문서가 길면 핵심 내용 위주로 요약
+- parse_document: Summarize the document content, inform the user it can be retrieved later via the memory skill.
+- generate_document: Briefly say "Document created" (the file is delivered automatically).
+- For long documents, summarize the key points.
 
-## 도구 결과 처리 원칙
+## Tool Result Handling
 
-- 도구가 **성공** 메시지를 반환하면 그 결과를 사용자에게 전달합니다.
-- 도구가 **오류·실패** 메시지를 반환하면 반드시 그 내용을 정직하게 사용자에게 전달합니다.
-- 도구를 호출하지 않고 저장·생성·완료됐다고 응답하지 마세요.
+- If the tool returns a **success** message, relay that result to the user.
+- If the tool returns an **error or failure** message, honestly relay that message to the user.
+- Never respond that a document was saved, generated, or completed without actually calling the tool.

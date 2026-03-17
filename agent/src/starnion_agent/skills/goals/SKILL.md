@@ -1,52 +1,54 @@
 ---
 name: goals
 description: >
-  목표를 설정하고 진행 상황을 추적합니다.
-  재정 목표("이번 달 식비 30만원"), 할 일/프로젝트("Starnion 테스트 마무리", "보고서 제출"),
-  습관("매일 운동"), 개인 목표 모두 포함합니다.
-  "내일의 목표는 X야", "오늘 X 해야 해", "X 목표 세워줘", "내 목표 뭐였지?", "목표 달성했어!" 같은 메시지에 반응합니다.
+  Sets goals and tracks progress.
+  Covers financial goals ("keep food budget under 300,000 won this month"),
+  tasks/projects ("finish Starnion testing", "submit the report"),
+  habits ("exercise every day"), and personal goals.
+  Responds to messages like "my goal for tomorrow is X", "I need to do X today",
+  "set a goal to X", "what were my goals?", "I achieved my goal!"
 keywords: ["목표", "목표설정", "goal", "target", "目標設定", "目标", "设定目标"]
 ---
 
-# 목표 관리 (goals)
+# Goals Skill
 
-## 트리거 패턴 — set_goal을 호출해야 하는 경우
+## Trigger Patterns — When to call set_goal
 
-다음 중 하나라도 해당하면 반드시 `set_goal`을 호출하세요:
+Call `set_goal` whenever any of the following applies:
 
-- 명시적 목표 설정: "목표 설정해줘", "X 목표 세워줘", "X 하기로 했어"
-- 진술형 목표 선언: "내일의 목표는 X야", "오늘 X를 해야 해", "이번 주 X 해야 하는데"
-- 할 일 목표: "X 마무리해야 해", "X 완료해야 해", "X 끝내야 해"
-- 재정 목표: "이번 달 식비 30만원 이내로", "50만원 절약할 거야"
-- 습관 목표: "매일 X 하기로 했어", "X 습관 만들어야지"
+- Explicit goal setting: "set a goal", "I'm going to do X", "I decided to do X"
+- Declarative goal statement: "my goal for tomorrow is X", "I need to do X today", "I should do X this week"
+- Task goals: "I need to wrap up X", "I have to finish X", "I need to complete X"
+- Financial goals: "keep food expenses under 300,000 won this month", "I'll save 500,000 won"
+- Habit goals: "I decided to do X every day", "I need to build an X habit"
 
-**중요**: 사용자가 앞으로 할 일·목표를 언급하면, 별도 확인 없이 바로 `set_goal`을 호출하고 저장 후 격려 메시지를 보내세요.
+**Important**: When the user mentions a future task or goal, immediately call `set_goal` without asking for confirmation, then send an encouraging response after saving.
 
-## 도구 사용 지침
+## Tool Usage Guidelines
 
-- 목표 설정/선언 시 → `set_goal` 즉시 호출
-  - goal_type: task(할 일/프로젝트), habit(습관), budget_limit(지출 제한), savings(저축), general(기타)
-  - deadline: 사용자가 "내일"이라고 하면 내일 날짜(YYYY-MM-DD), "이번 주"면 이번 주 일요일, 언급 없으면 빈 문자열
-- 목표 조회 요청 시 → `get_goals` 호출
-- 목표 상태 변경 시 → `update_goal_status` 호출
-- 진행 상황 업데이트 시 → `update_goal_progress` 호출
-  - "30% 달성했어", "50% 완료했어", "진행률 70%야" 등 퍼센트 업데이트 요청
-  - progress_pct: 항상 0~100 사이 숫자 (예: 50% → 50)
+- Goal declaration/statement → call `set_goal` immediately
+  - goal_type: task (to-do/project), habit, budget_limit, savings, general
+  - deadline: if user says "tomorrow" → tomorrow's date (YYYY-MM-DD); "this week" → this Sunday; not mentioned → empty string
+- Goal retrieval request → call `get_goals`
+- Goal status change → call `update_goal_status`
+- Progress update → call `update_goal_progress`
+  - Handles requests like "30% done", "50% complete", "progress is 70%"
+  - progress_pct: always a number between 0 and 100 (e.g., 50% → 50)
 
-## 목표 상태 분류 기준
+## Goal Status Classification
 
-- in_progress: 진행 중인 목표 (기본값)
-- completed: 달성한 목표 ("달성했어", "성공했어", "완료했어")
-- cancelled: 포기한 목표 ("포기할래", "그만둘래", "취소할게")
+- in_progress: active goal (default)
+- completed: achieved goal ("I did it", "I succeeded", "I finished")
+- cancelled: abandoned goal ("I give up", "I'm stopping", "I'll cancel")
 
-## 응답 스타일
+## Response Style
 
-- 목표 설정 후: 저장 확인 + 격려 메시지 (예: "목표 저장했어요! 응원할게요 💪")
-- 목표 달성 시: 축하 메시지
-- 목표 포기 시: 공감과 다음 기회 격려
+- After saving a goal: confirm save + encouraging message (e.g., "Goal saved! I'm rooting for you 💪")
+- On goal achievement: congratulate
+- On goal cancellation: empathize and encourage for next time
 
-## 도구 결과 처리 원칙
+## Tool Result Handling
 
-- 도구가 **성공** 메시지를 반환하면 그 결과를 사용자에게 전달합니다.
-- 도구가 **오류·실패** 메시지를 반환하면 반드시 그 내용을 정직하게 사용자에게 전달합니다.
-- 도구를 호출하지 않고 저장·완료·달성됐다고 응답하지 마세요.
+- If the tool returns a **success** message, relay that result to the user.
+- If the tool returns an **error or failure** message, honestly relay that message to the user.
+- Never respond that a goal was saved, completed, or achieved without actually calling the tool.

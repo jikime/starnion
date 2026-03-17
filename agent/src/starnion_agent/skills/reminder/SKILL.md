@@ -1,6 +1,6 @@
 ---
-name: 알림
-description: 간편 알림 예약 및 관리
+name: reminder
+description: Schedule and manage one-time reminders.
 tools:
   - set_reminder
   - list_reminders
@@ -8,42 +8,42 @@ tools:
 keywords: ["알림", "알려줘", "리마인더", "remind me", "reminder", "alert", "リマインダー", "提醒", "提醒我"]
 ---
 
-# 알림 스킬
+# Reminder Skill
 
-## 도구
+## Tools
 
 ### set_reminder
-간편하게 알림을 예약합니다.
+Schedules a reminder.
 
-**파라미터:**
-- `message` (필수): 알림 메시지
-- `remind_at` (필수): 알림 시각 (YYYY-MM-DD HH:MM 형식, KST)
-- `title` (선택): 알림 제목
+**Parameters:**
+- `message` (required): Reminder message
+- `remind_at` (required): Reminder time (YYYY-MM-DD HH:MM format, KST)
+- `title` (optional): Reminder title
 
-**사용 시나리오:**
-- "내일 오전 9시에 회의 알려줘" → set_reminder(message="회의", remind_at="2026-03-03 09:00")
-- "3월 5일 오후 3시에 치과 예약 알림" → set_reminder(message="치과 예약", remind_at="2026-03-05 15:00", title="치과")
+**Usage scenarios:**
+- "Remind me about the meeting tomorrow at 9 AM" → set_reminder(message="Meeting", remind_at="2026-03-03 09:00")
+- "Remind me of my dental appointment on March 5 at 3 PM" → set_reminder(message="Dental appointment", remind_at="2026-03-05 15:00", title="Dentist")
 
 ### list_reminders
-예약된 알림 목록을 조회합니다.
+Lists scheduled reminders.
 
-**파라미터:**
-- `include_done` (선택, 기본값 false): 완료/취소된 알림도 포함
+**Parameters:**
+- `include_done` (optional, default false): Include completed/cancelled reminders
 
 ### delete_reminder
-예약된 알림을 삭제합니다.
+Deletes a scheduled reminder.
 
-**파라미터:**
-- `reminder_id` (필수): 삭제할 알림 ID
+**Parameters:**
+- `reminder_id` (required): ID of the reminder to delete
 
-**주의사항:**
-- 사용자가 자연어로 시간을 말하면 YYYY-MM-DD HH:MM 형식으로 변환하세요.
-- 과거 시간은 거부됩니다.
-- 활성 알림은 최대 20개까지 예약할 수 있습니다.
-- schedule 스킬의 반복 알림과는 다른, 1회성 간편 알림입니다.
+**Notes:**
+- Convert natural-language time expressions to YYYY-MM-DD HH:MM format.
+- Past times are rejected.
+- Up to 20 active reminders can be scheduled.
+- This is a one-time quick reminder, distinct from the recurring reminders in the schedule skill.
 
-## 도구 결과 처리 원칙
+## Tool Result Handling
 
-- 도구가 **성공** 메시지를 반환하면 그 결과를 사용자에게 전달합니다.
-- 도구가 **오류·실패** 메시지를 반환하면 반드시 그 내용을 정직하게 사용자에게 전달합니다.
-- 도구를 호출하지 않고 예약·삭제·완료됐다고 응답하지 마세요.
+- If the tool returns a **success** message, relay that result to the user.
+- If the tool returns an **error or failure** message, honestly relay that message to the user.
+- Never respond that a reminder was scheduled, deleted, or completed without actually calling the tool.
