@@ -187,6 +187,11 @@ func runUpdate(checkOnly, force bool) error {
 		PrintWarn("agent", fmt.Sprintf("패키지 재설치 실패 (SELinux 적용 보류): %v", err))
 	}
 
+	// ── Post-install: install UI node_modules (not bundled in tarball) ─────
+	if err := ensureUIDeps(starnionHome); err != nil {
+		PrintWarn("ui", fmt.Sprintf("node_modules 설치 실패: %v", err))
+	}
+
 	// ── Post-install: SELinux context fixup (Linux only) ───────────────────
 	if runtime.GOOS == "linux" {
 		var seTargets []string
