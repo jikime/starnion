@@ -555,7 +555,15 @@ func verifyChecksum(checksumsPath, assetName, tarballPath string) error {
 	return nil
 }
 
+// symlinkEntry holds a deferred symlink to create after all regular files are extracted.
+type symlinkEntry struct {
+	target   string
+	linkname string
+}
+
 // extractTarGz extracts a .tar.gz archive into destDir.
+// Symlinks are created in a second pass after all regular files and directories
+// are extracted, so pnpm-style relative symlinks never fail due to missing targets.
 func extractTarGz(src, destDir string) error {
 	f, err := os.Open(src)
 	if err != nil {
@@ -568,6 +576,8 @@ func extractTarGz(src, destDir string) error {
 		return fmt.Errorf("gzip 열기 실패: %w", err)
 	}
 	defer gz.Close()
+
+	var symlinks []symlinkEntry
 
 	tr := tar.NewReader(gz)
 	for {
@@ -601,11 +611,19 @@ func extractTarGz(src, destDir string) error {
 			}
 			out.Close()
 		case tar.TypeSymlink:
-			// Remove existing file/symlink first
-			_ = os.Remove(target)
-			if err := os.Symlink(hdr.Linkname, target); err != nil {
-				return err
-			}
+			// Defer symlink creation until all files/dirs are extracted.
+			symlinks = append(symlinks, symlinkEntry{target: target, linkname: hdr.Linkname})
+		}
+	}
+
+	// Second pass: create symlinks now that all targets exist.
+	for _, sl := range symlinks {
+		if err := os.MkdirAll(filepath.Dir(sl.target), 0o755); err != nil {
+			return err
+		}
+		_ = os.Remove(sl.target)
+		if err := os.Symlink(sl.linkname, sl.target); err != nil {
+			return err
 		}
 	}
 	return nil
