@@ -187,10 +187,8 @@ func runUpdate(checkOnly, force bool) error {
 		PrintWarn("agent", fmt.Sprintf("패키지 재설치 실패 (SELinux 적용 보류): %v", err))
 	}
 
-	// ── Post-install: install UI node_modules (not bundled in tarball) ─────
-	if err := ensureUIDeps(starnionHome); err != nil {
-		PrintWarn("ui", fmt.Sprintf("node_modules 설치 실패: %v", err))
-	}
+	// ── Post-install: update systemd service files ─────────────────────────
+	updateSystemdServices(starnionHome)
 
 	// ── Post-install: SELinux context fixup (Linux only) ───────────────────
 	if runtime.GOOS == "linux" {
@@ -253,6 +251,55 @@ func runUpdate(checkOnly, force bool) error {
 	}
 
 	return nil
+}
+
+// updateSystemdServices copies service files from ~/.starnion/scripts/ to
+// /etc/systemd/system/ and runs daemon-reload so new ExecStart lines take effect.
+func updateSystemdServices(starnionHome string) {
+	if runtime.GOOS != "linux" {
+		return
+	}
+	scriptsDir := filepath.Join(starnionHome, "scripts")
+	services := []string{
+		"starnion-ui.service",
+		"starnion-gateway.service",
+		"starnion-agent.service",
+	}
+
+	// Detect actual node binary path (handles nvm/fnm installs)
+	nodeBin := "/usr/bin/node"
+	if p, err := exec.LookPath("node"); err == nil {
+		if real, err := filepath.EvalSymlinks(p); err == nil {
+			nodeBin = real
+		} else {
+			nodeBin = p
+		}
+	}
+
+	updated := false
+	for _, name := range services {
+		src := filepath.Join(scriptsDir, name)
+		data, err := os.ReadFile(src)
+		if err != nil {
+			continue // not in tarball — skip
+		}
+		content := string(data)
+		// Patch node path in ui service so it works regardless of install method
+		if name == "starnion-ui.service" {
+			content = strings.ReplaceAll(content, "/usr/bin/node", nodeBin)
+			content = strings.ReplaceAll(content, "/usr/local/bin/node", nodeBin)
+		}
+		dest := filepath.Join("/etc/systemd/system", name)
+		if err := os.WriteFile(dest, []byte(content), 0o644); err != nil {
+			PrintWarn("systemd", fmt.Sprintf("%s 업데이트 실패: %v", name, err))
+			continue
+		}
+		updated = true
+	}
+	if updated {
+		_ = exec.Command("systemctl", "daemon-reload").Run()
+		PrintOK("systemd", "서비스 파일 업데이트 완료 (daemon-reload 실행됨)")
+	}
 }
 
 // currentBinaryPath returns the real path of the running starnion binary,

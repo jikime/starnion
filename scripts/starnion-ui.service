@@ -12,16 +12,10 @@ User=root
 Group=root
 
 # ── 실행 경로 ────────────────────────────────────────────────────────────────
-# standalone 빌드 사용 (starnion install 기본값):
-#   ExecStart=/usr/bin/node .next/standalone/server.js
-#   Environment=PORT=3893
-#   Environment=HOSTNAME=0.0.0.0
-#
-# pnpm start(non-standalone) 사용 시:
-#   ExecStart=/usr/bin/pnpm start
-#   (pnpm 경로는 `which pnpm` 으로 확인)
+# standalone 빌드: server.js가 WorkingDirectory 루트에 위치
+# (starnion update가 자동으로 node 경로를 조정함)
 WorkingDirectory=/root/.starnion/ui
-ExecStart=/usr/bin/node .next/standalone/server.js
+ExecStart=/usr/bin/node server.js
 
 # ── 환경 변수 ────────────────────────────────────────────────────────────────
 Environment=HOME=/root
@@ -51,11 +45,6 @@ KillSignal=SIGTERM
 
 # ── 보안 ─────────────────────────────────────────────────────────────────────
 NoNewPrivileges=true
-
-# ── Rocky Linux: Node.js 경로 확인 ──────────────────────────────────────────
-# `which node`, `which pnpm` 으로 실제 경로 확인 후 ExecStart 수정.
-# nvm/fnm 으로 설치한 경우 /usr/bin 대신 ~/.nvm/versions/... 등에 위치.
-# 예) ExecStart=/home/starnion/.local/share/fnm/node-versions/v22.x.x/bin/pnpm start
 
 # ── 로그 ─────────────────────────────────────────────────────────────────────
 StandardOutput=journal
