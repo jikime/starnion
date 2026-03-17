@@ -453,7 +453,7 @@ func installRuntimeFiles(extractDir, starnionHome string) error {
 	return nil
 }
 
-// copyDir recursively copies src directory to dst.
+// copyDir recursively copies src directory to dst, preserving symlinks.
 func copyDir(src, dst string) error {
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -464,6 +464,20 @@ func copyDir(src, dst string) error {
 			return err
 		}
 		target := filepath.Join(dst, rel)
+
+		// Recreate symlinks as-is (do NOT follow them — following causes
+		// "copy_file_range: is a directory" when the target is a directory).
+		if info.Mode()&os.ModeSymlink != 0 {
+			linkname, err := os.Readlink(path)
+			if err != nil {
+				return err
+			}
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			_ = os.Remove(target)
+			return os.Symlink(linkname, target)
+		}
 
 		if info.IsDir() {
 			return os.MkdirAll(target, info.Mode())
