@@ -203,6 +203,18 @@ func runUpdate(checkOnly, force bool) error {
 			seTargets = append(seTargets, real)
 		}
 
+		// UI: node and pnpm — only when installed under a home directory (e.g. nvm)
+		for _, bin := range []string{"node", "pnpm"} {
+			if p, err := exec.LookPath(bin); err == nil {
+				if real, err := filepath.EvalSymlinks(p); err == nil {
+					p = real
+				}
+				if strings.HasPrefix(p, "/root/") || strings.HasPrefix(p, "/home/") {
+					seTargets = append(seTargets, p)
+				}
+			}
+		}
+
 		if len(seTargets) > 0 {
 			selinuxFixup(seTargets)
 		}
