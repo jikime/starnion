@@ -60,15 +60,7 @@ async def run_coding_agent(task: str, workdir: str = "") -> str:
     Do not use for simple one-line edits or read-only code review.
     """
     try:
-        from claude_code_sdk import (
-            AssistantMessage,
-            CLINotFoundError,
-            ClaudeCodeOptions,
-            ProcessError,
-            ResultMessage,
-            TextBlock,
-            query,
-        )
+        from claude_code_sdk import ClaudeCodeOptions, query
     except ImportError:
         return (
             "❌ claude-code-sdk is not installed.\n"
@@ -104,12 +96,17 @@ async def run_coding_agent(task: str, workdir: str = "") -> str:
                     permission_mode="acceptEdits",
                 ),
             ):
-                if isinstance(event, AssistantMessage):
+                logger.debug("coding_agent event: %s", type(event).__name__)
+
+                # Duck-typed extraction — works regardless of SDK version
+                if hasattr(event, "content"):
+                    # AssistantMessage-like: content is list[TextBlock | ...]
                     for block in event.content:
-                        if isinstance(block, TextBlock):
+                        if hasattr(block, "text"):
                             output_parts.append(block.text)
-                elif isinstance(event, ResultMessage):
-                    if event.is_error and not output_parts:
+                elif hasattr(event, "result"):
+                    # ResultMessage-like
+                    if getattr(event, "is_error", False) and not output_parts:
                         return f"❌ Task failed: {event.result or 'Unknown error'}"
 
     except asyncio.TimeoutError:
@@ -117,16 +114,20 @@ async def run_coding_agent(task: str, workdir: str = "") -> str:
             f"⏱️ Task exceeded {_TIMEOUT}s and was cancelled.\n"
             "Try breaking it into smaller steps."
         )
-    except CLINotFoundError:
-        return (
-            "❌ Claude Code CLI is not installed.\n"
-            "Run: npm install -g @anthropic-ai/claude-code"
-        )
-    except ProcessError as e:
-        return f"❌ Process error (exit {e.exit_code}):\n{e.stderr or str(e)}"
-    except Exception:
-        logger.debug("run_coding_agent failed", exc_info=True)
-        return "❌ Coding agent error. Please try again."
+    except Exception as e:
+        err_type = type(e).__name__
+        # Check well-known SDK error types by name (avoids version-specific imports)
+        if err_type == "CLINotFoundError":
+            return (
+                "❌ Claude Code CLI is not installed.\n"
+                "Run: npm install -g @anthropic-ai/claude-code"
+            )
+        if err_type == "ProcessError":
+            exit_code = getattr(e, "exit_code", "?")
+            stderr = getattr(e, "stderr", "") or ""
+            return f"❌ Process error (exit {exit_code}):\n{stderr or str(e)}"
+        logger.exception("run_coding_agent failed: %s: %s", err_type, e)
+        return f"❌ Coding agent error ({err_type}): {e}"
 
     result = "".join(output_parts).strip()
     if not result:
