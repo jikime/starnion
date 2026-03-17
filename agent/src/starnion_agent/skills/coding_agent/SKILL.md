@@ -18,6 +18,10 @@ keywords: ["코딩", "coding", "claude code", "구현", "implement", "코드 작
 - **When NOT to use**: Simple one-line edits (edit directly), read-only code review (use read tool)
 - `task`: Describe the task in natural language — the more specific, the better the result
 - `workdir`: Absolute path to the working directory (auto-creates a per-user temp dir if omitted)
+- `permission_mode`: Claude Code permission level (default: `acceptEdits`)
+  - `acceptEdits` — auto-approves file edits, asks for shell commands (default, recommended)
+  - `bypassPermissions` — auto-approves everything including shell execution (use only in isolated temp dirs)
+  - `default` — asks confirmation for any risky operation
 - Timeout: 120 seconds / break complex tasks into smaller steps
 
 ### Usage Scenarios

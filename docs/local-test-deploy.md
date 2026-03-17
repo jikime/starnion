@@ -171,6 +171,12 @@ starnion update --check
 starnion update
 ```
 
+`starnion update` performs the following automatically:
+1. Downloads the latest release tarball (binary + UI + agent + scripts)
+2. Installs the new `starnion` and `starnion-gateway` binaries
+3. Extracts and copies the Next.js standalone UI to `~/.starnion/ui/`
+4. On Linux: copies updated systemd service files and patches the node binary path
+
 ---
 
 ## Checklist
