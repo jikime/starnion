@@ -35,6 +35,7 @@ dependencies = [
     "chardet<6",
     "qrcode[pil]>=8.0",
     "playwright>=1.40",
+    "claude-code-sdk>=0.0.25",
 ]
 
 [project.optional-dependencies]
