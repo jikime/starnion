@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import json
 
-from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.errors import GraphInterrupt  # noqa: F401 — re-exported for server.py
@@ -200,6 +200,45 @@ def _filter_stale_tool_errors(messages: list) -> list:
     if removed:
         logger.debug("_filter_stale_tool_errors: removed %d stale error message(s)", removed)
     return filtered
+
+
+def _sanitize_image_urls(messages: list) -> list:
+    """Replace expired Telegram CDN image_url blocks in historical messages.
+
+    langchain_google_genai fetches every image_url content block to send raw
+    bytes to Gemini.  Telegram CDN URLs (api.telegram.org) expire quickly and
+    return 404, which crashes the entire stream — even for messages that contain
+    no image at all, because the *history* being replayed still has the old URL.
+
+    Any image_url pointing to api.telegram.org is replaced with a text
+    placeholder so the conversation history remains safe to replay.
+    """
+    sanitized = []
+    for msg in messages:
+        if not isinstance(msg, HumanMessage) or not isinstance(msg.content, list):
+            sanitized.append(msg)
+            continue
+
+        new_content = []
+        modified = False
+        for block in msg.content:
+            if (
+                isinstance(block, dict)
+                and block.get("type") == "image_url"
+                and isinstance(block.get("image_url"), dict)
+                and "api.telegram.org" in block["image_url"].get("url", "")
+            ):
+                new_content.append({"type": "text", "text": "[이전 이미지 - 만료됨]"})
+                modified = True
+            else:
+                new_content.append(block)
+
+        sanitized.append(msg.model_copy(update={"content": new_content}) if modified else msg)
+
+    n = sum(1 for o, n in zip(messages, sanitized) if o is not n)
+    if n:
+        logger.debug("_sanitize_image_urls: replaced expired Telegram URLs in %d message(s)", n)
+    return sanitized
 
 
 # ── ANSI colour helpers ──────────────────────────────────────────────────────
@@ -904,7 +943,9 @@ async def _agent_node(state: MessagesState) -> dict:
         language=user_language,
         now_str=now_str,
     )
-    messages = [SystemMessage(content=prompt_text)] + _filter_stale_tool_errors(state["messages"])
+    messages = [SystemMessage(content=prompt_text)] + _sanitize_image_urls(
+        _filter_stale_tool_errors(state["messages"])
+    )
 
     # Dynamic tool binding: LLM only sees enabled tools.
     if enabled_tool_names:
