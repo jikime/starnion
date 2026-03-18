@@ -556,6 +556,54 @@ async def get_llm_for_use_case(user_id: str, use_case: str) -> Any:
     raise RuntimeError("AI provider not configured")
 
 
+async def log_tool_usage(
+    llm: Any,
+    response: Any,
+    user_id: str,
+    call_type: str = "tool",
+) -> None:
+    """Best-effort usage logging for secondary LLM calls inside tool functions.
+
+    Extracts token counts from the LangChain response, normalises provider
+    semantics (Anthropic vs OpenAI/Gemini), and inserts a usage_logs row.
+    Never raises — errors are silently logged at DEBUG level.
+    """
+    try:
+        active_model: str = (
+            getattr(llm, "model", None) or getattr(llm, "model_name", "") or ""
+        )
+        active_provider = get_provider(active_model)
+        um: dict = getattr(response, "usage_metadata", {}) or {}
+        raw_input     = int(um.get("input_tokens", 0))
+        output_tokens = int(um.get("output_tokens", 0))
+
+        if active_provider == "anthropic":
+            cache_read         = int(um.get("cache_read_input_tokens", 0))
+            cache_write_tokens = int(um.get("cache_creation_input_tokens", 0))
+            input_tokens       = raw_input + cache_read + cache_write_tokens
+            cached_tokens      = cache_read
+            cost_input         = raw_input + cache_read
+        else:
+            itd                = um.get("input_token_details") or {}
+            cached_tokens      = int(itd.get("cache_read", 0))
+            cache_write_tokens = int(itd.get("cache_creation", 0))
+            input_tokens       = raw_input
+            cost_input         = raw_input
+
+        cost = calculate_cost(
+            active_model, cost_input, output_tokens, cached_tokens, cache_write_tokens,
+        )
+        if user_id:
+            pool = get_pool()
+            await usage_repo.save_usage_log(
+                pool, user_id, active_model, active_provider,
+                input_tokens, output_tokens, cached_tokens, cost,
+                status="success", call_type=call_type,
+            )
+    except Exception:
+        logger.debug("log_tool_usage failed", exc_info=True)
+
+
 async def get_model_config_for_use_case(user_id: str | None, use_case: str) -> dict | None:
     """Return the raw model assignment config for a generative use case, or None.
 

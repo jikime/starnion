@@ -173,6 +173,9 @@ async def analyze_image(
         logger.warning("analyze_image: LLM call failed: %s", e)
         return "이미지 분석 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."
 
+    if user_id:
+        from starnion_agent.graph.agent import log_tool_usage  # lazy to avoid circular
+        await log_tool_usage(llm, response, user_id, "image")
     analysis_text = response.content if isinstance(response.content, str) else str(response.content)
 
     if user_id:

@@ -1,5 +1,6 @@
 """Report generation for weekly/monthly/daily financial summaries."""
 
+import logging
 import statistics
 from datetime import datetime, timedelta
 
@@ -8,7 +9,9 @@ from langchain_core.messages import HumanMessage
 from starnion_agent.db.pool import get_pool
 from starnion_agent.db.repositories import finance as finance_repo
 from starnion_agent.db.repositories import profile as profile_repo
-from starnion_agent.persona import DEFAULT_PERSONA, LANGUAGE_INSTRUCTIONS, get_tone_instruction
+from starnion_agent.persona import DEFAULT_PERSONA, LANGUAGE_INSTRUCTIONS, get_prompt_strings, get_tone_instruction
+
+logger = logging.getLogger(__name__)
 
 
 async def generate_weekly_report(user_id: str, language: str = "ko") -> str:
@@ -89,7 +92,7 @@ async def generate_weekly_report(user_id: str, language: str = "ko") -> str:
 
     data_summary = "\n".join(data_lines)
 
-    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    from starnion_agent.graph.agent import get_llm_for_use_case, log_tool_usage  # lazy to avoid circular
     try:
         llm = await get_llm_for_use_case(user_id, "report")
     except RuntimeError:
@@ -109,7 +112,12 @@ async def generate_weekly_report(user_id: str, language: str = "ko") -> str:
         f"데이터:\n{data_summary}"
     )
 
-    response = await llm.ainvoke([HumanMessage(content=prompt)])
+    try:
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+    except Exception as e:
+        logger.warning("LLM call failed in generate_weekly_report for user %s: %s", user_id, e)
+        return get_prompt_strings(language)["error_try_later"]
+    await log_tool_usage(llm, response, user_id, "report")
     return response.content
 
 
@@ -167,7 +175,7 @@ async def generate_daily_summary(user_id: str, language: str = "ko") -> str:
 
     data_summary = "\n".join(data_lines)
 
-    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    from starnion_agent.graph.agent import get_llm_for_use_case, log_tool_usage  # lazy to avoid circular
     try:
         llm = await get_llm_for_use_case(user_id, "report")
     except RuntimeError:
@@ -186,7 +194,12 @@ async def generate_daily_summary(user_id: str, language: str = "ko") -> str:
         f"데이터:\n{data_summary}"
     )
 
-    response = await llm.ainvoke([HumanMessage(content=prompt)])
+    try:
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+    except Exception as e:
+        logger.warning("LLM call failed in generate_daily_summary for user %s: %s", user_id, e)
+        return get_prompt_strings(language)["error_try_later"]
+    await log_tool_usage(llm, response, user_id, "report")
     return response.content
 
 
@@ -256,7 +269,7 @@ async def generate_monthly_closing(user_id: str, language: str = "ko") -> str:
 
     data_summary = "\n".join(data_lines)
 
-    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    from starnion_agent.graph.agent import get_llm_for_use_case, log_tool_usage  # lazy to avoid circular
     try:
         llm = await get_llm_for_use_case(user_id, "report")
     except RuntimeError:
@@ -276,7 +289,12 @@ async def generate_monthly_closing(user_id: str, language: str = "ko") -> str:
         f"데이터:\n{data_summary}"
     )
 
-    response = await llm.ainvoke([HumanMessage(content=prompt)])
+    try:
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+    except Exception as e:
+        logger.warning("LLM call failed in generate_monthly_closing for user %s: %s", user_id, e)
+        return get_prompt_strings(language)["error_try_later"]
+    await log_tool_usage(llm, response, user_id, "report")
     return response.content
 
 
@@ -390,7 +408,7 @@ async def generate_anomaly_report(user_id: str, language: str = "ko") -> str:
 
     data_summary = "\n".join(data_lines)
 
-    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    from starnion_agent.graph.agent import get_llm_for_use_case, log_tool_usage  # lazy to avoid circular
     try:
         llm = await get_llm_for_use_case(user_id, "report")
     except RuntimeError:
@@ -411,5 +429,10 @@ async def generate_anomaly_report(user_id: str, language: str = "ko") -> str:
         f"데이터:\n{data_summary}"
     )
 
-    response = await llm.ainvoke([HumanMessage(content=prompt)])
+    try:
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+    except Exception as e:
+        logger.warning("LLM call failed in generate_anomaly_report for user %s: %s", user_id, e)
+        return get_prompt_strings(language)["error_try_later"]
+    await log_tool_usage(llm, response, user_id, "report")
     return response.content

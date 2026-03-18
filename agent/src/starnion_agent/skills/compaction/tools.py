@@ -61,7 +61,7 @@ async def compact_memory(user_id: str, language: str = "ko") -> str:
         return "주별 그룹이 없습니다."
 
     # 3. Summarize each week and collect results.
-    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    from starnion_agent.graph.agent import get_llm_for_use_case, log_tool_usage  # lazy to avoid circular
     try:
         llm = await get_llm_for_use_case(user_id, "chat_default")
     except RuntimeError:
@@ -83,6 +83,7 @@ async def compact_memory(user_id: str, language: str = "ko") -> str:
                 week_label, user_id,
             )
             return f"LLM 오류로 압축 중단 (주: {week_label})"
+        await log_tool_usage(llm, response, user_id, "compaction")
 
         summary_json = _extract_json(response.content)
         if not summary_json:

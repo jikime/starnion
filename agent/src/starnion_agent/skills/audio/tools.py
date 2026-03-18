@@ -102,6 +102,11 @@ async def transcribe_audio(file_url: str) -> str:
     except Exception as e:
         logger.warning("transcribe_audio: LLM call failed: %s", e)
         return get_prompt_strings(get_current_language())["error_audio_transcribe"]
+
+    user_id = get_current_user()
+    if user_id:
+        from starnion_agent.graph.agent import log_tool_usage  # lazy to avoid circular
+        await log_tool_usage(llm, response, user_id, "audio")
     return f"음성 인식 결과:\n{response.content}"
 
 

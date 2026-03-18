@@ -299,7 +299,7 @@ async def evaluate_goals(user_id: str, language: str = "ko") -> str:
 
     data_summary = _build_evaluation_data(active_goals, monthly, daily_totals, budget, now)
 
-    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    from starnion_agent.graph.agent import get_llm_for_use_case, log_tool_usage  # lazy to avoid circular
     try:
         llm = await get_llm_for_use_case(user_id, "report")
     except RuntimeError:
@@ -311,6 +311,7 @@ async def evaluate_goals(user_id: str, language: str = "ko") -> str:
     except Exception as e:
         logger.warning("LLM call failed in evaluate_goals for user %s: %s", user_id, e)
         return get_prompt_strings(language)["error_try_later"]
+    await log_tool_usage(llm, response, user_id, "report")
 
     evaluations = _extract_json(response.content)
     if not evaluations or "evaluations" not in evaluations:
@@ -361,7 +362,7 @@ async def generate_goal_status(user_id: str, language: str = "ko") -> str:
         budget = preferences.get("budget", {})
         persona_id = preferences.get("persona", DEFAULT_PERSONA)
 
-    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    from starnion_agent.graph.agent import get_llm_for_use_case, log_tool_usage  # lazy to avoid circular
     try:
         llm = await get_llm_for_use_case(user_id, "report")
     except RuntimeError:
@@ -373,6 +374,7 @@ async def generate_goal_status(user_id: str, language: str = "ko") -> str:
     except Exception as e:
         logger.warning("LLM call failed in generate_goal_status for user %s: %s", user_id, e)
         return get_prompt_strings(language)["error_try_later"]
+    await log_tool_usage(llm, response, user_id, "report")
     return response.content
 
 

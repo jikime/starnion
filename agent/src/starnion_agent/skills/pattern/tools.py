@@ -17,7 +17,7 @@ from starnion_agent.db.repositories import daily_log as daily_log_repo
 from starnion_agent.db.repositories import finance as finance_repo
 from starnion_agent.db.repositories import knowledge as knowledge_repo
 from starnion_agent.db.repositories import profile as profile_repo
-from starnion_agent.persona import DEFAULT_PERSONA, LANGUAGE_INSTRUCTIONS, get_tone_instruction
+from starnion_agent.persona import DEFAULT_PERSONA, LANGUAGE_INSTRUCTIONS, get_prompt_strings, get_tone_instruction
 
 logger = logging.getLogger(__name__)
 
@@ -87,14 +87,19 @@ async def analyze_patterns(user_id: str, language: str = "ko") -> str:
     )
 
     # 5. Call LLM for structured pattern detection.
-    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    from starnion_agent.graph.agent import get_llm_for_use_case, log_tool_usage  # lazy to avoid circular
     try:
         llm = await get_llm_for_use_case(user_id, "report")
     except RuntimeError:
         return "AI 프로바이더가 설정되지 않아 패턴 분석을 생성할 수 없습니다."
 
     prompt = _build_analysis_prompt(data_summary, language=language)
-    response = await llm.ainvoke([HumanMessage(content=prompt)])
+    try:
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+    except Exception as e:
+        logger.warning("LLM call failed in analyze_spending_patterns for user %s: %s", user_id, e)
+        return get_prompt_strings(language)["error_try_later"]
+    await log_tool_usage(llm, response, user_id, "report")
 
     # 6. Parse and store patterns.
     patterns_json = _extract_json(response.content)
@@ -161,14 +166,19 @@ async def generate_pattern_insight(user_id: str, language: str = "ko") -> str:
         persona_id = preferences.get("persona", DEFAULT_PERSONA)
 
     # 3. Build prompt and generate insight.
-    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    from starnion_agent.graph.agent import get_llm_for_use_case, log_tool_usage  # lazy to avoid circular
     try:
         llm = await get_llm_for_use_case(user_id, "report")
     except RuntimeError:
         return "AI 프로바이더가 설정되지 않아 패턴 인사이트를 생성할 수 없습니다."
 
     prompt = _build_insight_prompt(patterns, today_records, monthly, budget, now, persona_id, language=language)
-    response = await llm.ainvoke([HumanMessage(content=prompt)])
+    try:
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+    except Exception as e:
+        logger.warning("LLM call failed in generate_pattern_insight for user %s: %s", user_id, e)
+        return get_prompt_strings(language)["error_try_later"]
+    await log_tool_usage(llm, response, user_id, "report")
     return response.content
 
 

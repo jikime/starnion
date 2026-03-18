@@ -56,7 +56,7 @@ async def analyze_conversation(user_id: str, language: str = "ko") -> str:
     logs_text = _build_logs_summary(today_logs, now)
 
     # 3. Call LLM for structured analysis.
-    from starnion_agent.graph.agent import get_llm_for_use_case  # lazy to avoid circular
+    from starnion_agent.graph.agent import get_llm_for_use_case, log_tool_usage  # lazy to avoid circular
     try:
         llm = await get_llm_for_use_case(user_id, "report")
     except RuntimeError:
@@ -68,6 +68,7 @@ async def analyze_conversation(user_id: str, language: str = "ko") -> str:
     except Exception as e:
         logger.warning("LLM call failed in analyze_conversation for user %s: %s", user_id, e)
         return get_prompt_strings(language)["error_try_later"]
+    await log_tool_usage(llm, response, user_id, "report")
 
     # 4. Parse and store insights.
     insights_json = _extract_json(response.content)
