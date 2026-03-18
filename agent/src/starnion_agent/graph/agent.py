@@ -202,6 +202,41 @@ def _filter_stale_tool_errors(messages: list) -> list:
     return filtered
 
 
+def _drop_orphaned_human_messages(messages: list) -> list:
+    """Remove orphaned HumanMessages when multiple consecutive ones trail the history.
+
+    When the agent crashes before generating an AIMessage (e.g. the LLM call
+    raises an exception), the triggering HumanMessage is saved in the LangGraph
+    checkpoint but no AIMessage follows it.  On the next turn a new HumanMessage
+    is appended, creating a run of consecutive HumanMessages at the tail.
+
+    Gemini interprets two consecutive 'save memo' HumanMessages as 'I already
+    handled the first one' and generates a fake completion without calling the
+    tool.  By keeping only the *latest* HumanMessage from the trailing run we
+    prevent this hallucination trigger.
+    """
+    if len(messages) < 2:
+        return messages
+
+    # Walk backwards to find the start of a trailing HumanMessage run.
+    tail_start = len(messages)
+    for i in range(len(messages) - 1, -1, -1):
+        if isinstance(messages[i], HumanMessage):
+            tail_start = i
+        else:
+            break
+
+    trailing = len(messages) - tail_start
+    if trailing > 1:
+        logger.debug(
+            "_drop_orphaned_human_messages: dropping %d orphaned HumanMessage(s)",
+            trailing - 1,
+        )
+        return messages[:tail_start] + [messages[-1]]
+
+    return messages
+
+
 def _sanitize_image_urls(messages: list) -> list:
     """Replace expired Telegram CDN image_url blocks in historical messages.
 
@@ -943,8 +978,10 @@ async def _agent_node(state: MessagesState) -> dict:
         language=user_language,
         now_str=now_str,
     )
-    messages = [SystemMessage(content=prompt_text)] + _sanitize_image_urls(
-        _filter_stale_tool_errors(state["messages"])
+    messages = [SystemMessage(content=prompt_text)] + _drop_orphaned_human_messages(
+        _sanitize_image_urls(
+            _filter_stale_tool_errors(state["messages"])
+        )
     )
 
     # Dynamic tool binding: LLM only sees enabled tools.
