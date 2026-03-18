@@ -826,3 +826,5 @@ CREATE INDEX IF NOT EXISTS idx_report_task_runs_started_at ON report_task_runs (
 INSERT INTO schema_migrations (version) VALUES ('1.5.20') ON CONFLICT DO NOTHING;
 -- v1.5.21: goals.depends_on column included above
 INSERT INTO schema_migrations (version) VALUES ('1.5.21') ON CONFLICT DO NOTHING;
+-- v1.5.22: report_task_runs schema fix (job_name column) — skip for fresh installs (init.sql already correct)
+INSERT INTO schema_migrations (version) VALUES ('1.5.22') ON CONFLICT DO NOTHING;

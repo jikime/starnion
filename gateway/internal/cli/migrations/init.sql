@@ -545,11 +545,13 @@ CREATE TABLE IF NOT EXISTS goals (
     metadata       JSONB       NOT NULL DEFAULT '{}',
     completed_date DATE,
     abandoned_date DATE,
+    depends_on     BIGINT      REFERENCES goals(id) ON DELETE SET NULL,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_goals_user_status  ON goals(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_goals_user_created ON goals(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_goals_depends_on   ON goals(depends_on);
 
 CREATE TABLE IF NOT EXISTS goal_checkins (
     id         BIGSERIAL   PRIMARY KEY,
@@ -799,3 +801,30 @@ INSERT INTO schema_migrations (version) VALUES ('1.4.0') ON CONFLICT DO NOTHING;
 INSERT INTO schema_migrations (version) VALUES ('1.4.1') ON CONFLICT DO NOTHING;
 -- v1.4.2: channel_settings, telegram_approved_contacts, telegram_pairing_requests included above
 INSERT INTO schema_migrations (version) VALUES ('1.4.2') ON CONFLICT DO NOTHING;
+
+-- =============================================================
+-- SCHEDULER JOB TRACKING
+-- =============================================================
+
+-- Tracks each cron job execution for audit and dead-task recovery.
+-- Rows with status='running' older than 10 minutes at startup are
+-- marked 'dead' by the scheduler's recoverDeadTasks() function.
+CREATE TABLE IF NOT EXISTS report_task_runs (
+    id          BIGSERIAL    PRIMARY KEY,
+    job_name    TEXT         NOT NULL,
+    started_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    finished_at TIMESTAMPTZ,
+    status      TEXT         NOT NULL DEFAULT 'running',  -- running | success | failed | dead
+    error       TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_report_task_runs_job_name   ON report_task_runs (job_name);
+CREATE INDEX IF NOT EXISTS idx_report_task_runs_status     ON report_task_runs (status);
+CREATE INDEX IF NOT EXISTS idx_report_task_runs_started_at ON report_task_runs (started_at DESC);
+
+-- v1.5.20: report_task_runs table included above
+INSERT INTO schema_migrations (version) VALUES ('1.5.20') ON CONFLICT DO NOTHING;
+-- v1.5.21: goals.depends_on column included above
+INSERT INTO schema_migrations (version) VALUES ('1.5.21') ON CONFLICT DO NOTHING;
+-- v1.5.22: report_task_runs schema fix (job_name column) — skip for fresh installs (init.sql already correct)
+INSERT INTO schema_migrations (version) VALUES ('1.5.22') ON CONFLICT DO NOTHING;
