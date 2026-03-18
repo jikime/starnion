@@ -17,8 +17,8 @@ search_enabled: true
 search_tokenizer_separator: /[\s/]+/
 
 # Footer
-starnion_version: "1.5.19"
-footer_content: "Copyright &copy; 2025 Starnion. All rights reserved. &nbsp;|&nbsp; <a href=\"https://github.com/jikime/starnion/releases/tag/v1.5.19\">v1.5.19</a>"
+starnion_version: "1.6.11"
+footer_content: "Copyright &copy; 2025 Starnion. All rights reserved. &nbsp;|&nbsp; <a href=\"https://github.com/jikime/starnion/releases/tag/v1.6.11\">v1.6.11</a>"
 
 # Plugins
 plugins:
