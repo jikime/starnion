@@ -93,6 +93,11 @@ PROMPT_I18N: dict[str, dict[str, str]] = {
             "반드시 transcribe_audio(file_url=위 URL) 도구를 먼저 호출해 텍스트로 변환한 후, "
             "변환된 내용을 바탕으로 이후 요청을 처리하세요."
         ),
+        "image_tag": (
+            "[🖼️ 이미지 파일 첨부됨 — file_url: {url}]\n"
+            "이미지를 분석하거나 처리하려면 반드시 file_url 파라미터에 위 URL을 그대로 사용하세요. "
+            "URL을 추측하거나 변경하지 마세요."
+        ),
         "file_attach": "[파일 첨부: type={type}, name={name}, url={url}]",
     },
     "en": {
@@ -116,6 +121,11 @@ PROMPT_I18N: dict[str, dict[str, str]] = {
             "An audio file is attached. "
             "You MUST call transcribe_audio(file_url=above URL) first to convert it to text, "
             "then process the request based on the transcribed content."
+        ),
+        "image_tag": (
+            "[🖼️ Image file attached — file_url: {url}]\n"
+            "To analyze or process this image, you MUST use the exact URL above as the file_url parameter. "
+            "Do not guess or modify the URL."
         ),
         "file_attach": "[File attached: type={type}, name={name}, url={url}]",
     },
@@ -141,6 +151,11 @@ PROMPT_I18N: dict[str, dict[str, str]] = {
             "必ず transcribe_audio(file_url=上記URL) ツールを最初に呼び出してテキストに変換した後、"
             "変換された内容に基づいてリクエストを処理してください。"
         ),
+        "image_tag": (
+            "[🖼️ 画像ファイルが添付されました — file_url: {url}]\n"
+            "この画像を分析または処理するには、上記のURLをそのまま file_url パラメータに使用してください。"
+            "URLを推測または変更しないでください。"
+        ),
         "file_attach": "[ファイル添付: type={type}, name={name}, url={url}]",
     },
     "zh": {
@@ -164,6 +179,11 @@ PROMPT_I18N: dict[str, dict[str, str]] = {
             "已附加音频文件。"
             "必须首先调用 transcribe_audio(file_url=上述URL) 将其转换为文本，"
             "然后根据转换后的内容处理请求。"
+        ),
+        "image_tag": (
+            "[🖼️ 已附加图像文件 — file_url: {url}]\n"
+            "要分析或处理此图像，必须将上述URL原样用作 file_url 参数。"
+            "请勿猜测或修改URL。"
         ),
         "file_attach": "[附件: type={type}, name={name}, url={url}]",
     },

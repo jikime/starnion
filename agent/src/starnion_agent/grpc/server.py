@@ -79,8 +79,11 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
             return ("human", message)
 
         if file_input.file_type == "image":
-            # True multimodal: pass the image URL directly to the LLM.
-            content: list = []
+            # Multimodal: include the image visually AND inject the URL as text
+            # so the LLM can reliably extract it when calling analyze_image.
+            # Without the text tag the LLM may hallucinate a wrong URL.
+            image_tag = strings["image_tag"].format(url=file_input.file_url)
+            content: list = [{"type": "text", "text": image_tag}]
             if message:
                 content.append({"type": "text", "text": message})
             content.append({
