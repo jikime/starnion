@@ -19,8 +19,13 @@ async def create(
     end_date: date | None = None,
     description: str | None = None,
     icon: str = "🎯",
+    depends_on: int | None = None,
 ) -> dict[str, Any]:
     """Insert a new goal.
+
+    Args:
+        depends_on: Optional goal ID that must be completed before this
+            goal can receive progress updates.
 
     Returns:
         The created goal row as a dictionary.
@@ -31,16 +36,17 @@ async def create(
                 """
                 INSERT INTO goals
                     (user_id, title, icon, category, target_value, unit,
-                     start_date, end_date, description)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     start_date, end_date, description, depends_on)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id, user_id, title, icon, category,
                           target_value, current_value, unit,
                           start_date, end_date, status, description,
-                          metadata, created_at, updated_at
+                          metadata, depends_on, created_at, updated_at
                 """,
                 (
                     user_id, title, icon, category, target_value, unit,
                     start_date or date.today(), end_date, description,
+                    depends_on,
                 ),
             )
             row = await cur.fetchone()
@@ -152,28 +158,34 @@ async def list_goals(
             if status:
                 await cur.execute(
                     """
-                    SELECT id, user_id, title, icon, category,
-                           target_value, current_value, unit,
-                           start_date, end_date, status, description,
-                           metadata, completed_date, abandoned_date,
-                           created_at, updated_at
-                    FROM goals
-                    WHERE user_id = %s AND status = %s
-                    ORDER BY created_at DESC
+                    SELECT g.id, g.user_id, g.title, g.icon, g.category,
+                           g.target_value, g.current_value, g.unit,
+                           g.start_date, g.end_date, g.status, g.description,
+                           g.metadata, g.completed_date, g.abandoned_date,
+                           g.depends_on, g.created_at, g.updated_at,
+                           dg.status AS depends_on_status,
+                           dg.title  AS depends_on_title
+                    FROM goals g
+                    LEFT JOIN goals dg ON dg.id = g.depends_on
+                    WHERE g.user_id = %s AND g.status = %s
+                    ORDER BY g.created_at DESC
                     """,
                     (user_id, status),
                 )
             else:
                 await cur.execute(
                     """
-                    SELECT id, user_id, title, icon, category,
-                           target_value, current_value, unit,
-                           start_date, end_date, status, description,
-                           metadata, completed_date, abandoned_date,
-                           created_at, updated_at
-                    FROM goals
-                    WHERE user_id = %s
-                    ORDER BY created_at DESC
+                    SELECT g.id, g.user_id, g.title, g.icon, g.category,
+                           g.target_value, g.current_value, g.unit,
+                           g.start_date, g.end_date, g.status, g.description,
+                           g.metadata, g.completed_date, g.abandoned_date,
+                           g.depends_on, g.created_at, g.updated_at,
+                           dg.status AS depends_on_status,
+                           dg.title  AS depends_on_title
+                    FROM goals g
+                    LEFT JOIN goals dg ON dg.id = g.depends_on
+                    WHERE g.user_id = %s
+                    ORDER BY g.created_at DESC
                     """,
                     (user_id,),
                 )
@@ -195,13 +207,16 @@ async def get_by_id(
         async with conn.cursor(row_factory=dict_row) as cur:
             await cur.execute(
                 """
-                SELECT id, user_id, title, icon, category,
-                       target_value, current_value, unit,
-                       start_date, end_date, status, description,
-                       metadata, completed_date, abandoned_date,
-                       created_at, updated_at
-                FROM goals
-                WHERE id = %s AND user_id = %s
+                SELECT g.id, g.user_id, g.title, g.icon, g.category,
+                       g.target_value, g.current_value, g.unit,
+                       g.start_date, g.end_date, g.status, g.description,
+                       g.metadata, g.completed_date, g.abandoned_date,
+                       g.depends_on, g.created_at, g.updated_at,
+                       dg.status AS depends_on_status,
+                       dg.title  AS depends_on_title
+                FROM goals g
+                LEFT JOIN goals dg ON dg.id = g.depends_on
+                WHERE g.id = %s AND g.user_id = %s
                 """,
                 (goal_id, user_id),
             )

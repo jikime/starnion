@@ -545,11 +545,13 @@ CREATE TABLE IF NOT EXISTS goals (
     metadata       JSONB       NOT NULL DEFAULT '{}',
     completed_date DATE,
     abandoned_date DATE,
+    depends_on     BIGINT      REFERENCES goals(id) ON DELETE SET NULL,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_goals_user_status  ON goals(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_goals_user_created ON goals(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_goals_depends_on   ON goals(depends_on);
 
 CREATE TABLE IF NOT EXISTS goal_checkins (
     id         BIGSERIAL   PRIMARY KEY,
@@ -822,3 +824,5 @@ CREATE INDEX IF NOT EXISTS idx_report_task_runs_started_at ON report_task_runs (
 
 -- v1.5.20: report_task_runs table included above
 INSERT INTO schema_migrations (version) VALUES ('1.5.20') ON CONFLICT DO NOTHING;
+-- v1.5.21: goals.depends_on column included above
+INSERT INTO schema_migrations (version) VALUES ('1.5.21') ON CONFLICT DO NOTHING;

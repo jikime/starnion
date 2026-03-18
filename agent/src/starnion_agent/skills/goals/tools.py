@@ -58,6 +58,13 @@ class SetGoalInput(BaseModel):
         default="",
         description="마감일 (YYYY-MM-DD). 빈 문자열이면 task/general은 1주일 후, 재정 목표는 이번 달 말일",
     )
+    depends_on: int | None = Field(
+        default=None,
+        description=(
+            "선행 목표 ID. 이 목표를 시작하기 전에 완료되어야 하는 다른 목표의 ID. "
+            "없으면 null. 예: 2단계 프로젝트에서 1단계 목표 ID를 지정"
+        ),
+    )
 
 
 class GetGoalsInput(BaseModel):
@@ -99,6 +106,7 @@ async def set_goal(
     category: str = "",
     target_amount: int = 0,
     deadline: str = "",
+    depends_on: int | None = None,
 ) -> str:
     """목표를 설정합니다. 재정 목표(지출 제한, 저축)뿐 아니라 할 일, 프로젝트 완료, 습관 형성 등 모든 종류의 목표를 저장합니다."""
     user_id = get_current_user()
@@ -106,6 +114,7 @@ async def set_goal(
         return "사용자 정보를 확인할 수 없어요."
 
     pool = get_pool()
+    dep_goal: dict | None = None
 
     # Check active goal limit.
     active_goals = await goal_db_repo.list_goals(pool, user_id, status="in_progress")
@@ -114,6 +123,17 @@ async def set_goal(
             f"활성 목표는 최대 {MAX_ACTIVE_GOALS}개까지 설정할 수 있어요. "
             "기존 목표를 완료하거나 취소한 후 다시 시도해 주세요."
         )
+
+    # Validate dependency goal if provided.
+    if depends_on is not None:
+        dep_goal = await goal_db_repo.get_by_id(pool, user_id, depends_on)
+        if dep_goal is None:
+            return f"선행 목표 ID '{depends_on}'를 찾을 수 없어요. 올바른 목표 ID를 확인해 주세요."
+        if dep_goal["status"] == "abandoned":
+            return (
+                f"선행 목표 '{dep_goal['title']}'(ID: {depends_on})가 이미 취소됐어요. "
+                "다른 목표를 선행 목표로 지정하거나 depends_on 없이 설정해 주세요."
+            )
 
     # Default deadline: financial goals → end of month, others → 1 week later.
     now = datetime.now()
@@ -141,12 +161,23 @@ async def set_goal(
         target_value=float(target_amount),
         unit=unit,
         end_date=end_date,
+        depends_on=depends_on,
     )
 
     lines = [
         f"목표를 설정했어요! '{title}'",
         f"목표 ID: {goal['id']}",
         f"마감일: {deadline}",
+    ]
+    if dep_goal is not None:
+        assert isinstance(dep_goal, dict)
+        dep_title = dep_goal["title"]
+        dep_status = dep_goal["status"]
+        if dep_status == "completed":
+            lines.append(f"선행 목표: {dep_title} (ID: {depends_on}) ✅ 이미 완료됨 — 바로 진행 가능해요.")
+        else:
+            lines.append(f"선행 목표: {dep_title} (ID: {depends_on}) ⛔ 완료 전까지 진행률 업데이트가 제한돼요.")
+    lines += [
         "",
         "매일 진행 상황을 체크하고, 매주 수요일에 진행률 리포트를 보내드릴게요.",
     ]
@@ -181,6 +212,15 @@ async def get_goals(include_completed: bool = False) -> str:
         }.get(status, status)
 
         line = f"[{status_label}] {goal['title']} (ID: {goal['id']})"
+
+        # Dependency chain indicator.
+        if goal.get("depends_on"):
+            dep_status = goal.get("depends_on_status")
+            dep_title = goal.get("depends_on_title", f"ID {goal['depends_on']}")
+            if dep_status == "completed":
+                line += f"\n  ✅ 선행 목표 완료: {dep_title} (ID: {goal['depends_on']})"
+            else:
+                line += f"\n  ⛔ 선행 목표 미완료: {dep_title} (ID: {goal['depends_on']}) — 진행 업데이트 불가"
 
         target_value = goal.get("target_value", 0)
         if target_value:
@@ -247,6 +287,18 @@ async def update_goal_progress(goal_id: int, progress_pct: float) -> str:
     pct = max(0.0, min(progress_pct, 100.0))
 
     pool = get_pool()
+
+    # Block updates if the dependency goal is not yet completed.
+    goal = await goal_db_repo.get_by_id(pool, user_id, goal_id)
+    if goal is None:
+        return f"목표 ID '{goal_id}'를 찾을 수 없거나 이미 완료/취소됐어요."
+    if goal.get("depends_on") and goal.get("depends_on_status") != "completed":
+        dep_title = goal.get("depends_on_title") or f"ID {goal['depends_on']}"
+        return (
+            f"'{goal['title']}' 목표는 선행 목표 '{dep_title}'(ID: {goal['depends_on']})가 "
+            "완료되기 전까지 진행률을 업데이트할 수 없어요."
+        )
+
     result = await goal_db_repo.update_progress(pool, user_id, goal_id, pct)
 
     if not result:
