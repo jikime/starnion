@@ -249,6 +249,22 @@ func (h *ChatStreamHandler) Stream(c echo.Context) error {
 				sseEvent(map[string]any{"type": "text-delta", "id": textPartID, "delta": note})
 			}
 
+		case starnionv1.ResponseType_PENDING_APPROVAL:
+			// Emit description as a text chunk so the existing chat bubble shows it.
+			if !textStarted {
+				sseEvent(map[string]string{"type": "text-start", "id": textPartID})
+				textStarted = true
+			}
+			assistantBuf.WriteString(resp.Content)
+			sseEvent(map[string]any{"type": "text-delta", "id": textPartID, "delta": resp.Content})
+			// Emit a custom event that the frontend can intercept to show approve/reject buttons.
+			sseEvent(map[string]any{
+				"type":       "pending-approval",
+				"toolName":   resp.ToolName,
+				"toolDetail": resp.ToolResult,
+			})
+			// STREAM_END follows immediately — let the loop continue.
+
 		case starnionv1.ResponseType_ERROR:
 			sseEvent(map[string]string{"type": "error", "errorText": resp.Content})
 			fmt.Fprintf(w, "data: [DONE]\n\n")

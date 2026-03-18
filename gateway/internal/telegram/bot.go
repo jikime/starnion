@@ -32,6 +32,16 @@ type policyCache struct {
 
 const policyCacheTTL = 30 * time.Second
 
+// pendingApproval holds the state for a PENDING_APPROVAL interrupt waiting for user input.
+type pendingApproval struct {
+	chatID    int64
+	threadID  string // LangGraph thread to resume (= telegramID)
+	msgID     int    // Telegram message ID of the approval keyboard message
+	convID    string // conversation UUID for DB persistence
+	lang      string
+	origMsgID int // original user message ID (for setting reaction after completion)
+}
+
 // maxConcurrentHandlers limits the number of goroutines processing Telegram
 // updates concurrently per bot instance. Prevents goroutine accumulation under
 // heavy message load (e.g. group chats or burst traffic).
@@ -53,6 +63,9 @@ type Bot struct {
 	policy policyCache
 	// sem is a semaphore that limits concurrent update handler goroutines.
 	sem chan struct{}
+	// pendingApprovals maps userID → *pendingApproval for in-flight approval requests.
+	// Populated by handleMessageStream on PENDING_APPROVAL; consumed by handleApprovalCallback.
+	pendingApprovals sync.Map
 }
 
 // NewBot creates a new Telegram bot connected to the agent gRPC service.
@@ -599,12 +612,13 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 	}
 
 	var (
-		accumulated strings.Builder
-		sentMsgID   int
-		statusMsgID int // Status message ("생각중...", "도구 XXX 사용중...")
-		lastEdit    time.Time
-		lastLen     int
-		attachments []storage.FileAttachment
+		accumulated  strings.Builder
+		sentMsgID    int
+		statusMsgID  int // Status message ("생각중...", "도구 XXX 사용중...")
+		lastEdit     time.Time
+		lastLen      int
+		attachments  []storage.FileAttachment
+		approvalSent bool // true when PENDING_APPROVAL keyboard was sent; skip 👍 reaction
 	)
 	const editInterval = 500 * time.Millisecond
 
@@ -716,7 +730,9 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 			}
 			// Backfill analysis column for the uploaded photo (if any).
 			b.backfillImageAnalysis(imgIDCh, accumulated.String())
-			b.setReaction(chatID, messageID, "👍")
+			if !approvalSent {
+				b.setReaction(chatID, messageID, "👍")
+			}
 			return nil
 
 		case starnionv1.ResponseType_ERROR:
@@ -754,6 +770,40 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 				}
 			}
 
+		case starnionv1.ResponseType_PENDING_APPROVAL:
+			// Agent is interrupted waiting for explicit user approval before a risky tool call.
+			// Clean up the "thinking" status message, send approval keyboard, and record state.
+			if statusMsgID != 0 && sentMsgID == 0 {
+				deleteMsg := tgbotapi.NewDeleteMessage(chatID, statusMsgID)
+				b.api.Request(deleteMsg)
+				statusMsgID = 0
+			}
+			desc := resp.Content
+			if desc == "" {
+				desc = botMsg(lang, "approvalRequest")
+			}
+			kbRows := [][]tgbotapi.InlineKeyboardButton{{
+				tgbotapi.NewInlineKeyboardButtonData(botMsg(lang, "approvalYes"), "approval:yes"),
+				tgbotapi.NewInlineKeyboardButtonData(botMsg(lang, "approvalNo"), "approval:no"),
+			}}
+			keyboard := tgbotapi.NewInlineKeyboardMarkup(kbRows...)
+			approvalMsg := tgbotapi.NewMessage(chatID, desc)
+			approvalMsg.ReplyMarkup = keyboard
+			if sent, sendErr := b.api.Send(approvalMsg); sendErr == nil {
+				b.pendingApprovals.Store(userID, &pendingApproval{
+					chatID:    chatID,
+					threadID:  req.ThreadId,
+					msgID:     sent.MessageID,
+					convID:    convID,
+					lang:      lang,
+					origMsgID: messageID,
+				})
+			} else {
+				log.Warn().Err(sendErr).Str("user_id", userID).Msg("telegram: send approval keyboard failed")
+			}
+			approvalSent = true
+			// STREAM_END arrives next; the loop continues until then.
+
 		case starnionv1.ResponseType_TOOL_CALL:
 			// Update status message with tool-specific text.
 			if statusMsgID != 0 {
@@ -787,7 +837,9 @@ func (b *Bot) handleMessageStream(ctx context.Context, chatID int64, messageID i
 	}
 	// Backfill analysis column for the uploaded photo (if any).
 	b.backfillImageAnalysis(imgIDCh, accumulated.String())
-	b.setReaction(chatID, messageID, "👍")
+	if !approvalSent {
+		b.setReaction(chatID, messageID, "👍")
+	}
 	return nil
 }
 
@@ -1174,6 +1226,12 @@ var botMessages = map[string]map[string]string{
 		"skillToggleError":   "토글할 수 없는 스킬이에요.",
 		"skillOff":           "꺼짐",
 		"skillOn":            "켜짐",
+		"approvalRequest":    "⚠️ 다음 작업을 실행하려고 해요. 승인하시겠어요?",
+		"approvalYes":        "✅ 승인",
+		"approvalNo":         "❌ 거부",
+		"approvalConfirmed":  "✅ 작업이 승인됐어요. 처리 중이에요...",
+		"approvalRejected":   "❌ 작업이 취소됐어요.",
+		"approvalNotFound":   "승인 요청을 찾을 수 없어요. 이미 처리됐거나 만료됐을 수 있어요.",
 	},
 	"en": {
 		"dmDenied":           "Sorry, DMs are not currently accepted.",
@@ -1200,6 +1258,12 @@ var botMessages = map[string]map[string]string{
 		"skillToggleError":   "Unable to toggle this skill.",
 		"skillOff":           "OFF",
 		"skillOn":            "ON",
+		"approvalRequest":    "⚠️ The following action is about to run. Do you approve?",
+		"approvalYes":        "✅ Approve",
+		"approvalNo":         "❌ Reject",
+		"approvalConfirmed":  "✅ Approved. Processing...",
+		"approvalRejected":   "❌ Action cancelled.",
+		"approvalNotFound":   "No pending approval found. It may have already been handled or expired.",
 	},
 	"ja": {
 		"dmDenied":           "申し訳ありませんが、現在DMは受け付けていません。",
@@ -1226,6 +1290,12 @@ var botMessages = map[string]map[string]string{
 		"skillToggleError":   "このスキルをトグルできません。",
 		"skillOff":           "オフ",
 		"skillOn":            "オン",
+		"approvalRequest":    "⚠️ 次の操作を実行しようとしています。承認しますか？",
+		"approvalYes":        "✅ 承認",
+		"approvalNo":         "❌ 拒否",
+		"approvalConfirmed":  "✅ 承認されました。処理中...",
+		"approvalRejected":   "❌ 操作がキャンセルされました。",
+		"approvalNotFound":   "承認リクエストが見つかりません。すでに処理済みか期限切れの可能性があります。",
 	},
 	"zh": {
 		"dmDenied":           "抱歉，目前不接受私信。",
@@ -1252,6 +1322,12 @@ var botMessages = map[string]map[string]string{
 		"skillToggleError":   "无法切换此技能。",
 		"skillOff":           "关闭",
 		"skillOn":            "开启",
+		"approvalRequest":    "⚠️ 即将执行以下操作，是否批准？",
+		"approvalYes":        "✅ 批准",
+		"approvalNo":         "❌ 拒绝",
+		"approvalConfirmed":  "✅ 已批准，处理中...",
+		"approvalRejected":   "❌ 操作已取消。",
+		"approvalNotFound":   "未找到待审批请求，可能已处理或已过期。",
 	},
 }
 
@@ -1401,6 +1477,11 @@ func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQue
 	}
 
 	lang := b.getUserLanguage(userID)
+	if strings.HasPrefix(data, "approval:") {
+		b.handleApprovalCallback(ctx, callback, chatID, userID, lang, data)
+		return
+	}
+
 	if strings.HasPrefix(data, "skill:toggle:") {
 		b.handleSkillToggle(ctx, callback, chatID, userID, lang)
 		return
@@ -1551,6 +1632,218 @@ func (b *Bot) handleSkillToggle(ctx context.Context, callback *tgbotapi.Callback
 	b.api.Request(callbackCfg)
 
 	log.Info().Str("user_id", userID).Str("skill_id", skillID).Bool("enabled", enabled).Msg("skill toggled")
+}
+
+
+// handleApprovalCallback processes approve/reject responses from the approval inline keyboard.
+// It resumes the paused LangGraph thread via SubmitApproval gRPC and streams the result.
+func (b *Bot) handleApprovalCallback(ctx context.Context, callback *tgbotapi.CallbackQuery, chatID int64, userID, lang, data string) {
+	approved := data == "approval:yes"
+
+	// Answer the callback immediately to dismiss the loading spinner.
+	b.api.Request(tgbotapi.NewCallback(callback.ID, "")) //nolint:errcheck
+
+	// Load and delete the pending approval state.
+	val, ok := b.pendingApprovals.LoadAndDelete(userID)
+	if !ok {
+		b.SendMessage(chatID, botMsg(lang, "approvalNotFound"))
+		return
+	}
+	pa := val.(*pendingApproval)
+
+	// Edit the approval keyboard message to show the user's decision.
+	confirmText := botMsg(pa.lang, "approvalConfirmed")
+	if !approved {
+		confirmText = botMsg(pa.lang, "approvalRejected")
+	}
+	editMsg := tgbotapi.NewEditMessageText(chatID, pa.msgID, confirmText)
+	emptyKb := tgbotapi.NewInlineKeyboardMarkup()
+	editMsg.ReplyMarkup = &emptyKb
+	b.api.Send(editMsg) //nolint:errcheck
+
+	// Call SubmitApproval and stream the agent's continuation back to Telegram.
+	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
+	stream, err := b.grpcClient.SubmitApproval(reqCtx, &starnionv1.ApprovalRequest{
+		UserId:   userID,
+		ThreadId: pa.threadID,
+		Approved: approved,
+	})
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("telegram: SubmitApproval open failed")
+		b.SendMessage(chatID, botMsg(pa.lang, "serviceError"))
+		if pa.origMsgID != 0 {
+			b.setReaction(chatID, pa.origMsgID, "😢")
+		}
+		return
+	}
+
+	if streamErr := b.handleApprovalStream(reqCtx, chatID, pa.origMsgID, userID, pa.convID, pa.threadID, pa.lang, stream); streamErr != nil {
+		log.Warn().Err(streamErr).Str("user_id", userID).Msg("telegram: approval stream error")
+	}
+}
+
+// handleApprovalStream streams a SubmitApproval gRPC response to a Telegram chat.
+// It mirrors handleMessageStream without the initial "thinking" status message.
+func (b *Bot) handleApprovalStream(ctx context.Context, chatID int64, origMsgID int, userID, convID, threadID, lang string, stream starnionv1.AgentService_SubmitApprovalClient) error {
+	var (
+		accumulated  strings.Builder
+		sentMsgID    int
+		lastEdit     time.Time
+		lastLen      int
+		attachments  []storage.FileAttachment
+		approvalSent bool
+	)
+	const editInterval = 500 * time.Millisecond
+
+	editWithHTML := func(msgID int, rawMD string) {
+		final := markdownToTelegramHTML(rawMD)
+		edit := tgbotapi.NewEditMessageText(chatID, msgID, final)
+		edit.ParseMode = "HTML"
+		if _, editErr := b.api.Send(edit); editErr != nil {
+			edit.ParseMode = ""
+			edit.Text = rawMD
+			b.api.Send(edit) //nolint:errcheck
+		}
+	}
+
+	for {
+		resp, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			if sentMsgID != 0 {
+				accumulated.WriteString("\n\n_(stream interrupted)_")
+				editWithHTML(sentMsgID, accumulated.String())
+			}
+			if origMsgID != 0 {
+				b.setReaction(chatID, origMsgID, "😢")
+			}
+			return fmt.Errorf("approval stream recv: %w", err)
+		}
+
+		switch resp.Type {
+		case starnionv1.ResponseType_TEXT:
+			accumulated.WriteString(resp.Content)
+			if sentMsgID == 0 {
+				final := markdownToTelegramHTML(accumulated.String())
+				msg := tgbotapi.NewMessage(chatID, final)
+				msg.ParseMode = "HTML"
+				sent, sendErr := b.api.Send(msg)
+				if sendErr != nil {
+					msg.ParseMode = ""
+					msg.Text = accumulated.String()
+					sent, sendErr = b.api.Send(msg)
+					if sendErr != nil {
+						return fmt.Errorf("approval stream send initial: %w", sendErr)
+					}
+				}
+				sentMsgID = sent.MessageID
+				lastEdit = time.Now()
+				lastLen = accumulated.Len()
+				continue
+			}
+			if time.Since(lastEdit) >= editInterval && accumulated.Len() > lastLen {
+				editWithHTML(sentMsgID, accumulated.String())
+				lastEdit = time.Now()
+				lastLen = accumulated.Len()
+			}
+
+		case starnionv1.ResponseType_STREAM_END:
+			if sentMsgID != 0 && accumulated.Len() > 0 {
+				editWithHTML(sentMsgID, accumulated.String())
+			} else if sentMsgID == 0 && accumulated.Len() > 0 {
+				b.SendMessage(chatID, accumulated.String())
+			}
+			if accumulated.Len() > 0 || len(attachments) > 0 {
+				b.saveMessage(convID, "assistant", accumulated.String(), attachments)
+			}
+			if origMsgID != 0 && !approvalSent {
+				b.setReaction(chatID, origMsgID, "👍")
+			}
+			return nil
+
+		case starnionv1.ResponseType_ERROR:
+			errText := resp.Content
+			if errText == "" {
+				errText = botMsg(lang, "serviceError")
+			}
+			if sentMsgID == 0 {
+				b.SendMessage(chatID, errText)
+			} else {
+				accumulated.WriteString("\n\n" + errText)
+				editWithHTML(sentMsgID, accumulated.String())
+			}
+			if origMsgID != 0 {
+				b.setReaction(chatID, origMsgID, "😢")
+			}
+			return nil
+
+		case starnionv1.ResponseType_FILE:
+			b.sendFile(chatID, resp.FileData, resp.FileName, resp.FileMime)
+			if att, uploadErr := b.uploadFileToStorage(ctx, resp.FileName, resp.FileMime, resp.FileData); uploadErr != nil {
+				log.Warn().Err(uploadErr).Str("file", resp.FileName).Msg("telegram: approval stream file upload failed")
+			} else {
+				attachments = append(attachments, att)
+				if strings.HasPrefix(att.Mime, "image/") {
+					b.recordImage(userID, att.URL, att.Name, att.Mime, att.Size, tgImageType(resp.FileName), "")
+				} else if strings.HasPrefix(att.Mime, "audio/") {
+					b.recordAudio(userID, att.URL, att.Name, att.Mime, att.Size, 0, "generated", "", "")
+				} else {
+					b.recordDocument(userID, att.URL, att.Name, att.Mime, att.Size)
+				}
+			}
+
+		case starnionv1.ResponseType_TOOL_CALL:
+			log.Info().Str("tool", resp.ToolName).Str("user_id", userID).Msg("telegram: approval stream tool call")
+
+		case starnionv1.ResponseType_TOOL_RESULT:
+			// Ignored.
+
+		case starnionv1.ResponseType_PENDING_APPROVAL:
+			// Nested approval (e.g. another risky tool after the first was approved).
+			desc := resp.Content
+			if desc == "" {
+				desc = botMsg(lang, "approvalRequest")
+			}
+			kbRows := [][]tgbotapi.InlineKeyboardButton{{
+				tgbotapi.NewInlineKeyboardButtonData(botMsg(lang, "approvalYes"), "approval:yes"),
+				tgbotapi.NewInlineKeyboardButtonData(botMsg(lang, "approvalNo"), "approval:no"),
+			}}
+			keyboard := tgbotapi.NewInlineKeyboardMarkup(kbRows...)
+			approvalMsg := tgbotapi.NewMessage(chatID, desc)
+			approvalMsg.ReplyMarkup = keyboard
+			if sent, sendErr := b.api.Send(approvalMsg); sendErr == nil {
+				b.pendingApprovals.Store(userID, &pendingApproval{
+					chatID:    chatID,
+					threadID:  threadID,
+					msgID:     sent.MessageID,
+					convID:    convID,
+					lang:      lang,
+					origMsgID: origMsgID,
+				})
+			} else {
+				log.Warn().Err(sendErr).Str("user_id", userID).Msg("telegram: nested approval keyboard send failed")
+			}
+			approvalSent = true
+		}
+	}
+
+	// EOF path without explicit STREAM_END.
+	if sentMsgID != 0 && accumulated.Len() > 0 {
+		editWithHTML(sentMsgID, accumulated.String())
+	} else if sentMsgID == 0 && accumulated.Len() > 0 {
+		b.SendMessage(chatID, accumulated.String())
+	}
+	if accumulated.Len() > 0 || len(attachments) > 0 {
+		b.saveMessage(convID, "assistant", accumulated.String(), attachments)
+	}
+	if origMsgID != 0 && !approvalSent {
+		b.setReaction(chatID, origMsgID, "👍")
+	}
+	return nil
 }
 
 // recordDocument inserts a documents row for a generated document file.
