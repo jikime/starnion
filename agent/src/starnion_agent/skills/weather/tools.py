@@ -81,13 +81,32 @@ def _code_emoji(code: int) -> str:
     return _WEATHER_CODES.get(code, ("알 수 없음", "🌈"))[1]
 
 
-def _display_name(data: dict) -> str:
-    """Extract location display name from wttr.in JSON response."""
+def _unwrap(data: dict) -> dict:
+    """Handle wttr.in response wrapping: newer API wraps payload under a 'data' key."""
+    return data.get("data", data)
+
+
+def _display_name(data: dict, fallback: str = "") -> str:
+    """Extract location display name from wttr.in JSON response.
+
+    Handles both the legacy format (nearest_area key) and the newer format
+    where nearest_area is absent. Falls back to the caller-supplied location
+    string if neither source is available.
+    """
+    # Legacy format
     try:
         area = data["nearest_area"][0]
         city = area["areaName"][0]["value"]
         country = area["country"][0]["value"]
         return f"{city}, {country}" if country else city
+    except (KeyError, IndexError):
+        pass
+    # Use caller-supplied location name (e.g. user query string)
+    if fallback:
+        return fallback
+    # Last-resort: raw query string from request field
+    try:
+        return data["request"][0]["query"]
     except (KeyError, IndexError):
         return "알 수 없는 위치"
 
@@ -121,9 +140,9 @@ async def get_weather(location: str = "서울") -> str:
             resp = await client.get(url, params={"format": "j1"})
             resp.raise_for_status()
 
-        data = resp.json()
+        data = _unwrap(resp.json())
         cond = data["current_condition"][0]
-        display = _display_name(data)
+        display = _display_name(data, fallback=location)
         code = int(cond["weatherCode"])
 
         return (
@@ -134,7 +153,7 @@ async def get_weather(location: str = "서울") -> str:
             f"💨 풍속: {cond['windspeedKmph']} km/h"
         )
     except Exception:
-        logger.debug("get_weather failed", exc_info=True)
+        logger.warning("get_weather failed", exc_info=True)
         return "날씨 정보를 가져오는 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."
 
 
@@ -150,8 +169,8 @@ async def get_forecast(location: str = "서울", days: int = 3) -> str:
             resp = await client.get(url, params={"format": "j1"})
             resp.raise_for_status()
 
-        data = resp.json()
-        display = _display_name(data)
+        data = _unwrap(resp.json())
+        display = _display_name(data, fallback=location)
         forecast_days = data["weather"][:days]
 
         lines: list[str] = [f"📅 **{display}** {days}일 예보\n"]
@@ -161,7 +180,11 @@ async def get_forecast(location: str = "서울", days: int = 3) -> str:
             code = int(day["hourly"][4]["weatherCode"])
             tmax = day["maxtempC"]
             tmin = day["mintempC"]
-            precip = max(int(h.get("precipProbability", 0)) for h in day["hourly"])
+            # wttr.in newer API uses "chanceofrain"; fall back to "precipProbability" for legacy
+            precip = max(
+                int(h.get("chanceofrain") or h.get("precipProbability") or 0)
+                for h in day["hourly"]
+            )
             lines.append(
                 f"{_code_emoji(code)} **{date}**: {_code_text(code)}, "
                 f"{tmin}°C ~ {tmax}°C, 강수확률 {precip}%"
@@ -169,5 +192,5 @@ async def get_forecast(location: str = "서울", days: int = 3) -> str:
 
         return "\n".join(lines)
     except Exception:
-        logger.debug("get_forecast failed", exc_info=True)
+        logger.warning("get_forecast failed", exc_info=True)
         return "일기예보를 가져오는 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."
