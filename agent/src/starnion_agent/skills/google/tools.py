@@ -81,6 +81,14 @@ class CalendarListInput(BaseModel):
     """Input schema for google_calendar_list."""
 
     max_results: int = Field(default=10, description="최대 조회 건수")
+    time_min: str = Field(
+        default="",
+        description="조회 시작일 (ISO 8601, 예: 2026-03-24T00:00:00+09:00). 비우면 현재 시각부터",
+    )
+    time_max: str = Field(
+        default="",
+        description="조회 종료일 (ISO 8601, 예: 2026-03-30T23:59:59+09:00). 비우면 제한 없음",
+    )
 
 
 class CalendarDeleteInput(BaseModel):
@@ -116,11 +124,52 @@ async def google_calendar_create(
     return f"일정 '{title}'을 생성했어요. (ID: {result.get('id', 'N/A')})"
 
 
+_KO_WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"]
+
+
+def _fmt_event_start(start_str: str) -> str:
+    """Format a Google Calendar start string into a human-readable Korean date+time.
+
+    Handles both dateTime (e.g. 2026-03-19T10:00:00+09:00) and all-day date
+    (e.g. 2026-03-19). Returns strings like '3월 19일(목) 오전 10:00' or '3월 19일(목)'.
+    Day-of-week is computed from the date, not inferred by the LLM.
+    """
+    from datetime import datetime, timezone
+
+    try:
+        if "T" in start_str:
+            # dateTime field – parse with timezone offset
+            dt = datetime.fromisoformat(start_str)
+            day = _KO_WEEKDAYS[dt.weekday()]
+            hour, minute = dt.hour, dt.minute
+            if hour == 0 and minute == 0:
+                time_str = "자정"
+            elif hour < 12:
+                time_str = f"오전 {hour}:{minute:02d}" if minute else f"오전 {hour}시"
+            elif hour == 12:
+                time_str = f"오후 12:{minute:02d}" if minute else "정오"
+            else:
+                time_str = f"오후 {hour - 12}:{minute:02d}" if minute else f"오후 {hour - 12}시"
+            return f"{dt.month}월 {dt.day}일({day}) {time_str}"
+        else:
+            # All-day event – date only
+            from datetime import date as date_cls
+            d = date_cls.fromisoformat(start_str)
+            day = _KO_WEEKDAYS[d.weekday()]
+            return f"{d.month}월 {d.day}일({day}) 종일"
+    except (ValueError, IndexError):
+        return start_str  # fallback: raw string
+
+
 @tool(args_schema=CalendarListInput)
 @skill_guard("google")
-async def google_calendar_list(max_results: int = 10) -> str:
+async def google_calendar_list(
+    max_results: int = 10,
+    time_min: str = "",
+    time_max: str = "",
+) -> str:
     """구글 캘린더의 예정된 일정을 조회합니다."""
-    from datetime import datetime, timezone
+    from datetime import datetime, timezone as tz
 
     user_id = get_current_user()
     if not user_id:
@@ -129,19 +178,20 @@ async def google_calendar_list(max_results: int = 10) -> str:
     service = await get_google_service(user_id, "calendar", "v3")
     if service is None:
         return NOT_LINKED_MSG
-    now = datetime.now(timezone.utc).isoformat()
+
+    now = datetime.now(tz.utc).isoformat()
+    list_kwargs: dict = {
+        "calendarId": "primary",
+        "timeMin": time_min if time_min else now,
+        "maxResults": max_results,
+        "singleEvents": True,
+        "orderBy": "startTime",
+    }
+    if time_max:
+        list_kwargs["timeMax"] = time_max
+
     try:
-        result = (
-            service.events()
-            .list(
-                calendarId="primary",
-                timeMin=now,
-                maxResults=max_results,
-                singleEvents=True,
-                orderBy="startTime",
-            )
-            .execute()
-        )
+        result = service.events().list(**list_kwargs).execute()
     except Exception as e:
         logger.warning("google_calendar_list failed for user %s: %s", user_id, e)
         return get_prompt_strings(get_current_language())["error_google_api"].format(error=e)
@@ -152,9 +202,10 @@ async def google_calendar_list(max_results: int = 10) -> str:
 
     lines = []
     for e in events:
-        start = e["start"].get("dateTime", e["start"].get("date", ""))
+        raw_start = e["start"].get("dateTime", e["start"].get("date", ""))
+        formatted = _fmt_event_start(raw_start)
         lines.append(
-            f"- {start}: {e.get('summary', '(제목 없음)')} (ID: {e.get('id', 'N/A')})"
+            f"- {formatted}: {e.get('summary', '(제목 없음)')} (ID: {e.get('id', 'N/A')})"
         )
     return "예정된 일정:\n" + "\n".join(lines)
 
