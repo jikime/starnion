@@ -97,7 +97,11 @@ async def transcribe_audio(file_url: str) -> str:
         ],
     )
 
-    response = await llm.ainvoke([message])
+    try:
+        response = await llm.ainvoke([message])
+    except Exception as e:
+        logger.warning("transcribe_audio: LLM call failed: %s", e)
+        return "음성 인식 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."
     return f"음성 인식 결과:\n{response.content}"
 
 
@@ -125,23 +129,26 @@ async def generate_audio(text: str, voice: str = "Kore") -> str:
 
     client = genai.Client(api_key=api_key)
 
-    response = await client.aio.models.generate_content(
-        model=model,
-        contents=text,
-        config=types.GenerateContentConfig(
-            response_modalities=["AUDIO"],
-            speech_config=types.SpeechConfig(
-                voice_config=types.VoiceConfig(
-                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                        voice_name=voice,
+    try:
+        response = await client.aio.models.generate_content(
+            model=model,
+            contents=text,
+            config=types.GenerateContentConfig(
+                response_modalities=["AUDIO"],
+                speech_config=types.SpeechConfig(
+                    voice_config=types.VoiceConfig(
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                            voice_name=voice,
+                        ),
                     ),
                 ),
             ),
-        ),
-    )
+        )
+        pcm_data = response.candidates[0].content.parts[0].inline_data.data
+    except Exception as e:
+        logger.warning("generate_audio: TTS call failed: %s", e)
+        return "음성 생성 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."
 
-    pcm_data = response.candidates[0].content.parts[0].inline_data.data
     wav_bytes = _pcm_to_wav(pcm_data)
-
     add_pending_file(wav_bytes, "speech.wav", "audio/wav")
     return "음성을 생성했어요."

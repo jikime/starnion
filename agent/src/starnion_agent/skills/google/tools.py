@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
@@ -11,6 +13,8 @@ from starnion_agent.db.pool import get_pool
 from starnion_agent.db.repositories import google as google_repo
 from starnion_agent.skills.google.api import NOT_LINKED_MSG, get_google_service
 from starnion_agent.skills.guard import skill_guard
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +107,11 @@ async def google_calendar_create(
         "start": {"dateTime": start_time},
         "end": {"dateTime": end_time},
     }
-    result = service.events().insert(calendarId="primary", body=event).execute()
+    try:
+        result = service.events().insert(calendarId="primary", body=event).execute()
+    except Exception as e:
+        logger.warning("google_calendar_create failed for user %s: %s", user_id, e)
+        return f"일정 생성 중 오류가 발생했어요: {e}"
     return f"일정 '{title}'을 생성했어요. (ID: {result.get('id', 'N/A')})"
 
 
@@ -121,17 +129,21 @@ async def google_calendar_list(max_results: int = 10) -> str:
     if service is None:
         return NOT_LINKED_MSG
     now = datetime.now(timezone.utc).isoformat()
-    result = (
-        service.events()
-        .list(
-            calendarId="primary",
-            timeMin=now,
-            maxResults=max_results,
-            singleEvents=True,
-            orderBy="startTime",
+    try:
+        result = (
+            service.events()
+            .list(
+                calendarId="primary",
+                timeMin=now,
+                maxResults=max_results,
+                singleEvents=True,
+                orderBy="startTime",
+            )
+            .execute()
         )
-        .execute()
-    )
+    except Exception as e:
+        logger.warning("google_calendar_list failed for user %s: %s", user_id, e)
+        return f"일정 조회 중 오류가 발생했어요: {e}"
 
     events = result.get("items", [])
     if not events:
@@ -197,16 +209,20 @@ async def google_docs_create(title: str, content: str = "") -> str:
     service = await get_google_service(user_id, "docs", "v1")
     if service is None:
         return NOT_LINKED_MSG
-    doc = service.documents().create(body={"title": title}).execute()
-    doc_id = doc.get("documentId", "")
+    try:
+        doc = service.documents().create(body={"title": title}).execute()
+        doc_id = doc.get("documentId", "")
 
-    if content:
-        requests = [
-            {"insertText": {"location": {"index": 1}, "text": content}},
-        ]
-        service.documents().batchUpdate(
-            documentId=doc_id, body={"requests": requests},
-        ).execute()
+        if content:
+            requests = [
+                {"insertText": {"location": {"index": 1}, "text": content}},
+            ]
+            service.documents().batchUpdate(
+                documentId=doc_id, body={"requests": requests},
+            ).execute()
+    except Exception as e:
+        logger.warning("google_docs_create failed for user %s: %s", user_id, e)
+        return f"문서 생성 중 오류가 발생했어요: {e}"
 
     return f"문서 '{title}'을 생성했어요.\nhttps://docs.google.com/document/d/{doc_id}"
 
@@ -222,7 +238,14 @@ async def google_docs_read(document_id: str) -> str:
     service = await get_google_service(user_id, "docs", "v1")
     if service is None:
         return NOT_LINKED_MSG
-    doc = service.documents().get(documentId=document_id).execute()
+    try:
+        doc = service.documents().get(documentId=document_id).execute()
+    except Exception as e:
+        logger.warning("google_docs_read failed for user %s: %s", user_id, e)
+        err = str(e)
+        if "404" in err:
+            return f"문서를 찾을 수 없어요. (ID: {document_id})"
+        return f"문서 읽기 중 오류가 발생했어요: {e}"
 
     title = doc.get("title", "")
     body = doc.get("body", {})
@@ -289,7 +312,11 @@ async def google_tasks_create(
     if due:
         task_body["due"] = due
 
-    result = service.tasks().insert(tasklist="@default", body=task_body).execute()
+    try:
+        result = service.tasks().insert(tasklist="@default", body=task_body).execute()
+    except Exception as e:
+        logger.warning("google_tasks_create failed for user %s: %s", user_id, e)
+        return f"할 일 추가 중 오류가 발생했어요: {e}"
     return f"할 일 '{title}'을 추가했어요. (ID: {result.get('id', 'N/A')})"
 
 
@@ -304,11 +331,15 @@ async def google_tasks_list(max_results: int = 20) -> str:
     service = await get_google_service(user_id, "tasks", "v1")
     if service is None:
         return NOT_LINKED_MSG
-    result = (
-        service.tasks()
-        .list(tasklist="@default", maxResults=max_results, showCompleted=False)
-        .execute()
-    )
+    try:
+        result = (
+            service.tasks()
+            .list(tasklist="@default", maxResults=max_results, showCompleted=False)
+            .execute()
+        )
+    except Exception as e:
+        logger.warning("google_tasks_list failed for user %s: %s", user_id, e)
+        return f"할 일 조회 중 오류가 발생했어요: {e}"
 
     items = result.get("items", [])
     if not items:
@@ -413,11 +444,15 @@ async def google_drive_upload(
 
     file_metadata = {"name": file_name}
     media = MediaIoBaseUpload(BytesIO(data), mimetype=mime_type)
-    result = (
-        service.files()
-        .create(body=file_metadata, media_body=media, fields="id,webViewLink")
-        .execute()
-    )
+    try:
+        result = (
+            service.files()
+            .create(body=file_metadata, media_body=media, fields="id,webViewLink")
+            .execute()
+        )
+    except Exception as e:
+        logger.warning("google_drive_upload failed for user %s: %s", user_id, e)
+        return f"파일 업로드 중 오류가 발생했어요: {e}"
 
     link = result.get("webViewLink", "")
     return f"'{file_name}'을 드라이브에 업로드했어요.\n{link}"
@@ -435,11 +470,15 @@ async def google_drive_list(query: str = "", max_results: int = 10) -> str:
     if service is None:
         return NOT_LINKED_MSG
     q = f"name contains '{query}'" if query else None
-    result = (
-        service.files()
-        .list(q=q, pageSize=max_results, fields="files(id,name,mimeType,modifiedTime)")
-        .execute()
-    )
+    try:
+        result = (
+            service.files()
+            .list(q=q, pageSize=max_results, fields="files(id,name,mimeType,modifiedTime)")
+            .execute()
+        )
+    except Exception as e:
+        logger.warning("google_drive_list failed for user %s: %s", user_id, e)
+        return f"파일 조회 중 오류가 발생했어요: {e}"
 
     files = result.get("files", [])
     if not files:
@@ -491,9 +530,13 @@ async def google_mail_send(to: str, subject: str, body: str) -> str:
     message["subject"] = subject
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
 
-    service.users().messages().send(
-        userId="me", body={"raw": raw},
-    ).execute()
+    try:
+        service.users().messages().send(
+            userId="me", body={"raw": raw},
+        ).execute()
+    except Exception as e:
+        logger.warning("google_mail_send failed for user %s: %s", user_id, e)
+        return f"메일 전송 중 오류가 발생했어요: {e}"
 
     return f"'{subject}' 메일을 {to}에게 전송했어요."
 
@@ -509,12 +552,16 @@ async def google_mail_list(query: str = "is:unread", max_results: int = 10) -> s
     service = await get_google_service(user_id, "gmail", "v1")
     if service is None:
         return NOT_LINKED_MSG
-    result = (
-        service.users()
-        .messages()
-        .list(userId="me", q=query, maxResults=max_results)
-        .execute()
-    )
+    try:
+        result = (
+            service.users()
+            .messages()
+            .list(userId="me", q=query, maxResults=max_results)
+            .execute()
+        )
+    except Exception as e:
+        logger.warning("google_mail_list failed for user %s: %s", user_id, e)
+        return f"메일 조회 중 오류가 발생했어요: {e}"
 
     messages = result.get("messages", [])
     if not messages:
@@ -522,15 +569,21 @@ async def google_mail_list(query: str = "is:unread", max_results: int = 10) -> s
 
     lines = []
     for msg_ref in messages[:max_results]:
-        msg = (
-            service.users()
-            .messages()
-            .get(userId="me", id=msg_ref["id"], format="metadata", metadataHeaders=["Subject", "From"])
-            .execute()
-        )
+        try:
+            msg = (
+                service.users()
+                .messages()
+                .get(userId="me", id=msg_ref["id"], format="metadata", metadataHeaders=["Subject", "From"])
+                .execute()
+            )
+        except Exception as e:
+            logger.warning("google_mail_list: failed to fetch message %s: %s", msg_ref["id"], e)
+            continue
         headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
         subject = headers.get("Subject", "(제목 없음)")
         sender = headers.get("From", "?")
         lines.append(f"- {subject} (from: {sender})")
 
+    if not lines:
+        return "메일 내용을 불러올 수 없었어요."
     return "메일 목록:\n" + "\n".join(lines)

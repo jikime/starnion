@@ -306,7 +306,11 @@ async def evaluate_goals(user_id: str, language: str = "ko") -> str:
         return "AI 프로바이더가 설정되지 않아 목표 평가를 생성할 수 없습니다."
 
     prompt = _build_evaluation_prompt(data_summary, language=language)
-    response = await llm.ainvoke([HumanMessage(content=prompt)])
+    try:
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+    except Exception as e:
+        logger.warning("LLM call failed in evaluate_goals for user %s: %s", user_id, e)
+        return "AI 응답을 받지 못했어요. 잠시 후 다시 시도해주세요."
 
     evaluations = _extract_json(response.content)
     if not evaluations or "evaluations" not in evaluations:
@@ -364,7 +368,11 @@ async def generate_goal_status(user_id: str, language: str = "ko") -> str:
         return "AI 프로바이더가 설정되지 않아 목표 상태 알림을 생성할 수 없습니다."
 
     prompt = _build_status_prompt(active_goals, monthly, budget, now, persona_id, language=language)
-    response = await llm.ainvoke([HumanMessage(content=prompt)])
+    try:
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+    except Exception as e:
+        logger.warning("LLM call failed in generate_goal_status for user %s: %s", user_id, e)
+        return "AI 응답을 받지 못했어요. 잠시 후 다시 시도해주세요."
     return response.content
 
 
