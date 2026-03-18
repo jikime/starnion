@@ -136,7 +136,7 @@ def load_all_skill_docs(skill_ids: list[str]) -> dict[str, SkillDoc]:
     return docs
 
 
-def build_skill_catalog(docs: dict[str, SkillDoc]) -> str:
+def build_skill_catalog(docs: dict[str, SkillDoc], language: str = "ko") -> str:
     """Build a concise skill catalog string for the system prompt.
 
     Level 1 (progressive disclosure): name + description + tool names per
@@ -149,6 +149,7 @@ def build_skill_catalog(docs: dict[str, SkillDoc]) -> str:
 
     Args:
         docs: Dict of parsed SkillDocs.
+        language: User language code for localized header (ko/en/ja/zh).
 
     Returns:
         Formatted catalog text.
@@ -157,8 +158,9 @@ def build_skill_catalog(docs: dict[str, SkillDoc]) -> str:
         return ""
 
     from starnion_agent.skills.registry import SKILLS  # noqa: PLC0415
+    from starnion_agent.persona import get_prompt_strings  # noqa: PLC0415
 
-    lines = ["## 활성 스킬 카탈로그\n"]
+    lines = [get_prompt_strings(language)["catalog_header"] + "\n"]
     for doc in docs.values():
         skill_def = SKILLS.get(doc.skill_id)
         kw_suffix = f" [{', '.join(doc.keywords)}]" if doc.keywords else ""
@@ -170,7 +172,7 @@ def build_skill_catalog(docs: dict[str, SkillDoc]) -> str:
     return "\n".join(lines)
 
 
-def build_skill_instructions(docs: dict[str, SkillDoc]) -> str:
+def build_skill_instructions(docs: dict[str, SkillDoc], language: str = "ko") -> str:
     """Build the full skill instruction block for the system prompt.
 
     Level 2 (progressive disclosure): Full SKILL.md body content
@@ -178,12 +180,15 @@ def build_skill_instructions(docs: dict[str, SkillDoc]) -> str:
 
     Args:
         docs: Dict of parsed SkillDocs.
+        language: User language code for localized header (ko/en/ja/zh).
 
     Returns:
         Combined instruction text from all skill bodies.
     """
     if not docs:
         return ""
+
+    from starnion_agent.persona import get_prompt_strings  # noqa: PLC0415
 
     sections = []
     for doc in docs.values():
@@ -193,7 +198,7 @@ def build_skill_instructions(docs: dict[str, SkillDoc]) -> str:
     if not sections:
         return ""
 
-    return "## 스킬 지침\n\n" + "\n\n---\n\n".join(sections)
+    return get_prompt_strings(language)["instructions_header"] + "\n\n" + "\n\n---\n\n".join(sections)
 
 
 def _split_frontmatter(text: str) -> tuple[str | None, str]:

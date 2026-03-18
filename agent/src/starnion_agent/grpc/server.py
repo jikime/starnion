@@ -19,7 +19,9 @@ from starnion.v1 import agent_pb2, agent_pb2_grpc  # noqa: E402
 
 from langchain_core.messages import HumanMessage
 
-from starnion_agent.context import set_current_user
+from starnion_agent.context import set_current_user, set_current_language
+from starnion_agent.db.repositories.profile import get_user_language
+from starnion_agent.persona import get_prompt_strings
 from starnion_agent.skills.file_context import init_pending_files, pop_pending_files
 from starnion_agent.db.pool import get_pool
 from starnion_agent.db.repositories import profile as profile_repo
@@ -59,7 +61,7 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
         self._agent = agent
 
     @staticmethod
-    def _build_message(request):
+    def _build_message(request, language: str = "ko"):
         """Build a LangChain message from a ChatRequest.
 
         For image files, returns a multimodal HumanMessage with an image_url
@@ -71,6 +73,7 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
         """
         message = request.message
         file_input = request.file
+        strings = get_prompt_strings(language)
 
         if not file_input or not file_input.file_url:
             return ("human", message)
@@ -89,20 +92,15 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
         if file_input.file_type == "audio":
             # Audio files: inject an explicit STT instruction so the LLM
             # reliably calls transcribe_audio first before processing intent.
-            audio_tag = (
-                f"[🎤 음성 파일 첨부됨 — file_url: {file_input.file_url}]\n"
-                "음성 파일이 첨부되어 있습니다. "
-                "반드시 transcribe_audio(file_url=위 URL) 도구를 먼저 호출해 텍스트로 변환한 후, "
-                "변환된 내용을 바탕으로 이후 요청을 처리하세요."
-            )
+            audio_tag = strings["audio_tag"].format(url=file_input.file_url)
             combined = f"{audio_tag}\n{message}" if message else audio_tag
             return ("human", combined)
 
         # Other non-image files: append as text annotation.
-        file_text = (
-            f"[파일 첨부: type={file_input.file_type}, "
-            f"name={file_input.file_name}, "
-            f"url={file_input.file_url}]"
+        file_text = strings["file_attach"].format(
+            type=file_input.file_type,
+            name=file_input.file_name,
+            url=file_input.file_url,
         )
         combined = f"{message}\n{file_text}" if message else file_text
         return ("human", combined)
@@ -127,7 +125,10 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
             pool = get_pool()
             await profile_repo.upsert(pool, uuid_id=user_id, user_name="")
 
-            human_input = self._build_message(request)
+            user_language = await get_user_language(pool, user_id)
+            set_current_language(user_language)
+
+            human_input = self._build_message(request, language=user_language)
             thread_id = request.thread_id or user_id
             result = await self._invoke_agent(human_input, thread_id)
 
@@ -187,10 +188,21 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
             pool = get_pool()
             await profile_repo.upsert(pool, uuid_id=user_id, user_name="")
 
-            human_input = self._build_message(request)
+            user_language = await get_user_language(pool, user_id)
+            set_current_language(user_language)
+
+            human_input = self._build_message(request, language=user_language)
             thread_id = request.thread_id or user_id
             config = {"configurable": {"thread_id": thread_id}}
             input_data = {"messages": [human_input]}
+
+            # pre_tool_buffer: first-turn LLM tokens are held here until we know
+            # whether a tool will be called.  If on_tool_start fires, the buffer is
+            # discarded (those tokens are interim "thinking" text that must not be
+            # sent before the tool actually runs).  If the loop ends without any tool
+            # call the buffer is flushed as the final response.
+            pre_tool_buffer: list[str] = []
+            tool_called = False
 
             async for event in self._agent.astream_events(
                 input_data, config=config, version="v2",
@@ -210,12 +222,21 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                                 for b in raw
                             )
                     if token:
-                        yield agent_pb2.ChatResponse(
-                            content=token,
-                            type=agent_pb2.TEXT,
-                        )
+                        if tool_called:
+                            # Post-tool turn — stream final response directly.
+                            yield agent_pb2.ChatResponse(
+                                content=token,
+                                type=agent_pb2.TEXT,
+                            )
+                        else:
+                            # First turn — buffer until we know if a tool is called.
+                            pre_tool_buffer.append(token)
 
                 elif kind == "on_tool_start":
+                    # A real tool call is starting — discard pre-tool text and
+                    # mark that at least one tool has been called this request.
+                    pre_tool_buffer.clear()
+                    tool_called = True
                     tool_name = event.get("name", "")
                     logger.info("tool_call: %s", tool_name)
                     print(f"[tool_call] {tool_name}", flush=True)
@@ -242,6 +263,14 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                             file_name=pf["name"],
                             file_mime=pf["mime"],
                         )
+
+            # Flush buffered first-turn tokens when no tool was called
+            # (pure conversation response without any tool invocation).
+            if pre_tool_buffer:
+                yield agent_pb2.ChatResponse(
+                    content="".join(pre_tool_buffer),
+                    type=agent_pb2.TEXT,
+                )
 
             # 루프 종료 후 남아있는 파일이 있으면 전송 (안전망).
             for pf in pop_pending_files():

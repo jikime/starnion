@@ -1,4 +1,3 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Wallet, CreditCard, Target, StickyNote, TrendingUp, TrendingDown } from "lucide-react"
 
 const stats = [
@@ -36,14 +35,14 @@ export function DashboardStats() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat) => (
-        <Card key={stat.title}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+        <div key={stat.title} className="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6">
+          <div className="flex flex-row items-center justify-between gap-2 px-6 pb-2">
+            <div className="leading-none text-sm font-medium text-muted-foreground">
               {stat.title}
-            </CardTitle>
+            </div>
             <stat.icon className="size-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div className="px-6">
             <div className="text-2xl font-bold">{stat.value}</div>
             <p className="flex items-center gap-1 text-xs text-muted-foreground">
               {stat.trend === "up" && (
@@ -54,8 +53,8 @@ export function DashboardStats() {
               )}
               {stat.description}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ))}
     </div>
   )

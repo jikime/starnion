@@ -24,7 +24,8 @@ from starnion_agent.db.repositories import provider as provider_repo
 from starnion_agent.db.repositories import usage as usage_repo
 from starnion_agent.db.repositories.profile import get_user_language, get_user_timezone
 from starnion_agent.pricing import calculate_cost, get_provider
-from starnion_agent.persona import DEFAULT_PERSONA, NAME_TO_ID, build_system_prompt, get_persona
+from starnion_agent.persona import DEFAULT_PERSONA, NAME_TO_ID, build_system_prompt, get_persona, get_prompt_strings
+from starnion_agent.context import set_current_language
 from starnion_agent.skills.audio.tools import generate_audio, transcribe_audio
 from starnion_agent.skills.budget.tools import get_budget_status, set_budget
 from starnion_agent.skills.diary.tools import save_daily_log, save_diary_entry
@@ -414,6 +415,7 @@ def _is_assignment_valid(assign: dict[str, Any]) -> bool:
 
 async def _get_enabled_context(
     user_id: str | None,
+    language: str = "ko",
 ) -> tuple[str, list[str], str, str, Any, str | None, str, str]:
     """Query user persona, enabled skills, and LLM in a single pass.
 
@@ -499,8 +501,8 @@ async def _get_enabled_context(
             enabled_tool_names.extend(skill_def.tools)
 
     skill_docs = load_all_skill_docs(enabled)
-    catalog_text = build_skill_catalog(skill_docs)
-    instructions_text = build_skill_instructions(skill_docs)
+    catalog_text = build_skill_catalog(skill_docs, language=language)
+    instructions_text = build_skill_instructions(skill_docs, language=language)
 
     return persona_id, enabled_tool_names, catalog_text, instructions_text, llm_override, custom_system_prompt, active_endpoint_type, active_prov
 
@@ -596,12 +598,14 @@ def _build_prompt(
     if now_str:
         prompt_text = now_str + "\n\n" + prompt_text
 
+    _strings = get_prompt_strings(language)
+
     # Level 1: Skill catalog — name + tools + description per skill.
     # The catalog already includes tool names (e.g. "**메모** (save_memo, ...):")
     # so the LLM can directly map user intent to the correct tool call.
     if catalog_text:
         prompt_text += "\n\n" + catalog_text
-        prompt_text += "\n위 카탈로그에 없는 도구는 절대 호출하지 마세요."
+        prompt_text += "\n" + _strings["catalog_no_other_tools"]
 
     # Level 2: Full instructions (tool usage guidelines).
     if instructions_text:
@@ -611,7 +615,7 @@ def _build_prompt(
     # long tool instructions can cause the LLM to "forget" early style rules.
     p = get_persona(persona_id)
     prompt_text += (
-        f"\n\n[최종 확인 — 페르소나 '{p['name']}']\n"
+        f"\n\n[{_strings['persona_final_header']} '{p['name']}']\n"
         f"{p['tone'].split(chr(10))[0]}"  # first line (the most critical rule)
     )
 
@@ -621,12 +625,8 @@ def _build_prompt(
     # The catalog above maps each skill to its tools — use it as the guide.
     if enabled_tool_names:
         prompt_text += (
-            "\n\n[도구 사용 최종 확인 — 절대 규칙]\n"
-            "위 스킬 카탈로그에 나열된 도구로 처리 가능한 요청이면 반드시 해당 도구를 먼저 호출하세요. "
-            "이전 실패 여부와 무관하게 지금 바로 도구를 호출하세요.\n"
-            "도구가 성공 메시지를 반환하면 그 결과를 사용자에게 전달하세요. "
-            "도구가 오류·실패 메시지를 반환하면 반드시 그 내용을 정직하게 사용자에게 전달하세요. "
-            "도구를 호출하지 않고 저장·삭제·처리 등을 완료했다고 응답하는 것은 절대 금지입니다."
+            f"\n\n{_strings['tool_rules_header']}\n"
+            + _strings["tool_rules_body"]
         )
 
     return prompt_text
@@ -645,6 +645,18 @@ async def _agent_node(state: MessagesState) -> dict:
     user_id = get_current_user()
     active_prov = ""
 
+    # Fetch user language and timezone first — language is passed to skill catalog/instructions
+    # builders so their headers are localized, and set in lang_ctx for tools/guard access.
+    user_language = "ko"
+    user_tz_str = "Asia/Seoul"
+    if user_id:
+        pool = get_pool()
+        user_language, user_tz_str = await asyncio.gather(
+            get_user_language(pool, user_id),
+            get_user_timezone(pool, user_id),
+        )
+    set_current_language(user_language)
+
     try:
         (
             persona_id,
@@ -655,7 +667,7 @@ async def _agent_node(state: MessagesState) -> dict:
             custom_system_prompt,
             _,
             active_prov,
-        ) = await _get_enabled_context(user_id)
+        ) = await _get_enabled_context(user_id, language=user_language)
     except Exception:
         logger.warning("Failed to load persona/skills, using defaults", exc_info=True)
         persona_id = DEFAULT_PERSONA
@@ -679,20 +691,10 @@ async def _agent_node(state: MessagesState) -> dict:
         elif "openai"  in _cls:   _llm_provider = "openai"
         else:                      _llm_provider = _cls
     logger.info(
-        "[LLM] user=%s | %s",
-        user_id,
+        "[LLM] user=%s | lang=%s | %s",
+        user_id, user_language,
         _model_tag(_llm_provider, _llm_model, "(chat)"),
     )
-
-    # 사용자 선호 언어 및 타임존 조회 (DB 오류 시 기본값 반환).
-    user_language = "ko"
-    user_tz_str = "Asia/Seoul"
-    if user_id:
-        pool = get_pool()
-        user_language, user_tz_str = await asyncio.gather(
-            get_user_language(pool, user_id),
-            get_user_timezone(pool, user_id),
-        )
 
     # Compute current datetime in user's timezone for system prompt injection.
     try:

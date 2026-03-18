@@ -67,6 +67,114 @@ LANGUAGE_INSTRUCTIONS: dict[str, str] = {
 
 SUPPORTED_LANGUAGES: list[str] = list(LANGUAGE_INSTRUCTIONS.keys())
 
+# Localized strings for system prompt fragments that were previously hardcoded Korean.
+# Used in: _build_prompt (agent.py), build_skill_catalog/build_skill_instructions (loader.py),
+#          skill_guard (guard.py), ChatStream audio/file tags (grpc/server.py).
+PROMPT_I18N: dict[str, dict[str, str]] = {
+    "ko": {
+        "catalog_header": "## 활성 스킬 카탈로그",
+        "catalog_no_other_tools": "위 카탈로그에 없는 도구는 절대 호출하지 마세요.",
+        "instructions_header": "## 스킬 지침",
+        "persona_final_header": "최종 확인 — 페르소나",
+        "tool_rules_header": "[도구 사용 최종 확인 — 절대 규칙]",
+        "tool_rules_body": (
+            "위 스킬 카탈로그에 나열된 도구로 처리 가능한 요청이면 반드시 해당 도구를 먼저 호출하세요. "
+            "이전 실패 여부와 무관하게 지금 바로 도구를 호출하세요.\n"
+            "도구가 성공 메시지를 반환하면 그 결과를 사용자에게 전달하세요. "
+            "도구가 오류·실패 메시지를 반환하면 반드시 그 내용을 정직하게 사용자에게 전달하세요.\n"
+            "⛔ 절대 금지: 도구를 호출하기 전에 '저장했어요', '등록했어요', '처리했어요' 같은 완료 표현을 사용하지 마세요. "
+            "도구 결과가 반환된 후에만 완료 여부를 판단하고 사용자에게 전달하세요. "
+            "도구를 실제로 호출하지 않고 스스로 성공을 판단하거나 선언하는 것은 절대 허용되지 않습니다."
+        ),
+        "skill_disabled": "'{name}' 기능이 비활성화되어 있어요. /skills 명령으로 활성화할 수 있어요.",
+        "audio_tag": (
+            "[🎤 음성 파일 첨부됨 — file_url: {url}]\n"
+            "음성 파일이 첨부되어 있습니다. "
+            "반드시 transcribe_audio(file_url=위 URL) 도구를 먼저 호출해 텍스트로 변환한 후, "
+            "변환된 내용을 바탕으로 이후 요청을 처리하세요."
+        ),
+        "file_attach": "[파일 첨부: type={type}, name={name}, url={url}]",
+    },
+    "en": {
+        "catalog_header": "## Active Skill Catalog",
+        "catalog_no_other_tools": "Never call tools that are not listed in the catalog above.",
+        "instructions_header": "## Skill Guidelines",
+        "persona_final_header": "Final Check — Persona",
+        "tool_rules_header": "[Tool Usage Final Check — Absolute Rules]",
+        "tool_rules_body": (
+            "If the request can be handled by a tool listed in the skill catalog above, you MUST call that tool first. "
+            "Call the tool right now regardless of any previous failures.\n"
+            "If the tool returns a success message, relay that result to the user. "
+            "If the tool returns an error or failure message, you MUST honestly report that to the user.\n"
+            "⛔ STRICTLY FORBIDDEN: Do not say 'I saved it', 'I registered it', or 'Done' before the tool has been called. "
+            "Only report completion AFTER the tool has returned a result. "
+            "Self-declaring success without an actual tool result is absolutely not allowed."
+        ),
+        "skill_disabled": "The '{name}' feature is disabled. Enable it via /skills.",
+        "audio_tag": (
+            "[🎤 Audio file attached — file_url: {url}]\n"
+            "An audio file is attached. "
+            "You MUST call transcribe_audio(file_url=above URL) first to convert it to text, "
+            "then process the request based on the transcribed content."
+        ),
+        "file_attach": "[File attached: type={type}, name={name}, url={url}]",
+    },
+    "ja": {
+        "catalog_header": "## 有効なスキルカタログ",
+        "catalog_no_other_tools": "カタログに記載されていないツールは絶対に呼び出さないでください。",
+        "instructions_header": "## スキルガイドライン",
+        "persona_final_header": "最終確認 — ペルソナ",
+        "tool_rules_header": "[ツール使用最終確認 — 絶対規則]",
+        "tool_rules_body": (
+            "スキルカタログに記載されたツールで処理できるリクエストは、必ずそのツールを最初に呼び出してください。"
+            "以前の失敗に関係なく、今すぐツールを呼び出してください。\n"
+            "ツールが成功メッセージを返した場合は、その結果をユーザーに伝えてください。"
+            "ツールがエラー・失敗メッセージを返した場合は、必ずその内容を正直にユーザーに伝えてください。\n"
+            "⛔ 絶対禁止: ツールを呼び出す前に「保存しました」「登録しました」「処理しました」などの完了表現を使わないでください。"
+            "ツールが結果を返した後にのみ完了を判断し、ユーザーに伝えてください。"
+            "実際のツール結果なしに自己判断で成功を宣言することは絶対に許可されていません。"
+        ),
+        "skill_disabled": "「{name}」機能は無効になっています。/skills コマンドで有効にできます。",
+        "audio_tag": (
+            "[🎤 音声ファイルが添付されました — file_url: {url}]\n"
+            "音声ファイルが添付されています。"
+            "必ず transcribe_audio(file_url=上記URL) ツールを最初に呼び出してテキストに変換した後、"
+            "変換された内容に基づいてリクエストを処理してください。"
+        ),
+        "file_attach": "[ファイル添付: type={type}, name={name}, url={url}]",
+    },
+    "zh": {
+        "catalog_header": "## 活跃技能目录",
+        "catalog_no_other_tools": "绝对不要调用目录中未列出的工具。",
+        "instructions_header": "## 技能指南",
+        "persona_final_header": "最终检查 — 角色",
+        "tool_rules_header": "[工具使用最终确认 — 绝对规则]",
+        "tool_rules_body": (
+            "如果请求可以由技能目录中列出的工具处理，必须首先调用该工具。"
+            "无论之前是否失败，立即调用工具。\n"
+            "如果工具返回成功消息，请将结果传达给用户。"
+            "如果工具返回错误或失败消息，必须如实告知用户。\n"
+            "⛔ 严格禁止: 在调用工具之前，不得说「已保存」「已注册」「已处理」等完成表达。"
+            "只有在工具返回结果之后，才能判断是否完成并告知用户。"
+            "在没有实际工具结果的情况下自行宣布成功，这是绝对不允许的。"
+        ),
+        "skill_disabled": "「{name}」功能已禁用。可通过 /skills 命令启用。",
+        "audio_tag": (
+            "[🎤 已附加音频文件 — file_url: {url}]\n"
+            "已附加音频文件。"
+            "必须首先调用 transcribe_audio(file_url=上述URL) 将其转换为文本，"
+            "然后根据转换后的内容处理请求。"
+        ),
+        "file_attach": "[附件: type={type}, name={name}, url={url}]",
+    },
+}
+
+
+def get_prompt_strings(language: str) -> dict[str, str]:
+    """Return localized prompt strings for the given language, falling back to Korean."""
+    return PROMPT_I18N.get(language, PROMPT_I18N["ko"])
+
+
 # Reverse mapping: DB에 저장된 한국어 이름 → PERSONAS 키
 # (DB personas.name 컬럼은 한국어 표시명을 저장함)
 NAME_TO_ID: dict[str, str] = {p["name"]: pid for pid, p in PERSONAS.items()}
