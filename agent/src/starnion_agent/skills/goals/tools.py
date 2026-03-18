@@ -19,7 +19,7 @@ from starnion_agent.db.pool import get_pool
 from starnion_agent.db.repositories import finance as finance_repo
 from starnion_agent.db.repositories import goal_db as goal_db_repo
 from starnion_agent.db.repositories import profile as profile_repo
-from starnion_agent.persona import DEFAULT_PERSONA, LANGUAGE_INSTRUCTIONS, get_tone_instruction
+from starnion_agent.persona import DEFAULT_PERSONA, LANGUAGE_INSTRUCTIONS, get_prompt_strings, get_tone_instruction
 from starnion_agent.skills.guard import skill_guard
 
 logger = logging.getLogger(__name__)
@@ -310,7 +310,7 @@ async def evaluate_goals(user_id: str, language: str = "ko") -> str:
         response = await llm.ainvoke([HumanMessage(content=prompt)])
     except Exception as e:
         logger.warning("LLM call failed in evaluate_goals for user %s: %s", user_id, e)
-        return "AI 응답을 받지 못했어요. 잠시 후 다시 시도해주세요."
+        return get_prompt_strings(language)["error_try_later"]
 
     evaluations = _extract_json(response.content)
     if not evaluations or "evaluations" not in evaluations:
@@ -372,7 +372,7 @@ async def generate_goal_status(user_id: str, language: str = "ko") -> str:
         response = await llm.ainvoke([HumanMessage(content=prompt)])
     except Exception as e:
         logger.warning("LLM call failed in generate_goal_status for user %s: %s", user_id, e)
-        return "AI 응답을 받지 못했어요. 잠시 후 다시 시도해주세요."
+        return get_prompt_strings(language)["error_try_later"]
     return response.content
 
 

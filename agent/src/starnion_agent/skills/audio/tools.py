@@ -11,9 +11,9 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 from starnion_agent.config import settings
-from starnion_agent.context import get_current_user
+from starnion_agent.context import get_current_language, get_current_user
 from starnion_agent.document.parser import fetch_file
-from starnion_agent.persona import LANGUAGE_INSTRUCTIONS
+from starnion_agent.persona import LANGUAGE_INSTRUCTIONS, get_prompt_strings
 from starnion_agent.skills.file_context import add_pending_file
 from starnion_agent.skills.gemini_key import get_gemini_api_key, no_key_message
 from starnion_agent.skills.guard import skill_guard
@@ -101,7 +101,7 @@ async def transcribe_audio(file_url: str) -> str:
         response = await llm.ainvoke([message])
     except Exception as e:
         logger.warning("transcribe_audio: LLM call failed: %s", e)
-        return "음성 인식 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."
+        return get_prompt_strings(get_current_language())["error_audio_transcribe"]
     return f"음성 인식 결과:\n{response.content}"
 
 
@@ -147,7 +147,7 @@ async def generate_audio(text: str, voice: str = "Kore") -> str:
         pcm_data = response.candidates[0].content.parts[0].inline_data.data
     except Exception as e:
         logger.warning("generate_audio: TTS call failed: %s", e)
-        return "음성 생성 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."
+        return get_prompt_strings(get_current_language())["error_audio_generate"]
 
     wav_bytes = _pcm_to_wav(pcm_data)
     add_pending_file(wav_bytes, "speech.wav", "audio/wav")

@@ -15,7 +15,7 @@ from langchain_core.messages import HumanMessage
 from starnion_agent.db.pool import get_pool
 from starnion_agent.db.repositories import daily_log as daily_log_repo
 from starnion_agent.db.repositories import knowledge as knowledge_repo
-from starnion_agent.persona import LANGUAGE_INSTRUCTIONS
+from starnion_agent.persona import LANGUAGE_INSTRUCTIONS, get_prompt_strings
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ async def analyze_conversation(user_id: str, language: str = "ko") -> str:
         response = await llm.ainvoke([HumanMessage(content=prompt)])
     except Exception as e:
         logger.warning("LLM call failed in analyze_conversation for user %s: %s", user_id, e)
-        return "AI 응답을 받지 못했어요. 잠시 후 다시 시도해주세요."
+        return get_prompt_strings(language)["error_try_later"]
 
     # 4. Parse and store insights.
     insights_json = _extract_json(response.content)

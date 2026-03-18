@@ -99,6 +99,10 @@ PROMPT_I18N: dict[str, dict[str, str]] = {
             "URL을 추측하거나 변경하지 마세요."
         ),
         "file_attach": "[파일 첨부: type={type}, name={name}, url={url}]",
+        "error_try_later": "AI 응답을 받지 못했어요. 잠시 후 다시 시도해주세요.",
+        "error_audio_transcribe": "음성 인식 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.",
+        "error_audio_generate": "음성 생성 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.",
+        "error_google_api": "처리 중 오류가 발생했어요: {error}",
     },
     "en": {
         "catalog_header": "## Active Skill Catalog",
@@ -128,6 +132,10 @@ PROMPT_I18N: dict[str, dict[str, str]] = {
             "Do not guess or modify the URL."
         ),
         "file_attach": "[File attached: type={type}, name={name}, url={url}]",
+        "error_try_later": "Couldn't get an AI response. Please try again later.",
+        "error_audio_transcribe": "An error occurred during audio transcription. Please try again later.",
+        "error_audio_generate": "An error occurred during audio generation. Please try again later.",
+        "error_google_api": "An error occurred: {error}",
     },
     "ja": {
         "catalog_header": "## 有効なスキルカタログ",
@@ -157,6 +165,10 @@ PROMPT_I18N: dict[str, dict[str, str]] = {
             "URLを推測または変更しないでください。"
         ),
         "file_attach": "[ファイル添付: type={type}, name={name}, url={url}]",
+        "error_try_later": "AIの応答を受け取れませんでした。しばらくしてから再試行してください。",
+        "error_audio_transcribe": "音声認識中にエラーが発生しました。しばらくしてから再試行してください。",
+        "error_audio_generate": "音声生成中にエラーが発生しました。しばらくしてから再試行してください。",
+        "error_google_api": "処理中にエラーが発生しました: {error}",
     },
     "zh": {
         "catalog_header": "## 活跃技能目录",
@@ -186,6 +198,10 @@ PROMPT_I18N: dict[str, dict[str, str]] = {
             "请勿猜测或修改URL。"
         ),
         "file_attach": "[附件: type={type}, name={name}, url={url}]",
+        "error_try_later": "未能获得AI响应。请稍后再试。",
+        "error_audio_transcribe": "语音识别过程中发生错误。请稍后再试。",
+        "error_audio_generate": "语音生成过程中发生错误。请稍后再试。",
+        "error_google_api": "处理过程中发生错误：{error}",
     },
 }
 

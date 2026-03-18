@@ -8,9 +8,10 @@ from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from starnion_agent.config import settings
-from starnion_agent.context import get_current_user
+from starnion_agent.context import get_current_language, get_current_user
 from starnion_agent.db.pool import get_pool
 from starnion_agent.db.repositories import google as google_repo
+from starnion_agent.persona import get_prompt_strings
 from starnion_agent.skills.google.api import NOT_LINKED_MSG, get_google_service
 from starnion_agent.skills.guard import skill_guard
 
@@ -111,7 +112,7 @@ async def google_calendar_create(
         result = service.events().insert(calendarId="primary", body=event).execute()
     except Exception as e:
         logger.warning("google_calendar_create failed for user %s: %s", user_id, e)
-        return f"일정 생성 중 오류가 발생했어요: {e}"
+        return get_prompt_strings(get_current_language())["error_google_api"].format(error=e)
     return f"일정 '{title}'을 생성했어요. (ID: {result.get('id', 'N/A')})"
 
 
@@ -143,7 +144,7 @@ async def google_calendar_list(max_results: int = 10) -> str:
         )
     except Exception as e:
         logger.warning("google_calendar_list failed for user %s: %s", user_id, e)
-        return f"일정 조회 중 오류가 발생했어요: {e}"
+        return get_prompt_strings(get_current_language())["error_google_api"].format(error=e)
 
     events = result.get("items", [])
     if not events:
@@ -174,10 +175,8 @@ async def google_calendar_delete(event_id: str) -> str:
         service.events().delete(calendarId="primary", eventId=event_id).execute()
         return f"일정(ID: {event_id})을 삭제했어요."
     except Exception as e:
-        err = str(e)
-        if "404" in err:
-            return f"일정을 찾을 수 없어요. (ID: {event_id})"
-        return f"일정 삭제 중 오류가 발생했어요: {err}"
+        logger.warning("google_calendar_delete failed for user %s: %s", user_id, e)
+        return get_prompt_strings(get_current_language())["error_google_api"].format(error=e)
 
 
 # ---------------------------------------------------------------------------
@@ -222,7 +221,7 @@ async def google_docs_create(title: str, content: str = "") -> str:
             ).execute()
     except Exception as e:
         logger.warning("google_docs_create failed for user %s: %s", user_id, e)
-        return f"문서 생성 중 오류가 발생했어요: {e}"
+        return get_prompt_strings(get_current_language())["error_google_api"].format(error=e)
 
     return f"문서 '{title}'을 생성했어요.\nhttps://docs.google.com/document/d/{doc_id}"
 
@@ -242,10 +241,7 @@ async def google_docs_read(document_id: str) -> str:
         doc = service.documents().get(documentId=document_id).execute()
     except Exception as e:
         logger.warning("google_docs_read failed for user %s: %s", user_id, e)
-        err = str(e)
-        if "404" in err:
-            return f"문서를 찾을 수 없어요. (ID: {document_id})"
-        return f"문서 읽기 중 오류가 발생했어요: {e}"
+        return get_prompt_strings(get_current_language())["error_google_api"].format(error=e)
 
     title = doc.get("title", "")
     body = doc.get("body", {})
@@ -316,7 +312,7 @@ async def google_tasks_create(
         result = service.tasks().insert(tasklist="@default", body=task_body).execute()
     except Exception as e:
         logger.warning("google_tasks_create failed for user %s: %s", user_id, e)
-        return f"할 일 추가 중 오류가 발생했어요: {e}"
+        return get_prompt_strings(get_current_language())["error_google_api"].format(error=e)
     return f"할 일 '{title}'을 추가했어요. (ID: {result.get('id', 'N/A')})"
 
 
@@ -339,7 +335,7 @@ async def google_tasks_list(max_results: int = 20) -> str:
         )
     except Exception as e:
         logger.warning("google_tasks_list failed for user %s: %s", user_id, e)
-        return f"할 일 조회 중 오류가 발생했어요: {e}"
+        return get_prompt_strings(get_current_language())["error_google_api"].format(error=e)
 
     items = result.get("items", [])
     if not items:
@@ -370,10 +366,8 @@ async def google_tasks_complete(task_id: str) -> str:
         service.tasks().update(tasklist="@default", task=task_id, body=task).execute()
         return f"할 일 '{task.get('title', task_id)}'을 완료 처리했어요."
     except Exception as e:
-        err = str(e)
-        if "404" in err:
-            return f"할 일을 찾을 수 없어요. (ID: {task_id})"
-        return f"완료 처리 중 오류가 발생했어요: {err}"
+        logger.warning("google_tasks_complete failed for user %s: %s", user_id, e)
+        return get_prompt_strings(get_current_language())["error_google_api"].format(error=e)
 
 
 @tool(args_schema=TasksDeleteInput)
@@ -395,10 +389,8 @@ async def google_tasks_delete(task_id: str) -> str:
         service.tasks().delete(tasklist="@default", task=task_id).execute()
         return f"할 일 '{title}'을 삭제했어요."
     except Exception as e:
-        err = str(e)
-        if "404" in err:
-            return f"할 일을 찾을 수 없어요. (ID: {task_id})"
-        return f"삭제 중 오류가 발생했어요: {err}"
+        logger.warning("google_tasks_delete failed for user %s: %s", user_id, e)
+        return get_prompt_strings(get_current_language())["error_google_api"].format(error=e)
 
 
 # ---------------------------------------------------------------------------
@@ -452,7 +444,7 @@ async def google_drive_upload(
         )
     except Exception as e:
         logger.warning("google_drive_upload failed for user %s: %s", user_id, e)
-        return f"파일 업로드 중 오류가 발생했어요: {e}"
+        return get_prompt_strings(get_current_language())["error_google_api"].format(error=e)
 
     link = result.get("webViewLink", "")
     return f"'{file_name}'을 드라이브에 업로드했어요.\n{link}"
@@ -478,7 +470,7 @@ async def google_drive_list(query: str = "", max_results: int = 10) -> str:
         )
     except Exception as e:
         logger.warning("google_drive_list failed for user %s: %s", user_id, e)
-        return f"파일 조회 중 오류가 발생했어요: {e}"
+        return get_prompt_strings(get_current_language())["error_google_api"].format(error=e)
 
     files = result.get("files", [])
     if not files:
@@ -536,7 +528,7 @@ async def google_mail_send(to: str, subject: str, body: str) -> str:
         ).execute()
     except Exception as e:
         logger.warning("google_mail_send failed for user %s: %s", user_id, e)
-        return f"메일 전송 중 오류가 발생했어요: {e}"
+        return get_prompt_strings(get_current_language())["error_google_api"].format(error=e)
 
     return f"'{subject}' 메일을 {to}에게 전송했어요."
 
@@ -561,7 +553,7 @@ async def google_mail_list(query: str = "is:unread", max_results: int = 10) -> s
         )
     except Exception as e:
         logger.warning("google_mail_list failed for user %s: %s", user_id, e)
-        return f"메일 조회 중 오류가 발생했어요: {e}"
+        return get_prompt_strings(get_current_language())["error_google_api"].format(error=e)
 
     messages = result.get("messages", [])
     if not messages:
@@ -585,5 +577,5 @@ async def google_mail_list(query: str = "is:unread", max_results: int = 10) -> s
         lines.append(f"- {subject} (from: {sender})")
 
     if not lines:
-        return "메일 내용을 불러올 수 없었어요."
+        return get_prompt_strings(get_current_language())["error_try_later"]
     return "메일 목록:\n" + "\n".join(lines)
