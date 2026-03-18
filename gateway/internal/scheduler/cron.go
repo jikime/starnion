@@ -58,7 +58,11 @@ func New(grpcConn *grpc.ClientConn, telegram TelegramSender, db *sql.DB, tracker
 }
 
 // Start registers cron jobs and begins the scheduler.
+// Before starting, it recovers any tasks left in 'running' state by a
+// previous process that crashed without completing.
 func (s *Scheduler) Start() {
+	s.recoverDeadTasks()
+
 	jobs := []struct {
 		schedule string
 		name     string
@@ -91,7 +95,7 @@ func (s *Scheduler) Start() {
 
 	registered := 0
 	for _, j := range jobs {
-		if _, err := s.cron.AddFunc(j.schedule, j.fn); err != nil {
+		if _, err := s.cron.AddFunc(j.schedule, s.wrapWithTracking(j.name, j.fn)); err != nil {
 			log.Error().Err(err).Str("job", j.name).Msg("failed to register cron job")
 		} else {
 			registered++
@@ -100,6 +104,107 @@ func (s *Scheduler) Start() {
 
 	s.cron.Start()
 	log.Info().Int("jobs", registered).Msg("scheduler started with proactive notification rules")
+}
+
+// wrapWithTracking wraps a cron job function with report_task_runs bookkeeping.
+// It inserts a 'running' row before the job executes, then updates the row to
+// 'success' or 'failed' (including panic recovery) when the job completes.
+// If the DB is unavailable, the job runs untracked.
+func (s *Scheduler) wrapWithTracking(jobName string, fn func()) func() {
+	return func() {
+		runID, err := s.recordJobStart(jobName)
+		if err != nil {
+			// Tracking is best-effort: run the job anyway.
+			log.Warn().Err(err).Str("job", jobName).Msg("scheduler: failed to record job start, running untracked")
+			fn()
+			return
+		}
+
+		var jobErr error
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					jobErr = fmt.Errorf("panic: %v", r)
+					log.Error().Str("job", jobName).Interface("panic", r).Msg("scheduler: cron job panicked")
+				}
+			}()
+			fn()
+		}()
+
+		status := "success"
+		errMsg := ""
+		if jobErr != nil {
+			status = "failed"
+			errMsg = jobErr.Error()
+		}
+		s.recordJobFinish(runID, status, errMsg)
+	}
+}
+
+// recordJobStart inserts a report_task_runs row with status='running' and
+// returns the new row ID.
+func (s *Scheduler) recordJobStart(jobName string) (int64, error) {
+	if s.db == nil {
+		return 0, fmt.Errorf("db not configured")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var id int64
+	err := s.db.QueryRowContext(ctx,
+		`INSERT INTO report_task_runs (job_name) VALUES ($1) RETURNING id`,
+		jobName,
+	).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("insert task run: %w", err)
+	}
+	log.Debug().Str("job", jobName).Int64("run_id", id).Msg("scheduler: job started")
+	return id, nil
+}
+
+// recordJobFinish updates a report_task_runs row with the final status.
+func (s *Scheduler) recordJobFinish(runID int64, status, errMsg string) {
+	if s.db == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if _, err := s.db.ExecContext(ctx,
+		`UPDATE report_task_runs
+		    SET status = $1, error = NULLIF($2, ''), finished_at = NOW()
+		  WHERE id = $3`,
+		status, errMsg, runID,
+	); err != nil {
+		log.Warn().Err(err).Int64("run_id", runID).Msg("scheduler: failed to record job finish")
+	} else {
+		log.Debug().Str("status", status).Int64("run_id", runID).Msg("scheduler: job finished")
+	}
+}
+
+// recoverDeadTasks marks any report_task_runs rows that are still 'running'
+// from a previous process (older than 10 minutes) as 'dead'.
+// Called once at scheduler startup before registering cron jobs.
+func (s *Scheduler) recoverDeadTasks() {
+	if s.db == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE report_task_runs
+		   SET status = 'dead', finished_at = NOW()
+		 WHERE status = 'running'
+		   AND started_at < NOW() - INTERVAL '10 minutes'
+	`)
+	if err != nil {
+		log.Error().Err(err).Msg("scheduler: dead task recovery failed")
+		return
+	}
+	if n, _ := result.RowsAffected(); n > 0 {
+		log.Warn().Int64("count", n).Msg("scheduler: marked dead tasks from previous process")
+	}
 }
 
 // Stop gracefully shuts down the scheduler.

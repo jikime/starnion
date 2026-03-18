@@ -799,3 +799,26 @@ INSERT INTO schema_migrations (version) VALUES ('1.4.0') ON CONFLICT DO NOTHING;
 INSERT INTO schema_migrations (version) VALUES ('1.4.1') ON CONFLICT DO NOTHING;
 -- v1.4.2: channel_settings, telegram_approved_contacts, telegram_pairing_requests included above
 INSERT INTO schema_migrations (version) VALUES ('1.4.2') ON CONFLICT DO NOTHING;
+
+-- =============================================================
+-- SCHEDULER JOB TRACKING
+-- =============================================================
+
+-- Tracks each cron job execution for audit and dead-task recovery.
+-- Rows with status='running' older than 10 minutes at startup are
+-- marked 'dead' by the scheduler's recoverDeadTasks() function.
+CREATE TABLE IF NOT EXISTS report_task_runs (
+    id          BIGSERIAL    PRIMARY KEY,
+    job_name    TEXT         NOT NULL,
+    started_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    finished_at TIMESTAMPTZ,
+    status      TEXT         NOT NULL DEFAULT 'running',  -- running | success | failed | dead
+    error       TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_report_task_runs_job_name   ON report_task_runs (job_name);
+CREATE INDEX IF NOT EXISTS idx_report_task_runs_status     ON report_task_runs (status);
+CREATE INDEX IF NOT EXISTS idx_report_task_runs_started_at ON report_task_runs (started_at DESC);
+
+-- v1.5.20: report_task_runs table included above
+INSERT INTO schema_migrations (version) VALUES ('1.5.20') ON CONFLICT DO NOTHING;
