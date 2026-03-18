@@ -1,52 +1,80 @@
 ---
-name: memo
-description: Save, list, and delete quick memos.
-tools:
-  - save_memo
-  - list_memos
-  - delete_memo
-keywords: ["메모", "적어줘", "기록해줘", "memo", "note", "jot down", "メモ", "メモして", "备忘录", "记下来"]
+name: 메모
+description: 간편 메모 저장, 조회, 삭제 — 무언가를 적거나 기억하거나 저장하고 싶을 때 사용
+keywords:
+  - "메모해"
+  - "메모해줘"
+  - "메모해둬"
+  - "메모해놔"
+  - "적어줘"
+  - "적어"
+  - "적어둬"
+  - "써줘"
+  - "써둬"
+  - "기록해"
+  - "기억해줘"
+  - "기억해"
+  - "저장해줘"
+  - "남겨줘"
+  - "노트해줘"
+  - "note this"
+  - "save a memo"
+  - "jot down"
+  - "メモして"
+  - "记下来"
 ---
 
-# Memo Skill
+# 메모 스킬
 
-## Tools
+## 도구
 
-### save_memo
-Saves a memo.
+### save_memo — 메모 저장
 
-**Parameters:**
-- `content` (required): Memo content
-- `title` (optional): Memo title
-- `tag` (optional): Memo tag (e.g., work, personal, idea)
+**파라미터:**
+- `content` (필수): 메모 내용
+- `title` (선택): 메모 제목
+- `tag` (선택): 태그 (업무, 개인, 아이디어 등)
 
-**Usage scenarios:**
-- "Remind me to buy milk" → save_memo(content="Buy milk", title="Shopping")
-- "Meeting note: launch planned for next week" → save_memo(content="Launch planned for next week", title="Meeting note", tag="work")
+**트리거 표현 (아래 중 어느 표현이든 save_memo 호출):**
 
-### list_memos
-Lists saved memos.
+| 표현 | 의미 |
+|------|------|
+| "메모해", "메모해줘", "메모해둬" | 기본 메모 저장 |
+| "적어", "적어줘", "적어둬" | 텍스트 기록 |
+| "써줘", "써둬", "써놔" | 내용 작성 저장 |
+| "기록해", "기록해줘", "기록해둬" | 기록 저장 |
+| "기억해", "기억해줘", "기억해둬" | 기억용 저장 |
+| "저장해", "저장해줘" | 명시적 저장 |
+| "남겨줘", "남겨둬" | 내용 남기기 |
+| "노트해줘", "노트해" | 노트 저장 |
 
-**Parameters:**
-- `tag` (optional): Filter by tag
-- `limit` (optional, default 10): Number of results (1–50)
+**사용 예시:**
+- "우유 사야 해, 메모해줘" → save_memo(content="우유 사기", tag="개인")
+- "이거 적어: 회의 다음주 월요일 오전 10시" → save_memo(content="회의 다음주 월요일 오전 10시", tag="업무")
+- "아이디어 있어, 메모해둬 — 앱에 다크모드 추가" → save_memo(content="앱에 다크모드 추가", title="아이디어", tag="아이디어")
+- "기억해줘, 비밀번호는 abc123" → save_memo(content="비밀번호: abc123", tag="개인")
+- "내일 병원 예약 잊지 말라고 메모해" → save_memo(content="내일 병원 예약", tag="개인")
 
-**Usage scenarios:**
-- "Show my memos" → list_memos()
-- "Show only work memos" → list_memos(tag="work")
+### list_memos — 메모 조회
 
-### delete_memo
-Deletes a memo.
+**파라미터:**
+- `tag` (선택): 태그 필터
+- `limit` (선택, 기본 10): 조회 개수 (1~50)
 
-**Parameters:**
-- `memo_id` (required): ID of the memo to delete
+**사용 예시:**
+- "메모 보여줘" → list_memos()
+- "업무 메모만 보여줘" → list_memos(tag="업무")
 
-**Notes:**
-- Up to 100 memos can be stored.
-- Unlike the memory skill, this is an explicit save/delete quick-memo feature.
+### delete_memo — 메모 삭제
 
-## Tool Result Handling
+**파라미터:**
+- `memo_id` (필수): 삭제할 메모 ID
 
-- If the tool returns a **success** message, relay that result to the user.
-- If the tool returns an **error or failure** message, honestly relay that message to the user.
-- Never respond that a memo was saved, deleted, or completed without actually calling the tool.
+**사용 예시:**
+- "3번 메모 지워줘" → delete_memo(memo_id=3)
+
+## 중요 규칙
+
+- 도구 호출 없이 "저장했어요", "메모했어요" 등을 말하지 마세요.
+- 도구 결과가 반환된 후에만 완료 여부를 사용자에게 전달하세요.
+- 메모 개수는 최대 100개, 내용은 최대 2000자.
