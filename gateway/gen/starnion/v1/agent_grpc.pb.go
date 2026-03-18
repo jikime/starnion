@@ -26,6 +26,11 @@ type AgentServiceClient interface {
 	GenerateReport(ctx context.Context, in *ReportRequest, opts ...grpc.CallOption) (*ReportResponse, error)
 	// GetHistory returns prior messages for a conversation thread.
 	GetHistory(ctx context.Context, in *HistoryRequest, opts ...grpc.CallOption) (*HistoryResponse, error)
+	// SubmitApproval resumes a paused agent run with a user approve/reject decision.
+	// The agent graph is interrupted when a risky tool (e.g. calendar_delete,
+	// mail_send) is about to run; the gateway calls this RPC after the user
+	// responds via Telegram to let execution continue or cancel.
+	SubmitApproval(ctx context.Context, in *ApprovalRequest, opts ...grpc.CallOption) (AgentService_SubmitApprovalClient, error)
 }
 
 type agentServiceClient struct {
@@ -95,6 +100,38 @@ func (c *agentServiceClient) GetHistory(ctx context.Context, in *HistoryRequest,
 	return out, nil
 }
 
+func (c *agentServiceClient) SubmitApproval(ctx context.Context, in *ApprovalRequest, opts ...grpc.CallOption) (AgentService_SubmitApprovalClient, error) {
+	stream, err := c.cc.NewStream(ctx, &AgentService_ServiceDesc.Streams[1], "/starnion.v1.AgentService/SubmitApproval", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &agentServiceSubmitApprovalClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type AgentService_SubmitApprovalClient interface {
+	Recv() (*ChatResponse, error)
+	grpc.ClientStream
+}
+
+type agentServiceSubmitApprovalClient struct {
+	grpc.ClientStream
+}
+
+func (x *agentServiceSubmitApprovalClient) Recv() (*ChatResponse, error) {
+	m := new(ChatResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // AgentServiceServer is the server API for AgentService service.
 // All implementations must embed UnimplementedAgentServiceServer
 // for forward compatibility
@@ -107,6 +144,11 @@ type AgentServiceServer interface {
 	GenerateReport(context.Context, *ReportRequest) (*ReportResponse, error)
 	// GetHistory returns prior messages for a conversation thread.
 	GetHistory(context.Context, *HistoryRequest) (*HistoryResponse, error)
+	// SubmitApproval resumes a paused agent run with a user approve/reject decision.
+	// The agent graph is interrupted when a risky tool (e.g. calendar_delete,
+	// mail_send) is about to run; the gateway calls this RPC after the user
+	// responds via Telegram to let execution continue or cancel.
+	SubmitApproval(*ApprovalRequest, AgentService_SubmitApprovalServer) error
 	mustEmbedUnimplementedAgentServiceServer()
 }
 
@@ -125,6 +167,9 @@ func (UnimplementedAgentServiceServer) GenerateReport(context.Context, *ReportRe
 }
 func (UnimplementedAgentServiceServer) GetHistory(context.Context, *HistoryRequest) (*HistoryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHistory not implemented")
+}
+func (UnimplementedAgentServiceServer) SubmitApproval(*ApprovalRequest, AgentService_SubmitApprovalServer) error {
+	return status.Errorf(codes.Unimplemented, "method SubmitApproval not implemented")
 }
 func (UnimplementedAgentServiceServer) mustEmbedUnimplementedAgentServiceServer() {}
 
@@ -214,6 +259,27 @@ func _AgentService_GetHistory_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AgentService_SubmitApproval_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ApprovalRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(AgentServiceServer).SubmitApproval(m, &agentServiceSubmitApprovalServer{stream})
+}
+
+type AgentService_SubmitApprovalServer interface {
+	Send(*ChatResponse) error
+	grpc.ServerStream
+}
+
+type agentServiceSubmitApprovalServer struct {
+	grpc.ServerStream
+}
+
+func (x *agentServiceSubmitApprovalServer) Send(m *ChatResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // AgentService_ServiceDesc is the grpc.ServiceDesc for AgentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -238,6 +304,11 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "ChatStream",
 			Handler:       _AgentService_ChatStream_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "SubmitApproval",
+			Handler:       _AgentService_SubmitApproval_Handler,
 			ServerStreams: true,
 		},
 	},

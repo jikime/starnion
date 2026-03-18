@@ -55,6 +55,11 @@ class AgentServiceStub(object):
                 request_serializer=starnion_dot_v1_dot_agent__pb2.HistoryRequest.SerializeToString,
                 response_deserializer=starnion_dot_v1_dot_agent__pb2.HistoryResponse.FromString,
                 _registered_method=True)
+        self.SubmitApproval = channel.unary_stream(
+                '/starnion.v1.AgentService/SubmitApproval',
+                request_serializer=starnion_dot_v1_dot_agent__pb2.ApprovalRequest.SerializeToString,
+                response_deserializer=starnion_dot_v1_dot_agent__pb2.ChatResponse.FromString,
+                _registered_method=True)
 
 
 class AgentServiceServicer(object):
@@ -89,6 +94,16 @@ class AgentServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SubmitApproval(self, request, context):
+        """SubmitApproval resumes a paused agent run with a user approve/reject decision.
+        The agent graph is interrupted when a risky tool (e.g. calendar_delete,
+        mail_send) is about to run; the gateway calls this RPC after the user
+        responds via Telegram to let execution continue or cancel.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AgentServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -111,6 +126,11 @@ def add_AgentServiceServicer_to_server(servicer, server):
                     servicer.GetHistory,
                     request_deserializer=starnion_dot_v1_dot_agent__pb2.HistoryRequest.FromString,
                     response_serializer=starnion_dot_v1_dot_agent__pb2.HistoryResponse.SerializeToString,
+            ),
+            'SubmitApproval': grpc.unary_stream_rpc_method_handler(
+                    servicer.SubmitApproval,
+                    request_deserializer=starnion_dot_v1_dot_agent__pb2.ApprovalRequest.FromString,
+                    response_serializer=starnion_dot_v1_dot_agent__pb2.ChatResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -222,6 +242,33 @@ class AgentService(object):
             '/starnion.v1.AgentService/GetHistory',
             starnion_dot_v1_dot_agent__pb2.HistoryRequest.SerializeToString,
             starnion_dot_v1_dot_agent__pb2.HistoryResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SubmitApproval(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/starnion.v1.AgentService/SubmitApproval',
+            starnion_dot_v1_dot_agent__pb2.ApprovalRequest.SerializeToString,
+            starnion_dot_v1_dot_agent__pb2.ChatResponse.FromString,
             options,
             channel_credentials,
             insecure,

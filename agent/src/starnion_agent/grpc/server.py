@@ -21,6 +21,7 @@ from langchain_core.messages import HumanMessage
 
 from starnion_agent.context import set_current_user, set_current_language
 from starnion_agent.db.repositories.profile import get_user_language
+from starnion_agent.graph.agent import Command, GraphInterrupt
 from starnion_agent.persona import get_prompt_strings
 from starnion_agent.skills.file_context import init_pending_files, pop_pending_files
 from starnion_agent.db.pool import get_pool
@@ -168,45 +169,17 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                 type=agent_pb2.ERROR,
             )
 
-    async def ChatStream(self, request, context):  # noqa: ARG002
-        """Handle a server-side streaming Chat request.
+    async def _stream_agent_events(self, input_data, config: dict, user_id: str):
+        """Shared async generator: streams ChatResponse objects from astream_events.
 
-        Streams token-level events from the LangGraph agent back to the
-        client using ``astream_events(version="v2")``.
+        Handles token streaming, tool call events, pending file delivery, and
+        GraphInterrupt (approval required).  Both ChatStream and SubmitApproval
+        iterate over this generator.
         """
-        user_id = request.user_id
-        message = request.message
-
-        if not user_id or not message:
-            yield agent_pb2.ChatResponse(
-                content="user_id and message are required",
-                type=agent_pb2.ERROR,
-            )
-            return
-
-        set_current_user(user_id)
-        init_pending_files()
+        pre_tool_buffer: list[str] = []
+        tool_called = False
 
         try:
-            pool = get_pool()
-            await profile_repo.upsert(pool, uuid_id=user_id, user_name="")
-
-            user_language = await get_user_language(pool, user_id)
-            set_current_language(user_language)
-
-            human_input = self._build_message(request, language=user_language)
-            thread_id = request.thread_id or user_id
-            config = {"configurable": {"thread_id": thread_id}}
-            input_data = {"messages": [human_input]}
-
-            # pre_tool_buffer: first-turn LLM tokens are held here until we know
-            # whether a tool will be called.  If on_tool_start fires, the buffer is
-            # discarded (those tokens are interim "thinking" text that must not be
-            # sent before the tool actually runs).  If the loop ends without any tool
-            # call the buffer is flushed as the final response.
-            pre_tool_buffer: list[str] = []
-            tool_called = False
-
             async for event in self._agent.astream_events(
                 input_data, config=config, version="v2",
             ):
@@ -226,39 +199,27 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                             )
                     if token:
                         if tool_called:
-                            # Post-tool turn — stream final response directly.
                             yield agent_pb2.ChatResponse(
-                                content=token,
-                                type=agent_pb2.TEXT,
+                                content=token, type=agent_pb2.TEXT,
                             )
                         else:
-                            # First turn — buffer until we know if a tool is called.
                             pre_tool_buffer.append(token)
 
                 elif kind == "on_tool_start":
-                    # A real tool call is starting — discard pre-tool text and
-                    # mark that at least one tool has been called this request.
                     pre_tool_buffer.clear()
                     tool_called = True
                     tool_name = event.get("name", "")
                     logger.info("tool_call: %s", tool_name)
                     print(f"[tool_call] {tool_name}", flush=True)
                     yield agent_pb2.ChatResponse(
-                        content="",
-                        type=agent_pb2.TOOL_CALL,
-                        tool_name=tool_name,
+                        content="", type=agent_pb2.TOOL_CALL, tool_name=tool_name,
                     )
 
                 elif kind == "on_tool_end":
                     output = str(event["data"].get("output", ""))[:500]
                     yield agent_pb2.ChatResponse(
-                        content="",
-                        type=agent_pb2.TOOL_RESULT,
-                        tool_result=output,
+                        content="", type=agent_pb2.TOOL_RESULT, tool_result=output,
                     )
-                    # 툴 실행 직후 대기 중인 파일(예: 스크린샷)을 즉시 전송한다.
-                    # astream_events 루프가 다음 LLM 호출로 블로킹되더라도
-                    # 파일이 텔레그램에 전달되도록 보장한다.
                     for pf in pop_pending_files():
                         yield agent_pb2.ChatResponse(
                             type=agent_pb2.FILE,
@@ -267,15 +228,13 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                             file_mime=pf["mime"],
                         )
 
-            # Flush buffered first-turn tokens when no tool was called
-            # (pure conversation response without any tool invocation).
+            # Flush buffered first-turn tokens (pure conversation, no tool called).
             if pre_tool_buffer:
                 yield agent_pb2.ChatResponse(
-                    content="".join(pre_tool_buffer),
-                    type=agent_pb2.TEXT,
+                    content="".join(pre_tool_buffer), type=agent_pb2.TEXT,
                 )
 
-            # 루프 종료 후 남아있는 파일이 있으면 전송 (안전망).
+            # Safety net: flush any remaining pending files after the loop.
             for pf in pop_pending_files():
                 yield agent_pb2.ChatResponse(
                     type=agent_pb2.FILE,
@@ -284,13 +243,28 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                     file_mime=pf["mime"],
                 )
 
+            yield agent_pb2.ChatResponse(content="", type=agent_pb2.STREAM_END)
+
+        except GraphInterrupt as gi:
+            # The approval_gate_node interrupted execution awaiting user decision.
+            pop_pending_files()
+            interrupts = gi.args[0] if gi.args else ()
+            info = interrupts[0].value if interrupts else {}
+            if not isinstance(info, dict):
+                info = {}
+            desc = info.get("description", "승인이 필요한 작업이 있어요.")
+            tool_name = info.get("tool_name", "")
+            tool_detail = info.get("tool_detail", "")
             yield agent_pb2.ChatResponse(
-                content="",
-                type=agent_pb2.STREAM_END,
+                content=desc,
+                type=agent_pb2.PENDING_APPROVAL,
+                tool_name=tool_name,
+                tool_result=tool_detail,
             )
+            yield agent_pb2.ChatResponse(content="", type=agent_pb2.STREAM_END)
 
         except Exception as exc:
-            pop_pending_files()  # Discard pending files on error.
+            pop_pending_files()
             if "AI provider not configured" in str(exc):
                 logger.info("No provider configured for user %s", user_id)
                 yield agent_pb2.ChatResponse(
@@ -308,6 +282,67 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
                     content="잠시 서비스에 문제가 있어요. 잠시 후 다시 시도해 주세요.",
                     type=agent_pb2.ERROR,
                 )
+
+    async def ChatStream(self, request, _context):  # noqa: ARG002
+        """Handle a server-side streaming Chat request."""
+        user_id = request.user_id
+        message = request.message
+
+        if not user_id or not message:
+            yield agent_pb2.ChatResponse(
+                content="user_id and message are required",
+                type=agent_pb2.ERROR,
+            )
+            return
+
+        set_current_user(user_id)
+        init_pending_files()
+
+        pool = get_pool()
+        await profile_repo.upsert(pool, uuid_id=user_id, user_name="")
+
+        user_language = await get_user_language(pool, user_id)
+        set_current_language(user_language)
+
+        human_input = self._build_message(request, language=user_language)
+        thread_id = request.thread_id or user_id
+        config = {"configurable": {"thread_id": thread_id}}
+        input_data = {"messages": [human_input]}
+
+        async for response in self._stream_agent_events(input_data, config, user_id):
+            yield response
+
+    async def SubmitApproval(self, request, _context):  # noqa: ARG002
+        """Resume a paused agent run with a user approve/reject decision.
+
+        Called by the gateway after the user responds to a PENDING_APPROVAL
+        Telegram message.  Resumes the LangGraph checkpoint via
+        ``Command(resume=approved)`` and streams the resulting agent output.
+        """
+        user_id = request.user_id
+        thread_id = request.thread_id or user_id
+        approved: bool = request.approved
+
+        if not user_id:
+            yield agent_pb2.ChatResponse(
+                content="user_id is required",
+                type=agent_pb2.ERROR,
+            )
+            return
+
+        set_current_user(user_id)
+        init_pending_files()
+
+        pool = get_pool()
+        user_language = await get_user_language(pool, user_id)
+        set_current_language(user_language)
+
+        config = {"configurable": {"thread_id": thread_id}}
+        # Command(resume=True/False) resumes the interrupted approval_gate_node.
+        resume_cmd = Command(resume=approved)
+
+        async for response in self._stream_agent_events(resume_cmd, config, user_id):
+            yield response
 
     async def _invoke_agent(self, message, thread_id: str):
         """Invoke agent with automatic history reset on corrupted state.

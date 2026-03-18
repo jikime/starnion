@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17starnion/v1/agent.proto\x12\x0bstarnion.v1\"w\n\x0b\x43hatRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\r\n\x05model\x18\x03 \x01(\t\x12$\n\x04\x66ile\x18\x04 \x01(\x0b\x32\x16.starnion.v1.FileInput\x12\x11\n\tthread_id\x18\x05 \x01(\t\"\xa9\x01\n\x0c\x43hatResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12\'\n\x04type\x18\x02 \x01(\x0e\x32\x19.starnion.v1.ResponseType\x12\x11\n\ttool_name\x18\x03 \x01(\t\x12\x13\n\x0btool_result\x18\x04 \x01(\t\x12\x11\n\tfile_data\x18\x05 \x01(\x0c\x12\x11\n\tfile_name\x18\x06 \x01(\t\x12\x11\n\tfile_mime\x18\x07 \x01(\t\"C\n\tFileInput\x12\x11\n\tfile_type\x18\x01 \x01(\t\x12\x10\n\x08\x66ile_url\x18\x02 \x01(\t\x12\x11\n\tfile_name\x18\x03 \x01(\t\"#\n\x0eHistoryRequest\x12\x11\n\tthread_id\x18\x01 \x01(\t\"/\n\x0eHistoryMessage\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\"@\n\x0fHistoryResponse\x12-\n\x08messages\x18\x01 \x03(\x0b\x32\x1b.starnion.v1.HistoryMessage\"5\n\rReportRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x13\n\x0breport_type\x18\x02 \x01(\t\"6\n\x0eReportResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12\x13\n\x0breport_type\x18\x02 \x01(\t*|\n\x0cResponseType\x12\x1d\n\x19RESPONSE_TYPE_UNSPECIFIED\x10\x00\x12\x08\n\x04TEXT\x10\x01\x12\r\n\tTOOL_CALL\x10\x02\x12\x0f\n\x0bTOOL_RESULT\x10\x03\x12\t\n\x05\x45RROR\x10\x04\x12\x0e\n\nSTREAM_END\x10\x05\x12\x08\n\x04\x46ILE\x10\x06\x32\xa4\x02\n\x0c\x41gentService\x12;\n\x04\x43hat\x12\x18.starnion.v1.ChatRequest\x1a\x19.starnion.v1.ChatResponse\x12\x43\n\nChatStream\x12\x18.starnion.v1.ChatRequest\x1a\x19.starnion.v1.ChatResponse0\x01\x12I\n\x0eGenerateReport\x12\x1a.starnion.v1.ReportRequest\x1a\x1b.starnion.v1.ReportResponse\x12G\n\nGetHistory\x12\x1b.starnion.v1.HistoryRequest\x1a\x1c.starnion.v1.HistoryResponseB?Z=github.com/jikime/starnion/gateway/gen/starnion/v1;starnionv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17starnion/v1/agent.proto\x12\x0bstarnion.v1\"w\n\x0b\x43hatRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\r\n\x05model\x18\x03 \x01(\t\x12$\n\x04\x66ile\x18\x04 \x01(\x0b\x32\x16.starnion.v1.FileInput\x12\x11\n\tthread_id\x18\x05 \x01(\t\"\xa9\x01\n\x0c\x43hatResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12\'\n\x04type\x18\x02 \x01(\x0e\x32\x19.starnion.v1.ResponseType\x12\x11\n\ttool_name\x18\x03 \x01(\t\x12\x13\n\x0btool_result\x18\x04 \x01(\t\x12\x11\n\tfile_data\x18\x05 \x01(\x0c\x12\x11\n\tfile_name\x18\x06 \x01(\t\x12\x11\n\tfile_mime\x18\x07 \x01(\t\"C\n\tFileInput\x12\x11\n\tfile_type\x18\x01 \x01(\t\x12\x10\n\x08\x66ile_url\x18\x02 \x01(\t\x12\x11\n\tfile_name\x18\x03 \x01(\t\"#\n\x0eHistoryRequest\x12\x11\n\tthread_id\x18\x01 \x01(\t\"/\n\x0eHistoryMessage\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\"@\n\x0fHistoryResponse\x12-\n\x08messages\x18\x01 \x03(\x0b\x32\x1b.starnion.v1.HistoryMessage\"5\n\rReportRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x13\n\x0breport_type\x18\x02 \x01(\t\"6\n\x0eReportResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12\x13\n\x0breport_type\x18\x02 \x01(\t\"W\n\x0f\x41pprovalRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x11\n\tthread_id\x18\x02 \x01(\t\x12\x10\n\x08\x61pproved\x18\x03 \x01(\x08\x12\x0e\n\x06reason\x18\x04 \x01(\t*\x92\x01\n\x0cResponseType\x12\x1d\n\x19RESPONSE_TYPE_UNSPECIFIED\x10\x00\x12\x08\n\x04TEXT\x10\x01\x12\r\n\tTOOL_CALL\x10\x02\x12\x0f\n\x0bTOOL_RESULT\x10\x03\x12\t\n\x05\x45RROR\x10\x04\x12\x0e\n\nSTREAM_END\x10\x05\x12\x08\n\x04\x46ILE\x10\x06\x12\x14\n\x10PENDING_APPROVAL\x10\x07\x32\xf1\x02\n\x0c\x41gentService\x12;\n\x04\x43hat\x12\x18.starnion.v1.ChatRequest\x1a\x19.starnion.v1.ChatResponse\x12\x43\n\nChatStream\x12\x18.starnion.v1.ChatRequest\x1a\x19.starnion.v1.ChatResponse0\x01\x12I\n\x0eGenerateReport\x12\x1a.starnion.v1.ReportRequest\x1a\x1b.starnion.v1.ReportResponse\x12G\n\nGetHistory\x12\x1b.starnion.v1.HistoryRequest\x1a\x1c.starnion.v1.HistoryResponse\x12K\n\x0eSubmitApproval\x12\x1c.starnion.v1.ApprovalRequest\x1a\x19.starnion.v1.ChatResponse0\x01\x42?Z=github.com/jikime/starnion/gateway/gen/starnion/v1;starnionv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,8 +32,8 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'starnion.v1.agent_pb2', _gl
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z=github.com/jikime/starnion/gateway/gen/starnion/v1;starnionv1'
-  _globals['_RESPONSETYPE']._serialized_start=665
-  _globals['_RESPONSETYPE']._serialized_end=789
+  _globals['_RESPONSETYPE']._serialized_start=755
+  _globals['_RESPONSETYPE']._serialized_end=901
   _globals['_CHATREQUEST']._serialized_start=40
   _globals['_CHATREQUEST']._serialized_end=159
   _globals['_CHATRESPONSE']._serialized_start=162
@@ -50,6 +50,8 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_REPORTREQUEST']._serialized_end=607
   _globals['_REPORTRESPONSE']._serialized_start=609
   _globals['_REPORTRESPONSE']._serialized_end=663
-  _globals['_AGENTSERVICE']._serialized_start=792
-  _globals['_AGENTSERVICE']._serialized_end=1084
+  _globals['_APPROVALREQUEST']._serialized_start=665
+  _globals['_APPROVALREQUEST']._serialized_end=752
+  _globals['_AGENTSERVICE']._serialized_start=904
+  _globals['_AGENTSERVICE']._serialized_end=1273
 # @@protoc_insertion_point(module_scope)

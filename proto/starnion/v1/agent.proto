@@ -14,6 +14,11 @@ service AgentService {
   rpc GenerateReport(ReportRequest) returns (ReportResponse);
   // GetHistory returns prior messages for a conversation thread.
   rpc GetHistory(HistoryRequest) returns (HistoryResponse);
+  // SubmitApproval resumes a paused agent run with a user approve/reject decision.
+  // The agent graph is interrupted when a risky tool (e.g. calendar_delete,
+  // mail_send) is about to run; the gateway calls this RPC after the user
+  // responds via Telegram to let execution continue or cancel.
+  rpc SubmitApproval(ApprovalRequest) returns (stream ChatResponse);
 }
 
 message ChatRequest {
@@ -46,6 +51,11 @@ enum ResponseType {
   ERROR = 4;
   STREAM_END = 5;
   FILE = 6;
+  // PENDING_APPROVAL is emitted when the agent has been interrupted and is
+  // waiting for the user to approve or reject a risky tool call.
+  // Fields used: content (human-readable description), tool_name (tool that
+  // will be invoked), tool_result (JSON-encoded action detail / parameters).
+  PENDING_APPROVAL = 7;
 }
 
 message FileInput {
@@ -75,4 +85,18 @@ message ReportRequest {
 message ReportResponse {
   string content = 1;
   string report_type = 2;
+}
+
+// ApprovalRequest resumes a LangGraph thread that was interrupted while
+// waiting for explicit user confirmation before a risky tool call.
+message ApprovalRequest {
+  // user_id is the UUID of the user whose graph is being resumed.
+  string user_id = 1;
+  // thread_id is the LangGraph checkpoint thread to resume.
+  // Defaults to user_id when empty (same convention as ChatRequest).
+  string thread_id = 2;
+  // approved indicates whether the user granted or denied permission.
+  bool approved = 3;
+  // reason is an optional free-text explanation from the user (shown to agent).
+  string reason = 4;
 }

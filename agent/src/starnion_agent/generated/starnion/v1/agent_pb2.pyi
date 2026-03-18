@@ -16,6 +16,7 @@ class ResponseType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR: _ClassVar[ResponseType]
     STREAM_END: _ClassVar[ResponseType]
     FILE: _ClassVar[ResponseType]
+    PENDING_APPROVAL: _ClassVar[ResponseType]
 RESPONSE_TYPE_UNSPECIFIED: ResponseType
 TEXT: ResponseType
 TOOL_CALL: ResponseType
@@ -23,6 +24,7 @@ TOOL_RESULT: ResponseType
 ERROR: ResponseType
 STREAM_END: ResponseType
 FILE: ResponseType
+PENDING_APPROVAL: ResponseType
 
 class ChatRequest(_message.Message):
     __slots__ = ("user_id", "message", "model", "file", "thread_id")
@@ -101,3 +103,15 @@ class ReportResponse(_message.Message):
     content: str
     report_type: str
     def __init__(self, content: _Optional[str] = ..., report_type: _Optional[str] = ...) -> None: ...
+
+class ApprovalRequest(_message.Message):
+    __slots__ = ("user_id", "thread_id", "approved", "reason")
+    USER_ID_FIELD_NUMBER: _ClassVar[int]
+    THREAD_ID_FIELD_NUMBER: _ClassVar[int]
+    APPROVED_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    user_id: str
+    thread_id: str
+    approved: bool
+    reason: str
+    def __init__(self, user_id: _Optional[str] = ..., thread_id: _Optional[str] = ..., approved: bool = ..., reason: _Optional[str] = ...) -> None: ...

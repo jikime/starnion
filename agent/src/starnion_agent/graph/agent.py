@@ -11,11 +11,15 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+import json
+
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.errors import GraphInterrupt  # noqa: F401 — re-exported for server.py
 from langgraph.graph import MessagesState, StateGraph
-from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.prebuilt import ToolNode
+from langgraph.types import Command, interrupt  # noqa: F401 — re-exported for server.py
 
 from starnion_agent.context import get_current_user
 from starnion_agent.db.pool import get_pool
@@ -330,6 +334,105 @@ ALL_TOOLS = [
     browser_current_url,
     browser_close,
 ]
+
+# Tools that require explicit user approval before execution.
+# When the LLM decides to call one of these, the graph pauses via interrupt()
+# and a PENDING_APPROVAL event is streamed to the gateway.  Execution resumes
+# only after the user confirms (SubmitApproval RPC) or cancels.
+RISKY_TOOLS: frozenset[str] = frozenset({
+    "google_calendar_delete",
+    "google_tasks_delete",
+    "google_mail_send",
+})
+
+
+def _format_risky_calls(tool_calls: list[dict]) -> str:
+    """Build a concise Korean description of risky tool calls for user display."""
+    labels = {
+        "google_calendar_delete": "캘린더 일정 삭제",
+        "google_tasks_delete": "할 일 삭제",
+        "google_mail_send": "이메일 발송",
+    }
+    parts = []
+    for tc in tool_calls:
+        label = labels.get(tc["name"], tc["name"])
+        args = tc.get("args", {})
+        detail = ""
+        if tc["name"] == "google_calendar_delete":
+            detail = f" (event_id: {args.get('event_id', '')})"
+        elif tc["name"] == "google_tasks_delete":
+            detail = f" (task_id: {args.get('task_id', '')})"
+        elif tc["name"] == "google_mail_send":
+            detail = f" → {args.get('to', '')} 제목: {args.get('subject', '')}"
+        parts.append(f"• {label}{detail}")
+    return "\n".join(parts)
+
+
+async def _approval_gate_node(state: MessagesState) -> dict:
+    """Pause execution when a risky tool call is pending and request approval.
+
+    Inserts itself between the agent node and the tools node.  If no risky
+    tools are pending the function returns immediately (pass-through).  When a
+    risky tool is detected it calls ``interrupt()`` which checkpoints the graph
+    and raises ``GraphInterrupt`` to the caller.
+
+    On resume (``Command(resume=True)``), returns {} so the tools node runs.
+    On cancellation (``Command(resume=False)``), injects ToolMessage stubs for
+    every pending tool call so the graph skips ToolNode and returns to the agent.
+    """
+    last = state["messages"][-1]
+    if not hasattr(last, "tool_calls") or not last.tool_calls:
+        return {}
+
+    risky = [tc for tc in last.tool_calls if tc["name"] in RISKY_TOOLS]
+    if not risky:
+        return {}
+
+    desc = _format_risky_calls(risky)
+    tool_detail = json.dumps(
+        [{"name": tc["name"], "args": tc.get("args", {})} for tc in risky],
+        ensure_ascii=False,
+    )
+    first_risky_name = risky[0]["name"]
+
+    # Blocks here — raises GraphInterrupt, resumes when Command(resume=value) arrives.
+    approved = interrupt({
+        "description": desc,
+        "tool_name": first_risky_name,
+        "tool_detail": tool_detail,
+    })
+
+    if approved:
+        return {}  # Proceed to ToolNode unchanged.
+
+    # Cancelled: inject stub ToolMessages for ALL pending calls so ToolNode is
+    # bypassed and the agent can acknowledge the cancellation gracefully.
+    cancel_msgs = [
+        ToolMessage(
+            tool_call_id=tc["id"],
+            content=f"작업이 취소됐어요: {tc['name']}",
+        )
+        for tc in last.tool_calls
+    ]
+    return {"messages": cancel_msgs}
+
+
+def _route_agent_to_gate_or_end(state: MessagesState) -> str:
+    """Route from agent node: to approval_gate if tool calls exist, else END."""
+    last = state["messages"][-1]
+    if hasattr(last, "tool_calls") and last.tool_calls:
+        return "approval_gate"
+    return "__end__"
+
+
+def _route_after_gate(state: MessagesState) -> str:
+    """Route after approval_gate: to tools if approved, back to agent if cancelled."""
+    last = state["messages"][-1]
+    # If cancellation ToolMessages were injected, last message is a ToolMessage.
+    if isinstance(last, ToolMessage):
+        return "agent"
+    return "tools"
+
 
 # LLM instance cache: (provider, model, key_hash, endpoint_type) → LLM object.
 # Avoids recreating identical clients on every request.
@@ -890,11 +993,22 @@ async def create_agent(database_url: str):
     tool_node = ToolNode(ALL_TOOLS)
 
     # Build the graph.
+    # agent → approval_gate → tools → agent (or approval_gate → agent on cancel)
     builder = StateGraph(MessagesState)
     builder.add_node("agent", _agent_node)
+    builder.add_node("approval_gate", _approval_gate_node)
     builder.add_node("tools", tool_node)
     builder.set_entry_point("agent")
-    builder.add_conditional_edges("agent", tools_condition)
+    builder.add_conditional_edges(
+        "agent",
+        _route_agent_to_gate_or_end,
+        {"approval_gate": "approval_gate", "__end__": "__end__"},
+    )
+    builder.add_conditional_edges(
+        "approval_gate",
+        _route_after_gate,
+        {"tools": "tools", "agent": "agent"},
+    )
     builder.add_edge("tools", "agent")
 
     # Checkpointer for conversation persistence.
