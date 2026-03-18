@@ -41,7 +41,16 @@ class GetMonthlyTotalInput(BaseModel):
 @tool(args_schema=SaveFinanceInput)
 @skill_guard("finance")
 async def save_finance(category: str, amount: int, description: str = "") -> str:
-    """수입이나 지출 내역을 기록합니다.
+    """수입·지출 내역 기록. 사용자가 돈을 쓰거나 벌었다고 말하면 반드시 호출.
+
+    한국어 트리거 (구어체 포함):
+      '기록해', '기록해줘', '적어줘', '써줘',
+      '썼어', '결제했어', '샀어', '지출했어', '소비했어', '사용했어',
+      '밥 먹었어', '택시 탔어', '커피 샀어', '쇼핑했어',
+      '수입 생겼어', '용돈 받았어', '월급 들어왔어', '돈 들어왔어',
+      '가계부 써줘', '지출 기록', '수입 기록'
+    영어: 'record expense', 'log spending', 'add income', 'spent', 'bought', 'paid for'
+    일본어: '支出記録', '出費を記録', '収入記録', '買った' | 중국어: '记录支出', '记账', '花了', '消费'
 
     중요: amount 부호 규칙 —
     - 지출(식비, 교통, 쇼핑 등 소비)은 반드시 음수 (예: -12000)
@@ -92,10 +101,7 @@ async def save_finance(category: str, amount: int, description: str = "") -> str
 @tool(args_schema=GetMonthlyTotalInput)
 @skill_guard("finance")
 async def get_monthly_total(category: str = "") -> str:
-    """이번 달 지출 현황을 조회합니다.
-
-    카테고리를 지정하면 해당 카테고리만, 비워두면 전체를 보여줍니다.
-    """
+    """이번 달 지출 현황 조회. ('이번 달 얼마 썼어', '지출 보여줘', '가계부 보여줘', 'monthly expenses', '今月の支出', '本月支出')"""
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요. 다시 시도해 주세요."

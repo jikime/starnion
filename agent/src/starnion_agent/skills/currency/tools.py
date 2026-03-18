@@ -123,7 +123,7 @@ async def get_exchange_rate(
     base: str = "USD",
     targets: str = "KRW,EUR,JPY",
 ) -> str:
-    """현재 환율 정보를 조회합니다."""
+    """환율 조회. ('환율 얼마야', '달러 환율', '엔화 환율', 'exchange rate', 'current rate', '為替レート', '汇率查询')"""
     base_code = base.strip().upper()
     target_codes = ",".join(t.strip().upper() for t in targets.split(",") if t.strip())
 

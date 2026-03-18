@@ -38,11 +38,14 @@ class GetBudgetStatusInput(BaseModel):
 @tool(args_schema=SetBudgetInput)
 @skill_guard("budget")
 async def set_budget(category: str, amount: int) -> str:
-    """월별 예산을 카테고리별로 설정하거나 변경합니다.
+    """월별 예산 설정·변경. 사용자가 지출 한도나 예산을 정하고 싶을 때 호출.
 
-    기존 예산이 있으면 새 금액으로 덮어씁니다(업데이트).
-    '전체' 카테고리는 월 총 지출 한도를 의미합니다.
-    예산을 설정하면 지출 기록 시 자동으로 예산 대비 사용률을 알려드립니다.
+    한국어 트리거 (구어체 포함):
+      '예산 설정', '예산 정해줘', '한도 설정', '이번 달 예산',
+      '식비 예산 얼마로 해줘', '예산 바꿔줘', '지출 한도 설정',
+      '예산 잡아줘', '월 예산 정해'
+    영어: 'set budget', 'set spending limit', 'budget for', 'monthly budget'
+    일본어: '予算設定', '予算を決めて' | 중국어: '设置预算', '设定预算', '月度预算'
     """
     user_id = get_current_user()
     if not user_id:
@@ -66,10 +69,7 @@ async def set_budget(category: str, amount: int) -> str:
 @tool(args_schema=GetBudgetStatusInput)
 @skill_guard("budget")
 async def get_budget_status(category: str = "") -> str:
-    """현재 예산 대비 지출 현황을 조회합니다.
-
-    카테고리를 지정하면 해당 카테고리만, 비워두면 전체 예산 현황을 보여줍니다.
-    """
+    """예산 대비 지출 현황 조회. ('예산 얼마 남았어', '예산 현황', '예산 초과했어', 'budget status', '予算状況', '预算情况')"""
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요."

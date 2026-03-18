@@ -88,10 +88,14 @@ class SaveDiaryEntryInput(BaseModel):
 @tool(args_schema=SaveDailyLogInput)
 @skill_guard("diary")
 async def save_daily_log(content: str, sentiment: str = "") -> str:
-    """사용자의 일상 기록을 저장합니다.
+    """일상·컨디션·기분 기록. 사용자가 오늘 하루를 이야기하거나 기분을 말하면 호출.
 
-    일상 대화, 컨디션, 기분, 하루 일과 등을 기록합니다.
-    AI 메모리(daily_logs)와 다이어리 UI(diary_entries) 모두에 저장됩니다.
+    한국어 트리거 (구어체 포함):
+      '오늘 어땠어', '오늘 기록해줘', '일상 기록', '하루 기록해',
+      '오늘 기분', '컨디션 기록', '오늘 피곤해', '오늘 힘들었어',
+      '오늘 좋았어', '오늘 스트레스 받았어', '오늘 일과 기록'
+    영어: 'log my day', 'record today', 'daily log', 'how I feel today'
+    일본어: '今日を記録', '日常記録', '体調記録' | 중국어: '记录今天', '日常记录', '心情记录'
     """
     user_id = get_current_user()
     if not user_id:
@@ -142,11 +146,13 @@ async def save_diary_entry(
     tags: list[str] | None = None,
     entry_date: str = "",
 ) -> str:
-    """구조화된 일기를 저장합니다.
+    """구조화된 일기 저장. 사용자가 일기를 쓰거나 오늘을 성찰하고 싶을 때 호출.
 
-    사용자가 오늘의 일기, 감정 일기, 성찰 기록 등을 남길 때 사용합니다.
-    다이어리 메뉴에서 볼 수 있도록 diary_entries 테이블에 저장하고,
-    추후 RAG 검색을 위해 AI 메모리(daily_logs)에도 동시에 기록합니다.
+    한국어 트리거 (구어체 포함):
+      '일기 써줘', '일기 써', '일기 남겨줘', '오늘 일기', '다이어리 써줘',
+      '오늘 있었던 일', '오늘 성찰', '감정 일기', '일기장에 써줘'
+    영어: 'write diary', 'save journal', 'diary entry', 'journal today'
+    일본어: '日記を書いて', '日記に書いて' | 중국어: '写日记', '记日记', '日记记录'
     """
     user_id = get_current_user()
     if not user_id:

@@ -108,7 +108,15 @@ async def set_goal(
     deadline: str = "",
     depends_on: int | None = None,
 ) -> str:
-    """목표를 설정합니다. 재정 목표(지출 제한, 저축)뿐 아니라 할 일, 프로젝트 완료, 습관 형성 등 모든 종류의 목표를 저장합니다."""
+    """목표 설정·등록. 사용자가 목표를 세우거나 달성하고 싶은 것을 말하면 호출.
+
+    한국어 트리거 (구어체 포함):
+      '목표 설정', '목표 세워줘', '목표 추가', '목표 잡아줘',
+      '이번 달 목표', '습관 만들어줘', '할 일 목표로', '계획 세워줘',
+      '저축 목표', '지출 목표', '프로젝트 목표', '운동 목표'
+    영어: 'set goal', 'add goal', 'create goal', 'I want to achieve', 'set a target'
+    일본어: '目標設定', '目標を立てて' | 중국어: '设定目标', '添加目标', '制定目标'
+    """
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요."
@@ -187,7 +195,7 @@ async def set_goal(
 @tool(args_schema=GetGoalsInput)
 @skill_guard("goals")
 async def get_goals(include_completed: bool = False) -> str:
-    """설정한 목표 목록을 조회합니다."""
+    """목표 목록 조회. ('목표 보여줘', '내 목표', '목표 뭐 있어', 'show goals', 'my goals', '目標一覧', '我的目标')"""
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요."
@@ -255,7 +263,7 @@ async def get_goals(include_completed: bool = False) -> str:
 @tool(args_schema=UpdateGoalStatusInput)
 @skill_guard("goals")
 async def update_goal_status(goal_id: int, new_status: str) -> str:
-    """목표를 완료(completed) 또는 취소(cancelled) 처리합니다."""
+    """목표 완료·취소 처리. ('목표 달성했어', '목표 완료', '목표 취소', 'goal completed', 'cancel goal', '目標達成', '完成目标')"""
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요."
@@ -279,7 +287,7 @@ async def update_goal_status(goal_id: int, new_status: str) -> str:
 @tool(args_schema=UpdateGoalProgressInput)
 @skill_guard("goals")
 async def update_goal_progress(goal_id: int, progress_pct: float) -> str:
-    """목표의 진행률(%)을 업데이트합니다. 0~100 사이 숫자를 넘기면 됩니다."""
+    """목표 진행률 업데이트. ('목표 진행률 업데이트', '50% 완료했어', '진행 상황 업데이트', 'update progress', '進捗更新', '更新进度')"""
     user_id = get_current_user()
     if not user_id:
         return "사용자 정보를 확인할 수 없어요."
