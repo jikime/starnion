@@ -134,6 +134,27 @@ async def analyze_image(
 
     user_id = get_current_user()
 
+    # Fetch the image bytes first so we pass a stable base64 data URL to the
+    # LLM instead of the original file URL.  Passing remote URLs directly to
+    # langchain_google_genai can fail when the URL expires or the library
+    # tries to re-download it via the Gemini Files API with the wrong path.
+    try:
+        image_bytes = await fetch_file(file_url)
+    except Exception as e:
+        logger.warning("analyze_image: failed to fetch image from %s: %s", file_url, e)
+        return "이미지를 불러오는 데 실패했어요. 파일이 만료되었거나 접근할 수 없어요."
+
+    mime_type = "image/jpeg"
+    if file_url.lower().endswith(".png"):
+        mime_type = "image/png"
+    elif file_url.lower().endswith(".gif"):
+        mime_type = "image/gif"
+    elif file_url.lower().endswith(".webp"):
+        mime_type = "image/webp"
+
+    b64 = base64.b64encode(image_bytes).decode("utf-8")
+    data_url = f"data:{mime_type};base64,{b64}"
+
     llm = ChatGoogleGenerativeAI(
         model=settings.gemini_model,
         google_api_key=api_key,
@@ -142,11 +163,16 @@ async def analyze_image(
     message = HumanMessage(
         content=[
             {"type": "text", "text": user_query},
-            {"type": "image_url", "image_url": {"url": file_url}},
+            {"type": "image_url", "image_url": {"url": data_url}},
         ],
     )
 
-    response = await llm.ainvoke([message])
+    try:
+        response = await llm.ainvoke([message])
+    except Exception as e:
+        logger.warning("analyze_image: LLM call failed: %s", e)
+        return "이미지 분석 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."
+
     analysis_text = response.content if isinstance(response.content, str) else str(response.content)
 
     if user_id:
