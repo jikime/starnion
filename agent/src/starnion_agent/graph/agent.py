@@ -869,9 +869,29 @@ async def _agent_node(state: MessagesState) -> dict:
     }
     _label = _labels.get(user_language, _labels["en"])
     _tz_abbr = _now.strftime("%Z") or user_tz_str
+
+    # Compute ISO-week boundaries (Monday-start) so the LLM never has to
+    # guess what "이번 주" / "다음 주" / "next week" means.
+    from datetime import timedelta
+    _today = _now.date()
+    _this_mon = _today - timedelta(days=_today.weekday())       # Monday of current week
+    _this_sun = _this_mon + timedelta(days=6)                   # Sunday of current week
+    _next_mon = _this_mon + timedelta(days=7)                   # Monday of next week
+    _next_sun = _next_mon + timedelta(days=6)                   # Sunday of next week
+
+    _week_labels = {
+        "ko": ("이번 주", "다음 주"),
+        "en": ("this week", "next week"),
+        "ja": ("今週", "来週"),
+        "zh": ("本周", "下周"),
+    }
+    _this_lbl, _next_lbl = _week_labels.get(user_language, _week_labels["en"])
+
     now_str = (
         f"[{_label}: {_now.strftime('%Y-%m-%d')} ({_wd}) "
-        f"{_now.strftime('%H:%M')} {_tz_abbr}]"
+        f"{_now.strftime('%H:%M')} {_tz_abbr} | "
+        f"{_this_lbl}: {_this_mon} ~ {_this_sun} | "
+        f"{_next_lbl}: {_next_mon} ~ {_next_sun}]"
     )
 
     # Build system prompt (custom_system_prompt takes priority over persona_id tone).
