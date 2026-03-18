@@ -1,9 +1,4 @@
--- v1.5.20.sql
--- Add report_task_runs table for scheduler job tracking and dead-task recovery.
---
--- Each cron job execution writes a row at start (status='running') and updates
--- it to 'success' or 'failed' when done.  Rows that remain 'running' after the
--- gateway restarts are marked 'dead' by recoverDeadTasks() in the scheduler.
+-- v1.5.20: report_task_runs table for scheduler dead-task recovery
 
 CREATE TABLE IF NOT EXISTS report_task_runs (
     id          BIGSERIAL    PRIMARY KEY,
