@@ -241,10 +241,14 @@ func runUpdate(checkOnly, force bool) error {
 		} else {
 			PrintOK("ui/.env", "업데이트 완료")
 		}
-		if mErr := connectAndMigrate(cfg, root); mErr != nil {
+		// Run migrations using the NEWLY INSTALLED binary, not the current process.
+		// connectAndMigrate() would use the current process's embed.FS which does
+		// not contain migration files added in the just-downloaded release.
+		migrateCmd := exec.Command(destBinary, "db", "migrate") // #nosec G204
+		migrateCmd.Stdout = os.Stdout
+		migrateCmd.Stderr = os.Stderr
+		if mErr := migrateCmd.Run(); mErr != nil {
 			PrintWarn("migrate", fmt.Sprintf("마이그레이션 실패: %v", mErr))
-		} else {
-			PrintOK("migrate", "마이그레이션 완료")
 		}
 	} else {
 		PrintWarn("config", fmt.Sprintf("설정 파일 로드 실패: %v", err))
