@@ -437,32 +437,36 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		photo := msg.Photo[len(msg.Photo)-1]
 		fileURL := b.getFileURL(photo.FileID)
 		if fileURL != "" {
-			// Pass the Telegram CDN URL to the agent for Gemini analysis.
-			// Mirror to MinIO in the background so it never blocks the response.
-			chatReq.File = &starnionv1.FileInput{
-				FileType: "image",
-				FileUrl:  fileURL,
-				FileName: "photo.jpg",
-			}
 			photoCaption := msg.Caption
 			if photoCaption == "" {
 				photoCaption = botMsg(lang, "analyzeImage")
 			}
 			imgIDCh = make(chan int64, 1)
-			go func(u, caption string) {
-				mirrorCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-				defer cancel()
-				if att, err := b.mirrorToStorage(mirrorCtx, "photo.jpg", "image/jpeg", u); err != nil {
-					log.Warn().Err(err).Msg("telegram: mirror photo to storage failed")
-					imgIDCh <- 0 // signal that no record was created
-				} else {
-					mirrorCh <- att
-					// Record uploaded photo to image gallery and send its DB row id
-					// back so the streaming handler can update the analysis column.
-					imgID := b.recordImageID(userID, att.URL, att.Name, att.Mime, att.Size, "uploaded", caption)
+
+			// Mirror photo to MinIO synchronously so the agent receives a stable,
+			// permanent URL. Telegram CDN URLs are temporary and can return 404
+			// by the time the agent (langchain_google_genai) fetches them for Gemini.
+			mirrorCtx, mirrorCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer mirrorCancel()
+
+			imageURL := fileURL // fallback to Telegram URL if mirror fails
+			if att, err := b.mirrorToStorage(mirrorCtx, "photo.jpg", "image/jpeg", fileURL); err != nil {
+				log.Warn().Err(err).Msg("telegram: mirror photo to storage failed, using Telegram URL")
+				imgIDCh <- 0
+			} else {
+				imageURL = att.URL
+				mirrorCh <- att // buffered channel — non-blocking, reader picks it up after saveMessage
+				go func(a storage.FileAttachment, caption string) {
+					imgID := b.recordImageID(userID, a.URL, a.Name, a.Mime, a.Size, "uploaded", caption)
 					imgIDCh <- imgID
-				}
-			}(fileURL, photoCaption)
+				}(att, photoCaption)
+			}
+
+			chatReq.File = &starnionv1.FileInput{
+				FileType: "image",
+				FileUrl:  imageURL,
+				FileName: "photo.jpg",
+			}
 			if chatReq.Message == "" {
 				chatReq.Message = msg.Caption
 			}
