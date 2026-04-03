@@ -502,6 +502,34 @@ func removeImageMarkdown(text string) string {
 	return strings.TrimSpace(blankRe.ReplaceAllString(cleaned, "\n\n"))
 }
 
+// ── Audio extraction ─────────────────────────────────────────────────────────
+
+type audioMatch struct {
+	name string
+	path string
+}
+
+// audioLinkRe matches [text](.../api/files/...mp3|ogg|wav|m4a|flac|webm) links.
+var audioLinkRe = regexp.MustCompile(`\[([^\]]*)\]\(((?:https?://[^/)]+)?/api/files/[^)]+\.(?:mp3|ogg|wav|m4a|flac|webm))\)`)
+
+func extractAudio(text string) []audioMatch {
+	var out []audioMatch
+	seen := map[string]bool{}
+	for _, m := range audioLinkRe.FindAllStringSubmatch(text, -1) {
+		if !seen[m[2]] {
+			out = append(out, audioMatch{name: m[1], path: m[2]})
+			seen[m[2]] = true
+		}
+	}
+	return out
+}
+
+func removeAudioMarkdown(text string) string {
+	cleaned := audioLinkRe.ReplaceAllString(text, "")
+	blankRe := regexp.MustCompile(`\n{3,}`)
+	return strings.TrimSpace(blankRe.ReplaceAllString(cleaned, "\n\n"))
+}
+
 // docMatch holds a parsed [name](url) document link from the agent reply.
 type docMatch struct {
 	name string
@@ -1091,6 +1119,8 @@ loop:
 	)
 	// ── Document handling: extract document download links ─────────────────────
 	docs := extractDocLinks(fullReply)
+	// ── Audio handling: extract audio file links ─────────────────────────────
+	audios := extractAudio(fullReply)
 	textReply := fullReply
 	if len(images) > 0 {
 		textReply = removeImageMarkdown(textReply)
@@ -1098,8 +1128,11 @@ loop:
 	if len(docs) > 0 {
 		textReply = removeDocLinks(textReply)
 	}
+	if len(audios) > 0 {
+		textReply = removeAudioMarkdown(textReply)
+	}
 
-	if textReply == "" && len(images) == 0 && len(docs) == 0 {
+	if textReply == "" && len(images) == 0 && len(docs) == 0 && len(audios) == 0 {
 		textReply = "✅ Done"
 	}
 
@@ -1195,7 +1228,25 @@ loop:
 		}
 	}
 
-	if photoSent || textReply != "" || len(docs) > 0 {
+	// Send each generated audio as a Telegram audio message.
+	for _, aud := range audios {
+		data, filename, dlErr := downloadFromMinio(h.config, aud.path)
+		if dlErr != nil {
+			h.logger.Warn("failed to download audio from MinIO", zap.String("path", aud.path), zap.Error(dlErr))
+			tg.SendMessage(chatID, aud.path)
+			continue
+		}
+		caption := aud.name
+		if caption == "" {
+			caption = filename
+		}
+		if err := tg.SendAudio(chatID, data, filename, caption); err != nil {
+			h.logger.Error("sendAudio failed", zap.String("filename", filename), zap.Error(err))
+			tg.SendMessage(chatID, aud.path)
+		}
+	}
+
+	if photoSent || textReply != "" || len(docs) > 0 || len(audios) > 0 {
 		tg.SetReaction(chatID, messageID, "👍")
 	} else if len(images) > 0 {
 		tg.SetReaction(chatID, messageID, "😢")

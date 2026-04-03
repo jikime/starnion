@@ -366,6 +366,46 @@ func (c *Client) SendPhoto(chatID int64, data []byte, filename, caption string) 
 	return nil
 }
 
+// SendAudio uploads audio bytes as a Telegram audio message.
+// caption is optional; pass "" to omit.
+func (c *Client) SendAudio(chatID int64, data []byte, filename, caption string) error {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+
+	_ = w.WriteField("chat_id", fmt.Sprintf("%d", chatID))
+	if caption != "" {
+		_ = w.WriteField("caption", caption)
+	}
+
+	part, err := w.CreateFormFile("audio", filename)
+	if err != nil {
+		return fmt.Errorf("sendAudio createFormFile: %w", err)
+	}
+	if _, err := io.Copy(part, bytes.NewReader(data)); err != nil {
+		return fmt.Errorf("sendAudio write: %w", err)
+	}
+	w.Close()
+
+	url := fmt.Sprintf("%s%s/sendAudio", apiBase, c.token)
+	resp, err := c.httpClient.Post(url, w.FormDataContentType(), &buf)
+	if err != nil {
+		return fmt.Errorf("telegram sendAudio: %w", err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("telegram sendAudio: status %d: %s", resp.StatusCode, b)
+	}
+	var apiResp struct {
+		OK          bool   `json:"ok"`
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(b, &apiResp); err == nil && !apiResp.OK {
+		return fmt.Errorf("telegram sendAudio: %s", apiResp.Description)
+	}
+	return nil
+}
+
 // SendDocument uploads file bytes as a Telegram document (any file type).
 // caption is optional; pass "" to omit.
 func (c *Client) SendDocument(chatID int64, data []byte, filename, caption string) error {
