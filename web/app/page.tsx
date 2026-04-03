@@ -1,13 +1,5 @@
-// cache-bust: v5
-import { PlannerApp } from "@/components/planner/planner-app"
+import { redirect } from "next/navigation"
 
-export const metadata = {
-  title: "Franklin Planner",
-  description: "프랭클린 플래너 — 역할 기반 일정 관리",
+export default function RootPage() {
+  redirect("/chat")
 }
-
-function App() {
-  return <PlannerApp />
-}
-
-export default App

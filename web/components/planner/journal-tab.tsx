@@ -449,59 +449,6 @@ export function JournalTab() {
 
 // ── App Section stubs (used by GlobalNav in planner-app.tsx) ──────────────────
 
-export function DashboardSection() {
-  const { tasks, goals, roles, selectedDate } = usePlannerStore()
-  const todayTasks = tasks.filter((t) => t.date === selectedDate)
-  const doneTasks  = todayTasks.filter((t) => t.status === "done")
-  const rate = todayTasks.length > 0 ? Math.round((doneTasks.length / todayTasks.length) * 100) : 0
-  const activeGoals    = goals.filter((g) => g.status === "active")
-  const completedGoals = goals.filter((g) => g.status === "completed")
-
-  const STATS = [
-    { label: "오늘 완료율",  value: `${rate}%`,             color: "var(--priority-b)" },
-    { label: "활성 목표",    value: `${activeGoals.length}`, color: "var(--priority-a)" },
-    { label: "완료된 목표",  value: `${completedGoals.length}`, color: "var(--status-done)" },
-    { label: "등록된 역할",  value: `${roles.length}`,       color: "var(--priority-c)" },
-  ]
-
-  return (
-    <div className="flex flex-col flex-1 overflow-y-auto p-8 gap-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">대시보드</h1>
-        <p className="text-sm text-muted-foreground mt-1">전체 현황을 한눈에 확인하세요.</p>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {STATS.map(({ label, value, color }) => (
-          <div key={label} className="rounded-xl border border-border bg-card p-5 flex flex-col gap-2">
-            <span className="text-xs text-muted-foreground">{label}</span>
-            <span className="text-3xl font-bold tabular-nums" style={{ color }}>{value}</span>
-          </div>
-        ))}
-      </div>
-      <div className="rounded-xl border border-border bg-card p-6">
-        <p className="text-xs font-semibold mb-4 text-foreground">역할 현황</p>
-        <div className="space-y-3">
-          {roles.map((role) => {
-            const rt = tasks.filter((t) => t.roleId === role.id)
-            const rd = rt.filter((t) => t.status === "done")
-            const rr = rt.length > 0 ? Math.round((rd.length / rt.length) * 100) : 0
-            return (
-              <div key={role.id} className="flex items-center gap-3">
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: role.color }} />
-                <span className="text-xs w-28 truncate">{role.name}</span>
-                <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${rr}%`, background: role.color }} />
-                </div>
-                <span className="text-[11px] text-muted-foreground w-8 text-right">{rr}%</span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export function ChatSection() {
   return (
     <div className="flex flex-col flex-1 items-center justify-center gap-4 text-muted-foreground">
@@ -509,6 +456,17 @@ export function ChatSection() {
         <span className="text-2xl">💬</span>
       </div>
       <p className="text-sm font-medium">채팅 기능은 준비 중입니다.</p>
+    </div>
+  )
+}
+
+export function AnalyticsSection() {
+  return (
+    <div className="flex flex-col flex-1 items-center justify-center gap-4 text-muted-foreground">
+      <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-border flex items-center justify-center">
+        <span className="text-2xl">📊</span>
+      </div>
+      <p className="text-sm font-medium">통계/분석 기능은 준비 중입니다.</p>
     </div>
   )
 }

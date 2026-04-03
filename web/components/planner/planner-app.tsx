@@ -2,6 +2,7 @@
 // cache-bust: v9
 
 import { useEffect, useRef, useState } from "react"
+import NextImage from "next/image"
 import { cn } from "@/lib/utils"
 import { TabBar, type PlannerTab } from "./tab-bar"
 import { DailyTab } from "./daily-tab"
@@ -11,10 +12,9 @@ import { YearlyTab } from "./yearly-tab"
 import { GoalsTab } from "./goals-tab"
 import { GuideTab } from "./guide-tab"
 import { MonthSidebar } from "./month-sidebar"
-import { DashboardSection, ChatSection, FilesSection } from "./journal-tab"
+import { ChatSection, FilesSection, AnalyticsSection } from "./journal-tab"
 import { AssetsSection } from "./stats-tab"
 import {
-  LayoutDashboard,
   MessageSquare,
   FolderOpen,
   CalendarDays,
@@ -28,19 +28,20 @@ import {
   Wrench,
   ScrollText,
   Activity,
+  TrendingUp,
   Bell,
   Cpu,
   UserSquare2,
 } from "lucide-react"
 
-type AppSection = "dashboard" | "chat" | "files" | "planner" | "assets"
+type AppSection = "chat" | "files" | "planner" | "assets" | "analytics"
 
-const NAV_ITEMS: { id: AppSection; label: string; icon: React.ElementType }[] = [
-  { id: "dashboard", label: "대시보드", icon: LayoutDashboard },
-  { id: "chat",      label: "채팅",     icon: MessageSquare },
-  { id: "files",     label: "내 파일",  icon: FolderOpen },
-  { id: "planner",   label: "플래너",   icon: CalendarDays },
-  { id: "assets",    label: "자산",     icon: BarChart3 },
+const NAV_ITEMS: { id: AppSection; label: string; icon: React.ElementType; activeClass: string }[] = [
+  { id: "chat",      label: "채팅",       icon: MessageSquare,   activeClass: "bg-emerald-600 text-white" },
+  { id: "files",     label: "내 파일",    icon: FolderOpen,      activeClass: "bg-amber-600 text-white" },
+  { id: "planner",   label: "플래너",     icon: CalendarDays,    activeClass: "bg-violet-600 text-white" },
+  { id: "assets",    label: "자산",       icon: BarChart3,       activeClass: "bg-rose-600 text-white" },
+  { id: "analytics", label: "통계/분석",  icon: TrendingUp,      activeClass: "bg-cyan-600 text-white" },
 ]
 
 interface GlobalNavProps {
@@ -104,26 +105,27 @@ function GlobalNav({ activeSection, onSectionChange }: GlobalNavProps) {
   return (
     <header className="flex items-center h-11 px-4 border-b border-border bg-card/80 backdrop-blur-sm shrink-0 z-10">
       {/* Logo */}
-      <div className="flex items-center gap-2 w-44 shrink-0">
-        <div
-          className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-black tracking-tight select-none"
-          style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
-        >
-          FP
-        </div>
-        <span className="text-xs font-semibold tracking-wide text-foreground">Franklin Planner</span>
+      <div className="flex items-center h-full w-44 shrink-0 py-1">
+        <NextImage
+          src="/brand_text_logo.png"
+          alt="StarNion"
+          width={160}
+          height={44}
+          className="object-contain h-full w-auto"
+          priority
+        />
       </div>
 
       {/* Centre nav */}
       <nav className="flex items-center gap-0.5 mx-auto" aria-label="주 메뉴">
-        {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+        {NAV_ITEMS.map(({ id, label, icon: Icon, activeClass }) => (
           <button
             key={id}
             onClick={() => onSectionChange(id)}
             className={cn(
               "flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium transition-colors",
               activeSection === id
-                ? "bg-accent text-foreground"
+                ? `${activeClass} shadow-sm`
                 : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
             )}
           >
@@ -212,7 +214,7 @@ function GlobalNav({ activeSection, onSectionChange }: GlobalNavProps) {
 export function PlannerApp() {
   const [mounted,       setMounted]       = useState(false)
   const [activeTab,     setActiveTab]     = useState<PlannerTab>("daily")
-  const [activeSection, setActiveSection] = useState<AppSection>("planner")
+  const [activeSection, setActiveSection] = useState<AppSection>("chat")
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -236,10 +238,10 @@ export function PlannerApp() {
 
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Non-planner sections fill full width */}
-        {activeSection === "dashboard" && <DashboardSection />}
         {activeSection === "chat"      && <ChatSection />}
         {activeSection === "files"     && <FilesSection />}
         {activeSection === "assets"    && <AssetsSection />}
+        {activeSection === "analytics" && <AnalyticsSection />}
 
         {/* Planner section keeps sidebar + tabs */}
         {activeSection === "planner" && (
