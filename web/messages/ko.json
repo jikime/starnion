@@ -1429,7 +1429,7 @@
   },
   "channels": {
     "title": "채널",
-    "subtitle": "외부 메시징 채널을 연결하여 어디서든 지키와 대화하세요.",
+    "subtitle": "외부 메시징 채널을 연결하여 어디서든 스타니온과 대화하세요.",
     "loading": "불러오는 중...",
     "statusRunning": "실행중",
     "statusConfigured": "설정됨",

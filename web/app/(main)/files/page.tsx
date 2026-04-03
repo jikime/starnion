@@ -1,334 +1,768 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import {
-  FileText, Image as ImageIcon, Music, FolderOpen,
-  Upload, X, Loader2, AlertCircle, Sparkles, RefreshCw, Trash2,
+  Search, Upload, Plus, RefreshCw, LayoutGrid, List,
+  Folder, FileText, Image as ImageIcon, Music, Sparkles,
+  MoreVertical, Download, Pencil, Copy, Trash, Loader2,
+  X, Play, Pause, FileAudio, MapPin, ExternalLink, Trash2,
+  Info, BookOpenText, AlertCircle,
 } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { Input } from "@/components/ui/input"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { cn } from "@/lib/utils"
-import { useTranslations } from "next-intl"
-import type { FileItem, FileType, ActionType } from "@/components/files/types"
-import { FILE_ACCEPT } from "@/components/files/types"
-import TopBar from "@/components/files/top-bar"
-import FileCard from "@/components/files/file-card"
-import FileRow from "@/components/files/file-row"
-import DetailPanel from "@/components/files/detail-panel"
-import DocSearchPanel from "@/components/files/doc-search-panel"
-import DocGenerateModal from "@/components/files/doc-generate-modal"
-import ImgActionModal from "@/components/files/img-action-modal"
-import AudioRecordModal from "@/components/files/audio-record-modal"
-import AudioTranscribeModal from "@/components/files/audio-transcribe-modal"
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+type FileType = "all" | "doc" | "image" | "audio"
+type ViewMode = "grid" | "list"
+
+interface SearchResult {
+  id: number
+  file_id: number
+  file_name: string
+  content: string
+  similarity: number
+}
+
+function similarityLabel(score: number): { label: string; cls: string } {
+  if (score >= 0.8) return { label: "높음", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" }
+  if (score >= 0.5) return { label: "보통", cls: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" }
+  return { label: "낮음", cls: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" }
+}
+
+interface FileItem {
+  id: number
+  name: string
+  file_type: string
+  format: string
+  size: number
+  size_label?: string
+  created_at: string
+  thumbnail_url?: string
+  url?: string
+  indexed?: boolean
+  sub_type?: string
+  duration?: number
+  analysis?: string
+  transcript?: string
+  prompt?: string
+  metadata?: Record<string, unknown>
+}
+
+const MIME_COLORS: Record<string, string> = {
+  pdf: "#F85149", docx: "#58A6FF", doc: "#58A6FF", txt: "#8B949E",
+  jpg: "#BC8CFF", jpeg: "#BC8CFF", png: "#3FB950", webp: "#3FB950", gif: "#BC8CFF",
+  mp3: "#E3A948", wav: "#E3A948", m4a: "#E3A948", ogg: "#E3A948",
+}
+
+const TYPE_FILTERS: { id: FileType | "search"; label: string; icon: React.ElementType }[] = [
+  { id: "all",    label: "전체",     icon: Folder },
+  { id: "doc",    label: "문서",     icon: FileText },
+  { id: "image",  label: "이미지",   icon: ImageIcon },
+  { id: "audio",  label: "오디오",   icon: Music },
+  { id: "search", label: "문서 검색", icon: Sparkles },
+]
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatDate(iso: string): string {
+  return iso.slice(0, 10)
+}
+
+function fmtDuration(s: number): string {
+  const m = Math.floor(s / 60)
+  const sec = s % 60
+  return `${m}:${String(sec).padStart(2, "0")}`
+}
+
+function mapFileType(ft: string): FileType {
+  if (ft === "document") return "doc"
+  if (ft === "image") return "image"
+  if (ft === "audio") return "audio"
+  return "doc"
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export default function FilesPage() {
-  const t = useTranslations("files")
   const [files, setFiles] = useState<FileItem[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [typeFilter, setTypeFilter] = useState<FileType>("all")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null)
-  const [activeTab, setActiveTab] = useState<"files" | "search">("files")
+  const [total, setTotal] = useState(0)
   const [typeCounts, setTypeCounts] = useState<Record<string, number>>({})
-  const [isDragging, setIsDragging] = useState(false)
+  const [filter, setFilter] = useState<FileType | "search">("all")
+  const [viewMode, setViewMode] = useState<ViewMode>("grid")
+  const [query, setQuery] = useState("")
+  const [menuId, setMenuId] = useState<number | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
-  const [activeAction, setActiveAction] = useState<ActionType>(null)
-  const [sortBy, setSortBy] = useState<"date" | "name" | "size" | "type">("date")
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
-  const autoSelectRef = useRef(false)
-  const LIMIT = 40
+  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null)
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null)
 
-  // ── Data fetching ──────────────────────────────────────────────────────────
+  // Doc search state
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [searching, setSearching] = useState(false)
+  const [searchMode, setSearchMode] = useState("")
+  const [searched, setSearched] = useState(false)
+  const [searchError, setSearchError] = useState("")
 
-  const fetchFiles = useCallback(async (p = 1, type: FileType = typeFilter, search = "") => {
-    setLoading(true); setError("")
+  const fetchFiles = useCallback(async (type: FileType = "all", search = "") => {
+    setLoading(true)
     try {
-      const params = new URLSearchParams({ page: String(p), limit: String(LIMIT) })
-      if (type !== "all") params.set("type", type)
+      const params = new URLSearchParams({ page: "1", limit: "100" })
+      const apiType = type === "doc" ? "document" : type
+      if (type !== "all") params.set("type", apiType)
       if (search) params.set("name", search)
       const res = await fetch(`/api/files?${params}`)
       if (!res.ok) throw new Error("failed")
       const data = await res.json() as { files?: FileItem[]; total?: number; type_counts?: Record<string, number> }
-      const newFiles = data.files ?? []
-      setFiles(newFiles); setTotal(data.total ?? 0); setPage(p)
-      if (data.type_counts) setTypeCounts(data.type_counts)
-      if (autoSelectRef.current && newFiles.length > 0) { setSelectedFile(newFiles[0]); autoSelectRef.current = false }
-    } catch { setError(t("loadFailed")) }
-    finally { setLoading(false) }
-  }, [typeFilter, t])
-
-  const fetchCounts = useCallback(async () => {
-    try {
-      const res = await fetch("/api/files?limit=1&page=1")
-      if (!res.ok) return
-      const data = await res.json() as { type_counts?: Record<string, number> }
+      setFiles(data.files ?? [])
+      setTotal(data.total ?? 0)
       if (data.type_counts) setTypeCounts(data.type_counts)
     } catch { /* silent */ }
+    finally { setLoading(false) }
   }, [])
 
   useEffect(() => {
-    const id = setTimeout(() => fetchFiles(1, typeFilter, searchQuery), searchQuery ? 300 : 0)
+    const id = setTimeout(() => {
+      const apiFilter = filter === "search" ? "all" : filter
+      fetchFiles(apiFilter, query)
+    }, query ? 300 : 0)
     return () => clearTimeout(id)
-  }, [typeFilter, searchQuery]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filter, query, fetchFiles])
 
-  // ── Actions ────────────────────────────────────────────────────────────────
+  const deleteFile = async (id: number) => {
+    setMenuId(null)
+    try {
+      await fetch(`/api/files/${id}`, { method: "DELETE" })
+      setFiles(prev => prev.filter(f => f.id !== id))
+      fetchFiles(filter === "search" ? "all" : filter, query)
+    } catch { /* silent */ }
+  }
 
   const uploadFile = async (file: File) => {
     setUploading(true)
     try {
-      const fd = new FormData(); fd.append("file", file)
+      const fd = new FormData()
+      fd.append("file", file)
       const res = await fetch("/api/files", { method: "POST", body: fd })
-      if (!res.ok) throw new Error("upload failed")
-      await fetchFiles(1, typeFilter, searchQuery); fetchCounts()
-    } catch { setError(t("uploadFailed")) }
+      if (res.ok) fetchFiles(filter === "search" ? "all" : filter, query)
+    } catch { /* silent */ }
     finally { setUploading(false) }
   }
 
-  const confirmDelete = (id: number) => setDeleteTarget(id)
-  const deleteFile = async (id: number) => {
-    setDeleteTarget(null)
+  const handleUploadClick = () => {
+    const input = document.createElement("input")
+    input.type = "file"
+    input.onchange = (e) => {
+      const f = (e.target as HTMLInputElement).files?.[0]
+      if (f) uploadFile(f)
+    }
+    input.click()
+  }
+
+  const doDocSearch = async () => {
+    const q = searchQuery.trim()
+    if (!q) return
+    setSearching(true); setSearchError("")
     try {
-      await fetch(`/api/files/${id}`, { method: "DELETE" })
-      setFiles(prev => prev.filter(f => f.id !== id))
-      if (selectedFile?.id === id) setSelectedFile(null)
-      fetchCounts()
-    } catch { setError(t("deleteFailed")) }
-  }
-
-  const indexFile = async (id: number) => {
-    try {
-      const res = await fetch(`/api/files/${id}/index`, { method: "POST" })
-      if (!res.ok) throw new Error("index failed")
-      const data = await res.json() as { indexed?: boolean }
-      if (data.indexed) {
-        setFiles(prev => prev.map(f => f.id === id ? { ...f, indexed: true } : f))
-        if (selectedFile?.id === id) setSelectedFile(prev => prev ? { ...prev, indexed: true } : null)
-      }
-    } catch { setError(t("indexFailed")) }
-  }
-
-  const toggleSelect = (id: number) => setSelectedIds(prev => {
-    const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next
-  })
-  const clearSelection = () => setSelectedIds(new Set())
-  const selectAll = () => setSelectedIds(new Set(files.map(f => f.id)))
-
-  const bulkDelete = async () => {
-    await Promise.all([...selectedIds].map(id => fetch(`/api/files/${id}`, { method: "DELETE" })))
-    setFiles(prev => prev.filter(f => !selectedIds.has(f.id)))
-    if (selectedFile && selectedIds.has(selectedFile.id)) setSelectedFile(null)
-    clearSelection(); fetchCounts()
-  }
-  const bulkIndex = async () => {
-    const ids = [...selectedIds].filter(id => { const f = files.find(f => f.id === id); return f?.file_type === "document" && !f.indexed })
-    await Promise.all(ids.map(id => indexFile(id))); clearSelection()
-  }
-
-  const handleActionDone = () => {
-    autoSelectRef.current = true
-    setTimeout(() => { fetchFiles(1, typeFilter, searchQuery); fetchCounts() }, 500)
+      const res = await fetch(`/api/files/search?q=${encodeURIComponent(q)}&limit=20`)
+      if (!res.ok) throw new Error()
+      const data = await res.json() as { results: SearchResult[]; search_mode: string }
+      setSearchResults(data.results ?? [])
+      setSearchMode(data.search_mode ?? "")
+      setSearched(true)
+    } catch {
+      setSearchError("문서 검색에 실패했습니다.")
+    } finally {
+      setSearching(false)
+    }
   }
 
   const handleSearchFileSelect = async (fileId: number) => {
     const found = files.find(f => f.id === fileId)
-    if (found) { setActiveTab("files"); setSelectedFile(found); return }
+    if (found) { setFilter("all"); setSelectedFile(found); return }
     try {
       const res = await fetch(`/api/files/${fileId}`)
       if (!res.ok) return
-      setActiveTab("files"); setSelectedFile(await res.json() as FileItem)
+      const file = await res.json() as FileItem
+      setFilter("all")
+      setSelectedFile(file)
     } catch { /* ignore */ }
   }
 
-  const handleSort = (key: "date" | "name" | "size" | "type") => {
-    if (sortBy === key) setSortDir(d => d === "asc" ? "desc" : "asc")
-    else { setSortBy(key); setSortDir("desc") }
+  const downloadFile = (file: FileItem) => {
+    if (file.url) window.open(file.url, "_blank")
+    setMenuId(null)
   }
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
-  const displayedFiles = [...files].sort((a, b) => {
-    let cmp = 0
-    switch (sortBy) {
-      case "name": cmp = a.name.localeCompare(b.name, "ko"); break
-      case "size": cmp = a.size - b.size; break
-      case "type": cmp = a.format.localeCompare(b.format); break
-      default: cmp = a.created_at.localeCompare(b.created_at); break
-    }
-    return sortDir === "asc" ? cmp : -cmp
+  const filtered = files.filter(f => {
+    const ft = mapFileType(f.file_type)
+    const matchesType = filter === "all" || filter === "search" || ft === filter
+    const matchesQuery = !query || f.name.toLowerCase().includes(query.toLowerCase())
+    return matchesType && matchesQuery
   })
 
-  const uploadAccept = typeFilter === "document" ? FILE_ACCEPT.document
-    : typeFilter === "image" ? FILE_ACCEPT.image
-    : typeFilter === "audio" ? FILE_ACCEPT.audio
-    : Object.values(FILE_ACCEPT).join(",")
-
-  const typeFilters: { key: FileType; label: string; icon: React.ReactNode; count?: number }[] = [
-    { key: "all", label: t("filterAll"), icon: <FolderOpen className="size-4" /> },
-    { key: "document", label: t("filterDocument"), icon: <FileText className="size-4 text-blue-500" />, count: typeCounts.document },
-    { key: "image", label: t("filterImage"), icon: <ImageIcon className="size-4 text-purple-500" />, count: typeCounts.image },
-    { key: "audio", label: t("filterAudio"), icon: <Music className="size-4 text-yellow-500" />, count: typeCounts.audio },
-  ]
-
-  const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true) }
-  const onDragLeave = () => setIsDragging(false)
-  const onDrop = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) uploadFile(f) }
+  const counts: Record<string, number> = {
+    all: total,
+    doc: typeCounts.document ?? 0,
+    image: typeCounts.image ?? 0,
+    audio: typeCounts.audio ?? 0,
+  }
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full w-full" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
-      {isDragging && (
-        <div className="fixed inset-0 z-50 bg-primary/10 border-4 border-dashed border-primary/40 flex items-center justify-center pointer-events-none">
-          <div className="bg-background rounded-2xl p-8 shadow-xl text-center">
-            <Upload className="size-12 text-primary mx-auto mb-3" />
-            <p className="text-lg font-semibold">{t("dropHere")}</p>
+    <div className="flex flex-col flex-1 overflow-hidden bg-background"
+      onClick={() => setMenuId(null)}>
+      {/* Top bar */}
+      <div className="flex items-center gap-3 px-5 h-12 border-b border-border shrink-0">
+        <span className="text-sm font-bold text-foreground whitespace-nowrap">내 파일</span>
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="파일 이름 검색..."
+            className="w-full h-8 pl-8 pr-3 rounded-lg border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            onClick={handleUploadClick}
+            disabled={uploading}
+            className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border text-xs font-medium text-foreground hover:bg-accent/40 transition-colors disabled:opacity-50">
+            {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+            업로드
+          </button>
+          <button className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold transition-colors"
+            style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}>
+            <Plus className="w-3.5 h-3.5" />새로 만들기
+          </button>
+          <div className="w-px h-5 bg-border" />
+          <button
+            onClick={() => fetchFiles(filter === "search" ? "all" : filter, query)}
+            disabled={loading}
+            className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent/40 transition-colors">
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+          </button>
+          <div className="flex items-center border border-border rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={cn("w-7 h-7 flex items-center justify-center transition-colors",
+                viewMode === "grid" ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/40")}>
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={cn("w-7 h-7 flex items-center justify-center transition-colors",
+                viewMode === "list" ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/40")}>
+              <List className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex items-center gap-2 px-5 py-2.5 border-b border-border shrink-0 overflow-x-auto">
+        {TYPE_FILTERS.map(({ id, label, icon: Icon }) => {
+          const count = id !== "search" ? counts[id] : undefined
+          const isActive = filter === id
+          return (
+            <button key={id} onClick={() => setFilter(id as FileType | "search")}
+              className={cn(
+                "shrink-0 flex items-center gap-1.5 h-8 px-3.5 rounded-full text-xs font-medium transition-colors border",
+                isActive
+                  ? "border-transparent text-white"
+                  : "border-border bg-background text-foreground hover:bg-accent/40"
+              )}
+              style={isActive ? { background: "var(--primary)" } : {}}>
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+              {count !== undefined && count > 0 && (
+                <span className={cn("text-[10px] font-semibold",
+                  isActive ? "opacity-80" : "text-muted-foreground")}>
+                  {count}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ── Doc Search Panel ── */}
+      {filter === "search" && (
+        <div className="flex flex-col flex-1 overflow-hidden">
+          {/* Search bar */}
+          <div className="px-6 py-4 border-b border-border shrink-0">
+            <p className="text-xs text-muted-foreground mb-2">인덱싱된 문서에서 의미 기반 검색을 수행합니다.</p>
+            <div className="flex items-start gap-2 text-xs bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg px-3 py-2 mb-3">
+              <Info className="size-3.5 shrink-0 mt-0.5 text-blue-500" />
+              <span className="text-blue-700 dark:text-blue-300 leading-relaxed">
+                문서 검색을 사용하려면 먼저 파일 상세 패널에서 문서를 인덱싱해주세요.
+              </span>
+            </div>
+            <form onSubmit={e => { e.preventDefault(); doDocSearch() }} className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                <Input
+                  placeholder="검색할 내용을 입력하세요..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                  autoFocus
+                />
+                {searchQuery && (
+                  <button type="button"
+                    onClick={() => { setSearchQuery(""); setSearchResults([]); setSearched(false) }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2">
+                    <X className="size-4 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+              <Button type="submit" disabled={searching || !searchQuery.trim()}>
+                {searching ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+                <span className="ml-1.5">검색</span>
+              </Button>
+            </form>
+            {searchError && (
+              <p className="mt-2 text-xs text-destructive flex items-center gap-1">
+                <AlertCircle className="size-3.5" />{searchError}
+              </p>
+            )}
+          </div>
+
+          {/* Results */}
+          <div className="flex-1 overflow-y-auto">
+            {searched && (
+              <div className="px-6 py-2 border-b border-border flex items-center justify-between text-xs text-muted-foreground">
+                <span>{searchResults.length > 0 ? `${searchResults.length}개 결과` : "검색 결과가 없습니다."}</span>
+                {searchMode && (
+                  <span className="px-2 py-0.5 bg-muted rounded-full font-medium">
+                    {searchMode === "semantic" ? "의미 검색" : searchMode === "full-text" ? "전문 검색" : searchMode}
+                  </span>
+                )}
+              </div>
+            )}
+            {searchResults.length === 0 && searched && !searching && (
+              <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2">
+                <BookOpenText className="size-10 opacity-30" />
+                <p className="text-sm">검색 결과가 없습니다.</p>
+              </div>
+            )}
+            <div className="divide-y divide-border/50">
+              {searchResults.map(r => {
+                const sim = similarityLabel(r.similarity)
+                return (
+                  <div key={r.id} className="px-6 py-4 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="size-4 shrink-0 text-blue-500" />
+                        <span className="text-sm font-medium truncate">{r.file_name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded", sim.cls)}>
+                          {sim.label}
+                        </span>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs"
+                          onClick={() => handleSearchFileSelect(r.file_id)}>
+                          파일 보기
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 bg-muted/40 rounded-md px-3 py-2">
+                      {r.content}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
       )}
 
-      <TopBar
-        searchQuery={searchQuery} onSearchChange={setSearchQuery}
-        uploading={uploading} uploadAccept={uploadAccept} onUpload={uploadFile}
-        onAction={setActiveAction}
-        sortBy={sortBy} sortDir={sortDir} onSort={handleSort}
-        viewMode={viewMode} onViewChange={setViewMode}
-        loading={loading} onRefresh={() => fetchFiles(1, typeFilter, searchQuery)}
-      />
-
-      {/* ── Filter tabs ── */}
-      <div className="flex items-center gap-1 px-4 sm:px-6 py-2 border-b border-border shrink-0 overflow-x-auto">
-        {typeFilters.map(tf => (
-          <button
-            key={tf.key}
-            onClick={() => { setTypeFilter(tf.key); setSelectedFile(null); setActiveTab("files"); setSearchQuery("") }}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap shrink-0",
-              activeTab === "files" && typeFilter === tf.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
-          >
-            {tf.icon}{tf.label}
-            {tf.count !== undefined && tf.count > 0 && (
-              <span className={cn("text-[11px] px-1.5 py-0.5 rounded-full font-semibold",
-                activeTab === "files" && typeFilter === tf.key ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
-              )}>{tf.count}</span>
-            )}
-          </button>
-        ))}
-        <div className="w-px h-5 bg-border mx-1 shrink-0" />
-        <button
-          onClick={() => { setActiveTab("search"); setSelectedFile(null) }}
-          className={cn(
-            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border whitespace-nowrap shrink-0",
-            activeTab === "search" ? "bg-violet-600 text-white border-violet-600"
-              : "text-violet-600 dark:text-violet-400 border-violet-200 dark:border-violet-800 hover:bg-violet-50 dark:hover:bg-violet-900/20"
-          )}
-        >
-          <Sparkles className="size-4" />{t("searchTab")}
-        </button>
+      {/* File count */}
+      {filter !== "search" && (
+      <div className="px-5 py-2 shrink-0">
+        <span className="text-xs text-muted-foreground">
+          {loading ? "불러오는 중..." : `${filtered.length}개 파일`}
+        </span>
       </div>
+      )}
 
-      {/* ── Body ── */}
-      <div className="flex flex-1 min-h-0">
-        {activeTab === "search" && <div className="flex-1 min-w-0"><DocSearchPanel onFileSelect={handleSearchFileSelect} /></div>}
-        <div className={cn("flex-1 flex flex-col min-w-0", activeTab === "search" && "hidden")}>
-          {error && (
-            <div className="mx-4 mt-3 flex items-center gap-2 px-3 py-2 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
-              <AlertCircle className="size-4 shrink-0" />{error}
-              <button onClick={() => setError("")} className="ml-auto"><X className="size-4" /></button>
-            </div>
-          )}
-          {selectedIds.size > 0 && (
-            <div className="mx-4 mt-2 flex items-center gap-2 px-3 py-2 bg-primary/5 border border-primary/20 rounded-lg flex-wrap">
-              <span className="text-sm font-medium text-primary">{selectedIds.size}개 선택됨</span>
-              <button onClick={selectAll} className="text-xs text-muted-foreground hover:text-foreground underline">전체 선택</button>
-              <button onClick={clearSelection} className="text-xs text-muted-foreground hover:text-foreground underline">선택 해제</button>
-              <div className="ml-auto flex items-center gap-1.5">
-                {files.some(f => selectedIds.has(f.id) && f.file_type === "document" && !f.indexed) && (
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={bulkIndex}><RefreshCw className="size-3 mr-1" />인덱싱</Button>
-                )}
-                <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={bulkDelete}><Trash2 className="size-3 mr-1" />삭제</Button>
-              </div>
-            </div>
-          )}
-          <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border shrink-0">
-            {loading ? t("loading") : total > LIMIT ? t("fileCountWithTotal", { count: displayedFiles.length, total }) : t("fileCount", { count: displayedFiles.length })}
+      {/* File grid / list */}
+      {filter !== "search" && (
+      <div className="flex-1 overflow-y-auto px-5 pb-5">
+        {loading && files.length === 0 ? (
+          <div className="flex items-center justify-center h-48">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            {loading ? (
-              <div className="flex items-center justify-center h-40"><Loader2 className="size-8 animate-spin text-muted-foreground" /></div>
-            ) : displayedFiles.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-3">
-                <FolderOpen className="size-12 opacity-30" />
-                <p className="text-sm">{searchQuery ? t("noSearchResults") : t("noFiles")}</p>
-              </div>
-            ) : viewMode === "grid" ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                {displayedFiles.map(f => (
-                  <FileCard key={f.id} file={f} onClick={setSelectedFile} onDelete={confirmDelete}
-                    isSelected={selectedIds.has(f.id)} onToggleSelect={toggleSelect} />
-                ))}
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground">
+            <Folder className="w-10 h-10 opacity-30" />
+            <p className="text-sm">파일이 없습니다.</p>
+          </div>
+        ) : viewMode === "grid" ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {filtered.map(file => {
+              const ext = file.format?.toLowerCase() ?? file.name.split(".").pop()?.toLowerCase() ?? ""
+              const color = MIME_COLORS[ext] ?? "#8B949E"
+              const isImage = file.file_type === "image"
+              return (
+                <div key={file.id}
+                  onClick={() => setSelectedFile(file)}
+                  className="group relative rounded-xl border border-border bg-card overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
+                  {/* Thumbnail or icon */}
+                  <div className="relative aspect-square bg-muted overflow-hidden rounded-lg">
+                    {isImage && file.url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={file.url} alt={file.name}
+                        className="w-full h-full object-cover cursor-zoom-in"
+                        onClick={e => { e.stopPropagation(); setPreviewImage({ url: file.url!, name: file.name }) }} />
+                    ) : file.file_type === "audio" ? (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Music className="w-10 h-10 text-yellow-400" />
+                      </div>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-sm"
+                          style={{ background: color }}>
+                          {ext.toUpperCase().slice(0, 4)}
+                        </div>
+                      </div>
+                    )}
+                    {/* Context menu button */}
+                    <button
+                      onClick={e => { e.stopPropagation(); setMenuId(menuId === file.id ? null : file.id) }}
+                      className="absolute top-1.5 right-1.5 w-6 h-6 rounded-md bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <MoreVertical className="w-3.5 h-3.5" />
+                    </button>
+                    {/* Dropdown */}
+                    {menuId === file.id && (
+                      <div
+                        onClick={e => e.stopPropagation()}
+                        className="absolute top-8 right-1.5 w-36 rounded-xl border border-border bg-card shadow-xl z-20 py-1 overflow-hidden">
+                        <button onClick={() => downloadFile(file)}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 transition-colors">
+                          <Download className="w-3.5 h-3.5 text-muted-foreground" />다운로드
+                        </button>
+                        <button onClick={() => setMenuId(null)}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 transition-colors">
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />이름 변경
+                        </button>
+                        <button onClick={() => setMenuId(null)}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 transition-colors">
+                          <Copy className="w-3.5 h-3.5 text-muted-foreground" />복사
+                        </button>
+                        <div className="border-t border-border my-1" />
+                        <button onClick={() => deleteFile(file.id)}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-accent/50 transition-colors">
+                          <Trash className="w-3.5 h-3.5" />삭제
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {/* Info */}
+                  <div className="p-2.5">
+                    <p className="text-xs text-foreground font-medium truncate">{file.name}</p>
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                        style={{ background: color + "22", color }}>
+                        {ext.toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1.5">{formatSize(file.size)} · {formatDate(file.created_at)}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          /* List view */
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="grid grid-cols-[2fr_1fr_1fr_1fr_40px] px-4 py-2 border-b border-border bg-muted/40">
+              {["이름", "유형", "크기", "날짜", ""].map((h, i) => (
+                <span key={i} className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{h}</span>
+              ))}
+            </div>
+            {filtered.map((file, idx) => {
+              const ext = file.format?.toLowerCase() ?? file.name.split(".").pop()?.toLowerCase() ?? ""
+              const color = MIME_COLORS[ext] ?? "#8B949E"
+              return (
+                <div key={file.id}
+                  onClick={() => setSelectedFile(file)}
+                  className={cn("grid grid-cols-[2fr_1fr_1fr_1fr_40px] items-center px-4 py-2.5 hover:bg-accent/10 transition-colors group cursor-pointer",
+                    idx < filtered.length - 1 && "border-b border-border")}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[9px] font-bold text-white"
+                      style={{ background: color }}>
+                      {ext.toUpperCase().slice(0, 4)}
+                    </div>
+                    <span className="text-xs text-foreground truncate">{file.name}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{ext.toUpperCase()}</span>
+                  <span className="text-xs text-muted-foreground">{formatSize(file.size)}</span>
+                  <span className="text-xs text-muted-foreground">{formatDate(file.created_at)}</span>
+                  <div className="relative flex justify-end">
+                    <button
+                      onClick={e => { e.stopPropagation(); setMenuId(menuId === file.id ? null : file.id) }}
+                      className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <MoreVertical className="w-3.5 h-3.5" />
+                    </button>
+                    {menuId === file.id && (
+                      <div
+                        onClick={e => e.stopPropagation()}
+                        className="absolute top-6 right-0 w-36 rounded-xl border border-border bg-card shadow-xl z-20 py-1 overflow-hidden">
+                        <button onClick={() => downloadFile(file)}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 transition-colors">
+                          <Download className="w-3.5 h-3.5 text-muted-foreground" />다운로드
+                        </button>
+                        <button onClick={() => setMenuId(null)}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 transition-colors">
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />이름 변경
+                        </button>
+                        <button onClick={() => setMenuId(null)}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 transition-colors">
+                          <Copy className="w-3.5 h-3.5 text-muted-foreground" />복사
+                        </button>
+                        <div className="border-t border-border my-1" />
+                        <button onClick={() => deleteFile(file.id)}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-accent/50 transition-colors">
+                          <Trash className="w-3.5 h-3.5" />삭제
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+      )}
+
+      {/* ── Image Preview Modal ── */}
+      <Dialog open={!!previewImage} onOpenChange={v => { if (!v) setPreviewImage(null) }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden bg-black/95 border-none">
+          <DialogHeader className="absolute top-0 left-0 right-0 z-10 flex flex-row items-center justify-between px-4 py-3 bg-gradient-to-b from-black/70 to-transparent">
+            <DialogTitle className="text-sm font-medium text-white truncate pr-8">
+              {previewImage?.name}
+            </DialogTitle>
+            <button onClick={() => setPreviewImage(null)}
+              className="absolute top-3 right-3 p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors">
+              <X className="size-4 text-white" />
+            </button>
+          </DialogHeader>
+          <div className="flex items-center justify-center w-full h-full min-h-[300px] max-h-[85vh] p-4 pt-12">
+            {previewImage && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={previewImage.url} alt={previewImage.name}
+                className="max-w-full max-h-full object-contain rounded-lg" />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Detail Panel (slide-in) ── */}
+      {selectedFile && (
+        <DetailPanel
+          file={selectedFile}
+          onClose={() => setSelectedFile(null)}
+          onDelete={(id) => { deleteFile(id); setSelectedFile(null) }}
+          onDownload={downloadFile}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── DetailPanel ──────────────────────────────────────────────────────────────
+
+function DetailPanel({ file, onClose, onDelete, onDownload }: {
+  file: FileItem
+  onClose: () => void
+  onDelete: (id: number) => void
+  onDownload: (f: FileItem) => void
+}) {
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const audioRef = useRef<HTMLAudioElement>(null)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+    document.addEventListener("keydown", handler)
+    return () => document.removeEventListener("keydown", handler)
+  }, [onClose])
+
+  const togglePlay = () => {
+    if (!audioRef.current) return
+    if (isPlaying) audioRef.current.pause()
+    else audioRef.current.play()
+    setIsPlaying(!isPlaying)
+  }
+
+  const ext = file.format?.toLowerCase() ?? file.name.split(".").pop()?.toLowerCase() ?? ""
+  const color = MIME_COLORS[ext] ?? "#8B949E"
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
+      <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[400px] bg-background border-l border-border flex flex-col shadow-xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <span className="text-sm font-semibold truncate">{file.name}</span>
+          <button onClick={onClose} className="p-1 hover:bg-muted rounded"><X className="size-4" /></button>
+        </div>
+
+        {/* Body */}
+        <div className="p-4 flex flex-col gap-4 overflow-y-auto flex-1">
+          {/* Preview */}
+          <div className="aspect-square w-full rounded-xl bg-muted flex items-center justify-center overflow-hidden">
+            {file.file_type === "image" && file.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={file.url} alt={file.name} className="w-full h-full object-contain" />
+            ) : file.file_type === "audio" ? (
+              <div className="flex flex-col items-center gap-3 p-4 w-full">
+                <FileAudio className="size-16 text-yellow-400" />
+                {file.url && (
+                  <>
+                    <audio
+                      ref={audioRef}
+                      src={file.url}
+                      onEnded={() => { setIsPlaying(false); setCurrentTime(0) }}
+                      onTimeUpdate={() => setCurrentTime(Math.floor(audioRef.current?.currentTime ?? 0))}
+                    />
+                    <button onClick={togglePlay} className="p-3 bg-yellow-100 rounded-full hover:bg-yellow-200 transition-colors">
+                      {isPlaying ? <Pause className="size-6 text-yellow-700" /> : <Play className="size-6 text-yellow-700" />}
+                    </button>
+                    {(file.duration ?? 0) > 0 && (
+                      <div className="w-full flex items-center gap-2 px-2">
+                        <span className="text-xs text-muted-foreground w-9 text-right tabular-nums">{fmtDuration(currentTime)}</span>
+                        <input type="range" min={0} max={file.duration} value={currentTime}
+                          onChange={e => { const v = Number(e.target.value); setCurrentTime(v); if (audioRef.current) audioRef.current.currentTime = v }}
+                          className="flex-1 h-1.5 accent-yellow-500 cursor-pointer" />
+                        <span className="text-xs text-muted-foreground w-9 tabular-nums">{fmtDuration(file.duration ?? 0)}</span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             ) : (
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-3 px-4 py-1.5 text-xs text-muted-foreground font-medium">
-                  <span className="w-5 shrink-0" />
-                  <span className="flex-1">{t("colName")}</span>
-                  <span className="w-16 text-right shrink-0">{t("colFormat")}</span>
-                  <span className="w-16 text-right shrink-0 hidden sm:block">{t("colSize")}</span>
-                  <span className="w-20 text-right shrink-0 hidden sm:block">{t("colDate")}</span>
-                  <span className="w-16 shrink-0" />
-                </div>
-                <Separator />
-                {displayedFiles.map(f => (
-                  <FileRow key={f.id} file={f} onClick={setSelectedFile} onDelete={confirmDelete}
-                    isSelected={selectedIds.has(f.id)} onToggleSelect={toggleSelect} />
-                ))}
+              <FileText className="size-16 text-blue-400" />
+            )}
+          </div>
+
+          {/* Details */}
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">유형</span>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded" style={{ background: color + "22", color }}>{ext.toUpperCase()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">크기</span>
+              <span>{file.size_label ?? formatSize(file.size)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">날짜</span>
+              <span>{formatDate(file.created_at)}</span>
+            </div>
+            {file.sub_type && file.sub_type !== "uploaded" && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">생성 방식</span>
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-muted">{file.sub_type}</span>
               </div>
             )}
-            {total > LIMIT && (
-              <div className="flex items-center justify-center gap-2 mt-6">
-                <Button variant="outline" size="sm" disabled={page === 1 || loading} onClick={() => fetchFiles(page - 1, typeFilter, searchQuery)}>{t("prev")}</Button>
-                <span className="text-sm text-muted-foreground">{page} / {Math.ceil(total / LIMIT)}</span>
-                <Button variant="outline" size="sm" disabled={page * LIMIT >= total || loading} onClick={() => fetchFiles(page + 1, typeFilter, searchQuery)}>{t("next")}</Button>
+            {file.file_type === "document" && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">인덱싱</span>
+                <span className={file.indexed ? "text-emerald-600 font-medium" : "text-muted-foreground"}>
+                  {file.indexed ? "완료" : "미완료"}
+                </span>
+              </div>
+            )}
+            {file.file_type === "audio" && (file.duration ?? 0) > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">길이</span>
+                <span>{fmtDuration(file.duration ?? 0)}</span>
+              </div>
+            )}
+            {file.file_type === "image" && !!file.metadata?.camera_model && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">카메라</span>
+                <span className="text-right text-xs">
+                  {[file.metadata.camera_make as string, file.metadata.camera_model as string].filter(Boolean).join(" ")}
+                </span>
               </div>
             )}
           </div>
+
+          {/* GPS */}
+          {file.file_type === "image" && !!file.metadata?.latitude && !!file.metadata?.longitude && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-muted-foreground">위치</p>
+              <div className="flex items-start gap-2 text-sm">
+                <MapPin className="size-4 text-muted-foreground shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-xs tabular-nums">
+                    {Number(file.metadata.latitude as number).toFixed(6)}, {Number(file.metadata.longitude as number).toFixed(6)}
+                  </p>
+                  <a href={`https://www.google.com/maps?q=${file.metadata.latitude},${file.metadata.longitude}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                    <ExternalLink className="size-3" />Google Maps
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Analysis / Transcript / Prompt */}
+          {file.analysis && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-1">분석 결과</p>
+              <div className="bg-muted/50 rounded-lg p-3 markdown-body">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{file.analysis}</ReactMarkdown>
+              </div>
+            </div>
+          )}
+          {file.transcript && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-1">텍스트 변환</p>
+              <div className="bg-muted/50 rounded-lg p-3 markdown-body">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{file.transcript}</ReactMarkdown>
+              </div>
+            </div>
+          )}
+          {file.prompt && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-1">프롬프트</p>
+              <div className="bg-muted/50 rounded-lg p-3 markdown-body">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{file.prompt}</ReactMarkdown>
+              </div>
+            </div>
+          )}
         </div>
-        {selectedFile && <DetailPanel file={selectedFile} onClose={() => setSelectedFile(null)} onDelete={confirmDelete} onIndex={indexFile} />}
+
+        {/* Footer actions */}
+        <div className="p-4 border-t border-border flex flex-col gap-2">
+          <Button variant="outline" size="sm" className="w-full" onClick={() => onDownload(file)}>
+            <Download className="size-4 mr-2" />다운로드
+          </Button>
+          <Button variant="destructive" size="sm" className="w-full" onClick={() => onDelete(file.id)}>
+            <Trash2 className="size-4 mr-2" />삭제
+          </Button>
+        </div>
       </div>
-
-      {/* ── Action Modals ── */}
-      <DocGenerateModal open={activeAction === "doc-generate"} onClose={() => setActiveAction(null)} onDone={handleActionDone} />
-      <ImgActionModal action="img-generate" open={activeAction === "img-generate"} onClose={() => setActiveAction(null)} onDone={handleActionDone} />
-      <ImgActionModal action="img-analyze" open={activeAction === "img-analyze"} onClose={() => setActiveAction(null)} onDone={handleActionDone} />
-      <ImgActionModal action="img-edit" open={activeAction === "img-edit"} onClose={() => setActiveAction(null)} onDone={handleActionDone} />
-      <AudioRecordModal open={activeAction === "audio-record"} onClose={() => setActiveAction(null)} onDone={handleActionDone} />
-      <AudioTranscribeModal open={activeAction === "audio-transcribe"} onClose={() => setActiveAction(null)} onDone={handleActionDone} />
-
-      {/* ── Delete Confirmation ── */}
-      <AlertDialog open={deleteTarget !== null} onOpenChange={open => { if (!open) setDeleteTarget(null) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("deleteConfirmTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("deleteConfirmDesc")}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteTarget !== null && deleteFile(deleteTarget)}>{t("delete")}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+    </>
   )
 }

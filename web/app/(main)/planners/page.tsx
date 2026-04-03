@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { usePlannerStore } from "@/lib/planner-store"
 import { TabBar, type PlannerTab } from "@/components/planner/tab-bar"
 import { DailyTab } from "@/components/planner/daily-tab"
 import { WeeklyTab } from "@/components/planner/weekly-tab"
@@ -12,6 +13,11 @@ import { MonthSidebar } from "@/components/planner/month-sidebar"
 
 export default function PlannersPage() {
   const [activeTab, setActiveTab] = useState<PlannerTab>("daily")
+  const hydrateFromAPI = usePlannerStore(s => s.hydrateFromAPI)
+
+  useEffect(() => {
+    hydrateFromAPI()
+  }, [hydrateFromAPI])
 
   return (
     <>

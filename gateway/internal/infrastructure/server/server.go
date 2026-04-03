@@ -133,9 +133,12 @@ func New(logger *zap.Logger) (*Server, error) {
 	h := handler.NewRouter(db, cfg, agentClient, hub, logger)
 	h.Register(e)
 
-	// Wire scheduler with report generation and notification callbacks.
+	// Wire scheduler with notification callbacks.
+	// Report generation removed — reports handler was deleted.
 	reportFn := func(ctx context.Context, userID, reportType string) error {
-		return h.ReportsHandler().GenerateForScheduler(ctx, userID, reportType)
+		_ = userID
+		_ = reportType
+		return nil // reports handler removed
 	}
 
 	// Build the notification dispatcher.

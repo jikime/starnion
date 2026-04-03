@@ -4,7 +4,7 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import {
-  BookOpen, BarChart2, Target, Map,
+  BookOpen, BarChart2, Target, Map, Loader2,
   Plus, TrendingUp, TrendingDown, Trash2, Download, ArrowUpRight,
 } from "lucide-react"
 import {
@@ -131,125 +131,16 @@ function StatCard({ label, value, sub, up }: { label: string; value: string; sub
   )
 }
 
-// ── Tab 1: 가계부 ─────────────────────────────────────────────────────────────
+// ── Tab 1: 가계부 (API 연동) ──────────────────────────────────────────────────
+
+import { Suspense } from "react"
+import { FinanceView } from "@/components/finance/finance-view"
 
 function LedgerTab() {
-  const [txs, setTxs]          = useState<Transaction[]>(SAMPLE_TXS)
-  const [adding, setAdding]    = useState(false)
-  const [filterCat, setFilter] = useState("전체")
-  const [form, setForm]        = useState<Partial<Transaction>>({
-    type: "expense", category: "식비", date: "2026-04-03",
-  })
-
-  const totalIncome  = txs.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0)
-  const totalExpense = txs.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0)
-  const filtered     = filterCat === "전체" ? txs : txs.filter(t => t.category === filterCat)
-
-  const save = () => {
-    if (!form.amount || !form.memo) return
-    setTxs(prev => [{
-      id: `t${Date.now()}`, type: form.type!, amount: Number(form.amount),
-      category: form.category!, tags: [], memo: form.memo!, date: form.date!,
-    }, ...prev])
-    setAdding(false)
-    setForm({ type: "expense", category: "식비", date: "2026-04-03" })
-  }
-
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Summary row */}
-      <div className="grid grid-cols-3 gap-3 px-5 py-4 border-b border-border shrink-0">
-        <StatCard label="이번달 수입"  value={`+${fmt(totalIncome)}`}           sub="전월 대비 +2.5%" up />
-        <StatCard label="이번달 지출"  value={`-${fmt(totalExpense)}`}          sub="전월 대비 +8.3%" />
-        <StatCard label="순 잔액"      value={fmt(totalIncome - totalExpense)} />
-      </div>
-
-      {/* Filter + add button */}
-      <div className="flex items-center gap-2 px-5 py-2 border-b border-border shrink-0 overflow-x-auto">
-        {["전체", ...CATEGORIES].map(c => (
-          <button key={c} onClick={() => setFilter(c)}
-            className={cn(
-              "shrink-0 h-6 px-2.5 rounded-full text-[10px] font-medium transition-colors",
-              filterCat === c ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/40"
-            )}>
-            {c}
-          </button>
-        ))}
-        <button onClick={() => setAdding(v => !v)}
-          className="ml-auto shrink-0 flex items-center gap-1 h-7 px-3 rounded-lg text-[11px] font-semibold"
-          style={{ background: "var(--priority-a)", color: "#0d1117" }}>
-          <Plus className="w-3 h-3" />추가
-        </button>
-      </div>
-
-      {/* Inline add form */}
-      {adding && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 px-5 py-3 border-b border-border bg-card/60 shrink-0">
-          <select value={form.type}
-            onChange={e => setForm(f => ({ ...f, type: e.target.value as TxType }))}
-            className="h-8 rounded-lg border border-border bg-background text-xs px-2 text-foreground">
-            <option value="expense">지출</option>
-            <option value="income">수입</option>
-          </select>
-          <select value={form.category}
-            onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-            className="h-8 rounded-lg border border-border bg-background text-xs px-2 text-foreground">
-            {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-          </select>
-          <input type="number" placeholder="금액 (원)" value={form.amount ?? ""}
-            onChange={e => setForm(f => ({ ...f, amount: Number(e.target.value) }))}
-            className="h-8 rounded-lg border border-border bg-background text-xs px-2 text-foreground" />
-          <input type="text" placeholder="메모" value={form.memo ?? ""}
-            onChange={e => setForm(f => ({ ...f, memo: e.target.value }))}
-            onKeyDown={e => e.key === "Enter" && save()}
-            className="h-8 rounded-lg border border-border bg-background text-xs px-2 text-foreground" />
-          <button onClick={save}
-            className="col-span-2 md:col-span-4 h-8 rounded-lg text-xs font-semibold"
-            style={{ background: "var(--priority-a)", color: "#0d1117" }}>
-            저장
-          </button>
-        </div>
-      )}
-
-      {/* Transaction list */}
-      <div className="flex-1 overflow-y-auto">
-        {filtered.map(tx => {
-          const color = CAT_COLOR[tx.category] ?? "#8B949E"
-          return (
-            <div key={tx.id}
-              className="flex items-center gap-3 px-5 py-2.5 border-b border-border hover:bg-accent/10 group transition-colors">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: color + "22" }}>
-                <span className="text-[10px] font-bold" style={{ color }}>{tx.category.slice(0, 1)}</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-foreground truncate">{tx.memo}</p>
-                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                  <span className="text-[10px] text-muted-foreground">{tx.date}</span>
-                  {tx.location && <span className="text-[10px] text-muted-foreground">· {tx.location}</span>}
-                  {tx.tags.map(tag => (
-                    <span key={tag}
-                      className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <span className={cn(
-                "text-sm font-semibold tabular-nums shrink-0",
-                tx.type === "income" ? "text-green-400" : "text-foreground"
-              )}>
-                {tx.type === "income" ? "+" : "-"}{fmtFull(tx.amount)}
-              </span>
-              <button onClick={() => setTxs(p => p.filter(t => t.id !== tx.id))}
-                className="opacity-0 group-hover:opacity-50 hover:!opacity-100 text-muted-foreground transition-opacity">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )
-        })}
-      </div>
-    </div>
+    <Suspense>
+      <FinanceView />
+    </Suspense>
   )
 }
 
@@ -266,299 +157,31 @@ const DONUT_DATA = CATEGORIES
   .filter(d => d.value > 0)
   .sort((a, b) => b.value - a.value)
 
+import { StatisticsView } from "@/components/statistics/statistics-view"
+
 function InsightsTab() {
-  const totalExp = DONUT_DATA.reduce((s, d) => s + d.value, 0)
-
-  return (
-    <div className="flex-1 overflow-y-auto p-5 space-y-5">
-      {/* Area chart */}
-      <div className="rounded-xl border border-border bg-card p-4">
-        <p className="text-xs font-semibold text-foreground mb-3">월별 수입 / 지출 추이</p>
-        <ResponsiveContainer width="100%" height={150}>
-          <AreaChart data={TREND_DATA} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-            <defs>
-              <linearGradient id="incG" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#3FB950" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="#3FB950" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="expG" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#F85149" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="#F85149" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-            <XAxis dataKey="month"
-              tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-              axisLine={false} tickLine={false} />
-            <YAxis
-              tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-              axisLine={false} tickLine={false}
-              tickFormatter={v => `${(v / 1_000_000).toFixed(1)}M`} />
-            <Tooltip
-              contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
-              formatter={(v: number) => fmtFull(v)} />
-            <Area type="monotone" dataKey="수입" stroke="#3FB950" strokeWidth={2} fill="url(#incG)" dot={false} />
-            <Area type="monotone" dataKey="지출" stroke="#F85149" strokeWidth={2} fill="url(#expG)" dot={false} />
-          </AreaChart>
-        </ResponsiveContainer>
-        <div className="flex gap-4 mt-2">
-          <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-            <span className="w-3 h-0.5 rounded bg-green-400 inline-block" />수입
-          </span>
-          <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-            <span className="w-3 h-0.5 rounded bg-red-400 inline-block" />지출
-          </span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Donut */}
-        <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xs font-semibold text-foreground mb-3">카테고리별 지출 비율</p>
-          <div className="flex items-center gap-3">
-            <ResponsiveContainer width={130} height={130}>
-              <PieChart>
-                <Pie data={DONUT_DATA} cx="50%" cy="50%"
-                  innerRadius={35} outerRadius={58} paddingAngle={2} dataKey="value">
-                  {DONUT_DATA.map((d, i) => <Cell key={i} fill={d.color} />)}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
-                  formatter={(v: number) => fmtFull(v)} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex-1 space-y-1.5">
-              {DONUT_DATA.map(d => (
-                <div key={d.name} className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.color }} />
-                  <span className="text-[11px] text-foreground flex-1">{d.name}</span>
-                  <span className="text-[11px] text-muted-foreground tabular-nums">
-                    {Math.round(d.value / totalExp * 100)}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Top 5 */}
-        <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xs font-semibold text-foreground mb-3">Top 5 지출 항목</p>
-          <div className="space-y-2.5">
-            {DONUT_DATA.slice(0, 5).map((d, i) => (
-              <div key={d.name} className="flex items-center gap-2">
-                <span className="text-[11px] text-muted-foreground w-4 tabular-nums">{i + 1}</span>
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.color }} />
-                <span className="text-[11px] text-foreground flex-1">{d.name}</span>
-                <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full"
-                    style={{ width: `${Math.round(d.value / DONUT_DATA[0].value * 100)}%`, background: d.color }} />
-                </div>
-                <span className="text-[11px] font-medium tabular-nums text-foreground w-14 text-right">
-                  {fmt(d.value)}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 pt-3 border-t border-border">
-            <p className="text-[10px] text-amber-400 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" />
-              현재 소비 속도가 지난달 대비 8.3% 빠릅니다
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  return <StatisticsView />
 }
 
-// ── Tab 3: 예산 관리 ──────────────────────────────────────────────────────────
+// ── Tab 3: 예산 관리 (API 연동) ──────────────────────────────────────────────
+
+import { BudgetView } from "@/components/budget/budget-view"
 
 function BudgetTab() {
-  const totalLimit = SAMPLE_BUDGETS.reduce((s, b) => s + b.limit, 0)
-  const totalUsed  = SAMPLE_BUDGETS.reduce((s, b) => s + b.used, 0)
-
-  return (
-    <div className="flex-1 overflow-y-auto p-5 space-y-5">
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard label="총 예산"    value={fmt(totalLimit)} />
-        <StatCard label="사용 금액"  value={fmt(totalUsed)}
-          sub={`${Math.round(totalUsed / totalLimit * 100)}% 소진`} />
-        <StatCard label="잔여 예산"  value={fmt(totalLimit - totalUsed)} sub="잔여 27일" up />
-      </div>
-
-      {/* Progress bars */}
-      <div className="rounded-xl border border-border bg-card p-5 space-y-5">
-        <p className="text-xs font-semibold text-foreground">카테고리별 예산 현황</p>
-        {SAMPLE_BUDGETS.map(b => {
-          const pct  = Math.min(Math.round(b.used / b.limit * 100), 100)
-          const warn = pct >= 80
-          return (
-            <div key={b.category} className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-foreground">{b.category}</span>
-                <span className={cn("text-[11px] tabular-nums font-medium",
-                  warn ? "text-amber-400" : "text-muted-foreground")}>
-                  {fmtFull(b.used)} / {fmtFull(b.limit)}{warn && "  ⚠"}
-                </span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-                <div className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${pct}%`,
-                    background: pct >= 90 ? "#F85149" : pct >= 80 ? "#E3A948" : b.color,
-                  }} />
-              </div>
-              <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>{pct}% 사용</span>
-                <span>잔여 {fmtFull(b.limit - b.used)}</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Saving goals */}
-      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-        <p className="text-xs font-semibold text-foreground">D-Day 저축 목표</p>
-        {SAMPLE_GOALS.map(g => {
-          const pct = Math.round(g.saved / g.target * 100)
-          return (
-            <div key={g.id} className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-foreground">{g.title}</span>
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                  style={{ background: g.color + "22", color: g.color }}>
-                  {dday(g.dueDate)}
-                </span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: g.color }} />
-              </div>
-              <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>{fmtFull(g.saved)} 저축 완료</span>
-                <span>목표 {fmtFull(g.target)} ({pct}%)</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Balance forecast */}
-      <div className="rounded-xl border border-border bg-card p-4">
-        <p className="text-xs font-semibold text-foreground mb-1">월말 잔액 예측</p>
-        <p className="text-[10px] text-muted-foreground mb-3">현재 소비 속도 기준 월말 예상 잔액</p>
-        <div className="flex items-end gap-5">
-          <div>
-            <p className="text-[10px] text-muted-foreground">예상 월 지출</p>
-            <p className="text-lg font-bold text-foreground">-{fmt(totalUsed / 4 * 30)}</p>
-          </div>
-          <ArrowUpRight className="w-5 h-5 text-green-400 mb-1" />
-          <div>
-            <p className="text-[10px] text-muted-foreground">예상 잔액</p>
-            <p className="text-lg font-bold text-green-400">+{fmt(3950000 - (totalUsed / 4 * 30))}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  return <BudgetView />
 }
 
-// ── Tab 4: 소비 지도 ──────────────────────────────────────────────────────────
+// ── Tab 4: 소비 지도 (API 연동 — Naver Maps) ────────────────────────────────
+
+import dynamic from "next/dynamic"
+
+const FinanceMapClient = dynamic(
+  () => import("@/components/finance-map/finance-map-client"),
+  { ssr: false, loading: () => <div className="flex flex-1 items-center justify-center"><Loader2 className="size-8 animate-spin text-primary" /></div> }
+)
 
 function HeatmapTab() {
-  const [selected, setSelected] = useState<typeof HEATMAP_SPOTS[0] | null>(null)
-
-  return (
-    <div className="flex flex-col flex-1 overflow-hidden min-h-0">
-      <div className="flex flex-1 overflow-hidden min-h-0">
-        {/* Map canvas */}
-        <div className="flex-1 relative overflow-hidden bg-[#0d1117]">
-          <svg className="absolute inset-0 w-full h-full opacity-10">
-            <defs>
-              <pattern id="mapgrid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#58A6FF" strokeWidth="0.5" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#mapgrid)" />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-72 h-60 rounded-[40%] border border-[#58A6FF]/20" />
-          </div>
-
-          {HEATMAP_SPOTS.map(spot => {
-            const size     = Math.max(32, spot.count * 3.2)
-            const isActive = selected?.name === spot.name
-            const hex      = Math.min(255, spot.count * 6).toString(16).padStart(2, "0")
-            return (
-              <button key={spot.name}
-                onClick={() => setSelected(isActive ? null : spot)}
-                className="absolute"
-                style={{ left: `${spot.x}%`, top: `${spot.y}%`, transform: "translate(-50%,-50%)" }}>
-                <div className="absolute rounded-full animate-pulse"
-                  style={{
-                    width: size, height: size,
-                    top: -size / 2, left: -size / 2,
-                    background: `radial-gradient(circle, #58A6FF${hex} 0%, transparent 70%)`,
-                  }} />
-                <div className={cn(
-                  "relative w-3 h-3 rounded-full border-2 transition-all",
-                  isActive ? "border-white scale-125" : "border-[#58A6FF]"
-                )}
-                  style={{ background: isActive ? "#fff" : "#58A6FF88" }} />
-              </button>
-            )
-          })}
-
-          <div className="absolute bottom-4 left-4 bg-card/90 border border-border rounded-lg p-2.5 space-y-1">
-            <p className="text-xs font-semibold text-foreground">지출 밀집도</p>
-            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-              <div className="w-16 h-1.5 rounded-full"
-                style={{ background: "linear-gradient(to right, #58A6FF22, #58A6FF)" }} />
-              낮음 → 높음
-            </div>
-          </div>
-        </div>
-
-        {/* Sidebar */}
-        <div className="w-56 shrink-0 border-l border-border flex flex-col overflow-hidden">
-          <div className="px-4 py-3 border-b border-border shrink-0">
-            <p className="text-xs font-semibold text-foreground">지출 핫스팟</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">마커를 클릭해 상세 확인</p>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {[...HEATMAP_SPOTS].sort((a, b) => b.amount - a.amount).map(spot => (
-              <button key={spot.name}
-                onClick={() => setSelected(selected?.name === spot.name ? null : spot)}
-                className={cn(
-                  "w-full text-left px-4 py-3 border-b border-border transition-colors",
-                  selected?.name === spot.name ? "bg-accent/30" : "hover:bg-accent/10"
-                )}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-foreground font-medium">{spot.name}</span>
-                  <span className="text-[10px] text-muted-foreground">{spot.count}회</span>
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{spot.category}</p>
-                <p className="text-xs font-semibold text-foreground mt-0.5">{fmtFull(spot.amount)}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {selected && (
-        <div className="flex items-center gap-3 px-5 py-3 border-t border-border bg-card/60 shrink-0">
-          <Map className="w-4 h-4 shrink-0" style={{ color: "#58A6FF" }} />
-          <div>
-            <p className="text-xs font-semibold text-foreground">{selected.name}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {selected.category} · {selected.count}회 방문 · {fmtFull(selected.amount)} 지출
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
-  )
+  return <FinanceMapClient />
 }
 
 // ── Main AssetsSection ────────────────────────────────────────────────────────

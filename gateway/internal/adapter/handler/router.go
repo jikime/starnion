@@ -25,28 +25,23 @@ type Router struct {
 	chat         *ChatHandler
 	telegram     *TelegramHandler
 	health       *HealthHandler
-	diary        *DiaryHandler
-	goals        *GoalsHandler
 	finance      *FinanceHandler
 	budget       *BudgetHandler
 	conversation *ConversationHandler
 	persona      *PersonaHandler
-	memo         *MemoHandler
-	dday         *DdayHandler
 	notification *NotificationHandler
 	cron         *CronHandler
 	settings     *SettingsHandler
 	statistics   *StatisticsHandler
 	search       *SearchHandler
-	knowledge    *KnowledgeHandler
 	files        *FilesHandler
-	reports      *ReportsHandler
 	media        *MediaHandler
 	integrations *IntegrationsHandler
 	stub         *StubHandler
 	ws           *WSHandler
 	logs         *LogsHandler
 	anomaly      *AnomalyHandler
+	planner      *PlannerHandler
 }
 
 func NewRouter(db *database.DB, cfg *config.Config, agentClient *agentgrpc.AgentClient, hub *logbuffer.Hub, logger *zap.Logger) *Router {
@@ -59,28 +54,23 @@ func NewRouter(db *database.DB, cfg *config.Config, agentClient *agentgrpc.Agent
 		chat:         NewChatHandler(db, cfg, agentClient, logger),
 		telegram:     NewTelegramHandler(db, cfg, agentClient, logger),
 		health:       NewHealthHandler(agentClient),
-		diary:        NewDiaryHandler(db, cfg, logger),
-		goals:        NewGoalsHandler(db, cfg, logger),
 		finance:      NewFinanceHandler(db, cfg, logger),
 		budget:       NewBudgetHandler(db, cfg, logger),
 		conversation: NewConversationHandler(db, cfg, logger),
 		persona:      NewPersonaHandler(db, cfg, logger),
-		memo:         NewMemoHandler(db, cfg, logger),
-		dday:         NewDdayHandler(db, cfg, logger),
 		notification: NewNotificationHandler(db, cfg, logger),
 		cron:         NewCronHandler(db, cfg, logger),
 		settings:     NewSettingsHandler(db, cfg, logger),
 		statistics:   NewStatisticsHandler(db, cfg, logger),
 		search:       NewSearchHandler(db, cfg, logger),
-		knowledge:    NewKnowledgeHandler(db, cfg, logger),
 		files:        NewFilesHandler(db, cfg, logger),
-		reports:      NewReportsHandler(db, cfg, agentClient, logger),
 		media:        NewMediaHandler(db, cfg, logger),
 		integrations: NewIntegrationsHandler(db, cfg, logger),
 		stub:         NewStubHandler(db, cfg, logger),
 		ws:           NewWSHandler(db, cfg, agentClient, logger),
 		logs:         NewLogsHandler(hub),
 		anomaly:      NewAnomalyHandler(db, cfg, logger),
+		planner:      NewPlannerHandler(db, cfg, logger),
 	}
 }
 
@@ -92,11 +82,6 @@ func (r *Router) TelegramHandler() *TelegramHandler {
 // DB returns the shared database connection (used by the server for startup queries).
 func (r *Router) DB() *database.DB {
 	return r.db
-}
-
-// ReportsHandler exposes the reports handler for the background scheduler.
-func (r *Router) ReportsHandler() *ReportsHandler {
-	return r.reports
 }
 
 // SetBotManager wires the BotManager into the stub handler so dynamic pollers
@@ -171,21 +156,6 @@ func (r *Router) Register(e *echo.Echo) {
 	protected.GET("/conversations/:id/messages", r.conversation.ListMessages)
 	protected.DELETE("/conversations/:id/messages/:msgId", r.conversation.DeleteMessage)
 
-	// ── Diary ─────────────────────────────────────────────────────────────────
-	protected.GET("/diary", r.diary.List)
-	protected.POST("/diary", r.diary.Create)
-	protected.GET("/diary/:id", r.diary.Get)
-	protected.PUT("/diary/:id", r.diary.Update)
-	protected.DELETE("/diary/:id", r.diary.Delete)
-
-	// ── Goals ─────────────────────────────────────────────────────────────────
-	protected.GET("/goals", r.goals.List)
-	protected.POST("/goals", r.goals.Create)
-	protected.GET("/goals/:id", r.goals.Get)
-	protected.PUT("/goals/:id", r.goals.Update)
-	protected.DELETE("/goals/:id", r.goals.Delete)
-	protected.PUT("/goals/:id/progress", r.goals.UpdateProgress)
-
 	// ── Finance ───────────────────────────────────────────────────────────────
 	protected.GET("/finance/summary", r.finance.Summary)
 	protected.GET("/finance/transactions", r.finance.ListTransactions)
@@ -199,37 +169,6 @@ func (r *Router) Register(e *echo.Echo) {
 	protected.POST("/personas", r.persona.Create)
 	protected.PUT("/personas/:id", r.persona.Update)
 	protected.DELETE("/personas/:id", r.persona.Delete)
-
-	// ── Memos ─────────────────────────────────────────────────────────────────
-	protected.GET("/memo", r.memo.List)
-	protected.POST("/memo", r.memo.Create)
-	protected.GET("/memo/:id", r.memo.Get)
-	protected.PUT("/memo/:id", r.memo.Update)
-	protected.DELETE("/memo/:id", r.memo.Delete)
-	// UI aliases (plural form)
-	protected.GET("/memos", r.memo.List)
-	protected.POST("/memos", r.memo.Create)
-	protected.GET("/memos/:id", r.memo.Get)
-	protected.PUT("/memos/:id", r.memo.Update)
-	protected.DELETE("/memos/:id", r.memo.Delete)
-
-	// ── D-Days ────────────────────────────────────────────────────────────────
-	protected.GET("/dday", r.dday.List)
-	protected.POST("/dday", r.dday.Create)
-	protected.PUT("/dday/:id", r.dday.Update)
-	protected.DELETE("/dday/:id", r.dday.Delete)
-	// UI aliases (plural form)
-	protected.GET("/ddays", r.dday.List)
-	protected.POST("/ddays", r.dday.Create)
-	protected.PUT("/ddays/:id", r.dday.Update)
-	protected.DELETE("/ddays/:id", r.dday.Delete)
-
-	// ── Diary (entries alias) ──────────────────────────────────────────────────
-	protected.GET("/diary/entries", r.diary.List)
-	protected.POST("/diary/entries", r.diary.Create)
-	protected.GET("/diary/entries/:id", r.diary.Get)
-	protected.PUT("/diary/entries/:id", r.diary.Update)
-	protected.DELETE("/diary/entries/:id", r.diary.Delete)
 
 	// ── Notifications ─────────────────────────────────────────────────────────
 	protected.GET("/notifications", r.notification.List)
@@ -260,10 +199,6 @@ func (r *Router) Register(e *echo.Echo) {
 	protected.POST("/model-assignments", r.settings.UpsertModelAssignment)
 	protected.DELETE("/model-assignments/:use_case", r.settings.DeleteModelAssignment)
 
-	// ── Goals: Checkin ────────────────────────────────────────────────────────
-	protected.GET("/goals/:id/checkin", r.stub.GetGoalCheckins)
-	protected.POST("/goals/:id/checkin", r.stub.CreateGoalCheckin)
-
 	// ── Budget ────────────────────────────────────────────────────────────────
 	protected.GET("/budget", r.budget.GetBudget)
 	protected.PUT("/budget", r.budget.UpdateBudget)
@@ -275,11 +210,6 @@ func (r *Router) Register(e *echo.Echo) {
 	protected.DELETE("/searches/:id", r.search.Delete)
 	protected.GET("/search/hybrid", r.search.HybridSearch)
 
-	// ── Knowledge ─────────────────────────────────────────────────────────────
-	protected.GET("/knowledge", r.knowledge.List)
-	protected.POST("/knowledge", r.knowledge.Create)
-	protected.DELETE("/knowledge/:id", r.knowledge.Delete)
-
 	// ── Files (unified: documents + images + audios) ──────────────────────────
 	protected.GET("/files", r.files.List)
 	protected.POST("/files", r.files.Upload)
@@ -289,11 +219,43 @@ func (r *Router) Register(e *echo.Echo) {
 	protected.DELETE("/files/:id", r.files.Delete)
 	protected.POST("/files/:id/index", r.files.Index)
 
-	// ── Reports ───────────────────────────────────────────────────────────────
-	protected.GET("/reports", r.reports.List)
-	protected.GET("/reports/:id", r.reports.Get)
-	protected.POST("/reports/generate", r.reports.Generate)
-	protected.DELETE("/reports/:id", r.reports.Delete)
+	// ── Planner ──────────────────────────────────────────────────────────────
+	protected.GET("/planner/snapshot", r.planner.Snapshot)
+	// Roles
+	protected.GET("/planner/roles", r.planner.ListRoles)
+	protected.POST("/planner/roles", r.planner.CreateRole)
+	protected.PUT("/planner/roles/:id", r.planner.UpdateRole)
+	protected.DELETE("/planner/roles/:id", r.planner.DeleteRole)
+	// Tasks
+	protected.GET("/planner/tasks", r.planner.ListTasks)
+	protected.POST("/planner/tasks", r.planner.CreateTask)
+	protected.PUT("/planner/tasks/:id", r.planner.UpdateTask)
+	protected.DELETE("/planner/tasks/:id", r.planner.DeleteTask)
+	protected.POST("/planner/tasks/:id/forward", r.planner.ForwardTask)
+	protected.PUT("/planner/tasks/reorder", r.planner.ReorderTasks)
+	// Inbox
+	protected.GET("/planner/inbox", r.planner.ListInbox)
+	protected.POST("/planner/inbox", r.planner.CreateInbox)
+	protected.POST("/planner/inbox/:id/promote", r.planner.PromoteInbox)
+	protected.DELETE("/planner/inbox/:id", r.planner.DeleteInbox)
+	// Weekly Goals
+	protected.GET("/planner/weekly-goals", r.planner.ListWeeklyGoals)
+	protected.POST("/planner/weekly-goals", r.planner.CreateWeeklyGoal)
+	protected.PATCH("/planner/weekly-goals/:id/toggle", r.planner.ToggleWeeklyGoal)
+	protected.DELETE("/planner/weekly-goals/:id", r.planner.DeleteWeeklyGoal)
+	// Goals
+	protected.GET("/planner/goals", r.planner.ListGoals)
+	protected.POST("/planner/goals", r.planner.CreateGoal)
+	protected.PUT("/planner/goals/:id", r.planner.UpdateGoal)
+	protected.DELETE("/planner/goals/:id", r.planner.DeleteGoal)
+	// Diary & Reflections
+	protected.GET("/planner/diary", r.planner.GetDiary)
+	protected.PUT("/planner/diary", r.planner.UpsertDiary)
+	protected.GET("/planner/reflections", r.planner.GetReflection)
+	protected.PUT("/planner/reflections", r.planner.UpsertReflection)
+	// Mission
+	protected.GET("/planner/mission", r.planner.GetMission)
+	protected.PUT("/planner/mission", r.planner.UpdateMission)
 
 	// ── Audio utilities ───────────────────────────────────────────────────────
 	protected.POST("/audios/transcribe", r.media.Transcribe)

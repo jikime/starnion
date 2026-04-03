@@ -6,23 +6,23 @@
 :root {
   /* Franklin Planner Dark Navy Theme */
   --background: oklch(0.095 0.012 255);
-  --foreground: oklch(0.93 0.007 255);
+  --foreground: oklch(0.97 0.003 255);
   --card: oklch(0.13 0.012 255);
-  --card-foreground: oklch(0.93 0.007 255);
+  --card-foreground: oklch(0.97 0.003 255);
   --popover: oklch(0.15 0.012 255);
-  --popover-foreground: oklch(0.93 0.007 255);
+  --popover-foreground: oklch(0.97 0.003 255);
   --primary: oklch(0.74 0.16 70);
   --primary-foreground: oklch(0.095 0.012 255);
   --secondary: oklch(0.18 0.012 255);
-  --secondary-foreground: oklch(0.93 0.007 255);
+  --secondary-foreground: oklch(0.97 0.003 255);
   --muted: oklch(0.18 0.012 255);
-  --muted-foreground: oklch(0.58 0.01 255);
+  --muted-foreground: oklch(0.68 0.01 255);
   --accent: oklch(0.22 0.012 255);
-  --accent-foreground: oklch(0.93 0.007 255);
+  --accent-foreground: oklch(0.97 0.003 255);
   --destructive: oklch(0.6 0.23 25);
-  --destructive-foreground: oklch(0.93 0.007 255);
+  --destructive-foreground: oklch(0.97 0.003 255);
   --border: oklch(0.24 0.012 255);
-  --input: oklch(0.22 0.012 255);
+  --input: oklch(0.26 0.012 255);
   --ring: oklch(0.74 0.16 70);
   --radius: 0.5rem;
 
@@ -61,37 +61,37 @@
 
 .dark {
   --background: oklch(0.095 0.012 255);
-  --foreground: oklch(0.93 0.007 255);
+  --foreground: oklch(0.97 0.003 255);
   --card: oklch(0.13 0.012 255);
-  --card-foreground: oklch(0.93 0.007 255);
+  --card-foreground: oklch(0.97 0.003 255);
   --popover: oklch(0.15 0.012 255);
-  --popover-foreground: oklch(0.93 0.007 255);
+  --popover-foreground: oklch(0.97 0.003 255);
   --primary: oklch(0.74 0.16 70);
   --primary-foreground: oklch(0.095 0.012 255);
   --secondary: oklch(0.18 0.012 255);
-  --secondary-foreground: oklch(0.93 0.007 255);
+  --secondary-foreground: oklch(0.97 0.003 255);
   --muted: oklch(0.18 0.012 255);
-  --muted-foreground: oklch(0.58 0.01 255);
+  --muted-foreground: oklch(0.68 0.01 255);
   --accent: oklch(0.22 0.012 255);
-  --accent-foreground: oklch(0.93 0.007 255);
+  --accent-foreground: oklch(0.97 0.003 255);
   --destructive: oklch(0.6 0.23 25);
-  --destructive-foreground: oklch(0.93 0.007 255);
+  --destructive-foreground: oklch(0.97 0.003 255);
   --border: oklch(0.24 0.012 255);
-  --input: oklch(0.22 0.012 255);
+  --input: oklch(0.26 0.012 255);
   --ring: oklch(0.74 0.16 70);
 
   --sidebar: oklch(0.11 0.012 255);
-  --sidebar-foreground: oklch(0.93 0.007 255);
+  --sidebar-foreground: oklch(0.97 0.003 255);
   --sidebar-primary: oklch(0.74 0.16 70);
   --sidebar-primary-foreground: oklch(0.095 0.012 255);
   --sidebar-accent: oklch(0.18 0.012 255);
-  --sidebar-accent-foreground: oklch(0.93 0.007 255);
+  --sidebar-accent-foreground: oklch(0.97 0.003 255);
   --sidebar-border: oklch(0.22 0.012 255);
   --sidebar-ring: oklch(0.74 0.16 70);
 }
 
 @theme inline {
-  --font-sans: var(--font-inter), 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Pretendard Variable', Pretendard, ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -154,4 +154,87 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Markdown body for detail panels */
+.markdown-body {
+  color: var(--foreground);
+  font-size: 0.75rem;
+  line-height: 1.7;
+}
+.markdown-body h1, .markdown-body h2, .markdown-body h3,
+.markdown-body h4, .markdown-body h5, .markdown-body h6 {
+  color: var(--foreground);
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+.markdown-body h1 { font-size: 1.1em; }
+.markdown-body h2 { font-size: 1em; }
+.markdown-body h3 { font-size: 0.95em; }
+.markdown-body p {
+  margin-bottom: 0.5em;
+}
+.markdown-body strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.markdown-body em {
+  font-style: italic;
+}
+.markdown-body ul, .markdown-body ol {
+  padding-left: 1.25em;
+  margin-bottom: 0.5em;
+}
+.markdown-body ul { list-style-type: disc; }
+.markdown-body ol { list-style-type: decimal; }
+.markdown-body li {
+  margin-bottom: 0.2em;
+}
+.markdown-body a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+.markdown-body code {
+  background: var(--muted);
+  padding: 0.15em 0.35em;
+  border-radius: 0.25rem;
+  font-size: 0.9em;
+  font-family: var(--font-mono);
+}
+.markdown-body pre {
+  background: var(--muted);
+  padding: 0.75em;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin-bottom: 0.5em;
+}
+.markdown-body pre code {
+  background: none;
+  padding: 0;
+}
+.markdown-body blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 0.75em;
+  color: var(--muted-foreground);
+  margin: 0.5em 0;
+}
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.5em;
+}
+.markdown-body th, .markdown-body td {
+  border: 1px solid var(--border);
+  padding: 0.35em 0.6em;
+  text-align: left;
+}
+.markdown-body th {
+  background: var(--muted);
+  font-weight: 600;
+}
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0.75em 0;
 }
