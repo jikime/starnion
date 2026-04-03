@@ -1,0 +1,26 @@
+# Environment files (contain secrets)
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dist/
+*.log
+
+# Go
+gateway/bin/
+gateway/*.test
+
+# Session data
+~/.starnion/
+
+# OS
+.DS_Store
+
+.jikime/
+.claude
+.mcp.json
+.env
+# pi-coding-agent auto-generated directories
+agent/skills/.pi/

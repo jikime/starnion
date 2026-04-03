@@ -1,0 +1,20 @@
+# StarNion skill Python dependencies
+# Installed into ~/.starnion/venv/ during install/update
+
+# DB access (all skills)
+psycopg2-binary>=2.9
+
+# Encryption (for decrypting API keys from DB)
+cryptography>=42.0
+
+# HTTP requests (google-workspace, naver-map, etc.)
+requests>=2.32
+
+# Document generation (documents skill)
+python-docx>=1.1
+openpyxl>=3.1
+python-pptx>=1.0
+reportlab>=4.4
+
+# Google AI (documents skill — Gemini-based text extraction)
+google-generativeai>=0.8

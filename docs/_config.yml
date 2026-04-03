@@ -1,0 +1,37 @@
+title: StarNion Docs
+description: "Personal AI Agent Platform — Self-hosted, privacy-first, multi-LLM"
+url: "https://jikime.github.io"
+baseurl: "/starnion"
+lang: en
+
+remote_theme: just-the-docs/just-the-docs@v0.10.0
+
+color_scheme: dark
+
+# Navigation
+nav_enabled: true
+nav_sort: order
+
+# Search
+search_enabled: true
+search_tokenizer_separator: /[\s/]+/
+
+# Footer
+starnion_version: "0.1.76"
+footer_content: "Copyright &copy; 2025 StarNion. All rights reserved. &nbsp;|&nbsp; <a href=\"https://github.com/jikime/starnion/releases/tag/v0.1.76\">v0.1.76</a>"
+
+# Plugins
+plugins:
+  - jekyll-remote-theme
+  - jekyll-seo-tag
+  - jekyll-github-metadata
+
+# Exclude from build
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
+  - "dev/"
+  - deploy.md
+  - local-test-deploy.md

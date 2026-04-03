@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+package agent;
+
+option go_package = "github.com/newstarnion/gateway/internal/infrastructure/grpc/proto;proto";
+
+service AgentService {
+  rpc Chat(ChatRequest) returns (stream ChatResponse);
+  rpc Generate(GenerateRequest) returns (GenerateResponse);
+  rpc GetSessions(GetSessionsRequest) returns (GetSessionsResponse);
+  rpc DeleteSession(DeleteSessionRequest) returns (DeleteSessionResponse);
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message ChatRequest {
+  string user_id = 1;
+  string session_id = 2;
+  string message = 3;
+  string model = 4;
+  map<string, string> metadata = 5;
+}
+
+message ChatResponse {
+  oneof event {
+    TextDelta text_delta = 1;
+    ToolUse tool_use = 2;
+    ToolResult tool_result = 3;
+    SessionInfo session_info = 4;
+    ErrorEvent error = 5;
+    DoneEvent done = 6;
+  }
+}
+
+message TextDelta {
+  string text = 1;
+}
+
+message ToolUse {
+  string tool_name = 1;
+  string input_json = 2;
+}
+
+message ToolResult {
+  string tool_name = 1;
+  string result = 2;
+  bool is_error = 3;
+}
+
+message SessionInfo {
+  string session_id = 1;
+  string title = 2;
+}
+
+message ErrorEvent {
+  string message = 1;
+  string code = 2;
+}
+
+message DoneEvent {
+  string session_id = 1;
+  int32 input_tokens = 2;
+  int32 output_tokens = 3;
+  int32 context_tokens = 4;       // current context window usage in tokens (0 if unknown)
+  int32 context_window = 5;       // model context window size in tokens
+  int32 cache_read_tokens = 6;    // tokens served from cache (ephemeral cache hit)
+  int32 cache_write_tokens = 7;   // tokens written to cache (ephemeral cache write)
+  double total_cost_usd = 8;      // estimated cost in USD for this turn (0 if unknown)
+  string model = 9;               // model ID used for this turn
+}
+
+message GetSessionsRequest {
+  string user_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message GetSessionsResponse {
+  repeated SessionSummary sessions = 1;
+  int32 total = 2;
+}
+
+message SessionSummary {
+  string session_id = 1;
+  string title = 2;
+  string last_message = 3;
+  string updated_at = 4;
+  string model = 5;
+}
+
+message DeleteSessionRequest {
+  string user_id = 1;
+  string session_id = 2;
+}
+
+message DeleteSessionResponse {
+  bool success = 1;
+}
+
+message GenerateRequest {
+  string prompt = 1;
+  string model  = 2; // optional, defaults to claude-haiku-4-5
+}
+
+message GenerateResponse {
+  string text  = 1;
+  string error = 2;
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string status = 1;
+  string version = 2;
+}

@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: newstarnion-postgres
+    environment:
+      POSTGRES_USER: starnion
+      POSTGRES_PASSWORD: starnion_pass
+      POSTGRES_DB: starnion
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U starnion"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # NOTE: Uses shared MinIO instance on localhost:9000 (gilgeori-minio container).
+  # Bucket: starnion-files
+  # Credentials stored in .env.local — see docs/setup.md for service account setup.
+
+volumes:
+  postgres_data:

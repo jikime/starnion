@@ -1,0 +1,128 @@
+version: 2
+
+project_name: starnion
+
+before:
+  hooks:
+    # Sync canonical migrations → starnion-cli embed path
+    - sh -c "rm -rf starnion-cli/internal/cli/migrations && mkdir -p starnion-cli/internal/cli/migrations && cp db/migrations/*.sql starnion-cli/internal/cli/migrations/"
+    # Build TypeScript agent (compiled to dist/)
+    - sh -c "cd agent && pnpm install --frozen-lockfile && pnpm build"
+    # Build Next.js Web (standalone mode)
+    - sh -c "cd web && pnpm install --frozen-lockfile && NEXT_STANDALONE=1 pnpm build"
+    # Prepare staging directory
+    - sh -c "rm -rf .staging && mkdir -p .staging/agent .staging/web .staging/docker .staging/proto"
+    # Stage agent: dist/ + skills/ + package.json + lockfile (no node_modules — installed on server)
+    - sh -c "cp -r agent/dist .staging/agent/dist && cp -r agent/skills .staging/agent/skills && cp agent/package.json .staging/agent/ && (test -f agent/pnpm-lock.yaml && cp agent/pnpm-lock.yaml .staging/agent/ || true)"
+    # Stage proto: gRPC definitions needed by agent at runtime
+    - sh -c "cp proto/*.proto .staging/proto/"
+    # Stage web: Next.js standalone + static + public
+    - sh -c "cp -r web/.next/standalone/. .staging/web/ && mkdir -p .staging/web/.next && cp -r web/.next/static .staging/web/.next/static && cp -r web/public .staging/web/public"
+    # Stage docker: compose files, Dockerfiles, env example, migrations
+    - sh -c "cp docker/docker-compose.yml docker/docker-compose.prod.yml docker/Dockerfile.agent docker/Dockerfile.gateway docker/Dockerfile.web docker/.env.example docker/setup.sh .staging/docker/"
+    - sh -c "test -d db/migrations && cp -r db/migrations .staging/docker/migrations || true"
+    # Stage scripts: systemd/launchd service files
+    - sh -c "cp -r scripts .staging/scripts"
+
+builds:
+  - id: starnion
+    dir: starnion-cli
+    main: ./cmd/starnion
+    binary: starnion
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/newstarnion/starnion-cli/internal/cli.Version={{.Version}}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+  - id: gateway
+    dir: gateway
+    main: ./cmd
+    binary: starnion-gateway
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: starnion
+    builds:
+      - starnion
+      - gateway
+    name_template: "starnion_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+    files:
+      - src: .staging/agent/**
+        dst: agent
+      - src: .staging/web/**
+        dst: web
+      - src: .staging/docker/**
+        dst: docker
+        strip_parent: true
+      - src: .staging/proto/**
+        dst: proto
+        strip_parent: true
+      - src: .staging/scripts/**
+        dst: scripts
+        strip_parent: true
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+release:
+  github:
+    owner: jikime
+    name: starnion
+  name_template: "v{{ .Version }}"
+  header: |
+    ## StarNion v{{ .Version }}
+
+    Personal AI Assistant — CLI release.
+
+    ### 설치
+    ```bash
+    curl -fsSL https://jikime.github.io/starnion/install.sh | bash
+    ```
+
+    ### 업데이트
+    ```bash
+    starnion update
+    ```
+  footer: |
+    ---
+    **Full Changelog**: https://github.com/jikime/starnion/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: "새 기능"
+      regexp: "^feat"
+      order: 0
+    - title: "버그 수정"
+      regexp: "^fix"
+      order: 1
+    - title: "기타"
+      order: 999
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"
+      - "^ci:"
+      - "^test:"
+      - "typo"

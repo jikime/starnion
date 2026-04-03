@@ -1,0 +1,17 @@
+[Unit]
+Description=StarNion - Personal AI Assistant
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+Environment=HOME=/root
+ExecStart=/bin/bash -lc "export HOME=/root && starnion start"
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=starnion
+
+[Install]
+WantedBy=multi-user.target

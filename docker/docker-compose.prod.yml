@@ -1,0 +1,80 @@
+# Production overrides for docker-compose.yml
+# Usage: starnion docker up --prod
+#        docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Differences from local:
+#   - PostgreSQL and MinIO S3 ports are NOT exposed externally
+#   - gRPC port is NOT exposed externally
+#   - Resource limits applied (CPU, memory)
+#   - Log rotation configured
+#   - restart: always (vs unless-stopped)
+
+services:
+  postgres:
+    restart: always
+    ports: []  # Do not expose DB port externally in production
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  minio:
+    restart: always
+    ports:
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"  # Console only; S3 port via reverse proxy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  agent:
+    restart: always
+    ports: []  # gRPC is internal only
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  gateway:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  web:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"

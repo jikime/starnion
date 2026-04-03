@@ -1,0 +1,141 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: starnion-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-starnion}
+      POSTGRES_USER: ${POSTGRES_USER:-starnion}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../db/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-starnion}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: starnion-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-starnion}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: ../agent
+      dockerfile: ../docker/Dockerfile.agent
+    container_name: starnion-agent
+    ports:
+      - "${GRPC_PORT:-50051}:50051"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-starnion}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-starnion}?sslmode=disable
+      AGENT_GRPC_PORT: ${GRPC_PORT:-50051}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_LOG_SECRET: ${INTERNAL_LOG_SECRET:-}
+      GATEWAY_HTTP_URL: http://gateway:${GATEWAY_PORT:-8080}
+      GATEWAY_INTERNAL_URL: http://gateway:${GATEWAY_PORT:-8080}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-starnion}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-starnion-files}
+      MINIO_USE_SSL: "false"
+      SKILLS_DIR: /app/skills
+      SESSION_DIR: /data/sessions
+      MEMORY_DIR: /data/memory
+      CHECKPOINT_DIR: /data/checkpoints
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: ${TZ:-Asia/Seoul}
+      BROWSER_HEADLESS: ${BROWSER_HEADLESS:-true}
+    volumes:
+      - agent_data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const n=require('net');const s=new n.Socket();s.connect(50051,'localhost',()=>{s.destroy();process.exit(0)});s.on('error',()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ../gateway
+      dockerfile: ../docker/Dockerfile.gateway
+    container_name: starnion-gateway
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-starnion}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-starnion}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      GRPC_AGENT_HOST: agent
+      GRPC_PORT: ${GRPC_PORT:-50051}
+      PUBLIC_URL: ${GATEWAY_PUBLIC_URL:-http://localhost:8080}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3893}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-starnion}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-starnion-files}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
+      MINIO_USE_SSL: "false"
+      SKILLS_DIR: /app/skills
+      SESSION_DIR: /data/sessions
+      INTERNAL_LOG_SECRET: ${INTERNAL_LOG_SECRET:-}
+    volumes:
+      - agent_data:/data:ro         # read skills & sessions written by agent
+      - gateway_sessions:/data/sessions
+    depends_on:
+      postgres:
+        condition: service_healthy
+      agent:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../web
+      dockerfile: ../docker/Dockerfile.web
+    container_name: starnion-web
+    ports:
+      - "${WEB_PORT:-3893}:3000"
+    environment:
+      NODE_ENV: production
+      AUTH_SECRET: ${AUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3893}
+      AUTH_TRUST_HOST: "true"
+      API_URL: http://gateway:${GATEWAY_PORT:-8080}
+      NEXT_PUBLIC_API_URL: ${GATEWAY_PUBLIC_URL:-http://localhost:8080}
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - gateway
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  minio_data:
+  agent_data:
+  gateway_sessions:
