@@ -148,7 +148,7 @@ export function MonthlyTab({
   return (
     <div className="flex flex-col flex-1 overflow-hidden min-h-0 bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-border shrink-0">
+      <div className="flex items-center justify-between px-2 sm:px-6 py-2 sm:py-3 border-b border-border shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={handlePrev}
@@ -258,7 +258,7 @@ export function MonthlyTab({
                                 e.stopPropagation()
                                 handleWeekClick(d)
                               }}
-                              className="text-xs font-bold px-1 py-0.5 rounded-sm transition-colors hover:opacity-80"
+                              className="hidden sm:inline-flex text-xs font-bold px-1 py-0.5 rounded-sm transition-colors hover:opacity-80"
                               style={{
                                 background: "var(--muted)",
                                 color: "var(--muted-foreground)",
@@ -270,35 +270,46 @@ export function MonthlyTab({
                           )}
                         </div>
 
-                        {/* Task list (Google Calendar style) */}
-                        <div className="flex flex-col gap-px mt-0.5 overflow-hidden flex-1 min-h-0">
-                          {dayTasks.slice(0, 3).map((t) => {
-                            const color = t.status === "done"
-                              ? "var(--status-done)"
-                              : t.priority === "A" ? "var(--priority-a)"
-                              : t.priority === "B" ? "var(--priority-b)"
-                              : "var(--muted-foreground)"
-                            return (
-                              <div
-                                key={t.id}
-                                className={cn(
-                                  "flex items-center gap-1 px-1 py-px rounded text-xs truncate leading-tight",
-                                  t.status === "done" && "opacity-50 line-through"
-                                )}
-                                style={{ background: `color-mix(in oklch, ${color} 15%, transparent)` }}
-                                title={`${t.priority}${t.order + 1}. ${t.title}`}
-                              >
-                                <span className="font-bold shrink-0" style={{ color }}>{t.priority}</span>
-                                <span className="truncate" style={{ color }}>{t.title}</span>
-                              </div>
-                            )
-                          })}
-                          {dayTasks.length > 3 && (
-                            <span className="text-xs text-muted-foreground px-1 leading-tight">
-                              +{dayTasks.length - 3}개
-                            </span>
-                          )}
-                        </div>
+                        {/* Task list — desktop: titles, mobile: count only */}
+                        {dayTasks.length > 0 && (
+                          <>
+                            {/* Mobile: count badge — bottom right */}
+                            <div className="sm:hidden flex-1 flex items-end justify-end">
+                              <span className="text-xs font-semibold tabular-nums px-1 py-px rounded" style={{ color: "var(--primary)", background: "var(--priority-a-bg)" }}>
+                                {dayTasks.length}
+                              </span>
+                            </div>
+                            {/* Desktop: task titles */}
+                            <div className="hidden sm:flex flex-col gap-px mt-0.5 overflow-hidden flex-1 min-h-0">
+                              {dayTasks.slice(0, 3).map((t) => {
+                                const color = t.status === "done"
+                                  ? "var(--status-done)"
+                                  : t.priority === "A" ? "var(--priority-a)"
+                                  : t.priority === "B" ? "var(--priority-b)"
+                                  : "var(--muted-foreground)"
+                                return (
+                                  <div
+                                    key={t.id}
+                                    className={cn(
+                                      "flex items-center gap-1 px-1 py-px rounded text-xs truncate leading-tight",
+                                      t.status === "done" && "opacity-50 line-through"
+                                    )}
+                                    style={{ background: `color-mix(in oklch, ${color} 15%, transparent)` }}
+                                    title={`${t.priority}${t.order + 1}. ${t.title}`}
+                                  >
+                                    <span className="font-bold shrink-0" style={{ color }}>{t.priority}</span>
+                                    <span className="truncate" style={{ color }}>{t.title}</span>
+                                  </div>
+                                )
+                              })}
+                              {dayTasks.length > 3 && (
+                                <span className="text-xs text-muted-foreground px-1 leading-tight">
+                                  +{dayTasks.length - 3}개
+                                </span>
+                              )}
+                            </div>
+                          </>
+                        )}
                       </div>
                     )
                   })}
@@ -310,7 +321,7 @@ export function MonthlyTab({
         </div>
 
         {/* Right: prev/next mini calendars */}
-        <div className="w-36 shrink-0 border-l border-border flex flex-col">
+        <div className="hidden lg:flex w-36 shrink-0 border-l border-border flex-col">
           <MiniCalendar
             year={prevMonthDate.getFullYear()}
             month={prevMonthDate.getMonth()}
@@ -333,7 +344,7 @@ export function MonthlyTab({
 
       {/* Bottom: 주요 업무 + 월간 목표 */}
       <div className="shrink-0 border-t border-border" style={{ minHeight: 120 }}>
-        <div className="grid grid-cols-2 h-full divide-x divide-border">
+        <div className="grid grid-cols-1 sm:grid-cols-2 h-full sm:divide-x divide-border">
           {/* 주요 업무 (A 우선순위 미완료) */}
           <div className="flex flex-col">
             <div className="px-4 py-2 border-b border-border text-xs font-semibold text-muted-foreground tracking-wider text-center">

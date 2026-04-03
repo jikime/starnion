@@ -414,7 +414,7 @@ export function FinanceView() {
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col flex-1 overflow-y-auto p-4 space-y-4 w-full min-h-0">
+    <div className="flex flex-col flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 w-full min-h-0">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div />
@@ -444,7 +444,7 @@ export function FinanceView() {
 
       {/* Stat cards */}
       {loading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="rounded-xl border bg-card p-5 flex items-start gap-4">
               <Skeleton className="size-10 rounded-lg shrink-0" />
@@ -457,7 +457,7 @@ export function FinanceView() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <StatCard
             label={t("thisMonthIncome")}
             value={KRW(summary?.income ?? 0)}
@@ -492,7 +492,7 @@ export function FinanceView() {
       )}
 
       {/* Charts row */}
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Monthly bar chart */}
         <div className="rounded-xl border bg-card p-5">
           <p className="text-sm font-medium mb-4">{t("monthlyChart")}</p>
@@ -651,11 +651,11 @@ export function FinanceView() {
         <Table>
           <TableHeader>
             <TableRow className="text-xs">
-              <TableHead className="w-24">{t("date")}</TableHead>
+              <TableHead className="w-24 hidden sm:table-cell">{t("date")}</TableHead>
               <TableHead>{t("description")}</TableHead>
-              <TableHead className="w-24">{t("category")}</TableHead>
-              <TableHead className="text-right w-36">{t("amount")}</TableHead>
-              <TableHead className="w-16" />
+              <TableHead className="w-24 hidden sm:table-cell">{t("category")}</TableHead>
+              <TableHead className="text-right w-28 sm:w-36">{t("amount")}</TableHead>
+              <TableHead className="w-10 sm:w-16" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -685,7 +685,7 @@ export function FinanceView() {
             ) : (
               filteredTransactions.map((tx) => (
                 <TableRow key={tx.id} className="group">
-                  <TableCell className="text-muted-foreground text-sm">
+                  <TableCell className="text-muted-foreground text-sm hidden sm:table-cell">
                     {tx.created_at.slice(0, 10)}
                   </TableCell>
                   <TableCell className="text-sm">
@@ -698,7 +698,7 @@ export function FinanceView() {
                       )}
                     </span>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     <Badge
                       variant="secondary"
                       className="text-xs font-normal"

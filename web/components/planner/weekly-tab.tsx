@@ -320,9 +320,9 @@ export function WeeklyTab({ onNavigateToDaily }: { onNavigateToDaily: () => void
       <WeekHeader weekStart={weekStart} onPrev={goToPrevWeek} onNext={goToNextWeek} />
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Day grid: 2 rows layout with flexible columns */}
-        <div className="flex flex-col flex-1 overflow-hidden min-h-0 p-4 gap-4">
-          {/* Row 1: Mon Tue Wed (3 equal cols) */}
-          <div className="flex gap-3 overflow-hidden min-h-0 flex-1">
+        <div className="flex flex-col flex-1 overflow-hidden min-h-0 p-2 sm:p-4 gap-2 sm:gap-4">
+          {/* Row 1: Mon Tue Wed */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 overflow-hidden min-h-0 flex-1">
             {days.slice(0, 3).map(({ dateStr, isWeekend }) => (
               <div key={dateStr} className="flex-1 min-w-0">
                 <DayColumn
@@ -333,8 +333,8 @@ export function WeeklyTab({ onNavigateToDaily }: { onNavigateToDaily: () => void
               </div>
             ))}
           </div>
-          {/* Row 2: Thu Fri Sat+Sun (3 equal cols, last col is Sat+Sun combined) */}
-          <div className="flex gap-3 overflow-hidden min-h-0 flex-1">
+          {/* Row 2: Thu Fri Sat+Sun */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 overflow-hidden min-h-0 flex-1">
             {days.slice(3, 5).map(({ dateStr, isWeekend }) => (
               <div key={dateStr} className="flex-1 min-w-0">
                 <DayColumn
@@ -344,7 +344,6 @@ export function WeeklyTab({ onNavigateToDaily }: { onNavigateToDaily: () => void
                 />
               </div>
             ))}
-            {/* Sat + Sun combined card */}
             <div className="flex-1 min-w-0">
               <DayColumn
                 dateStr={days[5].dateStr}
@@ -359,7 +358,7 @@ export function WeeklyTab({ onNavigateToDaily }: { onNavigateToDaily: () => void
 
         {/* Right: Weekly Compass panel */}
         <div
-          className="w-64 shrink-0 border-l border-border overflow-y-auto"
+          className="hidden lg:block w-64 shrink-0 border-l border-border overflow-y-auto"
           style={{ background: "var(--sidebar)" }}
         >
           <div className="px-4 pt-4 pb-2">

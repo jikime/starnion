@@ -315,7 +315,7 @@ function SpendingHeatmap({
 
 function PageSkeleton() {
   return (
-    <div className="flex flex-col flex-1 overflow-y-auto p-4 space-y-4 w-full min-h-0">
+    <div className="flex flex-col flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 w-full min-h-0">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <Skeleton className="h-7 w-40" />
@@ -443,7 +443,7 @@ export function StatisticsView() {
   const maxWeekday = Math.max(...weekdayData.map((w) => w.total), 1)
 
   return (
-    <div className={cn("flex flex-col flex-1 overflow-y-auto p-4 space-y-4 w-full min-h-0 transition-opacity", refreshing && "opacity-60 pointer-events-none")}>
+    <div className={cn("flex flex-col flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 w-full min-h-0 transition-opacity", refreshing && "opacity-60 pointer-events-none")}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

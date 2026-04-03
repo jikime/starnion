@@ -201,16 +201,16 @@ export function AssetsSection() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* Section header */}
-      <div className="flex items-center gap-4 px-5 py-3 border-b border-border bg-card/50 shrink-0">
-        <div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 px-3 sm:px-5 py-2 sm:py-3 border-b border-border bg-card/50 shrink-0">
+        <div className="hidden sm:block">
           <h1 className="text-sm font-bold text-foreground tracking-tight">자산 관리</h1>
           <p className="text-xs text-muted-foreground">StarNion Financial Intelligence</p>
         </div>
-        <nav className="flex items-center gap-0.5 ml-4">
+        <nav className="flex items-center gap-0.5 sm:ml-4 overflow-x-auto w-full sm:w-auto">
           {ASSET_TABS.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => setTab(id)}
               className={cn(
-                "flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium transition-colors",
+                "flex items-center gap-1 sm:gap-1.5 h-7 px-2 sm:px-3 rounded-lg text-xs font-medium transition-colors whitespace-nowrap",
                 tab === id
                   ? "bg-accent text-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
@@ -220,7 +220,7 @@ export function AssetsSection() {
             </button>
           ))}
         </nav>
-        <button className="ml-auto flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground transition-colors">
+        <button className="hidden sm:flex ml-auto items-center gap-1.5 h-7 px-2.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground transition-colors">
           <Download className="w-3.5 h-3.5" />CSV
         </button>
       </div>

@@ -68,17 +68,17 @@ export function MagicBar() {
   const timeOptions = Array.from({ length: 19 }, (_, i) => i + 5)
 
   return (
-    <div className="px-4 pt-3 pb-2 shrink-0 space-y-2">
+    <div className="px-2 sm:px-4 pt-3 pb-2 shrink-0 space-y-2">
       {/* Main row */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2">
         {/* Priority buttons + order number */}
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
           {(["A", "B", "C"] as Priority[]).map(p => (
             <button
               key={p}
               onClick={() => setPriority(p)}
               className={cn(
-                "w-8 h-9 rounded-md text-xs font-bold transition-all",
+                "w-7 h-8 sm:w-8 sm:h-9 rounded-md text-xs font-bold transition-all",
                 priority === p
                   ? "text-[#ffffff] shadow-sm"
                   : "text-muted-foreground bg-muted hover:bg-accent"
@@ -97,7 +97,7 @@ export function MagicBar() {
             value={order}
             onChange={e => { const v = e.target.value.replace(/\D/g, ""); setOrder(v || "1") }}
             onKeyDown={e => { if (["e", "E", "+", "-", "."].includes(e.key)) e.preventDefault() }}
-            className="w-14 h-9 text-center text-xs px-1"
+            className="w-10 sm:w-14 h-8 sm:h-9 text-center text-xs px-1"
           />
         </div>
 
@@ -123,7 +123,7 @@ export function MagicBar() {
         {/* Toggle details */}
         <button
           onClick={() => setExpanded(v => !v)}
-          className={cn("h-9 px-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors", expanded && "bg-accent text-foreground")}
+          className={cn("h-8 sm:h-9 px-1.5 sm:px-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors", expanded && "bg-accent text-foreground")}
           title={t("role")}
         >
           <ChevronDown className={cn("w-4 h-4 transition-transform", expanded && "rotate-180")} />
@@ -133,7 +133,7 @@ export function MagicBar() {
         <button
           onClick={commit}
           disabled={!title.trim()}
-          className="h-9 px-4 rounded-lg text-xs font-bold shrink-0 transition-all hover:opacity-85 disabled:opacity-25 disabled:cursor-not-allowed"
+          className="h-8 sm:h-9 px-3 sm:px-4 rounded-lg text-xs font-bold shrink-0 transition-all hover:opacity-85 disabled:opacity-25 disabled:cursor-not-allowed"
           style={{ background: "var(--priority-a)", color: "#ffffff" }}
         >
           {t("add")}
@@ -142,12 +142,12 @@ export function MagicBar() {
 
       {/* Expanded: Role + Time */}
       {expanded && (
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {/* Role */}
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground shrink-0">{t("role")}</span>
             <Select value={roleId} onValueChange={setRoleId}>
-              <SelectTrigger className="h-8 w-[130px] text-xs">
+              <SelectTrigger className="h-8 w-[100px] sm:w-[130px] text-xs">
                 <SelectValue placeholder={t("roleNone")} />
               </SelectTrigger>
               <SelectContent>

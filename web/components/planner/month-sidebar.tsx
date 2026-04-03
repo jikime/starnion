@@ -35,7 +35,7 @@ export function MonthSidebar() {
   }
 
   return (
-    <aside className="w-20 shrink-0 flex flex-col gap-2 items-center py-4 px-1.5 border-r border-border bg-card/50">
+    <aside className="hidden sm:flex w-20 shrink-0 flex-col gap-2 items-center py-4 px-1.5 border-r border-border bg-card/50">
       {/* Year and nav */}
       <div className="flex flex-col items-center gap-1 text-center text-xs text-muted-foreground font-medium mb-2">
         <div className="flex items-center justify-center gap-0.5">

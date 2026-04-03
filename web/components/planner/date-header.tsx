@@ -30,11 +30,12 @@ export function DateHeader({ rightSlot }: DateHeaderProps = {}) {
 
   const dayOfWeek = format(parsed, "EEEE", { locale: ko })
   const fullDate = format(parsed, "yyyy년 M월 d일", { locale: ko })
+  const shortDate = format(parsed, "M월 d일", { locale: ko })
 
   return (
-    <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50 backdrop-blur-sm shrink-0">
+    <header className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3 border-b border-border bg-card/50 backdrop-blur-sm shrink-0">
       {/* Date navigation */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2">
         <button
           onClick={goBack}
           className="w-7 h-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
@@ -46,7 +47,7 @@ export function DateHeader({ rightSlot }: DateHeaderProps = {}) {
         <div className="flex items-center gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">{fullDate}</span>
+              <span className="text-sm font-semibold text-foreground"><span className="hidden sm:inline">{fullDate}</span><span className="sm:hidden">{shortDate}</span></span>
               {dayLabel && (
                 <span
                   className="text-xs font-semibold px-1.5 py-0.5 rounded"
@@ -59,7 +60,7 @@ export function DateHeader({ rightSlot }: DateHeaderProps = {}) {
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">{dayOfWeek}</p>
+            <p className="text-xs text-muted-foreground hidden sm:block">{dayOfWeek}</p>
           </div>
         </div>
 

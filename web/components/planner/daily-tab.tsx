@@ -51,10 +51,10 @@ export function DailyTab() {
       <main className="flex flex-1 overflow-hidden min-h-0">
         {view === "tasks" && (
           <>
-            <div className="flex flex-col flex-1 min-w-0 overflow-hidden border-r border-border">
+            <div className="flex flex-col flex-1 min-w-0 overflow-hidden sm:border-r border-border">
               <AbcTaskList />
             </div>
-            <div className="flex flex-col w-72 shrink-0 overflow-hidden">
+            <div className="hidden md:flex flex-col w-72 shrink-0 overflow-hidden">
               <TimeBlockCalendar />
             </div>
           </>

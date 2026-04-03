@@ -15,7 +15,7 @@ function PlannerSkeleton() {
   return (
     <>
       {/* Sidebar skeleton */}
-      <div className="w-20 shrink-0 border-r border-border bg-card/50 flex flex-col items-center py-4 gap-3">
+      <div className="hidden sm:flex w-20 shrink-0 border-r border-border bg-card/50 flex-col items-center py-4 gap-3">
         <Skeleton className="h-5 w-12" />
         <div className="flex flex-col gap-2 w-full px-3">
           {Array.from({ length: 12 }).map((_, i) => (
@@ -83,7 +83,7 @@ function PlannerSkeleton() {
             </div>
           </div>
           {/* Time block skeleton */}
-          <div className="flex flex-col w-72 shrink-0 overflow-hidden">
+          <div className="hidden md:flex flex-col w-72 shrink-0 overflow-hidden">
             <div className="px-4 py-3 border-b border-border">
               <Skeleton className="h-3 w-24" />
             </div>

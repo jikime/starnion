@@ -20,7 +20,7 @@ export function TabBar({ active, onChange }: TabBarProps) {
 
   return (
     <nav
-      className="flex items-end gap-0 px-6 border-b border-border bg-card/60 backdrop-blur-sm shrink-0"
+      className="flex items-end gap-0 px-2 sm:px-6 border-b border-border bg-card/60 backdrop-blur-sm shrink-0 overflow-x-auto"
       role="tablist"
       aria-label="Planner tabs"
     >
@@ -33,7 +33,7 @@ export function TabBar({ active, onChange }: TabBarProps) {
             aria-selected={isActive}
             onClick={() => onChange(id)}
             className={cn(
-              "relative px-5 py-3 text-xs font-semibold tracking-widest transition-colors select-none",
+              "relative px-3 sm:px-5 py-3 text-xs font-semibold tracking-widest transition-colors select-none whitespace-nowrap",
               isActive
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"

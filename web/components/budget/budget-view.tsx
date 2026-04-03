@@ -431,7 +431,7 @@ export function BudgetView() {
 
   if (loading) {
     return (
-      <div className="flex flex-col flex-1 overflow-y-auto p-4 space-y-4 w-full min-h-0">
+      <div className="flex flex-col flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 w-full min-h-0">
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Skeleton className="h-8 w-32" />
@@ -522,7 +522,7 @@ export function BudgetView() {
   }
 
   return (
-    <div className="flex flex-col flex-1 overflow-y-auto p-4 space-y-4 w-full min-h-0">
+    <div className="flex flex-col flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 w-full min-h-0">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
