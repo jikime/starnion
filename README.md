@@ -1,0 +1,245 @@
+<div align="center">
+
+![StarNion Banner](web/public/brand_banner.webp)
+
+# ✦ StarNion
+
+**Your Stellar Companion in Every Task.**
+
+A hyper-personalized AI agent platform for finance, journaling, goals, and daily life — accessible from Web and Telegram.
+
+[![Release](https://img.shields.io/github/v/release/jikime/starnion)](https://github.com/jikime/starnion/releases)
+[![License](https://img.shields.io/badge/license-Private-lightgrey)](LICENSE)
+
+[Documentation](https://jikime.github.io/starnion/) · [Installation Guide](https://jikime.github.io/starnion/en/getting-started/installation) · [Korean Docs](https://jikime.github.io/starnion/ko/)
+
+</div>
+
+---
+
+## What is StarNion?
+
+StarNion is a self-hosted personal AI agent platform. All your data stays on your own server while AI helps you manage your daily life more smartly — accessible from **Web UI**, **Telegram**, and a native **CLI**.
+
+**Key highlights:**
+- **24+ built-in features** — finance, diary, goals, memos, garden, wellness, documents, image/audio, web search, and more
+- **Multi-provider LLM** — Anthropic Claude, Google Gemini, OpenAI, GLM (Z.AI), Ollama support
+- **System Scheduler** — notification jobs (weekly report, budget warning, daily summary, etc.) individually enabled/disabled per user
+- **Language Preference** — 4-language i18n (Korean, English, Japanese, Chinese); AI responds in your chosen language
+- **Personas** — configure custom AI personalities per conversation context
+- **Privacy-first** — all data on your own PostgreSQL + MinIO
+
+> Full feature documentation is available at **[jikime.github.io/starnion](https://jikime.github.io/starnion/)**.
+
+---
+
+## Requirements
+
+| Component | Minimum Version | Notes |
+|-----------|----------------|-------|
+| **Node.js** | 20+ | Agent + Web runtime |
+| **Python** | 3.11+ | AI skill scripts |
+| **uv** | latest | Python package manager ([install](https://docs.astral.sh/uv/getting-started/installation/)) |
+| **Docker** | 24+ (with Compose v2) | PostgreSQL + MinIO |
+| **PostgreSQL** | 16 + pgvector | Database |
+| **MinIO** | latest | File storage (S3-compatible) |
+
+> **Go** is only required for source development (`starnion dev`), not for binary installs.
+
+**AI Provider (at least one):**
+
+- [Claude Code](https://claude.ai/) subscription — run `claude` → `/login` (recommended)
+- [Google Gemini](https://aistudio.google.com/), [OpenAI](https://platform.openai.com/), [Anthropic API](https://console.anthropic.com/), [Ollama](https://ollama.com/) — configure in Settings → Models
+
+---
+
+## Installation
+
+### One-line installer (Linux / macOS)
+
+Requires **Node.js 20+**, **pnpm**, and **uv** (Python package manager).
+
+```bash
+# Install prerequisites
+npm install -g pnpm
+curl -LsSf https://astral.sh/uv/install.sh | sh   # uv (Python)
+
+curl -fsSL https://jikime.github.io/starnion/install.sh | bash
+```
+
+The installer creates a Python virtual environment at `~/.starnion/venv/` with all skill dependencies.
+
+After installation, PostgreSQL + MinIO must be running before setup:
+
+```bash
+# 1. Start PostgreSQL + MinIO
+cp ~/.starnion/docker/.env.example ~/.starnion/docker/.env   # set your passwords
+docker compose -f ~/.starnion/docker/docker-compose.yml up -d postgres minio
+
+# 2. Run the setup wizard (7 steps: language, system check, DB, admin, MinIO, service config, AI provider)
+starnion setup
+
+# 3. Start all services
+starnion start
+```
+
+### AI Provider Setup
+
+Claude Code subscription (recommended):
+```bash
+claude        # Start Claude Code CLI
+/login        # Authenticate (browser-based)
+```
+Credentials are saved to `~/.claude/.credentials.json` and auto-detected on service start.
+
+Other providers (Gemini, OpenAI, Ollama, etc.): configure in the web UI at **Settings → Models**.
+
+### Running as a systemd service
+
+```bash
+sudo cp ~/.starnion/scripts/starnion.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now starnion
+```
+
+### Other ways to run
+
+```bash
+starnion start          # Binary mode (foreground)
+starnion docker up -d   # Docker mode
+starnion dev            # Development mode (requires Go + source)
+```
+
+### From source
+
+```bash
+git clone https://github.com/jikime/starnion.git
+cd starnion
+
+# Create docker environment file
+cp docker/.env.example docker/.env
+
+# Start PostgreSQL + MinIO
+docker compose -f docker/docker-compose.yml up -d postgres minio
+
+# Build the starnion CLI
+make starnion
+
+# Interactive setup wizard
+./starnion setup
+
+# Start all services (development mode)
+./starnion dev
+```
+
+### Verify
+
+```bash
+curl http://localhost:8080/healthz
+# {"status":"ok"}
+```
+
+> For detailed configuration options, Docker-only setup, and production deployment, see the **[Installation Guide](https://jikime.github.io/starnion/en/getting-started/installation)**.
+
+---
+
+## Architecture
+
+```
+┌──────────────────────┐   ┌──────────────────────┐
+│   Web UI (Next.js)   │   │   Telegram Bot        │
+│   localhost:3893     │   │   (polling)           │
+└──────────┬───────────┘   └──────────┬────────────┘
+           │                          │
+           ▼                          ▼
+┌──────────────────────────────────────────────────┐
+│              Go Gateway  :8080                    │
+│  REST API  ·  WebSocket  ·  Cron Scheduler        │
+│                  │ gRPC (streaming)               │
+└──────────────────┼───────────────────────────────┘
+                   ▼
+┌──────────────────────────────────────────────────┐
+│           TypeScript Agent  :50051                │
+│  AI SDK v5  ·  Multi-LLM  ·  Skills (24+)        │
+│  Streaming SSE  ·  Tool Calls  ·  RAG Memory     │
+└──────────────────┬───────────────────────────────┘
+                   ▼
+┌──────────────────────────────────────────────────┐
+│        PostgreSQL 16 + pgvector   (HNSW)          │
+└──────────────────────────────────────────────────┘
+          │
+          ▼
+┌─────────────────┐
+│  MinIO (S3)     │  images · audio · documents
+└─────────────────┘
+```
+
+| Layer | Technology |
+|-------|------------|
+| Web UI | Next.js 16 · React 19 · Tailwind CSS 4 · shadcn/ui |
+| Auth | NextAuth.js v5 (Credentials) |
+| Gateway | Go · Echo · go-telegram-bot-api |
+| Agent | TypeScript · Vercel AI SDK v5 · gRPC |
+| LLM | Anthropic Claude · Google Gemini · OpenAI · GLM (Z.AI) · Ollama |
+| Embedding | OpenAI text-embedding-3-small · Gemini text-embedding |
+| Database | PostgreSQL 16 · pgvector (HNSW) |
+| File Storage | MinIO (S3-compatible) |
+| Scheduler | robfig/cron (per-user toggleable) |
+| i18n | next-intl (ko · en · ja · zh) |
+| Runtime | Docker Compose |
+
+> Architecture deep-dive: **[docs/en/architecture/overview](https://jikime.github.io/starnion/en/architecture/overview)**.
+
+---
+
+## Project Structure
+
+```
+starnion/
+├── web/                  # Next.js 16 Web UI  (:3893)
+├── agent/                # TypeScript AI agent (gRPC :50051)
+│   └── skills/           # 24+ skill definitions
+├── gateway/              # Go gateway — REST API + Telegram + Cron  (:8080)
+├── starnion-cli/         # Go CLI tool (starnion command)
+├── proto/                # Protobuf / gRPC definitions
+├── db/
+│   └── migrations/       # PostgreSQL schema migrations
+└── docker/
+    ├── docker-compose.yml
+    ├── docker-compose.prod.yml
+    └── .env.example
+```
+
+---
+
+## Features
+
+| Category | Features |
+|----------|----------|
+| **Finance** | Expense tracking · Spending map · Budget management · Analytics |
+| **Journaling** | Diary with AI assistance · Wellness check-in · Data garden |
+| **Productivity** | Goals & milestones · D-Day countdown · Memos · Reports |
+| **AI** | Multi-LLM · Personas · Skills · Web search · AI memory (RAG) |
+| **Files** | Document & image upload · Audio transcription · MinIO storage |
+| **Channels** | Web chat · Telegram bot · WebSocket streaming |
+| **Settings** | Models management · Cron notifications · Usage analytics · Logs |
+
+---
+
+## Documentation
+
+Full documentation is hosted at **[jikime.github.io/starnion](https://jikime.github.io/starnion/)**.
+
+| | 🇺🇸 English | 🇰🇷 한국어 | 🇯🇵 日本語 | 🇨🇳 中文 |
+|-|------------|-----------|----------|---------|
+| Introduction | [Introduction](https://jikime.github.io/starnion/en/getting-started/introduction) | [소개](https://jikime.github.io/starnion/ko/getting-started/introduction) | [Starnionとは](https://jikime.github.io/starnion/ja/getting-started/introduction) | [简介](https://jikime.github.io/starnion/zh/getting-started/introduction) |
+| Quick Start | [Quick Start](https://jikime.github.io/starnion/en/getting-started/quickstart) | [빠른 시작](https://jikime.github.io/starnion/ko/getting-started/quickstart) | [クイックスタート](https://jikime.github.io/starnion/ja/getting-started/quickstart) | [快速开始](https://jikime.github.io/starnion/zh/getting-started/quickstart) |
+| Installation | [Installation](https://jikime.github.io/starnion/en/getting-started/installation) | [설치 가이드](https://jikime.github.io/starnion/ko/getting-started/installation) | [インストール](https://jikime.github.io/starnion/ja/getting-started/installation) | [安装指南](https://jikime.github.io/starnion/zh/getting-started/installation) |
+| Architecture | [Architecture](https://jikime.github.io/starnion/en/architecture/overview) | [아키텍처](https://jikime.github.io/starnion/ko/architecture/overview) | [アーキテクチャ](https://jikime.github.io/starnion/ja/architecture/overview) | [架构](https://jikime.github.io/starnion/zh/architecture/overview) |
+
+---
+
+## License
+
+Private project. All rights reserved.
+# starnion-new
