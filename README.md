@@ -6,7 +6,7 @@
 
 **Your Stellar Companion in Every Task.**
 
-A hyper-personalized AI agent platform for finance, journaling, goals, and daily life — accessible from Web and Telegram.
+A hyper-personalized AI agent platform with Franklin Planner, finance management, and AI-powered daily life assistance — accessible from Web and Telegram.
 
 [![Release](https://img.shields.io/github/v/release/jikime/starnion)](https://github.com/jikime/starnion/releases)
 [![License](https://img.shields.io/badge/license-Private-lightgrey)](LICENSE)
@@ -22,11 +22,14 @@ A hyper-personalized AI agent platform for finance, journaling, goals, and daily
 StarNion is a self-hosted personal AI agent platform. All your data stays on your own server while AI helps you manage your daily life more smartly — accessible from **Web UI**, **Telegram**, and a native **CLI**.
 
 **Key highlights:**
-- **24+ built-in features** — finance, diary, goals, memos, garden, wellness, documents, image/audio, web search, and more
+- **Franklin Digital Planner** — ABC priority-based daily/weekly/monthly planning with roles, goals, and mission statement
+- **Finance & Assets** — expense tracking, spending map, budget management, statistics & analytics
+- **AI Chat** — multi-provider LLM with personas, web search, and file management
 - **Multi-provider LLM** — Anthropic Claude, Google Gemini, OpenAI, GLM (Z.AI), Ollama support
-- **System Scheduler** — notification jobs (weekly report, budget warning, daily summary, etc.) individually enabled/disabled per user
-- **Language Preference** — 4-language i18n (Korean, English, Japanese, Chinese); AI responds in your chosen language
+- **System Scheduler** — notification jobs (budget warning, daily summary, etc.) individually enabled/disabled per user
+- **Language & Theme** — 4-language i18n (Korean, English, Japanese, Chinese) + dark/light theme
 - **Personas** — configure custom AI personalities per conversation context
+- **Telegram Integration** — full planner CRUD, chat, and notifications via Telegram bot
 - **Privacy-first** — all data on your own PostgreSQL + MinIO
 
 > Full feature documentation is available at **[jikime.github.io/starnion](https://jikime.github.io/starnion/)**.
@@ -160,8 +163,8 @@ curl http://localhost:8080/healthz
                    ▼
 ┌──────────────────────────────────────────────────┐
 │           TypeScript Agent  :50051                │
-│  AI SDK v5  ·  Multi-LLM  ·  Skills (24+)        │
-│  Streaming SSE  ·  Tool Calls  ·  RAG Memory     │
+│  AI SDK v5  ·  Multi-LLM  ·  Skills (30+)        │
+│  Streaming SSE  ·  Tool Calls  ·  Planner Skills │
 └──────────────────┬───────────────────────────────┘
                    ▼
 ┌──────────────────────────────────────────────────┐
@@ -176,8 +179,9 @@ curl http://localhost:8080/healthz
 
 | Layer | Technology |
 |-------|------------|
-| Web UI | Next.js 16 · React 19 · Tailwind CSS 4 · shadcn/ui |
+| Web UI | Next.js 16 · React 19 · Tailwind CSS 4 · shadcn/ui · Pretendard |
 | Auth | NextAuth.js v5 (Credentials) |
+| Theme | next-themes (dark / light) |
 | Gateway | Go · Echo · go-telegram-bot-api |
 | Agent | TypeScript · Vercel AI SDK v5 · gRPC |
 | LLM | Anthropic Claude · Google Gemini · OpenAI · GLM (Z.AI) · Ollama |
@@ -188,8 +192,6 @@ curl http://localhost:8080/healthz
 | i18n | next-intl (ko · en · ja · zh) |
 | Runtime | Docker Compose |
 
-> Architecture deep-dive: **[docs/en/architecture/overview](https://jikime.github.io/starnion/en/architecture/overview)**.
-
 ---
 
 ## Project Structure
@@ -197,8 +199,36 @@ curl http://localhost:8080/healthz
 ```
 starnion/
 ├── web/                  # Next.js 16 Web UI  (:3893)
+│   ├── app/(main)/       # Route pages (chat, files, planners, assets, analytics, ...)
+│   ├── components/       # Feature-based components
+│   │   ├── planner/      # Franklin Planner components
+│   │   ├── chat/         # Chat components
+│   │   ├── files/        # File management components
+│   │   ├── search/       # Web search components
+│   │   ├── skills/       # Skills management
+│   │   ├── logs/         # System logs viewer
+│   │   ├── usage/        # API usage analytics
+│   │   ├── finance/      # Finance (ledger) view
+│   │   ├── budget/       # Budget management view
+│   │   ├── statistics/   # Spending statistics view
+│   │   └── finance-map/  # Naver Maps spending map
+│   └── messages/         # i18n translations (ko, en, ja, zh)
 ├── agent/                # TypeScript AI agent (gRPC :50051)
-│   └── skills/           # 24+ skill definitions
+│   └── skills/           # 30+ skill definitions
+│       ├── planner-tasks/    # Daily task CRUD
+│       ├── planner-inbox/    # Inbox management
+│       ├── planner-roles/    # Role management
+│       ├── planner-goals/    # D-Day goal management
+│       ├── planner-weekly/   # Weekly Big Rocks
+│       ├── planner-diary/    # Diary with mood
+│       ├── planner-reflection/ # Reflection notes
+│       ├── planner-mission/  # Mission statement
+│       ├── finance/          # Finance tracking
+│       ├── budget/           # Budget management
+│       ├── websearch/        # Web search
+│       ├── image/            # Image generation/analysis
+│       ├── audio/            # Audio transcription/TTS
+│       └── ...               # Other skills
 ├── gateway/              # Go gateway — REST API + Telegram + Cron  (:8080)
 ├── starnion-cli/         # Go CLI tool (starnion command)
 ├── proto/                # Protobuf / gRPC definitions
@@ -216,13 +246,47 @@ starnion/
 
 | Category | Features |
 |----------|----------|
-| **Finance** | Expense tracking · Spending map · Budget management · Analytics |
-| **Journaling** | Diary with AI assistance · Wellness check-in · Data garden |
-| **Productivity** | Goals & milestones · D-Day countdown · Memos · Reports |
-| **AI** | Multi-LLM · Personas · Skills · Web search · AI memory (RAG) |
-| **Files** | Document & image upload · Audio transcription · MinIO storage |
-| **Channels** | Web chat · Telegram bot · WebSocket streaming |
-| **Settings** | Models management · Cron notifications · Usage analytics · Logs |
+| **Planner** | Franklin ABC priority tasks · Weekly Big Rocks · Monthly calendar · D-Day goals · Mission & Roles · Diary & Reflection |
+| **Finance** | Expense tracking · Spending map (Naver Maps) · Budget management · Statistics & Analytics |
+| **AI Chat** | Multi-LLM conversations · Personas · WebSocket streaming · Telegram integration |
+| **Files** | Document & image upload · Audio transcription · AI document search · MinIO storage |
+| **Web Search** | AI-powered web search with streaming · Search history & auto-save |
+| **Skills** | 30+ AI skills · API key management · Google OAuth · Per-skill toggle |
+| **Channels** | Web chat · Telegram bot · Channel management · Pairing requests |
+| **Settings** | Model providers · Pricing · Account · Notifications · System logs · Usage analytics |
+
+---
+
+## Web UI Pages
+
+| Menu | Route | Description |
+|------|-------|-------------|
+| Chat | `/chat` | AI chat with sidebar, model selection, personas |
+| Files | `/files` | File management with grid/list view, search, upload |
+| Planner | `/planners` | Franklin Digital Planner (daily/weekly/monthly/goals/compass) |
+| Assets | `/assets` | Finance ledger · Statistics · Budget · Spending map |
+| Analytics | `/analytics` | Message analytics · Channel breakdown · Anomaly detection |
+| Search | `/search` | AI web search with history |
+| Skills | `/skills` | Skill management with API keys |
+| Logs | `/logs` | Real-time system logs (SSE/polling) |
+| Usage | `/usage` | API usage analytics with charts |
+| Settings | `/settings` | Account · Password · Timezone |
+| Notifications | `/cron` | Scheduled notifications & system jobs |
+| Models | `/models` | LLM provider configuration & pricing |
+| Personas | `/personas` | AI personality management |
+
+---
+
+## Planner Database Tables
+
+| Table | Description |
+|-------|-------------|
+| `planner_roles` | Life roles with color, mission, Big Rock |
+| `planner_tasks` | Daily tasks with ABC priority + inbox items |
+| `planner_weekly_goals` | Weekly Big Rocks per role |
+| `planner_goals` | D-Day goals with due dates |
+| `planner_diary` | Daily diary with mood tracking |
+| `planner_reflection_notes` | Reflection notes (JSONB) |
 
 ---
 
@@ -242,4 +306,3 @@ Full documentation is hosted at **[jikime.github.io/starnion](https://jikime.git
 ## License
 
 Private project. All rights reserved.
-# starnion-new

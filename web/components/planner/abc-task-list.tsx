@@ -1,6 +1,6 @@
 "use client"
 // cache-bust: v5
-import { useState } from "react"
+import { useState, useMemo, memo } from "react"
 import { usePlannerStore, type Priority, type Task } from "@/lib/planner-store"
 import { TaskItem } from "./task-item"
 import { MagicBar } from "./magic-bar"
@@ -65,12 +65,14 @@ const PRIORITY_CONFIG = {
 // Compute urgentGoalsByRole inline — avoids prop-passing issues entirely
 function useUrgentGoalsByRole() {
   const { getDdayGoals } = usePlannerStore()
-  const urgentGoals = (getDdayGoals?.() ?? []).filter((g) => g.urgent)
-  const map = new Map<string, { title: string; daysLeft: number }>()
-  for (const g of urgentGoals) {
-    map.set(g.roleId, { title: g.title, daysLeft: g.daysLeft })
-  }
-  return { map, urgentGoals }
+  return useMemo(() => {
+    const urgentGoals = (getDdayGoals?.() ?? []).filter((g) => g.urgent)
+    const map = new Map<string, { title: string; daysLeft: number }>()
+    for (const g of urgentGoals) {
+      map.set(g.roleId, { title: g.title, daysLeft: g.daysLeft })
+    }
+    return { map, urgentGoals }
+  }, [getDdayGoals])
 }
 
 interface PriorityGroupProps {
@@ -82,9 +84,10 @@ function PriorityGroup({ priority }: PriorityGroupProps) {
   const { map: urgentMap } = useUrgentGoalsByRole()
   const { selectedDate, getTasksForDate, addTask, roles, reorderTasks } = usePlannerStore()
   const allTasks = getTasksForDate(selectedDate)
-  const tasks: Task[] = allTasks
-    .filter((t) => t.priority === priority)
-    .sort((a, b) => a.order - b.order)
+  const tasks = useMemo(() =>
+    allTasks.filter((t) => t.priority === priority).sort((a, b) => a.order - b.order),
+    [allTasks, priority]
+  )
 
   const [collapsed, setCollapsed] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -92,11 +95,10 @@ function PriorityGroup({ priority }: PriorityGroupProps) {
   const [newRoleId, setNewRoleId] = useState(roles[0]?.id ?? "")
 
   const cfg = PRIORITY_CONFIG[priority]
-  const doneCount = tasks.filter((t) => t.status === "done").length
-  const pendingACount =
-    priority === "A"
-      ? tasks.filter((t) => t.status === "pending" || t.status === "in-progress").length
-      : 0
+  const { doneCount, pendingACount } = useMemo(() => ({
+    doneCount: tasks.filter((t) => t.status === "done").length,
+    pendingACount: priority === "A" ? tasks.filter((t) => t.status === "pending" || t.status === "in-progress").length : 0,
+  }), [tasks, priority])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, memo } from "react"
 import { usePlannerStore, type Task, type TaskStatus } from "@/lib/planner-store"
 import { cn } from "@/lib/utils"
 import {
@@ -80,7 +80,7 @@ interface TaskItemProps {
   urgentGoal?: { title: string; daysLeft: number }
 }
 
-export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
+export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
   const { updateTask, deleteTask, forwardTask, roles, getDdayGoals } = usePlannerStore()
 
   // Derive urgentGoal internally so old callers that pass undefined don't crash
@@ -469,4 +469,4 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
       {/* Time block inline panel removed — now inline in meta row */}
     </div>
   )
-}
+})

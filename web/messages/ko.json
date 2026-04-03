@@ -923,7 +923,7 @@
     "fileAttached": "첨부됨",
     "fileRemove": "파일 제거",
     "uploadFailed": "업로드 실패",
-    "inputPlaceholder": "메시지를 입력하세요. /를 입력하면 바로가기를 볼 수 있어요.",
+    "inputPlaceholder": "메시지를 입력하세요.",
     "attachFile": "파일 첨부",
     "selectModel": "모델 선택",
     "botSettings": "봇 설정",

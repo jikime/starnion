@@ -25,8 +25,8 @@
   --input: oklch(0.90 0.008 80);
   --ring: oklch(0.65 0.18 55);
   --radius: 0.5rem;
-  --header: oklch(0.22 0.02 255);
-  --header-foreground: oklch(0.85 0.005 255);
+  --header: oklch(0.35 0.12 55);
+  --header-foreground: oklch(0.95 0.02 70);
 
   /* Priority colors */
   --priority-a: oklch(0.60 0.20 55);
@@ -176,6 +176,19 @@
     filter: invert(1) brightness(0.7);
   }
 }
+
+/* Chat message prose */
+.chat-prose {
+  font-size: 0.875rem;
+  line-height: 2;
+}
+.chat-prose p { margin-bottom: 0.5em; }
+.chat-prose ul, .chat-prose ol { margin-bottom: 0.5em; padding-left: 1.25em; }
+.chat-prose ul { list-style-type: disc; }
+.chat-prose ol { list-style-type: decimal; }
+.chat-prose li { margin-bottom: 0.25em; }
+.chat-prose code { font-size: 0.85em; }
+.chat-prose pre { margin: 0.5em 0; }
 
 /* Markdown body for detail panels */
 .markdown-body {

@@ -926,7 +926,7 @@
     "fileAttached": "Attached",
     "fileRemove": "Remove file",
     "uploadFailed": "Upload failed",
-    "inputPlaceholder": "Type a message. Type / to see shortcuts.",
+    "inputPlaceholder": "Type a message.",
     "attachFile": "Attach file",
     "selectModel": "Select model",
     "botSettings": "Bot settings",

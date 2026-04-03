@@ -11,6 +11,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { cn } from "@/lib/utils"
@@ -404,9 +405,40 @@ export default function FilesPage() {
       {filter !== "search" && (
       <div className="flex-1 overflow-y-auto px-5 pb-5">
         {loading && files.length === 0 ? (
-          <div className="flex items-center justify-center h-48">
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-          </div>
+          viewMode === "grid" ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="rounded-xl border border-border bg-card overflow-hidden">
+                  <Skeleton className="aspect-square w-full" />
+                  <div className="p-2.5 space-y-2">
+                    <Skeleton className="h-3 w-3/4" />
+                    <Skeleton className="h-3 w-1/3" />
+                    <Skeleton className="h-2 w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_40px] px-4 py-2 border-b border-border bg-muted/40">
+                {["이름", "유형", "크기", "날짜", ""].map((h, i) => (
+                  <span key={i} className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</span>
+                ))}
+              </div>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="grid grid-cols-[2fr_1fr_1fr_1fr_40px] items-center px-4 py-2.5 border-b border-border last:border-0">
+                  <div className="flex items-center gap-2.5">
+                    <Skeleton className="w-7 h-7 rounded-lg shrink-0" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                  <Skeleton className="h-3 w-12" />
+                  <Skeleton className="h-3 w-14" />
+                  <Skeleton className="h-3 w-16" />
+                  <div />
+                </div>
+              ))}
+            </div>
+          )
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground">
             <Folder className="w-10 h-10 opacity-30" />

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { usePlannerStore } from "@/lib/planner-store"
 import { cn } from "@/lib/utils"
 import {
@@ -105,11 +105,18 @@ export function MonthlyTab({
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
 
-  const rows = getCalendarDays(viewYear, viewMonth)
+  const rows = useMemo(() => getCalendarDays(viewYear, viewMonth), [viewYear, viewMonth])
 
   // Monthly key tasks (store tasks that belong to this month)
   const monthStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`
-  const monthTasks = tasks.filter((t) => t.date.startsWith(monthStr))
+  const monthTasks = useMemo(() => tasks.filter((t) => t.date.startsWith(monthStr)), [tasks, monthStr])
+
+  // Pre-compute task map by date for O(1) lookup in calendar cells
+  const tasksByDate = useMemo(() => {
+    const map = new Map<string, typeof tasks>()
+    for (const t of tasks) { const arr = map.get(t.date) ?? []; arr.push(t); map.set(t.date, arr) }
+    return map
+  }, [tasks])
 
   const prevMonthDate = subMonths(new Date(viewYear, viewMonth, 1), 1)
   const nextMonthDate = addMonths(new Date(viewYear, viewMonth, 1), 1)
@@ -209,7 +216,7 @@ export function MonthlyTab({
                     const inMonth = isSameMonth(d, new Date(viewYear, viewMonth, 1))
                     const isToday = isSameDay(d, today)
                     const ds = format(d, "yyyy-MM-dd")
-                    const dayTasks = tasks.filter((t) => t.date === ds)
+                    const dayTasks = tasksByDate.get(ds) ?? []
                     const isSelected = false
 
                     return (

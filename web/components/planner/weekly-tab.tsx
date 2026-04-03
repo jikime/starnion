@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo, memo } from "react"
 import { usePlannerStore, type Priority, type Task } from "@/lib/planner-store"
 import { WeeklyCompass } from "./weekly-compass"
 import { cn } from "@/lib/utils"
@@ -29,7 +29,7 @@ const PRIORITY_COLOR: Record<Priority, string> = {
 
 // ── Day column ─────────────────────────────────────────────────────────────
 
-function DayColumn({
+const DayColumn = memo(function DayColumn({
   dateStr,
   isWeekend,
   onNavigate,
@@ -46,13 +46,16 @@ function DayColumn({
   const [addingPriority, setAddingPriority] = useState<Priority | null>(null)
   const [newTitle, setNewTitle] = useState("")
 
-  const dayTasks = tasks
-    .filter((t) => t.date === dateStr || (extraDateStr && t.date === extraDateStr))
-    .sort((a, b) => {
-      const po: Record<Priority, number> = { A: 0, B: 1, C: 2 }
-      if (po[a.priority] !== po[b.priority]) return po[a.priority] - po[b.priority]
-      return a.order - b.order
-    })
+  const dayTasks = useMemo(() =>
+    tasks
+      .filter((t) => t.date === dateStr || (extraDateStr && t.date === extraDateStr))
+      .sort((a, b) => {
+        const po: Record<Priority, number> = { A: 0, B: 1, C: 2 }
+        if (po[a.priority] !== po[b.priority]) return po[a.priority] - po[b.priority]
+        return a.order - b.order
+      }),
+    [tasks, dateStr, extraDateStr]
+  )
 
   const handleAddTask = (priority: Priority) => {
     if (!newTitle.trim()) { setAddingPriority(null); return }
@@ -226,7 +229,7 @@ function DayColumn({
       </div>
     </div>
   )
-}
+})
 
 // ── Weekly header bar ──────────────────────────────────────────────────────
 

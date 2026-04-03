@@ -77,28 +77,7 @@ CREATE TABLE IF NOT EXISTS daily_logs (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Reports ──────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS reports (
-    id          BIGSERIAL   NOT NULL PRIMARY KEY,
-    user_id     UUID        NOT NULL,
-    report_type TEXT        NOT NULL,
-    title       TEXT        NOT NULL DEFAULT '',
-    content     TEXT        NOT NULL DEFAULT '',
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT fk_reports_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
--- ── Knowledge Base (vector + full-text hybrid RAG) ───────────
-CREATE TABLE IF NOT EXISTS knowledge_base (
-    id          BIGSERIAL   NOT NULL PRIMARY KEY,
-    user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    key         TEXT        NOT NULL,
-    value       TEXT        NOT NULL,
-    source      TEXT,
-    embedding   vector(768),
-    content_tsv tsvector,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+-- ── (reports and knowledge_base removed) ─────────────────────
 
 -- ── Skills (catalog + per-user settings) ─────────────────────
 CREATE TABLE IF NOT EXISTS user_skills (
@@ -271,92 +250,93 @@ CREATE TABLE IF NOT EXISTS personas (
     UNIQUE (user_id, name)
 );
 
--- ── Diary Entries ────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS diary_entries (
-    id          UUID        NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
+-- ── (diary_entries, goals, goal_checkins, memos, content_tags, ddays removed) ──
+
+-- ── Franklin Planner: Roles ─────────────────────────────────
+CREATE TABLE IF NOT EXISTS planner_roles (
+    id          BIGSERIAL PRIMARY KEY,
     user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title       TEXT        NOT NULL DEFAULT '',
-    content     TEXT        NOT NULL,
-    mood        TEXT        NOT NULL DEFAULT '보통'
-                            CHECK (mood IN ('매우좋음', '좋음', '보통', '나쁨', '매우나쁨')),
-    tags        TEXT[]      NOT NULL DEFAULT '{}',
-    entry_date  DATE        NOT NULL DEFAULT CURRENT_DATE,
-    embedding   vector(768),
-    content_tsv tsvector,
+    name        TEXT        NOT NULL,
+    color       TEXT        NOT NULL DEFAULT '#3b6de0',
+    big_rock    TEXT        NOT NULL DEFAULT '',
+    mission     TEXT,
+    sort_order  INT         NOT NULL DEFAULT 0,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Goals ────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS goals (
-    id             UUID        NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id        UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title          TEXT        NOT NULL,
-    icon           TEXT        NOT NULL DEFAULT '🎯',
-    category       TEXT        NOT NULL DEFAULT 'general',
-    description    TEXT,
-    target_value   NUMERIC     NOT NULL DEFAULT 0,
-    current_value  NUMERIC     NOT NULL DEFAULT 0,
-    unit           TEXT        NOT NULL DEFAULT '',
-    progress       INTEGER     NOT NULL DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
-    start_date     DATE        NOT NULL DEFAULT CURRENT_DATE,
-    end_date       DATE,
-    target_date    DATE,
-    status         TEXT        NOT NULL DEFAULT 'in_progress'
-                               CHECK (status IN ('in_progress','completed','abandoned')),
-    metadata       JSONB       NOT NULL DEFAULT '{}',
-    completed_date DATE,
-    abandoned_date DATE,
-    depends_on     UUID        REFERENCES goals(id) ON DELETE SET NULL,
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- ── Franklin Planner: Tasks ─────────────────────────────────
+CREATE TABLE IF NOT EXISTS planner_tasks (
+    id                BIGSERIAL PRIMARY KEY,
+    user_id           UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title             TEXT        NOT NULL,
+    status            TEXT        NOT NULL DEFAULT 'pending'
+                      CHECK (status IN ('pending','done','forwarded','cancelled','in-progress','delegated')),
+    priority          CHAR(1)     NOT NULL DEFAULT 'C'
+                      CHECK (priority IN ('A','B','C')),
+    sort_order        INT         NOT NULL DEFAULT 0,
+    role_id           BIGINT      REFERENCES planner_roles(id) ON DELETE SET NULL,
+    time_start        TEXT,
+    time_end          TEXT,
+    delegatee         TEXT,
+    note              TEXT,
+    task_date         DATE        NOT NULL DEFAULT CURRENT_DATE,
+    is_inbox          BOOLEAN     NOT NULL DEFAULT FALSE,
+    forwarded_from_id BIGINT      REFERENCES planner_tasks(id) ON DELETE SET NULL,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS goal_checkins (
-    id         BIGSERIAL   PRIMARY KEY,
-    goal_id    UUID        NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
-    user_id    UUID        NOT NULL,
-    check_date DATE        NOT NULL DEFAULT CURRENT_DATE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(goal_id, check_date)
-);
-
--- ── Memos ────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS memos (
-    id          BIGSERIAL   PRIMARY KEY,
-    user_id     UUID        NOT NULL,
-    title       TEXT        NOT NULL DEFAULT '',
-    content     TEXT        NOT NULL DEFAULT '',
-    tag         TEXT        NOT NULL DEFAULT '개인',
-    embedding   vector(768),
-    content_tsv tsvector,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ── Content Tags ─────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS content_tags (
-    id          BIGSERIAL   PRIMARY KEY,
-    user_id     UUID        NOT NULL,
-    source      TEXT        NOT NULL CHECK (source IN ('diary', 'memo')),
-    source_id   TEXT        NOT NULL,
-    tag         TEXT        NOT NULL,
-    auto_tagged BOOLEAN     NOT NULL DEFAULT TRUE,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(source, source_id, tag)
-);
-
--- ── D-Day ────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS ddays (
-    id          BIGSERIAL   PRIMARY KEY,
-    user_id     UUID        NOT NULL,
+-- ── Franklin Planner: Weekly Goals ──────────────────────────
+CREATE TABLE IF NOT EXISTS planner_weekly_goals (
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role_id     BIGINT      NOT NULL REFERENCES planner_roles(id) ON DELETE CASCADE,
     title       TEXT        NOT NULL,
-    target_date DATE        NOT NULL,
-    icon        TEXT        NOT NULL DEFAULT '📅',
-    description TEXT        NOT NULL DEFAULT '',
-    recurring   BOOLEAN     NOT NULL DEFAULT FALSE,
+    done        BOOLEAN     NOT NULL DEFAULT FALSE,
+    week_start  DATE        NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ── Franklin Planner: Goals (D-Day) ────────────────────────
+CREATE TABLE IF NOT EXISTS planner_goals (
+    id              BIGSERIAL PRIMARY KEY,
+    user_id         UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title           TEXT        NOT NULL,
+    role_id         BIGINT      REFERENCES planner_roles(id) ON DELETE SET NULL,
+    due_date        DATE        NOT NULL,
+    description     TEXT,
+    status          TEXT        NOT NULL DEFAULT 'active'
+                    CHECK (status IN ('active','completed','archived')),
+    linked_task_ids BIGINT[]    DEFAULT '{}',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ── Franklin Planner: Diary ────────────────────────────────
+CREATE TABLE IF NOT EXISTS planner_diary (
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    entry_date  DATE        NOT NULL,
+    one_liner   TEXT        NOT NULL DEFAULT '',
+    mood        TEXT        NOT NULL DEFAULT 'neutral'
+                CHECK (mood IN ('great','good','neutral','tired','rough')),
+    full_note   TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, entry_date)
+);
+
+-- ── Franklin Planner: Reflection Notes ─────────────────────
+CREATE TABLE IF NOT EXISTS planner_reflection_notes (
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    note_date   DATE        NOT NULL,
+    notes       JSONB       NOT NULL DEFAULT '[]',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, note_date)
 );
 
 -- ── Web Searches ─────────────────────────────────────────────
@@ -502,17 +482,7 @@ CREATE INDEX IF NOT EXISTS idx_daily_logs_embedding    ON daily_logs
     USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 CREATE INDEX IF NOT EXISTS idx_daily_logs_content_tsv  ON daily_logs USING gin(content_tsv);
 
--- reports
-CREATE INDEX IF NOT EXISTS idx_reports_user_id    ON reports(user_id);
-CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_reports_type       ON reports(report_type);
-
--- knowledge_base
-CREATE INDEX IF NOT EXISTS idx_knowledge_base_user_id    ON knowledge_base(user_id);
-CREATE INDEX IF NOT EXISTS idx_knowledge_base_user_key   ON knowledge_base(user_id, key);
-CREATE INDEX IF NOT EXISTS idx_knowledge_base_embedding  ON knowledge_base
-    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
-CREATE INDEX IF NOT EXISTS idx_knowledge_base_content_tsv ON knowledge_base USING gin(content_tsv);
+-- (reports and knowledge_base indexes removed)
 
 -- conversations
 CREATE INDEX IF NOT EXISTS conversations_user_id_updated_at ON conversations (user_id, updated_at DESC);
@@ -554,33 +524,28 @@ CREATE INDEX IF NOT EXISTS idx_model_assignments_user_usecase  ON model_assignme
 -- personas
 CREATE INDEX IF NOT EXISTS idx_personas_user_id ON personas(user_id);
 
--- diary_entries
-CREATE INDEX IF NOT EXISTS idx_diary_entries_user_date   ON diary_entries(user_id, entry_date DESC);
-CREATE INDEX IF NOT EXISTS idx_diary_entries_embedding   ON diary_entries
-    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
-CREATE INDEX IF NOT EXISTS idx_diary_entries_content_tsv ON diary_entries USING gin(content_tsv);
+-- (diary_entries, goals, goal_checkins, memos, content_tags, ddays indexes removed)
 
--- goals
-CREATE INDEX IF NOT EXISTS idx_goals_user_status  ON goals(user_id, status);
-CREATE INDEX IF NOT EXISTS idx_goals_user_created ON goals(user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_goals_depends_on   ON goals(depends_on);
+-- planner_roles
+CREATE INDEX IF NOT EXISTS idx_planner_roles_user ON planner_roles(user_id);
 
--- goal_checkins
-CREATE INDEX IF NOT EXISTS idx_goal_checkins_goal ON goal_checkins(goal_id);
+-- planner_tasks
+CREATE INDEX IF NOT EXISTS idx_planner_tasks_user_date   ON planner_tasks(user_id, task_date);
+CREATE INDEX IF NOT EXISTS idx_planner_tasks_user_inbox  ON planner_tasks(user_id, is_inbox) WHERE is_inbox = TRUE;
+CREATE INDEX IF NOT EXISTS idx_planner_tasks_user_status ON planner_tasks(user_id, status);
 
--- memos
-CREATE INDEX IF NOT EXISTS idx_memos_user_id          ON memos(user_id);
-CREATE INDEX IF NOT EXISTS idx_memos_user_tag_created ON memos(user_id, tag, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_memos_embedding        ON memos
-    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
-CREATE INDEX IF NOT EXISTS idx_memos_content_tsv      ON memos USING gin(content_tsv);
+-- planner_weekly_goals
+CREATE INDEX IF NOT EXISTS idx_planner_wgoals_user_week ON planner_weekly_goals(user_id, week_start);
 
--- content_tags
-CREATE INDEX IF NOT EXISTS idx_content_tags_user_tag ON content_tags(user_id, tag);
-CREATE INDEX IF NOT EXISTS idx_content_tags_source   ON content_tags(source, source_id);
+-- planner_goals
+CREATE INDEX IF NOT EXISTS idx_planner_goals_user        ON planner_goals(user_id);
+CREATE INDEX IF NOT EXISTS idx_planner_goals_user_status ON planner_goals(user_id, status);
 
--- ddays
-CREATE INDEX IF NOT EXISTS idx_ddays_user_id ON ddays(user_id);
+-- planner_diary
+CREATE INDEX IF NOT EXISTS idx_planner_diary_user_date ON planner_diary(user_id, entry_date);
+
+-- planner_reflection_notes
+CREATE INDEX IF NOT EXISTS idx_planner_reflections_user_date ON planner_reflection_notes(user_id, note_date);
 
 -- searches
 CREATE INDEX IF NOT EXISTS idx_searches_user_id    ON searches(user_id);
@@ -660,29 +625,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION knowledge_base_tsv_trigger() RETURNS trigger AS $$
-BEGIN
-    NEW.content_tsv := to_tsvector('simple',
-        COALESCE(NEW.key, '') || ' ' || COALESCE(NEW.value, ''));
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION diary_entries_tsv_trigger() RETURNS trigger AS $$
-BEGIN
-    NEW.content_tsv := to_tsvector('simple',
-        COALESCE(NEW.title, '') || ' ' || COALESCE(NEW.content, ''));
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION memos_tsv_trigger() RETURNS trigger AS $$
-BEGIN
-    NEW.content_tsv := to_tsvector('simple',
-        COALESCE(NEW.title, '') || ' ' || COALESCE(NEW.content, ''));
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- (knowledge_base_tsv_trigger, diary_entries_tsv_trigger, memos_tsv_trigger removed)
 
 CREATE OR REPLACE FUNCTION searches_tsv_trigger() RETURNS trigger AS $$
 BEGIN
@@ -804,20 +747,7 @@ CREATE TRIGGER trg_daily_logs_tsv
     BEFORE INSERT OR UPDATE OF content ON daily_logs
     FOR EACH ROW EXECUTE FUNCTION daily_logs_tsv_trigger();
 
-DROP TRIGGER IF EXISTS trg_knowledge_base_tsv ON knowledge_base;
-CREATE TRIGGER trg_knowledge_base_tsv
-    BEFORE INSERT OR UPDATE OF key, value ON knowledge_base
-    FOR EACH ROW EXECUTE FUNCTION knowledge_base_tsv_trigger();
-
-DROP TRIGGER IF EXISTS trg_diary_entries_tsv ON diary_entries;
-CREATE TRIGGER trg_diary_entries_tsv
-    BEFORE INSERT OR UPDATE OF title, content ON diary_entries
-    FOR EACH ROW EXECUTE FUNCTION diary_entries_tsv_trigger();
-
-DROP TRIGGER IF EXISTS trg_memos_tsv ON memos;
-CREATE TRIGGER trg_memos_tsv
-    BEFORE INSERT OR UPDATE OF title, content ON memos
-    FOR EACH ROW EXECUTE FUNCTION memos_tsv_trigger();
+-- (knowledge_base, diary_entries, memos triggers removed)
 
 DROP TRIGGER IF EXISTS trg_searches_tsv ON searches;
 CREATE TRIGGER trg_searches_tsv
@@ -840,15 +770,7 @@ CREATE TRIGGER update_chat_sessions_updated_at
     BEFORE UPDATE ON chat_sessions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_diary_entries_updated_at ON diary_entries;
-CREATE TRIGGER update_diary_entries_updated_at
-    BEFORE UPDATE ON diary_entries
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-DROP TRIGGER IF EXISTS update_goals_updated_at ON goals;
-CREATE TRIGGER update_goals_updated_at
-    BEFORE UPDATE ON goals
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- (diary_entries, goals updated_at triggers removed)
 
 -- Default personas trigger
 DROP TRIGGER IF EXISTS trg_seed_default_personas ON users;

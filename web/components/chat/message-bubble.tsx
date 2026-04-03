@@ -62,7 +62,7 @@ export function MessageBubble({
               <AssistantBody message={message} />
             </>
           ) : (
-            <p className="text-base whitespace-pre-wrap leading-relaxed">
+            <p className="text-sm whitespace-pre-wrap leading-loose">
               {message.text}
               {message.streaming && (
                 <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-current align-middle" />
