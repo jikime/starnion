@@ -244,7 +244,7 @@ function RoleCard({
             size="sm"
             className="h-7 text-xs px-2 shrink-0"
             onClick={handleAdd}
-            style={{ background: role.color, color: "#0d1117" }}
+            style={{ background: role.color, color: "#ffffff" }}
           >
             추가
           </Button>

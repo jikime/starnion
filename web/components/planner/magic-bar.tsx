@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef } from "react"
+import { useTranslations } from "next-intl"
 import { usePlannerStore, type Priority } from "@/lib/planner-store"
 import { cn } from "@/lib/utils"
 import { Zap, X, ChevronDown } from "lucide-react"
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/select"
 
 export function MagicBar() {
+  const t = useTranslations("planner.task")
   const { addTask, updateTask, roles } = usePlannerStore()
   const [title, setTitle] = useState("")
   const [priority, setPriority] = useState<Priority>("A")
@@ -78,7 +80,7 @@ export function MagicBar() {
               className={cn(
                 "w-8 h-9 rounded-md text-xs font-bold transition-all",
                 priority === p
-                  ? "text-[#0d1117] shadow-sm"
+                  ? "text-[#ffffff] shadow-sm"
                   : "text-muted-foreground bg-muted hover:bg-accent"
               )}
               style={priority === p ? {
@@ -108,7 +110,7 @@ export function MagicBar() {
             onChange={e => setTitle(e.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => setExpanded(true)}
-            placeholder="업무 제목 입력..."
+            placeholder={t("addPlaceholder")}
             className="h-9 pl-8 pr-8 text-sm"
           />
           {title && (
@@ -122,7 +124,7 @@ export function MagicBar() {
         <button
           onClick={() => setExpanded(v => !v)}
           className={cn("h-9 px-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors", expanded && "bg-accent text-foreground")}
-          title="상세 옵션"
+          title={t("role")}
         >
           <ChevronDown className={cn("w-4 h-4 transition-transform", expanded && "rotate-180")} />
         </button>
@@ -132,9 +134,9 @@ export function MagicBar() {
           onClick={commit}
           disabled={!title.trim()}
           className="h-9 px-4 rounded-lg text-xs font-bold shrink-0 transition-all hover:opacity-85 disabled:opacity-25 disabled:cursor-not-allowed"
-          style={{ background: "var(--priority-a)", color: "#0d1117" }}
+          style={{ background: "var(--priority-a)", color: "#ffffff" }}
         >
-          추가
+          {t("add")}
         </button>
       </div>
 
@@ -143,13 +145,13 @@ export function MagicBar() {
         <div className="flex items-center gap-3 flex-wrap">
           {/* Role */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground shrink-0">역할</span>
+            <span className="text-xs text-muted-foreground shrink-0">{t("role")}</span>
             <Select value={roleId} onValueChange={setRoleId}>
               <SelectTrigger className="h-8 w-[130px] text-xs">
-                <SelectValue placeholder="선택 안함" />
+                <SelectValue placeholder={t("roleNone")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">선택 안함</SelectItem>
+                <SelectItem value="none">{t("roleNone")}</SelectItem>
                 {roles.map(r => (
                   <SelectItem key={r.id} value={r.id}>
                     <span className="flex items-center gap-1.5">
@@ -164,7 +166,7 @@ export function MagicBar() {
 
           {/* Time start */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground shrink-0">시작</span>
+            <span className="text-xs text-muted-foreground shrink-0">{t("timeStart")}</span>
             <Select value={timeStart} onValueChange={v => { setTimeStart(v); if (!timeEnd && v && v !== "none") setTimeEnd(String(Math.min(Number(v) + 1, 23))) }}>
               <SelectTrigger className="h-8 w-[80px] text-xs">
                 <SelectValue placeholder="--" />
@@ -180,7 +182,7 @@ export function MagicBar() {
 
           {/* Time end */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground shrink-0">종료</span>
+            <span className="text-xs text-muted-foreground shrink-0">{t("timeEnd")}</span>
             <Select value={timeEnd} onValueChange={setTimeEnd}>
               <SelectTrigger className="h-8 w-[80px] text-xs">
                 <SelectValue placeholder="--" />

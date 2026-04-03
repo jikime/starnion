@@ -312,7 +312,7 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
                 onKeyDown={e => { if (e.key === "Enter") saveTimeBlock(); if (e.key === "Escape") setShowTimeAssign(false); if (["e","E","+","-","."].includes(e.key)) e.preventDefault() }}
                 className="w-12 h-6 text-xs text-center px-1"
               />
-              <button onClick={saveTimeBlock} className="text-xs font-medium px-1.5 py-0.5 rounded hover:opacity-80" style={{ background: "var(--priority-a)", color: "#0d1117" }}>확인</button>
+              <button onClick={saveTimeBlock} className="text-xs font-medium px-1.5 py-0.5 rounded hover:opacity-80" style={{ background: "var(--priority-a)", color: "#ffffff" }}>확인</button>
               <button onClick={() => setShowTimeAssign(false)} className="text-xs text-muted-foreground hover:text-foreground">취소</button>
             </div>
           ) : task.timeStart !== undefined ? (
@@ -396,7 +396,7 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
               <button
                 onClick={() => { saveMemo(); setShowMemo(false) }}
                 className="h-5 px-2 rounded text-xs font-medium hover:opacity-80 transition-opacity"
-                style={{ background: "var(--priority-b)", color: "#0d1117" }}
+                style={{ background: "var(--priority-b)", color: "#ffffff" }}
               >
                 저장
               </button>

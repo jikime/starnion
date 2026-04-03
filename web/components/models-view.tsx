@@ -779,10 +779,6 @@ export function ModelsView() {
             <DollarSign className="h-3.5 w-3.5 mr-1 hidden sm:inline-block" />
             {t("tabs.pricing")}
           </TabsTrigger>
-          <TabsTrigger value="assignments" className="text-xs sm:text-sm flex-1 sm:flex-none">
-            <BrainCircuit className="h-3.5 w-3.5 mr-1 hidden sm:inline-block" />
-            {t("tabs.assignments")}
-          </TabsTrigger>
         </TabsList>
 
         {/* ── Providers Tab ──────────────────────────────────────────────── */}
@@ -1297,133 +1293,8 @@ export function ModelsView() {
           </div>
         </TabsContent>
 
-        {/* ── Assignments Tab ──────────────────────────────────────────────── */}
-        <TabsContent value="assignments">
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">{t("assignments.subtitle")}</p>
+        {/* Assignments tab removed */}
 
-            {savedProviders.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">{t("assignments.noModels")}</p>
-            ) : (
-              <div className="space-y-3">
-                {USE_CASES.map((uc) => {
-                  const edit = getAssignmentEdit(uc.id)
-                  const saved = savedAssignments[uc.id]
-                  const isSavingThis = savingAssignment === uc.id
-                  const hasAssignmentChanged = !!assignmentEdits[uc.id] && assignmentEdits[uc.id].model !== (saved?.model ?? "")
-
-                  // Group models by provider for the select
-                  // Embedding use case: show embedding-capable models from configured providers
-                  // Other use cases: show chat/generation models the user has enabled
-                  const modelsByProvider: Record<string, { modelId: string; modelName: string; provider: string }[]> = {}
-                  if (uc.isEmbedding) {
-                    for (const sp of savedProviders) {
-                      const embModels = EMBEDDING_MODELS[sp.provider]
-                      if (!embModels || embModels.length === 0) continue
-                      modelsByProvider[sp.provider] = embModels.map(m => ({
-                        modelId: m.id,
-                        modelName: m.name,
-                        provider: sp.provider,
-                      }))
-                    }
-                  } else {
-                    for (const m of allEnabledModels) {
-                      if (!modelsByProvider[m.provider]) modelsByProvider[m.provider] = []
-                      modelsByProvider[m.provider].push(m)
-                    }
-                  }
-
-                  return (
-                    <div
-                      key={uc.id}
-                      className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 rounded-lg border border-border bg-card px-3 py-2.5 sm:px-4 sm:py-3"
-                    >
-                      {/* Use case label */}
-                      <div className="sm:w-36 sm:shrink-0">
-                        <p className="text-xs sm:text-sm font-medium">{t(uc.labelKey as Parameters<typeof t>[0])}</p>
-                      </div>
-
-                      {/* Model selector + actions */}
-                      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                      <div className="flex-1 min-w-0">
-                        <Select
-                          value={edit.model || "__default__"}
-                          onValueChange={(val) => {
-                            if (val === "__default__") {
-                              setAssignmentEdits(prev => { const next = { ...prev }; delete next[uc.id]; return next })
-                              return
-                            }
-                            // For embedding, find provider from EMBEDDING_MODELS; otherwise from allEnabledModels
-                            let provider = ""
-                            if (uc.isEmbedding) {
-                              for (const [prov, models] of Object.entries(EMBEDDING_MODELS)) {
-                                if (models.some(m => m.id === val)) { provider = prov; break }
-                              }
-                            } else {
-                              provider = allEnabledModels.find(m => m.modelId === val)?.provider ?? ""
-                            }
-                            setAssignmentEdits(prev => ({
-                              ...prev,
-                              [uc.id]: { provider, model: val },
-                            }))
-                          }}
-                        >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder={t("assignments.noAssignment")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__default__" className="text-xs text-muted-foreground">
-                              {uc.isEmbedding
-                                ? `${t("assignments.noAssignment")} (${t("assignments.providerDefault")})`
-                                : `${t("assignments.noAssignment")} (${systemDefaults[uc.id] ?? "claude-haiku-4-5"})`}
-                            </SelectItem>
-                            {Object.entries(modelsByProvider).map(([provider, models]) => (
-                              <SelectGroup key={provider}>
-                                <SelectLabel className="text-xs">{PROVIDER_META[provider]?.name ?? provider}</SelectLabel>
-                                {models.map((m) => (
-                                  <SelectItem key={m.modelId} value={m.modelId} className="text-xs">
-                                    {m.modelName}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2 text-xs"
-                          disabled={isSavingThis || !edit.model || !hasAssignmentChanged}
-                          onClick={() => saveAssignment(uc.id)}
-                        >
-                          {isSavingThis
-                            ? <RefreshCw className="h-3 w-3 animate-spin" />
-                            : t("assignments.save")}
-                        </Button>
-                        {saved && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                            title={t("assignments.reset")}
-                            onClick={() => setDeleteAssignTarget(uc.id)}
-                          >
-                            <RotateCcw className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </TabsContent>
       </Tabs>
 
       {/* ── AlertDialog: Remove Provider ───────────────────────────── */}
@@ -1465,23 +1336,6 @@ export function ModelsView() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── AlertDialog: Delete Assignment ───────────────────────── */}
-      <AlertDialog open={!!deleteAssignTarget} onOpenChange={open => { if (!open) setDeleteAssignTarget(null) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("deleteAssignDialog.title")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteAssignTarget && t("deleteAssignDialog.description", { useCase: deleteAssignTarget })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("removeDialog.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteAssignTarget && deleteAssignment(deleteAssignTarget)}>
-              {t("deleteAssignDialog.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
     </div>
     </TooltipProvider>

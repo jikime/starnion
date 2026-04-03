@@ -4,59 +4,61 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Franklin Planner Dark Navy Theme */
-  --background: oklch(0.095 0.012 255);
-  --foreground: oklch(0.97 0.003 255);
-  --card: oklch(0.13 0.012 255);
-  --card-foreground: oklch(0.97 0.003 255);
-  --popover: oklch(0.15 0.012 255);
-  --popover-foreground: oklch(0.97 0.003 255);
-  --primary: oklch(0.74 0.16 70);
-  --primary-foreground: oklch(0.095 0.012 255);
-  --secondary: oklch(0.18 0.012 255);
-  --secondary-foreground: oklch(0.97 0.003 255);
-  --muted: oklch(0.18 0.012 255);
-  --muted-foreground: oklch(0.68 0.01 255);
-  --accent: oklch(0.22 0.012 255);
-  --accent-foreground: oklch(0.97 0.003 255);
-  --destructive: oklch(0.6 0.23 25);
-  --destructive-foreground: oklch(0.97 0.003 255);
-  --border: oklch(0.24 0.012 255);
-  --input: oklch(0.26 0.012 255);
-  --ring: oklch(0.74 0.16 70);
+  /* Franklin Planner Light Theme — warm ivory + gold accent */
+  --background: oklch(0.98 0.005 80);
+  --foreground: oklch(0.15 0.01 255);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.01 255);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.01 255);
+  --primary: oklch(0.65 0.18 55);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0.005 80);
+  --secondary-foreground: oklch(0.2 0.01 255);
+  --muted: oklch(0.94 0.005 80);
+  --muted-foreground: oklch(0.45 0.01 255);
+  --accent: oklch(0.92 0.008 80);
+  --accent-foreground: oklch(0.15 0.01 255);
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.88 0.008 80);
+  --input: oklch(0.90 0.008 80);
+  --ring: oklch(0.65 0.18 55);
   --radius: 0.5rem;
+  --header: oklch(0.22 0.02 255);
+  --header-foreground: oklch(0.85 0.005 255);
 
   /* Priority colors */
-  --priority-a: oklch(0.74 0.16 70);
-  --priority-a-bg: oklch(0.74 0.16 70 / 0.12);
-  --priority-b: oklch(0.68 0.17 240);
-  --priority-b-bg: oklch(0.68 0.17 240 / 0.12);
-  --priority-c: oklch(0.52 0.01 255);
-  --priority-c-bg: oklch(0.52 0.01 255 / 0.1);
+  --priority-a: oklch(0.60 0.20 55);
+  --priority-a-bg: oklch(0.60 0.20 55 / 0.10);
+  --priority-b: oklch(0.55 0.18 240);
+  --priority-b-bg: oklch(0.55 0.18 240 / 0.10);
+  --priority-c: oklch(0.50 0.01 255);
+  --priority-c-bg: oklch(0.50 0.01 255 / 0.08);
 
   /* Status colors */
-  --status-done: oklch(0.7 0.18 145);
-  --status-forwarded: oklch(0.68 0.17 240);
-  --status-cancelled: oklch(0.6 0.23 25);
-  --status-in-progress: oklch(0.74 0.16 70);
-  --status-delegated: oklch(0.68 0.18 295);
+  --status-done: oklch(0.55 0.18 145);
+  --status-forwarded: oklch(0.55 0.18 240);
+  --status-cancelled: oklch(0.55 0.22 25);
+  --status-in-progress: oklch(0.60 0.20 55);
+  --status-delegated: oklch(0.55 0.18 295);
 
   /* Sidebar tokens */
-  --sidebar: oklch(0.11 0.012 255);
-  --sidebar-foreground: oklch(0.93 0.007 255);
-  --sidebar-primary: oklch(0.74 0.16 70);
-  --sidebar-primary-foreground: oklch(0.095 0.012 255);
-  --sidebar-accent: oklch(0.18 0.012 255);
-  --sidebar-accent-foreground: oklch(0.93 0.007 255);
-  --sidebar-border: oklch(0.22 0.012 255);
-  --sidebar-ring: oklch(0.74 0.16 70);
+  --sidebar: oklch(0.96 0.005 80);
+  --sidebar-foreground: oklch(0.15 0.01 255);
+  --sidebar-primary: oklch(0.65 0.18 55);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.92 0.008 80);
+  --sidebar-accent-foreground: oklch(0.15 0.01 255);
+  --sidebar-border: oklch(0.88 0.008 80);
+  --sidebar-ring: oklch(0.65 0.18 55);
 
   /* Chart colors */
-  --chart-1: oklch(0.74 0.16 70);
-  --chart-2: oklch(0.68 0.17 240);
-  --chart-3: oklch(0.7 0.18 145);
-  --chart-4: oklch(0.68 0.18 295);
-  --chart-5: oklch(0.6 0.23 25);
+  --chart-1: oklch(0.60 0.20 55);
+  --chart-2: oklch(0.55 0.18 240);
+  --chart-3: oklch(0.55 0.18 145);
+  --chart-4: oklch(0.55 0.18 295);
+  --chart-5: oklch(0.55 0.22 25);
 }
 
 .dark {
@@ -79,6 +81,8 @@
   --border: oklch(0.24 0.012 255);
   --input: oklch(0.26 0.012 255);
   --ring: oklch(0.74 0.16 70);
+  --header: oklch(0.13 0.012 255);
+  --header-foreground: oklch(0.80 0.005 255);
 
   --sidebar: oklch(0.11 0.012 255);
   --sidebar-foreground: oklch(0.97 0.003 255);
@@ -95,6 +99,8 @@
   --font-mono: 'Pretendard Variable', Pretendard, ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-header: var(--header);
+  --color-header-foreground: var(--header-foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -157,13 +163,17 @@
   body {
     @apply bg-background text-foreground;
   }
-  /* Number input spinner — dark theme compatible */
+  /* Number input spinner */
   input[type="number"]::-webkit-inner-spin-button,
   input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: inner-spin-button;
     opacity: 1;
-    filter: invert(1) brightness(0.7);
+    background: transparent;
     cursor: pointer;
+  }
+  .dark input[type="number"]::-webkit-inner-spin-button,
+  .dark input[type="number"]::-webkit-outer-spin-button {
+    filter: invert(1) brightness(0.7);
   }
 }
 

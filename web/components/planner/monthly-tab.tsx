@@ -263,27 +263,32 @@ export function MonthlyTab({
                           )}
                         </div>
 
-                        {/* Task dots */}
-                        <div className="flex flex-wrap gap-0.5 mt-0.5">
-                          {dayTasks.slice(0, 4).map((t) => (
-                            <span
-                              key={t.id}
-                              className="w-1 h-1 rounded-full shrink-0"
-                              style={{
-                                background:
-                                  t.status === "done"
-                                    ? "var(--status-done)"
-                                    : t.priority === "A"
-                                    ? "var(--priority-a)"
-                                    : t.priority === "B"
-                                    ? "var(--priority-b)"
-                                    : "var(--muted-foreground)",
-                              }}
-                            />
-                          ))}
-                          {dayTasks.length > 4 && (
-                            <span className="text-[8px] text-muted-foreground leading-none">
-                              +{dayTasks.length - 4}
+                        {/* Task list (Google Calendar style) */}
+                        <div className="flex flex-col gap-px mt-0.5 overflow-hidden flex-1 min-h-0">
+                          {dayTasks.slice(0, 3).map((t) => {
+                            const color = t.status === "done"
+                              ? "var(--status-done)"
+                              : t.priority === "A" ? "var(--priority-a)"
+                              : t.priority === "B" ? "var(--priority-b)"
+                              : "var(--muted-foreground)"
+                            return (
+                              <div
+                                key={t.id}
+                                className={cn(
+                                  "flex items-center gap-1 px-1 py-px rounded text-xs truncate leading-tight",
+                                  t.status === "done" && "opacity-50 line-through"
+                                )}
+                                style={{ background: `color-mix(in oklch, ${color} 15%, transparent)` }}
+                                title={`${t.priority}${t.order + 1}. ${t.title}`}
+                              >
+                                <span className="font-bold shrink-0" style={{ color }}>{t.priority}</span>
+                                <span className="truncate" style={{ color }}>{t.title}</span>
+                              </div>
+                            )
+                          })}
+                          {dayTasks.length > 3 && (
+                            <span className="text-xs text-muted-foreground px-1 leading-tight">
+                              +{dayTasks.length - 3}개
                             </span>
                           )}
                         </div>

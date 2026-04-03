@@ -1,11 +1,18 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { usePlannerStore } from "@/lib/planner-store"
 import { cn } from "@/lib/utils"
 import { Plus, Trash2, Flag, ChevronDown, ChevronUp } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { CalendarIcon } from "lucide-react"
+import { format, parseISO } from "date-fns"
+import { ko } from "date-fns/locale"
 
 export function GoalsTab() {
   const { goals, roles, addGoal, deleteGoal, getDdayGoals } = usePlannerStore()
@@ -35,13 +42,13 @@ export function GoalsTab() {
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0 bg-card/40">
         <div>
-          <h2 className="text-lg font-bold text-foreground">D-Day 목표</h2>
+          <h2 className="text-lg font-bold text-foreground">목표</h2>
           <p className="text-xs text-muted-foreground mt-0.5">마감일이 있는 중요한 목표를 관리합니다</p>
         </div>
         <button
           onClick={() => setAdding(!adding)}
           className="flex items-center gap-1.5 h-8 px-3 rounded text-xs font-medium hover:opacity-80 transition-opacity"
-          style={{ background: "var(--priority-a)", color: "#0d1117" }}
+          style={{ background: "var(--priority-a)", color: "#ffffff" }}
         >
           <Plus className="w-3.5 h-3.5" />
           목표 추가
@@ -63,27 +70,43 @@ export function GoalsTab() {
               placeholder="목표 이름"
               className="h-8 text-sm bg-muted border-border"
             />
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-[1fr_2fr] gap-2">
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">마감일</label>
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full h-8 px-2 rounded border border-border bg-muted text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full h-8 justify-start text-xs font-normal gap-1.5 px-2">
+                      <CalendarIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                      {dueDate ? format(parseISO(dueDate), "yyyy년 M월 d일", { locale: ko }) : "날짜 선택"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dueDate ? parseISO(dueDate) : undefined}
+                      onSelect={(date) => { if (date) setDueDate(format(date, "yyyy-MM-dd")) }}
+                      locale={ko}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">역할</label>
-                <select
-                  value={roleId}
-                  onChange={(e) => setRoleId(e.target.value)}
-                  className="w-full h-8 px-2 rounded border border-border bg-muted text-sm text-foreground focus:outline-none"
-                >
-                  {roles.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
-                </select>
+                <Select value={roleId} onValueChange={setRoleId}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="역할 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: r.color }} />
+                          {r.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <Input
@@ -96,7 +119,7 @@ export function GoalsTab() {
               <Button
                 size="sm"
                 onClick={handleAdd}
-                style={{ background: "var(--priority-a)", color: "#0d1117" }}
+                style={{ background: "var(--priority-a)", color: "#ffffff" }}
                 className="text-xs"
               >
                 추가
@@ -117,7 +140,7 @@ export function GoalsTab() {
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
             <Flag className="w-8 h-8 opacity-30" />
             <p className="text-sm">아직 목표가 없습니다</p>
-            <p className="text-xs opacity-70">위 &lsquo;목표 추가&rsquo; 버튼으로 D-Day 목표를 추가해보세요</p>
+            <p className="text-xs opacity-70">위 &lsquo;목표 추가&rsquo; 버튼으로 목표를 추가해보세요</p>
           </div>
         )}
 

@@ -66,7 +66,7 @@ export function MonthSidebar() {
             className="py-1 px-1 rounded text-xs font-semibold transition-all"
             style={{
               background: idx === currentMonth ? "var(--primary)" : "transparent",
-              color: idx === currentMonth ? "#0d1117" : "var(--muted-foreground)",
+              color: idx === currentMonth ? "#ffffff" : "var(--muted-foreground)",
               borderRadius: "4px",
             }}
             aria-pressed={idx === currentMonth}

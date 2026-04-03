@@ -89,7 +89,7 @@ export function InboxTab() {
             <button
               onClick={handleAdd}
               className="h-6 px-3 rounded text-xs font-medium"
-              style={{ background: "var(--priority-a)", color: "#0d1117" }}
+              style={{ background: "var(--priority-a)", color: "#ffffff" }}
             >
               추가
             </button>

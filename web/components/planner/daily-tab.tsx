@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { AbcTaskList } from "./abc-task-list"
 import { TimeBlockCalendar } from "./time-block-calendar"
 import { DateHeader } from "./date-header"
@@ -11,33 +12,35 @@ import { ListTodo, BookOpen, BrainCircuit } from "lucide-react"
 
 type DailyView = "tasks" | "note" | "intelligence"
 
-const VIEWS: { id: DailyView; label: string; icon: React.ElementType }[] = [
-  { id: "tasks",        label: "업무",        icon: ListTodo     },
-  { id: "note",         label: "노트",        icon: BookOpen     },
-  { id: "intelligence", label: "관리",  icon: BrainCircuit },
-]
+const VIEW_IDS: DailyView[] = ["tasks", "note", "intelligence"]
+const VIEW_KEYS: Record<DailyView, string> = { tasks: "tasks", note: "note", intelligence: "manage" }
+const VIEW_ICONS: Record<DailyView, React.ElementType> = { tasks: ListTodo, note: BookOpen, intelligence: BrainCircuit }
 
 export function DailyTab() {
+  const t = useTranslations("planner.views")
   const [view, setView] = useState<DailyView>("tasks")
 
   const viewSwitcher = (
     <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
-      {VIEWS.map(({ id, label, icon: Icon }) => (
-        <button
-          key={id}
-          onClick={() => setView(id)}
-          className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
-            view === id
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-          aria-pressed={view === id}
-        >
-          <Icon className="w-3 h-3" />
-          {label}
-        </button>
-      ))}
+      {VIEW_IDS.map((id) => {
+        const Icon = VIEW_ICONS[id]
+        return (
+          <button
+            key={id}
+            onClick={() => setView(id)}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+              view === id
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            aria-pressed={view === id}
+          >
+            <Icon className="w-3 h-3" />
+            {t(VIEW_KEYS[id])}
+          </button>
+        )
+      })}
     </div>
   )
 

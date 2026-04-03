@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useTranslations } from "next-intl"
 import { usePlannerStore } from "@/lib/planner-store"
 import { cn } from "@/lib/utils"
 import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, Check, Calendar } from "lucide-react"
@@ -307,7 +308,7 @@ export function NoteTab({ embedded = false }: { embedded?: boolean }) {
                 setMood(draftMood); setOneLiner(draftOneLiner)
                 setDiaryEntry(selectedDate, { mood: draftMood, oneLiner: draftOneLiner })
                 setViewMode("view")
-              }} style={{ background: "var(--priority-a)", color: "#0d1117" }}>
+              }} style={{ background: "var(--priority-a)", color: "#ffffff" }}>
                 <Check className="w-3.5 h-3.5" />수정 완료
               </Button>
             </div>
@@ -337,7 +338,7 @@ export function NoteTab({ embedded = false }: { embedded?: boolean }) {
               <Button variant="outline" className="flex-1 gap-1.5" onClick={handleCancel}>
                 <X className="w-3.5 h-3.5" />취소
               </Button>
-              <Button className="flex-1 gap-1.5" onClick={handleSave} style={{ background: "var(--priority-a)", color: "#0d1117" }}>
+              <Button className="flex-1 gap-1.5" onClick={handleSave} style={{ background: "var(--priority-a)", color: "#ffffff" }}>
                 <Check className="w-3.5 h-3.5" />{viewMode === "new" ? "저장" : "수정 완료"}
               </Button>
             </div>

@@ -149,7 +149,7 @@ function DiaryPanel() {
       <Button
         onClick={handleSave}
         className="w-full"
-        style={{ background: saved ? "var(--status-done)" : "var(--priority-a)", color: "#0d1117" }}
+        style={{ background: saved ? "var(--status-done)" : "var(--priority-a)", color: "#ffffff" }}
       >
         {saved ? "저장됨" : "저장"}
       </Button>
@@ -232,7 +232,7 @@ function InboxPanel() {
             <button
               onClick={handleAdd}
               className="h-6 px-3 rounded text-xs font-medium"
-              style={{ background: "var(--priority-a)", color: "#0d1117" }}
+              style={{ background: "var(--priority-a)", color: "#ffffff" }}
             >
               추가
             </button>

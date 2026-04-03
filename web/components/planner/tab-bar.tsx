@@ -1,17 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 
 export type PlannerTab = "daily" | "weekly" | "monthly" | "goals" | "guide"
 
-const TABS: { id: PlannerTab; label: string }[] = [
-  { id: "daily",   label: "DAILY" },
-  { id: "weekly",  label: "WEEKLY" },
-  { id: "monthly", label: "MONTHLY" },
-  { id: "goals",   label: "GOALS" },
-  { id: "guide",   label: "GUIDE" },
-]
+const TAB_IDS: PlannerTab[] = ["daily", "weekly", "monthly", "goals", "guide"]
+const TAB_KEYS: Record<PlannerTab, string> = {
+  daily: "daily", weekly: "weekly", monthly: "monthly", goals: "goals", guide: "compass",
+}
 
 interface TabBarProps {
   active: PlannerTab
@@ -19,20 +16,22 @@ interface TabBarProps {
 }
 
 export function TabBar({ active, onChange }: TabBarProps) {
+  const t = useTranslations("planner.tabs")
+
   return (
     <nav
       className="flex items-end gap-0 px-6 border-b border-border bg-card/60 backdrop-blur-sm shrink-0"
       role="tablist"
-      aria-label="플래너 탭"
+      aria-label="Planner tabs"
     >
-      {TABS.map((tab) => {
-        const isActive = tab.id === active
+      {TAB_IDS.map((id) => {
+        const isActive = id === active
         return (
           <button
-            key={tab.id}
+            key={id}
             role="tab"
             aria-selected={isActive}
-            onClick={() => onChange(tab.id)}
+            onClick={() => onChange(id)}
             className={cn(
               "relative px-5 py-3 text-xs font-semibold tracking-widest transition-colors select-none",
               isActive
@@ -40,7 +39,7 @@ export function TabBar({ active, onChange }: TabBarProps) {
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            {tab.label}
+            {t(TAB_KEYS[id])}
             {isActive && (
               <span
                 className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full"

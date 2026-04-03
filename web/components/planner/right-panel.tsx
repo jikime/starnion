@@ -95,7 +95,7 @@ function NionPopup({ onClose }: { onClose: () => void }) {
           <div className="flex items-center gap-2">
             <span
               className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-              style={{ background: "var(--priority-a)", color: "#0d1117" }}
+              style={{ background: "var(--priority-a)", color: "#ffffff" }}
             >
               N
             </span>
@@ -128,7 +128,7 @@ function NionPopup({ onClose }: { onClose: () => void }) {
                       "flex items-center gap-1 flex-1 h-6 rounded text-xs justify-center font-medium transition-colors border",
                       decisions[t.id] === "forward" ? "text-foreground" : "border-border text-muted-foreground hover:text-foreground"
                     )}
-                    style={decisions[t.id] === "forward" ? { background: "var(--status-forwarded)", color: "#0d1117", borderColor: "var(--status-forwarded)" } : undefined}
+                    style={decisions[t.id] === "forward" ? { background: "var(--status-forwarded)", color: "#ffffff", borderColor: "var(--status-forwarded)" } : undefined}
                   >
                     <ArrowRight className="w-3 h-3" />
                     내일로 이월 (→)
@@ -153,7 +153,7 @@ function NionPopup({ onClose }: { onClose: () => void }) {
         <div className="px-4 py-3 border-t border-border flex items-center gap-2">
           <Button
             className="flex-1 h-8 text-xs"
-            style={{ background: "var(--priority-a)", color: "#0d1117" }}
+            style={{ background: "var(--priority-a)", color: "#ffffff" }}
             disabled={!allDecided && remaining.length > 0}
             onClick={handleApply}
           >
@@ -238,7 +238,7 @@ function InboxPanel() {
                 ))}
               </SelectContent>
             </Select>
-            <button onClick={handleAdd} className="h-6 px-2 rounded text-xs font-medium shrink-0 hover:opacity-80 transition-opacity" style={{ background: "var(--priority-a)", color: "#0d1117" }}>
+            <button onClick={handleAdd} className="h-6 px-2 rounded text-xs font-medium shrink-0 hover:opacity-80 transition-opacity" style={{ background: "var(--priority-a)", color: "#ffffff" }}>
               추가
             </button>
           </div>
@@ -417,7 +417,7 @@ function DiaryPanel() {
         <p className={cn("text-xs transition-opacity duration-300", saved ? "opacity-100" : "opacity-0")} style={{ color: "var(--status-done)" }}>
           저장되었습니다
         </p>
-        <Button size="sm" className="h-7 text-xs px-3" style={{ background: "var(--priority-a)", color: "#0d1117" }} onClick={handleSave}>
+        <Button size="sm" className="h-7 text-xs px-3" style={{ background: "var(--priority-a)", color: "#ffffff" }} onClick={handleSave}>
           저장
         </Button>
       </div>
@@ -539,7 +539,7 @@ function TimelinePanel() {
                         {formatDate(dateStr)} ({dayLabel(dateStr)})
                       </span>
                       {isToday && (
-                        <span className="text-xs px-1 rounded font-medium" style={{ background: "var(--priority-a)", color: "#0d1117" }}>
+                        <span className="text-xs px-1 rounded font-medium" style={{ background: "var(--priority-a)", color: "#ffffff" }}>
                           오늘
                         </span>
                       )}

@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { useLocale } from "next-intl"
+import { useTheme } from "next-themes"
 import NextImage from "next/image"
 import { cn } from "@/lib/utils"
 import {
@@ -61,16 +63,19 @@ const SETTINGS_GROUPS = [
 
 export function GlobalNav() {
   const pathname = usePathname()
-  const [theme, setTheme] = useState<"dark" | "light">("dark")
-  const [lang, setLang] = useState<"ko" | "en">("ko")
+  const router = useRouter()
+  const currentLocale = useLocale()
+  const { theme, setTheme } = useTheme()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settingsRef = useRef<HTMLDivElement>(null)
 
-  const toggleTheme = () => {
-    const next = theme === "dark" ? "light" : "dark"
-    setTheme(next)
-    document.documentElement.classList.toggle("dark", next === "dark")
+  const toggleLocale = () => {
+    const next = currentLocale === "ko" ? "en" : currentLocale === "en" ? "ja" : currentLocale === "ja" ? "zh" : "ko"
+    document.cookie = `NEXT_LOCALE=${next};path=/;max-age=${365 * 24 * 60 * 60}`
+    router.refresh()
   }
+
+  const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark")
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -83,7 +88,7 @@ export function GlobalNav() {
   }, [settingsOpen])
 
   return (
-    <header className="flex items-center h-11 px-4 border-b border-border bg-secondary/80 backdrop-blur-sm shrink-0 z-10">
+    <header className="flex items-center h-11 px-4 border-b border-border bg-header shrink-0 z-10">
       {/* Logo */}
       <div className="flex items-center h-full w-44 shrink-0 py-1">
         <NextImage
@@ -108,7 +113,7 @@ export function GlobalNav() {
                 "flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium transition-colors",
                 isActive
                   ? `${activeClass} shadow-sm`
-                  : "text-sky-400 hover:text-sky-300 hover:bg-accent/40"
+                  : "text-header-foreground hover:text-white hover:bg-white/10"
               )}
             >
               <Icon className="w-3.5 h-3.5" />
@@ -121,16 +126,16 @@ export function GlobalNav() {
       {/* Right controls */}
       <div className="flex items-center gap-1 w-44 justify-end shrink-0">
         <button
-          onClick={() => setLang((l) => (l === "ko" ? "en" : "ko"))}
-          className="flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-foreground/60 hover:text-foreground hover:bg-accent/40 transition-colors"
-          title="언어 변경"
+          onClick={toggleLocale}
+          className="flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-header-foreground hover:text-white hover:bg-white/10 transition-colors"
+          title="언어 변경 (KO → EN → JA → ZH)"
         >
           <Globe className="w-3.5 h-3.5" />
-          {lang.toUpperCase()}
+          {currentLocale.toUpperCase()}
         </button>
         <button
           onClick={toggleTheme}
-          className="w-7 h-7 flex items-center justify-center rounded-md text-foreground/60 hover:text-foreground hover:bg-accent/40 transition-colors"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-header-foreground hover:text-white hover:bg-white/10 transition-colors"
           title={theme === "dark" ? "라이트 모드" : "다크 모드"}
         >
           {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
@@ -144,7 +149,7 @@ export function GlobalNav() {
               "w-7 h-7 flex items-center justify-center rounded-md transition-colors",
               settingsOpen
                 ? "bg-accent text-foreground"
-                : "text-foreground/60 hover:text-foreground hover:bg-accent/40"
+                : "text-header-foreground hover:text-white hover:bg-white/10"
             )}
             title="설정"
             aria-expanded={settingsOpen}
@@ -197,7 +202,7 @@ export function GlobalNav() {
         </div>
 
         <button
-          className="w-7 h-7 flex items-center justify-center rounded-md text-foreground/60 hover:text-foreground hover:bg-accent/40 transition-colors"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-header-foreground hover:text-white hover:bg-white/10 transition-colors"
           title="프로필"
         >
           <UserCircle2 className="w-4 h-4" />

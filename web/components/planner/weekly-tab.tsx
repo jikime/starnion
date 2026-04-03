@@ -114,7 +114,7 @@ function DayColumn({
           {isTodayDate && (
             <span
               className="text-xs font-bold px-1 rounded"
-              style={{ background: "var(--priority-a)", color: "#0d1117" }}
+              style={{ background: "var(--priority-a)", color: "#ffffff" }}
             >
               오늘
             </span>

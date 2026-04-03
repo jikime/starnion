@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { usePlannerStore } from "@/lib/planner-store"
 import { cn } from "@/lib/utils"
 import { Pencil, Check, Plus, Trash2 } from "lucide-react"
@@ -72,7 +73,7 @@ export function GuideTab() {
                 <Button
                   size="sm"
                   onClick={handleSaveMission}
-                  style={{ background: "var(--priority-a)", color: "#0d1117" }}
+                  style={{ background: "var(--priority-a)", color: "#ffffff" }}
                   className="text-xs"
                 >
                   저장
@@ -116,7 +117,7 @@ export function GuideTab() {
           <button
             onClick={() => setAddingRole(!addingRole)}
             className="flex items-center gap-1.5 h-8 px-3 rounded text-xs font-medium hover:opacity-80 transition-opacity"
-            style={{ background: "var(--priority-a)", color: "#0d1117" }}
+            style={{ background: "var(--priority-a)", color: "#ffffff" }}
           >
             <Plus className="w-3.5 h-3.5" />
             역할 추가
@@ -158,7 +159,7 @@ export function GuideTab() {
                 className="h-8 text-sm bg-muted border-border"
               />
               <div className="flex gap-2">
-                <Button size="sm" onClick={handleAddRole} style={{ background: "var(--priority-a)", color: "#0d1117" }} className="text-xs">추가</Button>
+                <Button size="sm" onClick={handleAddRole} style={{ background: "var(--priority-a)", color: "#ffffff" }} className="text-xs">추가</Button>
                 <Button size="sm" variant="ghost" onClick={() => setAddingRole(false)} className="text-xs text-muted-foreground">취소</Button>
               </div>
             </div>
@@ -186,7 +187,7 @@ export function GuideTab() {
                     className="h-7 text-sm bg-muted border-border"
                   />
                   <div className="flex gap-1.5">
-                    <Button size="sm" onClick={() => saveEditRole(role.id)} className="h-6 text-xs px-2" style={{ background: "var(--priority-a)", color: "#0d1117" }}>저장</Button>
+                    <Button size="sm" onClick={() => saveEditRole(role.id)} className="h-6 text-xs px-2" style={{ background: "var(--priority-a)", color: "#ffffff" }}>저장</Button>
                     <Button size="sm" variant="ghost" onClick={() => setEditingRoleId(null)} className="h-6 text-xs px-2 text-muted-foreground">취소</Button>
                   </div>
                 </div>

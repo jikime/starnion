@@ -1968,5 +1968,128 @@
     "healingDown_2": "Even on the hardest days, tomorrow will come. Just get through today 🌑",
     "healingDown_3": "You don't have to force yourself to be okay. Just rest. Nion is here 🌧️",
     "healingDown_4": "Feeling really tough? Close your eyes and breathe deeply. Nion is with you 💙"
+  },
+  "planner": {
+    "tabs": {
+      "daily": "DAILY",
+      "weekly": "WEEKLY",
+      "monthly": "MONTHLY",
+      "goals": "Goals",
+      "compass": "Compass"
+    },
+    "views": {
+      "tasks": "Tasks",
+      "note": "Notes",
+      "manage": "Manage"
+    },
+    "task": {
+      "addPlaceholder": "Enter task title...",
+      "add": "Add",
+      "priority": "Priority",
+      "role": "Role",
+      "roleNone": "None",
+      "timeStart": "Start",
+      "timeEnd": "End",
+      "editTitle": "Edit title",
+      "timeAssign": "Assign time",
+      "memoEdit": "Edit memo",
+      "memoAdd": "Add memo",
+      "forwardTomorrow": "Forward to tomorrow",
+      "delete": "Delete",
+      "confirm": "OK",
+      "cancel": "Cancel",
+      "save": "Save",
+      "close": "Close",
+      "taskMemo": "Task memo",
+      "memoContext": "Record task context",
+      "memoPlaceholder": "Record ideas, references, and progress related to this task...",
+      "emptyGroup": "No tasks in {priority} group",
+      "pendingWarning": "{count} incomplete A tasks remain. Complete A tasks first.",
+      "urgentGoal": "Promote related tasks to A priority.",
+      "noTimeBlock": "No time-blocked tasks",
+      "timeBlockHint": "Assign via task menu > Time block",
+      "feedbackAdded": "[{parts}] \"{title}\" added"
+    },
+    "inbox": {
+      "title": "Inbox",
+      "empty": "Inbox is empty",
+      "emptyHint": "Capture ideas and requests here",
+      "capturePlaceholder": "Quick capture...",
+      "promoteToTask": "To task",
+      "forwardToInbox": "Forward to inbox",
+      "pendingForward": "Forward incomplete tasks"
+    },
+    "score": {
+      "todayRate": "Today's completion",
+      "done": "{count} done",
+      "pending": "{count} pending"
+    },
+    "note": {
+      "todayCondition": "Today's condition",
+      "todayOneLiner": "Today's one-liner",
+      "oneLinerPlaceholder": "Summarize your day in one sentence",
+      "noteContent": "Note content",
+      "noteEdit": "Edit note",
+      "emptyNote": "No notes for this day.",
+      "firstNote": "Write first note",
+      "addNote": "Add note",
+      "notePlaceholder": "Freely record your thoughts, learnings, and gratitude...",
+      "editDone": "Done editing",
+      "goToday": "Today"
+    },
+    "mood": {
+      "great": "Great",
+      "good": "Good",
+      "neutral": "Okay",
+      "tired": "Tired",
+      "rough": "Rough"
+    },
+    "weekly": {
+      "bigRocks": "This Week's Big Rocks",
+      "roleBalance": "Role Balance",
+      "addAsATask": "Add as A task to today's planner",
+      "unassignedRoles": "Roles without Big Rocks yet",
+      "quickAdd": "Type and press Enter"
+    },
+    "monthly": {
+      "today": "Today",
+      "mainTasks": "Key Tasks (A)",
+      "noATasks": "No incomplete A-priority tasks",
+      "monthlyGoals": "Monthly Goals",
+      "noGoals": "No goals registered",
+      "weekPlan": "Go to weekly plan"
+    },
+    "goals": {
+      "title": "Goals",
+      "addGoal": "Add goal",
+      "goalName": "Goal name",
+      "dueDate": "Due date",
+      "selectDate": "Select date",
+      "role": "Role",
+      "selectRole": "Select role",
+      "description": "Description (optional)",
+      "add": "Add",
+      "emptyTitle": "No goals registered",
+      "emptyHint": "Add a goal using the button above"
+    },
+    "guide": {
+      "missionTitle": "Mission Statement",
+      "missionPlaceholder": "What kind of life do I want to live?",
+      "rolesTitle": "Roles",
+      "addRole": "Add role",
+      "roleName": "Role name",
+      "roleColor": "Color",
+      "roleMission": "Mission",
+      "roleMissionPlaceholder": "What kind of person do I want to be in this role?",
+      "bigRock": "Big Rock"
+    },
+    "status": {
+      "pending": "Pending",
+      "inProgress": "In Progress",
+      "done": "Done",
+      "forwarded": "Forwarded",
+      "cancelled": "Cancelled",
+      "delegated": "Delegated"
+    }
   }
 }
