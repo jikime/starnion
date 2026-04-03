@@ -6,7 +6,6 @@ import { TabBar, type PlannerTab } from "@/components/planner/tab-bar"
 import { DailyTab } from "@/components/planner/daily-tab"
 import { WeeklyTab } from "@/components/planner/weekly-tab"
 import { MonthlyTab } from "@/components/planner/monthly-tab"
-import { YearlyTab } from "@/components/planner/yearly-tab"
 import { GoalsTab } from "@/components/planner/goals-tab"
 import { GuideTab } from "@/components/planner/guide-tab"
 import { MonthSidebar } from "@/components/planner/month-sidebar"
@@ -34,7 +33,6 @@ export default function PlannersPage() {
               onNavigateToMonthly={() => {}}
             />
           )}
-          {activeTab === "yearly"  && <YearlyTab />}
           {activeTab === "goals"   && <GoalsTab />}
           {activeTab === "guide"   && <GuideTab />}
         </div>

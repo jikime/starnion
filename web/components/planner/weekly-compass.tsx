@@ -40,7 +40,7 @@ function NionCoachingTip({ unassigned }: { unassigned: string[] }) {
   if (unassigned.length === 0) return null
   return (
     <div
-      className="flex items-start gap-2 px-2.5 py-2 rounded-md text-[10px] leading-snug"
+      className="flex items-start gap-2 px-2.5 py-2 rounded-md text-xs leading-snug"
       style={{
         background: "color-mix(in oklch, var(--priority-b) 12%, transparent)",
         border: "1px solid color-mix(in oklch, var(--priority-b) 30%, var(--border))",
@@ -122,12 +122,12 @@ function RoleCard({
             className="w-2 h-2 rounded-full shrink-0"
             style={{ background: role.color }}
           />
-          <span className="text-[11px] font-semibold text-foreground uppercase tracking-wide truncate">
+          <span className="text-xs font-semibold text-foreground uppercase tracking-wide truncate">
             {role.name}
           </span>
           {ddayForRole && (
             <span
-              className="text-[9px] font-bold px-1 rounded shrink-0"
+              className="text-xs font-bold px-1 rounded shrink-0"
               style={{ background: "var(--status-cancelled)", color: "#fff" }}
             >
               D-{ddayForRole.daysLeft}
@@ -135,7 +135,7 @@ function RoleCard({
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[9px] text-muted-foreground tabular-nums">
+          <span className="text-xs text-muted-foreground tabular-nums">
             {doneCount}/{goals.length}
           </span>
           <button
@@ -150,7 +150,7 @@ function RoleCard({
 
       {/* Role mission */}
       {role.mission && (
-        <p className="text-[9px] text-muted-foreground italic leading-relaxed line-clamp-2 border-l-2 pl-2"
+        <p className="text-xs text-muted-foreground italic leading-relaxed line-clamp-2 border-l-2 pl-2"
           style={{ borderColor: role.color + "60" }}>
           {role.mission}
         </p>
@@ -159,7 +159,7 @@ function RoleCard({
       {/* Big Rocks list */}
       <div className="space-y-1">
         {goals.length === 0 && !adding && (
-          <p className="text-[10px] text-muted-foreground italic text-center py-1">
+          <p className="text-xs text-muted-foreground italic text-center py-1">
             이번 주 Big Rock을 추가하세요
           </p>
         )}
@@ -189,7 +189,7 @@ function RoleCard({
             {/* Title */}
             <span
               className={cn(
-                "text-[11px] flex-1 leading-snug",
+                "text-xs flex-1 leading-snug",
                 g.done ? "line-through text-muted-foreground" : "text-foreground"
               )}
             >
@@ -202,12 +202,12 @@ function RoleCard({
                 {/* Add as A task */}
                 <button
                   onClick={() => addWeeklyGoalAsTask(g.id, "A")}
-                  className="flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-bold transition-colors hover:opacity-80"
+                  className="flex items-center gap-0.5 rounded px-1 py-0.5 text-xs font-bold transition-colors hover:opacity-80"
                   style={{
                     background: "var(--priority-a-bg)",
                     color: "var(--priority-a)",
                   }}
-                  title="A 과업으로 오늘 플래너에 추가"
+                  title="A 업무으로 오늘 플래너에 추가"
                 >
                   <Zap className="w-2 h-2" />
                   A
@@ -233,7 +233,7 @@ function RoleCard({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="이번 주 핵심 목표..."
-            className="h-7 text-[11px] bg-muted border-border flex-1"
+            className="h-7 text-xs bg-muted border-border flex-1"
             onKeyDown={(e) => {
               if (e.key === "Enter") handleAdd()
               if (e.key === "Escape") { setAdding(false); setDraft("") }
@@ -242,7 +242,7 @@ function RoleCard({
           />
           <Button
             size="sm"
-            className="h-7 text-[10px] px-2 shrink-0"
+            className="h-7 text-xs px-2 shrink-0"
             onClick={handleAdd}
             style={{ background: role.color, color: "#0d1117" }}
           >
@@ -290,7 +290,7 @@ export function WeeklyCompass() {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
           <Compass className="w-3 h-3 text-muted-foreground" />
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
             주간 나침반
           </span>
         </div>
@@ -308,7 +308,7 @@ export function WeeklyCompass() {
           {/* Balance mini-bar for each role */}
           {totalWeekGoals > 0 && (
             <div className="space-y-1.5 mb-3">
-              <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-medium">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
                 역할 균형
               </p>
               {roles.map((role) => {
@@ -320,7 +320,7 @@ export function WeeklyCompass() {
                         className="w-1.5 h-1.5 rounded-full shrink-0"
                         style={{ background: role.color }}
                       />
-                      <span className="text-[9px] text-muted-foreground truncate">
+                      <span className="text-xs text-muted-foreground truncate">
                         {role.name}
                       </span>
                     </div>
@@ -332,7 +332,7 @@ export function WeeklyCompass() {
                         total={totalWeekGoals}
                       />
                     </div>
-                    <span className="text-[9px] text-muted-foreground tabular-nums w-4 text-right shrink-0">
+                    <span className="text-xs text-muted-foreground tabular-nums w-4 text-right shrink-0">
                       {count}
                     </span>
                   </div>

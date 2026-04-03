@@ -102,7 +102,7 @@ export default function DetailPanel({ file, onClose, onDelete, onIndex }: {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t("detailType")}</span>
-              <span className={cn("text-[11px] font-semibold px-2 py-0.5 rounded", formatBadgeColor(file.format))}>{file.format}</span>
+              <span className={cn("text-xs font-semibold px-2 py-0.5 rounded", formatBadgeColor(file.format))}>{file.format}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t("detailSize")}</span>
@@ -115,7 +115,7 @@ export default function DetailPanel({ file, onClose, onDelete, onIndex }: {
             {file.sub_type && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("detailSubtype")}</span>
-                <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded", subTypeBadgeColor(file.sub_type))}>{file.sub_type}</span>
+                <span className={cn("text-xs font-medium px-2 py-0.5 rounded", subTypeBadgeColor(file.sub_type))}>{file.sub_type}</span>
               </div>
             )}
             {file.file_type === "document" && (

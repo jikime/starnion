@@ -55,7 +55,7 @@ export function GuideTab() {
       <div className="w-80 shrink-0 border-r border-border flex flex-col overflow-hidden">
         <div className="px-6 py-4 border-b border-border bg-card/40 shrink-0">
           <h2 className="text-lg font-bold text-foreground">사명문</h2>
-          <p className="text-[11px] text-muted-foreground mt-0.5">나는 어떤 사람이 되고 싶은가</p>
+          <p className="text-xs text-muted-foreground mt-0.5">나는 어떤 사람이 되고 싶은가</p>
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {editingMission ? (
@@ -111,7 +111,7 @@ export function GuideTab() {
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/40 shrink-0">
           <div>
             <h2 className="text-lg font-bold text-foreground">역할</h2>
-            <p className="text-[11px] text-muted-foreground mt-0.5">삶의 중요한 역할들을 정의하세요</p>
+            <p className="text-xs text-muted-foreground mt-0.5">삶의 중요한 역할들을 정의하세요</p>
           </div>
           <button
             onClick={() => setAddingRole(!addingRole)}
@@ -186,8 +186,8 @@ export function GuideTab() {
                     className="h-7 text-sm bg-muted border-border"
                   />
                   <div className="flex gap-1.5">
-                    <Button size="sm" onClick={() => saveEditRole(role.id)} className="h-6 text-[10px] px-2" style={{ background: "var(--priority-a)", color: "#0d1117" }}>저장</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEditingRoleId(null)} className="h-6 text-[10px] px-2 text-muted-foreground">취소</Button>
+                    <Button size="sm" onClick={() => saveEditRole(role.id)} className="h-6 text-xs px-2" style={{ background: "var(--priority-a)", color: "#0d1117" }}>저장</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditingRoleId(null)} className="h-6 text-xs px-2 text-muted-foreground">취소</Button>
                   </div>
                 </div>
               ) : (
@@ -215,7 +215,7 @@ export function GuideTab() {
                     </div>
                   </div>
                   {role.mission && (
-                    <p className="text-[11px] text-muted-foreground leading-snug pl-4 italic">
+                    <p className="text-xs text-muted-foreground leading-snug pl-4 italic">
                       {role.mission}
                     </p>
                   )}

@@ -617,7 +617,7 @@ export function BudgetView() {
           {warnItems.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {warnItems.map(b => (
-                <span key={b.category} className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                <span key={b.category} className="text-xs font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                   {categoryLabel(b.category)} {b.percent.toFixed(0)}%
                 </span>
               ))}
@@ -635,7 +635,7 @@ export function BudgetView() {
           {overItems.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {overItems.map(b => (
-                <span key={b.category} className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400">
+                <span key={b.category} className="text-xs font-medium px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400">
                   {categoryLabel(b.category)} {b.percent.toFixed(0)}%
                 </span>
               ))}
@@ -766,7 +766,7 @@ export function BudgetView() {
                     )}
                   </div>
                   {over && item.budget > 0 && overAmt > 0 && (
-                    <span className="ml-3.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 w-fit">
+                    <span className="ml-3.5 text-xs font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 w-fit">
                       {t("overAmountBadge", { amount: KRW(overAmt) })}
                     </span>
                   )}
@@ -806,7 +806,7 @@ export function BudgetView() {
                 />
                 {isOver && (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-[11px] font-bold text-white drop-shadow-sm">
+                    <span className="text-xs font-bold text-white drop-shadow-sm">
                       {t("overBudgetLabel", { pct: totalPct.toFixed(0) })}
                     </span>
                   </div>

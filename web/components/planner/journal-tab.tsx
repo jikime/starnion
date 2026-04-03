@@ -20,7 +20,7 @@ type JournalSection = "diary" | "inbox" | "stats"
 
 const REFLECTION_PROMPTS = [
   "오늘 가장 잘한 일은 무엇인가?",
-  "놓친 A 과업이 있다면 이유는 무엇인가?",
+  "놓친 A 업무이 있다면 이유는 무엇인가?",
   "내일 가장 먼저 해야 할 일은?",
   "오늘 나의 역할을 얼마나 충실히 이행했는가?",
 ]
@@ -73,14 +73,14 @@ function DiaryPanel() {
     <div className="flex flex-col h-full overflow-y-auto px-6 py-4 space-y-5">
       {/* Mood picker */}
       <div className="space-y-2">
-        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">오늘의 컨디션</p>
+        <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">오늘의 컨디션</p>
         <div className="flex gap-2">
           {MOOD_OPTIONS.map((m) => (
             <button
               key={m.key}
               onClick={() => setMood(m.key)}
               className={cn(
-                "flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-[10px] transition-all font-medium",
+                "flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs transition-all font-medium",
                 mood === m.key ? "border-transparent" : "border-border bg-muted/30 text-muted-foreground hover:bg-accent/30"
               )}
               style={mood === m.key
@@ -96,7 +96,7 @@ function DiaryPanel() {
 
       {/* One-liner */}
       <div className="space-y-1.5">
-        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">오늘의 한 줄</p>
+        <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">오늘의 한 줄</p>
         <Input
           value={oneLiner}
           onChange={(e) => setOneLiner(e.target.value)}
@@ -104,12 +104,12 @@ function DiaryPanel() {
           className="h-9 text-sm bg-muted border-border"
           maxLength={80}
         />
-        <p className="text-[10px] text-muted-foreground text-right">{oneLiner.length}/80</p>
+        <p className="text-xs text-muted-foreground text-right">{oneLiner.length}/80</p>
       </div>
 
       {/* Reflection prompts */}
       <div className="space-y-2">
-        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">성찰 질문</p>
+        <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">성찰 질문</p>
         <div className="grid grid-cols-2 gap-1.5">
           {REFLECTION_PROMPTS.map((prompt, i) => (
             <button
@@ -123,12 +123,12 @@ function DiaryPanel() {
               className="flex items-start gap-2 px-2.5 py-2 rounded-lg border border-border bg-card hover:bg-accent/30 transition-colors text-left"
             >
               <span
-                className="w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center shrink-0 mt-px"
+                className="w-4 h-4 rounded text-xs font-bold flex items-center justify-center shrink-0 mt-px"
                 style={{ background: "var(--priority-a-bg)", color: "var(--priority-a)" }}
               >
                 {i + 1}
               </span>
-              <p className="text-[11px] text-muted-foreground leading-snug">{prompt}</p>
+              <p className="text-xs text-muted-foreground leading-snug">{prompt}</p>
             </button>
           ))}
         </div>
@@ -136,7 +136,7 @@ function DiaryPanel() {
 
       {/* Full note */}
       <div className="space-y-1.5 flex-1">
-        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">자유 기록</p>
+        <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">자유 기록</p>
         <Textarea
           value={fullNote}
           onChange={(e) => setFullNote(e.target.value)}
@@ -184,7 +184,7 @@ function InboxPanel() {
           <span className="text-sm font-semibold text-foreground">인박스</span>
           {inboxTasks.length > 0 && (
             <span
-              className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+              className="text-xs font-bold px-1.5 py-0.5 rounded-full"
               style={{ background: "var(--priority-a-bg)", color: "var(--priority-a)" }}
             >
               {inboxTasks.length}
@@ -215,7 +215,7 @@ function InboxPanel() {
           />
           <div className="flex gap-2">
             <Select value={newRoleId} onValueChange={setNewRoleId}>
-              <SelectTrigger className="h-6 text-[10px] bg-muted border-border flex-1">
+              <SelectTrigger className="h-6 text-xs bg-muted border-border flex-1">
                 <SelectValue placeholder="역할" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
@@ -231,7 +231,7 @@ function InboxPanel() {
             </Select>
             <button
               onClick={handleAdd}
-              className="h-6 px-3 rounded text-[10px] font-medium"
+              className="h-6 px-3 rounded text-xs font-medium"
               style={{ background: "var(--priority-a)", color: "#0d1117" }}
             >
               추가
@@ -262,7 +262,7 @@ function InboxPanel() {
                     {role && (
                       <div className="flex items-center gap-1 mt-0.5">
                         <span className="w-1.5 h-1.5 rounded-full" style={{ background: role.color }} />
-                        <span className="text-[10px] text-muted-foreground">{role.name}</span>
+                        <span className="text-xs text-muted-foreground">{role.name}</span>
                       </div>
                     )}
                   </div>
@@ -279,7 +279,7 @@ function InboxPanel() {
                     value={target}
                     onValueChange={(v) => setMoveTarget((prev) => ({ ...prev, [task.id]: v as Priority }))}
                   >
-                    <SelectTrigger className="h-6 text-[10px] bg-muted border-border w-16">
+                    <SelectTrigger className="h-6 text-xs bg-muted border-border w-16">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-popover border-border">
@@ -292,10 +292,10 @@ function InboxPanel() {
                   </Select>
                   <button
                     onClick={() => handleMove(task.id)}
-                    className="flex items-center gap-1 h-6 px-2.5 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors border border-border"
+                    className="flex items-center gap-1 h-6 px-2.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors border border-border"
                   >
                     <ArrowRight className="w-3 h-3" />
-                    과업으로
+                    업무으로
                   </button>
                 </div>
               </div>
@@ -333,7 +333,7 @@ function StatsPanel() {
         className="rounded-xl p-5 space-y-2"
         style={{ background: "var(--priority-a-bg)", border: "1px solid var(--priority-a)" }}
       >
-        <p className="text-[10px] uppercase tracking-widest font-medium" style={{ color: "var(--priority-a)" }}>오늘의 완료율</p>
+        <p className="text-xs uppercase tracking-widest font-medium" style={{ color: "var(--priority-a)" }}>오늘의 완료율</p>
         <div className="flex items-end gap-2">
           <span className="text-4xl font-bold tabular-nums" style={{ color: "var(--priority-a)" }}>
             {score}%
@@ -350,7 +350,7 @@ function StatsPanel() {
 
       {/* Role balance */}
       <div className="space-y-3">
-        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">역할별 과업 분포</p>
+        <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">역할별 업무 분포</p>
         {roles.map((role) => {
           const count = balance[role.id] ?? 0
           const pct = totalBalance === 0 ? 0 : Math.round((count / totalBalance) * 100)
@@ -376,7 +376,7 @@ function StatsPanel() {
 
       {/* Weekly completion chart */}
       <div className="space-y-3">
-        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">최근 7일 완료율</p>
+        <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">최근 7일 완료율</p>
         <div className="flex items-end gap-1.5 h-20">
           {last7.map((d) => (
             <div key={d.dateStr} className="flex flex-col items-center gap-1 flex-1">
@@ -390,7 +390,7 @@ function StatsPanel() {
                   }}
                 />
               </div>
-              <span className="text-[9px] text-muted-foreground tabular-nums">{d.label}</span>
+              <span className="text-xs text-muted-foreground tabular-nums">{d.label}</span>
             </div>
           ))}
         </div>
@@ -621,7 +621,7 @@ export function FilesSection() {
               <Icon className="w-3.5 h-3.5" />
               {label}
               {count !== undefined && count > 0 && (
-                <span className={cn("text-[10px] font-semibold",
+                <span className={cn("text-xs font-semibold",
                   isActive ? "opacity-80" : "text-muted-foreground")}>
                   {count}
                 </span>
@@ -699,13 +699,13 @@ export function FilesSection() {
                   <p className="text-xs text-foreground font-medium truncate">{file.name}</p>
                   <div className="flex flex-wrap gap-1 mt-1.5">
                     {file.tags.map(tag => (
-                      <span key={tag} className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                      <span key={tag} className="text-xs px-1.5 py-0.5 rounded-full font-medium"
                         style={{ background: (MIME_COLORS[file.mime] ?? "#8B949E") + "22", color: MIME_COLORS[file.mime] ?? "#8B949E" }}>
                         {tag}
                       </span>
                     ))}
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-1.5">{file.size} · {file.date}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5">{file.size} · {file.date}</p>
                 </div>
               </div>
             ))}
@@ -715,7 +715,7 @@ export function FilesSection() {
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="grid grid-cols-[2fr_1fr_1fr_1fr_40px] px-4 py-2 border-b border-border bg-muted/40">
               {["이름", "유형", "크기", "날짜", ""].map((h, i) => (
-                <span key={i} className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{h}</span>
+                <span key={i} className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</span>
               ))}
             </div>
             {filtered.map((file, idx) => (
@@ -723,7 +723,7 @@ export function FilesSection() {
                 className={cn("grid grid-cols-[2fr_1fr_1fr_1fr_40px] items-center px-4 py-2.5 hover:bg-accent/10 transition-colors group",
                   idx < filtered.length - 1 && "border-b border-border")}>
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[9px] font-bold text-white"
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold text-white"
                     style={{ background: MIME_COLORS[file.mime] ?? "#8B949E" }}>
                     {file.mime}
                   </div>

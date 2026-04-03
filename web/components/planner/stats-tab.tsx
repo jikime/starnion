@@ -119,10 +119,10 @@ function dday(dateStr: string) {
 function StatCard({ label, value, sub, up }: { label: string; value: string; sub?: string; up?: boolean }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4 flex flex-col gap-1">
-      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span className="text-xs text-muted-foreground">{label}</span>
       <span className="text-xl font-bold tabular-nums text-foreground">{value}</span>
       {sub && (
-        <span className={cn("text-[10px] flex items-center gap-0.5 font-medium", up ? "text-green-400" : "text-red-400")}>
+        <span className={cn("text-xs flex items-center gap-0.5 font-medium", up ? "text-green-400" : "text-red-400")}>
           {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
           {sub}
         </span>
@@ -204,13 +204,13 @@ export function AssetsSection() {
       <div className="flex items-center gap-4 px-5 py-3 border-b border-border bg-card/50 shrink-0">
         <div>
           <h1 className="text-sm font-bold text-foreground tracking-tight">자산 관리</h1>
-          <p className="text-[10px] text-muted-foreground">StarNion Financial Intelligence</p>
+          <p className="text-xs text-muted-foreground">StarNion Financial Intelligence</p>
         </div>
         <nav className="flex items-center gap-0.5 ml-4">
           {ASSET_TABS.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => setTab(id)}
               className={cn(
-                "flex items-center gap-1.5 h-7 px-3 rounded-lg text-[11px] font-medium transition-colors",
+                "flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium transition-colors",
                 tab === id
                   ? "bg-accent text-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
@@ -220,7 +220,7 @@ export function AssetsSection() {
             </button>
           ))}
         </nav>
-        <button className="ml-auto flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-border text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+        <button className="ml-auto flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground transition-colors">
           <Download className="w-3.5 h-3.5" />CSV
         </button>
       </div>

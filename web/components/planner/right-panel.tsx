@@ -46,7 +46,7 @@ const PRIORITY_CONFIG = {
 
 const REFLECTION_PROMPTS = [
   "오늘 가장 잘한 일은 무엇인가?",
-  "놓친 A 과업이 있다면 이유는 무엇인가?",
+  "놓친 A 업무이 있다면 이유는 무엇인가?",
   "내일 가장 먼저 해야 할 일은?",
   "오늘 나의 역할을 얼마나 충실히 이행했는가?",
 ]
@@ -101,7 +101,7 @@ function NionPopup({ onClose }: { onClose: () => void }) {
             </span>
             <div>
               <p className="text-xs font-semibold text-foreground">Nion의 하루 마감</p>
-              <p className="text-[10px] text-muted-foreground">미완료 과업을 처리해주세요</p>
+              <p className="text-xs text-muted-foreground">미완료 업무을 처리해주세요</p>
             </div>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors" aria-label="닫기">
@@ -111,12 +111,12 @@ function NionPopup({ onClose }: { onClose: () => void }) {
 
         <div className="px-4 py-3 space-y-2 max-h-72 overflow-y-auto">
           {remaining.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-4">모든 과업이 처리되었습니다!</p>
+            <p className="text-xs text-muted-foreground text-center py-4">모든 업무이 처리되었습니다!</p>
           ) : (
             remaining.map((t) => (
               <div key={t.id} className="border border-border rounded-lg p-2.5 space-y-2">
                 <div className="flex items-start gap-2">
-                  <span className="text-[10px] font-bold px-1 rounded shrink-0 mt-px" style={PRIORITY_CONFIG[t.priority].badgeStyle}>
+                  <span className="text-xs font-bold px-1 rounded shrink-0 mt-px" style={PRIORITY_CONFIG[t.priority].badgeStyle}>
                     {t.priority}
                   </span>
                   <p className="text-xs text-foreground leading-snug flex-1">{t.title}</p>
@@ -125,7 +125,7 @@ function NionPopup({ onClose }: { onClose: () => void }) {
                   <button
                     onClick={() => setDecisions((d) => ({ ...d, [t.id]: "forward" }))}
                     className={cn(
-                      "flex items-center gap-1 flex-1 h-6 rounded text-[10px] justify-center font-medium transition-colors border",
+                      "flex items-center gap-1 flex-1 h-6 rounded text-xs justify-center font-medium transition-colors border",
                       decisions[t.id] === "forward" ? "text-foreground" : "border-border text-muted-foreground hover:text-foreground"
                     )}
                     style={decisions[t.id] === "forward" ? { background: "var(--status-forwarded)", color: "#0d1117", borderColor: "var(--status-forwarded)" } : undefined}
@@ -136,7 +136,7 @@ function NionPopup({ onClose }: { onClose: () => void }) {
                   <button
                     onClick={() => setDecisions((d) => ({ ...d, [t.id]: "cancel" }))}
                     className={cn(
-                      "flex items-center gap-1 flex-1 h-6 rounded text-[10px] justify-center font-medium transition-colors border",
+                      "flex items-center gap-1 flex-1 h-6 rounded text-xs justify-center font-medium transition-colors border",
                       decisions[t.id] === "cancel" ? "text-foreground" : "border-border text-muted-foreground hover:text-foreground"
                     )}
                     style={decisions[t.id] === "cancel" ? { background: "var(--status-cancelled)", color: "#fff", borderColor: "var(--status-cancelled)" } : undefined}
@@ -199,12 +199,12 @@ function InboxPanel() {
           <Inbox className="w-3.5 h-3.5 text-muted-foreground" />
           <span className="text-xs font-semibold text-foreground">인박스</span>
           {inboxTasks.length > 0 && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "var(--priority-a-bg)", color: "var(--priority-a)" }}>
+            <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ background: "var(--priority-a-bg)", color: "var(--priority-a)" }}>
               {inboxTasks.length}
             </span>
           )}
         </div>
-        <button onClick={() => setAdding(!adding)} className="text-muted-foreground hover:text-foreground transition-colors" aria-label="인박스 과업 추가">
+        <button onClick={() => setAdding(!adding)} className="text-muted-foreground hover:text-foreground transition-colors" aria-label="인박스 업무 추가">
           <Plus className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -224,7 +224,7 @@ function InboxPanel() {
           />
           <div className="flex gap-2">
             <Select value={newRoleId} onValueChange={setNewRoleId}>
-              <SelectTrigger className="h-6 text-[10px] bg-muted border-border flex-1">
+              <SelectTrigger className="h-6 text-xs bg-muted border-border flex-1">
                 <SelectValue placeholder="역할" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
@@ -238,7 +238,7 @@ function InboxPanel() {
                 ))}
               </SelectContent>
             </Select>
-            <button onClick={handleAdd} className="h-6 px-2 rounded text-[10px] font-medium shrink-0 hover:opacity-80 transition-opacity" style={{ background: "var(--priority-a)", color: "#0d1117" }}>
+            <button onClick={handleAdd} className="h-6 px-2 rounded text-xs font-medium shrink-0 hover:opacity-80 transition-opacity" style={{ background: "var(--priority-a)", color: "#0d1117" }}>
               추가
             </button>
           </div>
@@ -252,7 +252,7 @@ function InboxPanel() {
             <p className="text-xs text-muted-foreground text-center">
               인박스가 비어 있습니다.
               <br />
-              <span className="text-[10px] opacity-60">빠르게 떠오른 것들을 여기에 캡처하세요</span>
+              <span className="text-xs opacity-60">빠르게 떠오른 것들을 여기에 캡처하세요</span>
             </p>
           </div>
         ) : (
@@ -267,7 +267,7 @@ function InboxPanel() {
                     {role && (
                       <div className="flex items-center gap-1 mt-0.5">
                         <span className="w-1.5 h-1.5 rounded-full" style={{ background: role.color }} />
-                        <span className="text-[10px] text-muted-foreground">{role.name}</span>
+                        <span className="text-xs text-muted-foreground">{role.name}</span>
                       </div>
                     )}
                   </div>
@@ -277,7 +277,7 @@ function InboxPanel() {
                 </div>
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <Select value={targetPriority} onValueChange={(v) => setMoveTarget((prev) => ({ ...prev, [task.id]: v as Priority }))}>
-                    <SelectTrigger className="h-5 text-[10px] bg-muted border-border w-16">
+                    <SelectTrigger className="h-5 text-xs bg-muted border-border w-16">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-popover border-border">
@@ -288,9 +288,9 @@ function InboxPanel() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <button onClick={() => handleMove(task.id)} className="flex items-center gap-1 h-5 px-2 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                  <button onClick={() => handleMove(task.id)} className="flex items-center gap-1 h-5 px-2 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
                     <ArrowRight className="w-2.5 h-2.5" />
-                    과업으로
+                    업무으로
                   </button>
                 </div>
               </div>
@@ -300,7 +300,7 @@ function InboxPanel() {
       </div>
 
       <div className="px-4 py-2 border-t border-border shrink-0">
-        <p className="text-[10px] text-muted-foreground italic leading-snug">
+        <p className="text-xs text-muted-foreground italic leading-snug">
           &ldquo;인박스는 수집 도구입니다. 정기적으로 비워두세요.&rdquo;
         </p>
       </div>
@@ -344,14 +344,14 @@ function DiaryPanel() {
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
         {/* Mood picker */}
         <div className="space-y-1.5">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">오늘의 컨디션</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">오늘의 컨디션</p>
           <div className="flex gap-1.5">
             {MOOD_OPTIONS.map((m) => (
               <button
                 key={m.key}
                 onClick={() => setMood(m.key)}
                 className={cn(
-                  "flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-lg border text-[9px] transition-all",
+                  "flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-lg border text-xs transition-all",
                   mood === m.key ? "border-transparent" : "border-border bg-muted/40 text-muted-foreground"
                 )}
                 style={mood === m.key ? { background: "var(--priority-a-bg)", color: "var(--priority-a)", border: "1px solid var(--priority-a)" } : {}}
@@ -365,7 +365,7 @@ function DiaryPanel() {
 
         {/* One-liner */}
         <div className="space-y-1.5">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">오늘의 한 줄</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">오늘의 한 줄</p>
           <Input
             value={oneLiner}
             onChange={(e) => setOneLiner(e.target.value)}
@@ -373,12 +373,12 @@ function DiaryPanel() {
             className="h-8 text-xs bg-muted border-border"
             maxLength={80}
           />
-          <p className="text-[10px] text-muted-foreground text-right">{oneLiner.length}/80</p>
+          <p className="text-xs text-muted-foreground text-right">{oneLiner.length}/80</p>
         </div>
 
         {/* Reflection prompts */}
         <div className="space-y-2">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">성찰 질문</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">성찰 질문</p>
           <div className="space-y-1">
             {REFLECTION_PROMPTS.map((prompt, i) => (
               <div
@@ -391,10 +391,10 @@ function DiaryPanel() {
                   }
                 }}
               >
-                <span className="w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center shrink-0 mt-px" style={{ background: "var(--priority-a-bg)", color: "var(--priority-a)" }}>
+                <span className="w-4 h-4 rounded text-xs font-bold flex items-center justify-center shrink-0 mt-px" style={{ background: "var(--priority-a-bg)", color: "var(--priority-a)" }}>
                   {i + 1}
                 </span>
-                <p className="text-[11px] text-muted-foreground leading-snug">{prompt}</p>
+                <p className="text-xs text-muted-foreground leading-snug">{prompt}</p>
               </div>
             ))}
           </div>
@@ -402,7 +402,7 @@ function DiaryPanel() {
 
         {/* Full note */}
         <div className="space-y-1.5">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">자유 기록</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">자유 기록</p>
           <Textarea
             value={fullNote}
             onChange={(e) => setFullNote(e.target.value)}
@@ -414,7 +414,7 @@ function DiaryPanel() {
       </div>
 
       <div className="px-4 py-3 border-t border-border shrink-0 flex items-center justify-between">
-        <p className={cn("text-[10px] transition-opacity duration-300", saved ? "opacity-100" : "opacity-0")} style={{ color: "var(--status-done)" }}>
+        <p className={cn("text-xs transition-opacity duration-300", saved ? "opacity-100" : "opacity-0")} style={{ color: "var(--status-done)" }}>
           저장되었습니다
         </p>
         <Button size="sm" className="h-7 text-xs px-3" style={{ background: "var(--priority-a)", color: "#0d1117" }} onClick={handleSave}>
@@ -463,14 +463,14 @@ function TimelinePanel() {
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
         <Clock3 className="w-3.5 h-3.5 text-muted-foreground" />
         <span className="text-xs font-semibold text-foreground">통합 타임라인</span>
-        <span className="text-[10px] text-muted-foreground ml-auto">과거 7일</span>
+        <span className="text-xs text-muted-foreground ml-auto">과거 7일</span>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5">
         {/* Upcoming D-Day Goals */}
         {ddayGoals.filter((g) => g.daysLeft >= 0 && g.daysLeft <= 30).length > 0 && (
           <div className="space-y-2">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">D-Day 목표</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">D-Day 목표</p>
             <div className="space-y-1.5">
               {ddayGoals.filter((g) => g.daysLeft >= 0 && g.daysLeft <= 30).map((goal) => {
                 const role = roles.find((r) => r.id === goal.roleId)
@@ -488,12 +488,12 @@ function TimelinePanel() {
                       {role && (
                         <div className="flex items-center gap-1 mt-0.5">
                           <span className="w-1.5 h-1.5 rounded-full" style={{ background: role.color }} />
-                          <span className="text-[10px] text-muted-foreground">{role.name}</span>
+                          <span className="text-xs text-muted-foreground">{role.name}</span>
                         </div>
                       )}
                     </div>
                     <span
-                      className="text-[10px] font-bold tabular-nums shrink-0"
+                      className="text-xs font-bold tabular-nums shrink-0"
                       style={{ color: goal.urgent ? "var(--status-cancelled)" : "var(--priority-a)" }}
                     >
                       D-{goal.daysLeft}
@@ -507,7 +507,7 @@ function TimelinePanel() {
 
         {/* Daily timeline */}
         <div className="space-y-2">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">일별 기록</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">일별 기록</p>
           <div className="space-y-4">
             {[...days].reverse().map((dateStr) => {
               const dayTasks = tasks.filter((t) => t.date === dateStr)
@@ -535,16 +535,16 @@ function TimelinePanel() {
                   <div className="space-y-1.5 pb-3">
                     {/* Date header */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-foreground">
+                      <span className="text-xs font-bold text-foreground">
                         {formatDate(dateStr)} ({dayLabel(dateStr)})
                       </span>
                       {isToday && (
-                        <span className="text-[9px] px-1 rounded font-medium" style={{ background: "var(--priority-a)", color: "#0d1117" }}>
+                        <span className="text-xs px-1 rounded font-medium" style={{ background: "var(--priority-a)", color: "#0d1117" }}>
                           오늘
                         </span>
                       )}
                       {total > 0 && (
-                        <span className="text-[10px] text-muted-foreground ml-auto">
+                        <span className="text-xs text-muted-foreground ml-auto">
                           {doneTasks.length}/{total} 완료
                         </span>
                       )}
@@ -569,7 +569,7 @@ function TimelinePanel() {
                         {dayTasks.slice(0, 8).map((t) => (
                           <span
                             key={t.id}
-                            className="text-[9px] px-1.5 py-0.5 rounded truncate max-w-[120px]"
+                            className="text-xs px-1.5 py-0.5 rounded truncate max-w-[120px]"
                             style={{
                               background: `color-mix(in oklch, ${STATUS_COLORS[t.status]} 15%, var(--muted))`,
                               color: STATUS_COLORS[t.status],
@@ -581,7 +581,7 @@ function TimelinePanel() {
                           </span>
                         ))}
                         {total > 8 && (
-                          <span className="text-[9px] text-muted-foreground">+{total - 8}개</span>
+                          <span className="text-xs text-muted-foreground">+{total - 8}개</span>
                         )}
                       </div>
                     )}
@@ -593,9 +593,9 @@ function TimelinePanel() {
                         style={{ background: "color-mix(in oklch, var(--priority-a) 6%, var(--muted))", border: "1px solid var(--border)" }}
                       >
                         <BookMarked className="w-2.5 h-2.5 shrink-0 mt-0.5" style={{ color: "var(--priority-a)" }} />
-                        <p className="text-[10px] text-foreground leading-snug italic">&ldquo;{diary.oneLiner}&rdquo;</p>
+                        <p className="text-xs text-foreground leading-snug italic">&ldquo;{diary.oneLiner}&rdquo;</p>
                         {diary.mood && (
-                          <span className="text-[10px] ml-auto shrink-0 text-muted-foreground">
+                          <span className="text-xs ml-auto shrink-0 text-muted-foreground">
                             {MOOD_OPTIONS.find((m) => m.key === diary.mood)?.symbol}
                           </span>
                         )}
@@ -653,8 +653,8 @@ function StatsPanel() {
   }: { label: string; done: number; total: number; color: string }) => (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-medium" style={{ color }}>{label}</span>
-        <span className="text-[10px] text-muted-foreground tabular-nums">{done}/{total}</span>
+        <span className="text-xs font-medium" style={{ color }}>{label}</span>
+        <span className="text-xs text-muted-foreground tabular-nums">{done}/{total}</span>
       </div>
       <div className="h-1.5 rounded-full bg-muted overflow-hidden">
         <div
@@ -676,7 +676,7 @@ function StatsPanel() {
         {/* Score */}
         <div className="rounded-lg border border-border p-3 space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">종합 성취도</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">종합 성취도</p>
             <span
               className="text-xl font-bold tabular-nums"
               style={{ color: score >= 70 ? "var(--status-done)" : score >= 40 ? "var(--priority-a)" : "var(--status-cancelled)" }}
@@ -693,14 +693,14 @@ function StatsPanel() {
               }}
             />
           </div>
-          <p className="text-[10px] text-muted-foreground">
-            A 과업 가중치 60% · 전체 완료 40%
+          <p className="text-xs text-muted-foreground">
+            A 업무 가중치 60% · 전체 완료 40%
           </p>
         </div>
 
         {/* Priority bars */}
         <div className="space-y-2">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">우선순위별 완료율</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">우선순위별 완료율</p>
           <div className="space-y-2.5">
             <PriorityBar label="A — 필수" done={aDone} total={aTotal} color="var(--priority-a)" />
             <PriorityBar label="B — 중요" done={bDone} total={bTotal} color="var(--priority-b)" />
@@ -710,7 +710,7 @@ function StatsPanel() {
 
         {/* Status breakdown */}
         <div className="space-y-2">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">상태별 현황</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">상태별 현황</p>
           <div className="grid grid-cols-3 gap-1.5">
             {Object.entries(statusCounts).map(([status, count]) => (
               <div
@@ -719,7 +719,7 @@ function StatsPanel() {
                 style={{ background: `color-mix(in oklch, ${STATUS_COLORS[status]} 10%, var(--muted))` }}
               >
                 <p className="text-sm font-bold tabular-nums" style={{ color: STATUS_COLORS[status] }}>{count}</p>
-                <p className="text-[9px] text-muted-foreground">{STATUS_LABELS[status] ?? status}</p>
+                <p className="text-xs text-muted-foreground">{STATUS_LABELS[status] ?? status}</p>
               </div>
             ))}
           </div>
@@ -727,16 +727,16 @@ function StatsPanel() {
 
         {/* Role balance */}
         <div className="space-y-2">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">역할 균형</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">역할 균형</p>
           <div className="space-y-2">
             {roleTaskCounts.filter((r) => r.count > 0).map((r) => (
               <div key={r.id} className="space-y-1">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full" style={{ background: r.color }} />
-                    <span className="text-[10px] text-foreground">{r.name}</span>
+                    <span className="text-xs text-foreground">{r.name}</span>
                   </div>
-                  <span className="text-[10px] text-muted-foreground tabular-nums">{r.doneCount}/{r.count}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">{r.doneCount}/{r.count}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                   <div
@@ -789,7 +789,7 @@ export function RightPanel() {
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={cn(
-                "flex-1 flex flex-col items-center gap-0.5 py-2 text-[9px] font-medium transition-colors border-b-2",
+                "flex-1 flex flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors border-b-2",
                 activeTab === tab.key
                   ? "border-[var(--primary)] text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -804,12 +804,12 @@ export function RightPanel() {
 
         {/* Nion trigger button */}
         <div className="px-3 py-2 border-b border-border shrink-0 flex items-center justify-between">
-          <span className="text-[10px] text-muted-foreground italic">
+          <span className="text-xs text-muted-foreground italic">
             하루를 마감할 준비가 됐나요?
           </span>
           <button
             onClick={() => setShowNion(true)}
-            className="text-[10px] font-medium px-2 py-0.5 rounded transition-colors hover:opacity-80"
+            className="text-xs font-medium px-2 py-0.5 rounded transition-colors hover:opacity-80"
             style={{ background: "var(--priority-a-bg)", color: "var(--priority-a)" }}
           >
             Nion

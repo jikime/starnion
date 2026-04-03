@@ -3,13 +3,12 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 
-export type PlannerTab = "daily" | "weekly" | "monthly" | "yearly" | "goals" | "guide"
+export type PlannerTab = "daily" | "weekly" | "monthly" | "goals" | "guide"
 
 const TABS: { id: PlannerTab; label: string }[] = [
   { id: "daily",   label: "DAILY" },
   { id: "weekly",  label: "WEEKLY" },
   { id: "monthly", label: "MONTHLY" },
-  { id: "yearly",  label: "YEARLY" },
   { id: "goals",   label: "GOALS" },
   { id: "guide",   label: "GUIDE" },
 ]
@@ -35,7 +34,7 @@ export function TabBar({ active, onChange }: TabBarProps) {
             aria-selected={isActive}
             onClick={() => onChange(tab.id)}
             className={cn(
-              "relative px-5 py-3 text-[11px] font-semibold tracking-widest transition-colors select-none",
+              "relative px-5 py-3 text-xs font-semibold tracking-widest transition-colors select-none",
               isActive
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"

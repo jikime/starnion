@@ -8,7 +8,6 @@ import { TabBar, type PlannerTab } from "./tab-bar"
 import { DailyTab } from "./daily-tab"
 import { WeeklyTab } from "./weekly-tab"
 import { MonthlyTab } from "./monthly-tab"
-import { YearlyTab } from "./yearly-tab"
 import { GoalsTab } from "./goals-tab"
 import { GuideTab } from "./guide-tab"
 import { MonthSidebar } from "./month-sidebar"
@@ -139,7 +138,7 @@ function GlobalNav({ activeSection, onSectionChange }: GlobalNavProps) {
       <div className="flex items-center gap-1 w-44 justify-end shrink-0">
         <button
           onClick={() => setLang((l) => (l === "ko" ? "en" : "ko"))}
-          className="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
+          className="flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
           title="언어 변경"
         >
           <Globe className="w-3.5 h-3.5" />
@@ -177,7 +176,7 @@ function GlobalNav({ activeSection, onSectionChange }: GlobalNavProps) {
             >
               {SETTINGS_GROUPS.map((group, gi) => (
                 <div key={group.label} className={cn(gi > 0 && "mt-1")}>
-                  <p className="px-4 pt-3 pb-1.5 text-[10px] font-semibold tracking-widest text-muted-foreground">
+                  <p className="px-4 pt-3 pb-1.5 text-xs font-semibold tracking-widest text-muted-foreground">
                     {group.label}
                   </p>
                   {group.items.map(({ icon: Icon, label }) => (
@@ -259,7 +258,6 @@ export function PlannerApp() {
                     onNavigateToMonthly={() => {}}
                   />
                 )}
-                {activeTab === "yearly"  && <YearlyTab />}
                 {activeTab === "goals"   && <GoalsTab />}
                 {activeTab === "guide"   && <GuideTab />}
               </div>

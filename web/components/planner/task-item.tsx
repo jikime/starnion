@@ -61,7 +61,7 @@ const STATUS_CONFIG: Record<
     label: "위임 (D)",
     icon: (
       <span
-        className="w-3.5 h-3.5 rounded border-2 text-[9px] font-bold inline-flex items-center justify-center"
+        className="w-3.5 h-3.5 rounded border-2 text-xs font-bold inline-flex items-center justify-center"
         style={{ color: "var(--status-delegated)", borderColor: "var(--status-delegated)" }}
       >
         D
@@ -94,8 +94,10 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState(task.title)
   const [showTimeAssign, setShowTimeAssign] = useState(false)
-  const [timeStart, setTimeStart] = useState(task.timeStart?.toString() ?? "")
-  const [timeEnd, setTimeEnd] = useState(task.timeEnd?.toString() ?? "")
+  const [timeStartH, setTimeStartH] = useState(task.timeStart !== undefined ? String(Math.floor(task.timeStart)) : "")
+  const [timeStartM, setTimeStartM] = useState(task.timeStart !== undefined ? String(Math.round((task.timeStart % 1) * 60)) : "0")
+  const [timeEndH, setTimeEndH] = useState(task.timeEnd !== undefined ? String(Math.floor(task.timeEnd)) : "")
+  const [timeEndM, setTimeEndM] = useState(task.timeEnd !== undefined ? String(Math.round((task.timeEnd % 1) * 60)) : "0")
   const [showMemo, setShowMemo] = useState(false)
   const [memoDraft, setMemoDraft] = useState(task.note ?? "")
 
@@ -131,9 +133,13 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
   }
 
   const saveTimeBlock = () => {
+    const sh = timeStartH ? parseInt(timeStartH) : undefined
+    const sm = timeStartM ? parseInt(timeStartM) : 0
+    const eh = timeEndH ? parseInt(timeEndH) : undefined
+    const em = timeEndM ? parseInt(timeEndM) : 0
     updateTask(task.id, {
-      timeStart: timeStart ? parseInt(timeStart) : undefined,
-      timeEnd: timeEnd ? parseInt(timeEnd) : undefined,
+      timeStart: sh !== undefined ? sh + sm / 60 : undefined,
+      timeEnd: eh !== undefined ? eh + em / 60 : undefined,
     })
     setShowTimeAssign(false)
   }
@@ -144,7 +150,9 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
 
   const formatHour = (h?: number) => {
     if (h === undefined) return null
-    return `${String(h).padStart(2, "0")}:00`
+    const hour = Math.floor(h)
+    const min = Math.round((h % 1) * 60)
+    return `${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`
   }
 
   return (
@@ -233,6 +241,7 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
             )}
             title={task.title}
           >
+            <span className="text-muted-foreground font-semibold mr-1">{task.priority}{task.order + 1}.</span>
             {task.title}
           </span>
         )}
@@ -245,7 +254,7 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
                 className="w-1.5 h-1.5 rounded-full shrink-0"
                 style={{ background: role.color }}
               />
-              <span className="text-[10px] text-muted-foreground">{role.name}</span>
+              <span className="text-xs text-muted-foreground">{role.name}</span>
             </div>
           )}
 
@@ -259,13 +268,13 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
               title={urgentGoal.title}
             >
               <span
-                className="text-[9px] font-bold tabular-nums"
+                className="text-xs font-bold tabular-nums"
                 style={{ color: "var(--status-cancelled)" }}
               >
                 D-{urgentGoal.daysLeft}
               </span>
               <span
-                className="text-[9px] max-w-[80px] truncate hidden sm:inline"
+                className="text-xs max-w-[80px] truncate hidden sm:inline"
                 style={{ color: "var(--status-cancelled)" }}
               >
                 {urgentGoal.title}
@@ -273,20 +282,52 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
             </div>
           )}
 
-          {task.timeStart !== undefined && (
-            <div className="flex items-center gap-0.5">
-              <Clock className="w-2.5 h-2.5 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground">
-                {formatHour(task.timeStart)}
-                {task.timeEnd ? `–${formatHour(task.timeEnd)}` : ""}
-              </span>
+          {showTimeAssign ? (
+            <div className="flex items-center gap-1">
+              <Clock className="w-2.5 h-2.5 text-muted-foreground shrink-0" />
+              <Input
+                type="number" min={5} max={23} value={timeStartH}
+                onChange={e => setTimeStartH(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") saveTimeBlock(); if (e.key === "Escape") setShowTimeAssign(false); if (["e","E","+","-","."].includes(e.key)) e.preventDefault() }}
+                className="w-12 h-6 text-xs text-center px-1" autoFocus
+              />
+              <span className="text-xs text-muted-foreground">:</span>
+              <Input
+                type="number" min={0} max={59} step={5} value={timeStartM}
+                onChange={e => setTimeStartM(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") saveTimeBlock(); if (e.key === "Escape") setShowTimeAssign(false); if (["e","E","+","-","."].includes(e.key)) e.preventDefault() }}
+                className="w-12 h-6 text-xs text-center px-1"
+              />
+              <span className="text-xs text-muted-foreground">–</span>
+              <Input
+                type="number" min={6} max={24} value={timeEndH}
+                onChange={e => setTimeEndH(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") saveTimeBlock(); if (e.key === "Escape") setShowTimeAssign(false); if (["e","E","+","-","."].includes(e.key)) e.preventDefault() }}
+                className="w-12 h-6 text-xs text-center px-1"
+              />
+              <span className="text-xs text-muted-foreground">:</span>
+              <Input
+                type="number" min={0} max={59} step={5} value={timeEndM}
+                onChange={e => setTimeEndM(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") saveTimeBlock(); if (e.key === "Escape") setShowTimeAssign(false); if (["e","E","+","-","."].includes(e.key)) e.preventDefault() }}
+                className="w-12 h-6 text-xs text-center px-1"
+              />
+              <button onClick={saveTimeBlock} className="text-xs font-medium px-1.5 py-0.5 rounded hover:opacity-80" style={{ background: "var(--priority-a)", color: "#0d1117" }}>확인</button>
+              <button onClick={() => setShowTimeAssign(false)} className="text-xs text-muted-foreground hover:text-foreground">취소</button>
             </div>
-          )}
+          ) : task.timeStart !== undefined ? (
+            <button onClick={() => setShowTimeAssign(true)} className="flex items-center gap-0.5 hover:text-foreground transition-colors">
+              <Clock className="w-2.5 h-2.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground hover:text-foreground">
+                {formatHour(task.timeStart)}{task.timeEnd ? `–${formatHour(task.timeEnd)}` : ""}
+              </span>
+            </button>
+          ) : null}
 
           {task.delegatee && task.status === "delegated" && (
             <div className="flex items-center gap-0.5">
               <User className="w-2.5 h-2.5 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground">{task.delegatee}</span>
+              <span className="text-xs text-muted-foreground">{task.delegatee}</span>
             </div>
           )}
 
@@ -297,7 +338,7 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
               aria-label="메모 보기"
             >
               <StickyNote className="w-2.5 h-2.5" style={{ color: "var(--priority-b)" }} />
-              <span className="text-[10px]" style={{ color: "var(--priority-b)" }}>메모</span>
+              <span className="text-xs" style={{ color: "var(--priority-b)" }}>메모</span>
             </button>
           )}
         </div>
@@ -309,7 +350,7 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
               value={delegateeDraft}
               onChange={(e) => setDelegateeDraft(e.target.value)}
               placeholder="피위임자 이름"
-              className="h-6 text-[10px] bg-muted border-border px-1.5 py-0"
+              className="h-6 text-xs bg-muted border-border px-1.5 py-0"
               onKeyDown={(e) => {
                 if (e.key === "Enter") saveDelegatee()
                 if (e.key === "Escape") setShowDelegatee(false)
@@ -318,7 +359,7 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
             />
             <Button
               size="sm"
-              className="h-6 text-[10px] px-1.5 shrink-0"
+              className="h-6 text-xs px-1.5 shrink-0"
               style={{ background: "var(--status-delegated)", color: "#fff" }}
               onClick={saveDelegatee}
             >
@@ -338,30 +379,30 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
           >
             <div className="flex items-center gap-1.5">
               <StickyNote className="w-2.5 h-2.5 shrink-0" style={{ color: "var(--priority-b)" }} />
-              <span className="text-[10px] font-medium" style={{ color: "var(--priority-b)" }}>
-                과업 메모
+              <span className="text-xs font-medium" style={{ color: "var(--priority-b)" }}>
+                업무 메모
               </span>
-              <span className="text-[9px] text-muted-foreground ml-auto">과업 맥락 기록</span>
+              <span className="text-xs text-muted-foreground ml-auto">업무 맥락 기록</span>
             </div>
             <Textarea
               value={memoDraft}
               onChange={(e) => setMemoDraft(e.target.value)}
               onBlur={saveMemo}
-              placeholder="이 과업과 관련된 아이디어, 참고사항, 진행상황을 기록하세요..."
+              placeholder="이 업무과 관련된 아이디어, 참고사항, 진행상황을 기록하세요..."
               rows={3}
-              className="text-[11px] resize-none bg-muted border-border text-foreground leading-relaxed"
+              className="text-xs resize-none bg-muted border-border text-foreground leading-relaxed"
             />
             <div className="flex justify-end gap-1">
               <button
                 onClick={() => { saveMemo(); setShowMemo(false) }}
-                className="h-5 px-2 rounded text-[10px] font-medium hover:opacity-80 transition-opacity"
+                className="h-5 px-2 rounded text-xs font-medium hover:opacity-80 transition-opacity"
                 style={{ background: "var(--priority-b)", color: "#0d1117" }}
               >
                 저장
               </button>
               <button
                 onClick={() => setShowMemo(false)}
-                className="h-5 px-2 rounded text-[10px] text-muted-foreground hover:text-foreground transition-colors border border-border"
+                className="h-5 px-2 rounded text-xs text-muted-foreground hover:text-foreground transition-colors border border-border"
               >
                 닫기
               </button>
@@ -425,62 +466,7 @@ export function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Time block inline panel */}
-      {showTimeAssign && (
-        <div
-          className="fixed z-50 p-3 rounded-lg border border-border bg-popover shadow-xl space-y-2"
-          style={{ minWidth: 180, right: "1rem", top: "auto" }}
-        >
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-            시간 배정
-          </p>
-          <div className="flex gap-2 items-center">
-            <div className="flex-1">
-              <p className="text-[10px] text-muted-foreground mb-0.5">시작</p>
-              <Input
-                type="number"
-                min={5}
-                max={23}
-                value={timeStart}
-                onChange={(e) => setTimeStart(e.target.value)}
-                placeholder="9"
-                className="h-7 text-xs bg-muted border-border text-center"
-              />
-            </div>
-            <span className="text-muted-foreground text-xs mt-4">–</span>
-            <div className="flex-1">
-              <p className="text-[10px] text-muted-foreground mb-0.5">종료</p>
-              <Input
-                type="number"
-                min={6}
-                max={24}
-                value={timeEnd}
-                onChange={(e) => setTimeEnd(e.target.value)}
-                placeholder="10"
-                className="h-7 text-xs bg-muted border-border text-center"
-              />
-            </div>
-          </div>
-          <div className="flex gap-1.5">
-            <Button
-              size="sm"
-              className="h-6 text-[10px] px-2 flex-1"
-              style={{ background: "var(--priority-a)", color: "#0d1117" }}
-              onClick={saveTimeBlock}
-            >
-              저장
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 text-[10px] px-2 text-muted-foreground"
-              onClick={() => setShowTimeAssign(false)}
-            >
-              취소
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* Time block inline panel removed — now inline in meta row */}
     </div>
   )
 }

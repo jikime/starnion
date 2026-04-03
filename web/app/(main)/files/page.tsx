@@ -290,7 +290,7 @@ export default function FilesPage() {
               <Icon className="w-3.5 h-3.5" />
               {label}
               {count !== undefined && count > 0 && (
-                <span className={cn("text-[10px] font-semibold",
+                <span className={cn("text-xs font-semibold",
                   isActive ? "opacity-80" : "text-muted-foreground")}>
                   {count}
                 </span>
@@ -371,7 +371,7 @@ export default function FilesPage() {
                         <span className="text-sm font-medium truncate">{r.file_name}</span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded", sim.cls)}>
+                        <span className={cn("text-xs font-semibold px-1.5 py-0.5 rounded", sim.cls)}>
                           {sim.label}
                         </span>
                         <Button variant="ghost" size="sm" className="h-7 px-2 text-xs"
@@ -476,12 +476,12 @@ export default function FilesPage() {
                   <div className="p-2.5">
                     <p className="text-xs text-foreground font-medium truncate">{file.name}</p>
                     <div className="flex flex-wrap gap-1 mt-1.5">
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                      <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
                         style={{ background: color + "22", color }}>
                         {ext.toUpperCase()}
                       </span>
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-1.5">{formatSize(file.size)} · {formatDate(file.created_at)}</p>
+                    <p className="text-xs text-muted-foreground mt-1.5">{formatSize(file.size)} · {formatDate(file.created_at)}</p>
                   </div>
                 </div>
               )
@@ -492,7 +492,7 @@ export default function FilesPage() {
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="grid grid-cols-[2fr_1fr_1fr_1fr_40px] px-4 py-2 border-b border-border bg-muted/40">
               {["이름", "유형", "크기", "날짜", ""].map((h, i) => (
-                <span key={i} className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{h}</span>
+                <span key={i} className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</span>
               ))}
             </div>
             {filtered.map((file, idx) => {
@@ -504,7 +504,7 @@ export default function FilesPage() {
                   className={cn("grid grid-cols-[2fr_1fr_1fr_1fr_40px] items-center px-4 py-2.5 hover:bg-accent/10 transition-colors group cursor-pointer",
                     idx < filtered.length - 1 && "border-b border-border")}>
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[9px] font-bold text-white"
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold text-white"
                       style={{ background: color }}>
                       {ext.toUpperCase().slice(0, 4)}
                     </div>
@@ -666,7 +666,7 @@ function DetailPanel({ file, onClose, onDelete, onDownload }: {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">유형</span>
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded" style={{ background: color + "22", color }}>{ext.toUpperCase()}</span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: color + "22", color }}>{ext.toUpperCase()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">크기</span>
@@ -679,7 +679,7 @@ function DetailPanel({ file, onClose, onDelete, onDownload }: {
             {file.sub_type && file.sub_type !== "uploaded" && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">생성 방식</span>
-                <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-muted">{file.sub_type}</span>
+                <span className="text-xs font-medium px-2 py-0.5 rounded bg-muted">{file.sub_type}</span>
               </div>
             )}
             {file.file_type === "document" && (

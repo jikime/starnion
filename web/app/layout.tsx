@@ -1,15 +1,9 @@
 import type { Metadata } from 'next'
-import { JetBrains_Mono } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale, getMessages } from 'next-intl/server'
 import { SessionProvider } from 'next-auth/react'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-jetbrains-mono',
-})
 
 export const metadata: Metadata = {
   title: 'Franklin Digital Planner',
@@ -48,7 +42,7 @@ export default async function RootLayout({
         <link rel="stylesheet" as="style" crossOrigin="anonymous"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
       </head>
-      <body className={`${jetbrainsMono.variable} font-sans antialiased bg-background text-foreground`}>
+      <body className="font-sans antialiased bg-background text-foreground">
         <SessionProvider>
           <NextIntlClientProvider locale={locale} messages={messages}>
             {children}

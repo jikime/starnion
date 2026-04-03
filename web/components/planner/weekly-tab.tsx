@@ -97,7 +97,7 @@ function DayColumn({
         <div className="flex items-center gap-1.5">
           <span
             className={cn(
-              "text-[11px] font-medium",
+              "text-xs font-medium",
               isTodayDate ? "text-primary" : isWeekend ? "text-muted-foreground" : "text-foreground"
             )}
           >
@@ -113,7 +113,7 @@ function DayColumn({
           </span>
           {isTodayDate && (
             <span
-              className="text-[9px] font-bold px-1 rounded"
+              className="text-xs font-bold px-1 rounded"
               style={{ background: "var(--priority-a)", color: "#0d1117" }}
             >
               오늘
@@ -138,7 +138,7 @@ function DayColumn({
             <tr className="border-b border-border/50">
               <th className="w-5 py-1 text-center text-[8px] text-muted-foreground font-normal border-r border-border/30">○</th>
               <th className="w-5 py-1 text-center text-[8px] text-muted-foreground font-normal border-r border-border/30">ABC</th>
-              <th className="py-1 px-1.5 text-left text-[8px] text-muted-foreground font-normal">과업</th>
+              <th className="py-1 px-1.5 text-left text-[8px] text-muted-foreground font-normal">업무</th>
             </tr>
           </thead>
           <tbody>
@@ -155,7 +155,7 @@ function DayColumn({
                   <td className="text-center border-r border-border/30 py-0.5">
                     <button
                       onClick={() => cycleStatus(task)}
-                      className="w-full h-full flex items-center justify-center text-[11px] font-mono"
+                      className="w-full h-full flex items-center justify-center text-xs font-mono"
                       style={{ color: sym.color }}
                       title={sym.label}
                     >
@@ -164,7 +164,7 @@ function DayColumn({
                   </td>
                   <td className="text-center border-r border-border/30">
                     <span
-                      className="text-[10px] font-bold"
+                      className="text-xs font-bold"
                       style={{ color: PRIORITY_COLOR[task.priority] }}
                     >
                       {task.priority}
@@ -173,7 +173,7 @@ function DayColumn({
                   <td className="px-1.5 py-0.5">
                     <span
                       className={cn(
-                        "text-[11px] leading-snug",
+                        "text-xs leading-snug",
                         task.status === "done" && "line-through text-muted-foreground"
                       )}
                     >
@@ -187,7 +187,7 @@ function DayColumn({
             {/* Quick add row */}
             {addingPriority ? (
               <tr className="border-b border-border/20 bg-accent/30">
-                <td className="text-center border-r border-border/30 text-[10px] font-bold" style={{ color: PRIORITY_COLOR[addingPriority] }}>
+                <td className="text-center border-r border-border/30 text-xs font-bold" style={{ color: PRIORITY_COLOR[addingPriority] }}>
                   {addingPriority}
                 </td>
                 <td colSpan={2} className="px-1.5 py-0.5">
@@ -200,8 +200,8 @@ function DayColumn({
                       if (e.key === "Escape") { setAddingPriority(null); setNewTitle("") }
                     }}
                     onBlur={() => handleAddTask(addingPriority)}
-                    placeholder="과업 입력 후 Enter"
-                    className="w-full bg-transparent text-[11px] text-foreground outline-none placeholder:text-muted-foreground/60"
+                    placeholder="업무 입력 후 Enter"
+                    className="w-full bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/60"
                   />
                 </td>
               </tr>
@@ -216,9 +216,9 @@ function DayColumn({
           <button
             key={p}
             onClick={() => { setAddingPriority(p); setNewTitle("") }}
-            className="flex-1 py-1 text-[9px] font-bold hover:bg-accent/50 transition-colors text-center"
+            className="flex-1 py-1 text-xs font-bold hover:bg-accent/50 transition-colors text-center"
             style={{ color: PRIORITY_COLOR[p] }}
-            title={`${p} 과업 추가`}
+            title={`${p} 업무 추가`}
           >
             +{p}
           </button>
@@ -247,11 +247,11 @@ function WeekHeader({
   return (
     <div className="flex items-center justify-between px-6 py-3 border-b border-border shrink-0 bg-card/40">
       <div>
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+        <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
           {format(start, "yyyy년 M월", { locale: ko })}
         </p>
         <h2 className="text-lg font-bold text-foreground leading-tight">주간계획</h2>
-        <p className="text-[10px] text-muted-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
       </div>
       <div className="flex items-center gap-2">
         <button
@@ -361,7 +361,7 @@ export function WeeklyTab({ onNavigateToDaily }: { onNavigateToDaily: () => void
         >
           <div className="px-4 pt-4 pb-2">
             <h3 className="text-lg font-bold text-foreground">위클리콤파스</h3>
-            <p className="text-[10px] text-muted-foreground mt-0.5">역할별 이번 주 목표</p>
+            <p className="text-xs text-muted-foreground mt-0.5">역할별 이번 주 목표</p>
           </div>
           <WeeklyCompass />
         </div>

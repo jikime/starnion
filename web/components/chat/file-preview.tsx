@@ -42,7 +42,7 @@ export function FilePreview({ file }: { file: FileAttachment }) {
       className="mt-2 flex items-center gap-3 rounded-xl bg-white/80 dark:bg-white/10 border border-black/8 dark:border-white/10 px-3 py-2.5 shadow-sm hover:bg-white dark:hover:bg-white/15 transition-colors min-w-0 max-w-[280px]"
     >
       {/* Extension badge */}
-      <div className={cn("flex shrink-0 items-center justify-center rounded-lg w-10 h-10 text-white font-bold text-[10px] uppercase tracking-wide", badgeColor)}>
+      <div className={cn("flex shrink-0 items-center justify-center rounded-lg w-10 h-10 text-white font-bold text-xs uppercase tracking-wide", badgeColor)}>
         {ext.length > 4 ? ext.slice(0, 4) : ext}
       </div>
       {/* Filename + size */}
@@ -68,7 +68,7 @@ export function DocDownloadCard({ href, label }: { href: string; label: string }
       rel="noopener noreferrer"
       className="my-2 inline-flex items-center gap-3 rounded-xl bg-white/80 dark:bg-white/10 border border-black/8 dark:border-white/10 px-3 py-2.5 shadow-sm hover:bg-white dark:hover:bg-white/15 transition-colors min-w-0 max-w-[280px] no-underline"
     >
-      <span className={cn("flex shrink-0 items-center justify-center rounded-lg w-10 h-10 text-white font-bold text-[10px] uppercase tracking-wide", badgeColor)}>
+      <span className={cn("flex shrink-0 items-center justify-center rounded-lg w-10 h-10 text-white font-bold text-xs uppercase tracking-wide", badgeColor)}>
         {ext.length > 4 ? ext.slice(0, 4) : ext}
       </span>
       <span className="min-w-0 flex-1">

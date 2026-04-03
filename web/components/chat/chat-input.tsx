@@ -51,21 +51,21 @@ function FileChip({ file, onRemove }: { file: AttachedFile; onRemove: () => void
         // eslint-disable-next-line @next/next/no-img-element
         <img src={file.previewUrl} alt={file.name} className="h-8 w-8 rounded object-cover shrink-0" />
       ) : (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-bold uppercase text-muted-foreground">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-muted text-xs font-bold uppercase text-muted-foreground">
           {file.name.split(".").pop()?.slice(0, 4) ?? "file"}
         </div>
       )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-medium leading-tight">{file.name}</p>
         {file.uploading && (
-          <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <p className="flex items-center gap-1 text-xs text-muted-foreground">
             <Loader2 className="size-2.5 animate-spin" />
             {t("fileSending")}
           </p>
         )}
-        {file.error && <p className="text-[10px] text-destructive">{file.error}</p>}
+        {file.error && <p className="text-xs text-destructive">{file.error}</p>}
         {!file.uploading && !file.error && (
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {file.url ? t("fileDone") : t("fileAttached")}
           </p>
         )}
@@ -403,7 +403,7 @@ export function ChatInput({
                         <span className="flex flex-col min-w-0">
                           <span className="truncate">{m.label}</span>
                           {m.description && (
-                            <span className="text-[10px] text-muted-foreground">{m.description}</span>
+                            <span className="text-xs text-muted-foreground">{m.description}</span>
                           )}
                         </span>
                       </button>
@@ -453,7 +453,7 @@ export function ChatInput({
                         <Bot className="size-3.5 text-muted-foreground shrink-0" />
                         <span className="truncate flex-1 text-left">{bp.name}</span>
                         {bp.isDefault && !activePersonaId && (
-                          <span className="text-[10px] text-muted-foreground shrink-0">{t("defaultLabel")}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">{t("defaultLabel")}</span>
                         )}
                       </button>
                     ))}

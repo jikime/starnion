@@ -155,13 +155,13 @@ function PriorityGroup({ priority }: PriorityGroupProps) {
         <div className="flex items-center gap-2">
           {priority === "A" && pendingACount > 0 && (
             <span
-              className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+              className="text-xs font-semibold px-1.5 py-0.5 rounded"
               style={{ background: "var(--priority-a-bg)", color: "var(--priority-a)" }}
             >
               !{pendingACount}
             </span>
           )}
-          <span className="text-[10px] text-muted-foreground tabular-nums">
+          <span className="text-xs text-muted-foreground tabular-nums">
             {doneCount}/{tasks.length}
           </span>
           {tasks.length > 0 && (
@@ -196,13 +196,13 @@ function PriorityGroup({ priority }: PriorityGroupProps) {
               strategy={verticalListSortingStrategy}
             >
               {tasks.length === 0 && !adding && (
-                <p className="px-3 py-3 text-[10px] text-muted-foreground italic">
-                  {priority} 그룹에 과업이 없습니다
+                <p className="px-3 py-3 text-xs text-muted-foreground italic">
+                  {priority} 그룹에 업무이 없습니다
                 </p>
               )}
               {tasks.map((task, idx) => (
                 <div key={task.id} className="relative">
-                  <div className="absolute left-7 top-2.5 w-3.5 text-[9px] text-muted-foreground text-right select-none pointer-events-none">
+                  <div className="absolute left-7 top-2.5 w-3.5 text-xs text-muted-foreground text-right select-none pointer-events-none">
                     {idx + 1}
                   </div>
                   <TaskItem task={task} urgentGoal={urgentMap.get(task.roleId)} />
@@ -211,66 +211,6 @@ function PriorityGroup({ priority }: PriorityGroupProps) {
             </SortableContext>
           </DndContext>
 
-          {/* Add task form */}
-          {adding ? (
-            <div className="px-3 py-2 space-y-2 border-t border-border/50 bg-accent/20">
-              <Input
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                placeholder={`${priority} 과업 제목 입력`}
-                className="h-7 text-xs bg-muted border-border"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAdd()
-                  if (e.key === "Escape") {
-                    setAdding(false)
-                    setNewTitle("")
-                  }
-                }}
-                autoFocus
-              />
-              <div className="flex gap-2 items-center">
-                <Select value={newRoleId} onValueChange={setNewRoleId}>
-                  <SelectTrigger className="h-6 text-[10px] bg-muted border-border flex-1">
-                    <SelectValue placeholder="역할 선택" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border">
-                    {roles.map((r) => (
-                      <SelectItem key={r.id} value={r.id} className="text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full" style={{ background: r.color }} />
-                          {r.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <button
-                  onClick={handleAdd}
-                  className="h-6 px-2 rounded text-[10px] font-medium shrink-0 transition-colors hover:opacity-80"
-                  style={{ background: cfg.accent, color: "#0d1117" }}
-                >
-                  추가
-                </button>
-                <button
-                  onClick={() => {
-                    setAdding(false)
-                    setNewTitle("")
-                  }}
-                  className="h-6 px-2 rounded text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  취소
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => setAdding(true)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors border-t border-border/50"
-            >
-              <Plus className="w-3 h-3" />
-              <span>과업 추가</span>
-            </button>
-          )}
         </div>
       )}
     </div>
@@ -288,10 +228,10 @@ export function AbcTaskList() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* A 과업 미완료 경고 배너 */}
+      {/* A 업무 미완료 경고 배너 */}
       {pendingA > 0 && (
         <div
-          className="mx-4 mt-3 mb-1 px-3 py-2 rounded-md text-[11px] font-medium flex items-center gap-2 shrink-0"
+          className="mx-4 mt-3 mb-1 px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2 shrink-0"
           style={{
             background: "var(--priority-a-bg)",
             color: "var(--priority-a)",
@@ -300,7 +240,7 @@ export function AbcTaskList() {
         >
           <span className="font-bold shrink-0">!</span>
           <span>
-            완료되지 않은 A 과업이 <strong>{pendingA}개</strong> 있습니다. A를 먼저 처리하세요.
+            완료되지 않은 A 업무이 <strong>{pendingA}개</strong> 있습니다. A를 먼저 처리하세요.
           </span>
         </div>
       )}
@@ -308,7 +248,7 @@ export function AbcTaskList() {
       {/* D-Day urgency banner */}
       {urgentGoals.length > 0 && (
         <div
-          className="mx-4 mt-2 mb-1 px-3 py-2 rounded-md text-[11px] font-medium flex items-start gap-2 shrink-0"
+          className="mx-4 mt-2 mb-1 px-3 py-2 rounded-md text-xs font-medium flex items-start gap-2 shrink-0"
           style={{
             background: "color-mix(in oklch, var(--status-cancelled) 12%, transparent)",
             color: "var(--status-cancelled)",
@@ -323,7 +263,7 @@ export function AbcTaskList() {
                 return `"${g.title}" (D-${g.daysLeft}${role ? ` · ${role.name}` : ""})`
               })
               .join(", ")}{" "}
-            — 관련 과업을 A등급으로 올리세요.
+            — 관련 업무을 A등급으로 올리세요.
           </span>
         </div>
       )}

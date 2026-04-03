@@ -41,11 +41,11 @@ export function TimeBlockCalendar() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="px-3 pt-3 pb-2 shrink-0 border-b border-border">
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+        <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
           타임 블로킹
         </p>
-        <p className="text-[10px] text-muted-foreground mt-0.5 opacity-70">
-          과업 메뉴 &rsaquo; 시간 배정으로 배치
+        <p className="text-xs text-muted-foreground mt-0.5 opacity-70">
+          업무 메뉴 &rsaquo; 시간 배정으로 배치
         </p>
       </div>
 
@@ -62,7 +62,7 @@ export function TimeBlockCalendar() {
               style={{ top: (hour - START_HOUR) * HOUR_HEIGHT }}
             >
               {/* Hour label */}
-              <span className="text-[10px] text-muted-foreground w-10 shrink-0 tabular-nums leading-none pt-px">
+              <span className="text-xs text-muted-foreground w-10 shrink-0 tabular-nums leading-none pt-px">
                 {pad(hour)}:00
               </span>
               {/* Grid line */}
@@ -131,7 +131,7 @@ export function TimeBlockCalendar() {
                 <div className="flex items-center gap-1.5 h-full overflow-hidden">
                   {/* Priority badge */}
                   <span
-                    className="text-[9px] font-bold shrink-0"
+                    className="text-xs font-bold shrink-0"
                     style={{ color: colors.text }}
                   >
                     {task.priority}
@@ -140,7 +140,7 @@ export function TimeBlockCalendar() {
                   {/* Title */}
                   <span
                     className={cn(
-                      "text-[10px] font-medium truncate leading-tight",
+                      "text-xs font-medium truncate leading-tight",
                       isDone && "line-through",
                       isCancelled && "line-through"
                     )}
@@ -160,7 +160,7 @@ export function TimeBlockCalendar() {
 
                 {/* Time label for taller blocks */}
                 {height > 44 && (
-                  <p className="text-[9px] mt-0.5" style={{ color: colors.text, opacity: 0.7 }}>
+                  <p className="text-xs mt-0.5" style={{ color: colors.text, opacity: 0.7 }}>
                     {pad(task.timeStart!)}:00 – {pad(task.timeEnd!)}:00
                   </p>
                 )}
@@ -175,9 +175,9 @@ export function TimeBlockCalendar() {
               style={{ top: (9 - START_HOUR) * HOUR_HEIGHT, height: HOUR_HEIGHT * 4 }}
             >
               <div className="text-center space-y-1">
-                <p className="text-[11px] text-muted-foreground">시간 배정된 과업 없음</p>
-                <p className="text-[10px] text-muted-foreground opacity-60">
-                  과업 메뉴 &gt; 시간 배정
+                <p className="text-xs text-muted-foreground">시간 배정된 업무 없음</p>
+                <p className="text-xs text-muted-foreground opacity-60">
+                  업무 메뉴 &gt; 시간 배정
                 </p>
               </div>
             </div>

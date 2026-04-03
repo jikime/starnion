@@ -60,12 +60,12 @@ export function GoogleOAuthConnectSection({ skill, onDisconnected, onConnected }
         <span className="text-base">🔵</span>
         <span className="text-xs font-semibold text-foreground">{tSkills("googleAccountConnect")}</span>
         {skill.oauth_connected && !expired && (
-          <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30">
+          <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30">
             <span className="size-1.5 rounded-full bg-emerald-400" />{tSkills("connected")}
           </span>
         )}
         {skill.oauth_connected && expired && (
-          <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30">
+          <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30">
             <AlertTriangle className="size-2.5" />{tSkills("expiredReconnect")}
           </span>
         )}
@@ -80,7 +80,7 @@ export function GoogleOAuthConnectSection({ skill, onDisconnected, onConnected }
           <div className="flex-1 space-y-0.5">
             <p className="text-xs text-muted-foreground">{tSkills("googleAccountConnected")}</p>
             {skill.oauth_expires_at && (
-              <p className="text-[10px] text-muted-foreground/60 flex items-center gap-1">
+              <p className="text-xs text-muted-foreground/60 flex items-center gap-1">
                 <Clock className="size-2.5" />{tSkills("oauthExpiry", { date: new Date(skill.oauth_expires_at).toLocaleString() })}
               </p>
             )}

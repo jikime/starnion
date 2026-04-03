@@ -111,7 +111,7 @@ export default function DocSearchPanel({ onFileSelect }: { onFileSelect: (fileId
                     <span className="text-sm font-medium truncate">{r.file_name}</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded", sim.cls)}>
+                    <span className={cn("text-xs font-semibold px-1.5 py-0.5 rounded", sim.cls)}>
                       {sim.label}
                     </span>
                     <Button

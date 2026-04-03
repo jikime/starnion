@@ -46,7 +46,7 @@ export default function FileCard({ file, onClick, onDelete, isSelected, onToggle
                 ? "bg-primary border-primary"
                 : "bg-white/80 dark:bg-zinc-800/80 border-muted-foreground/40 opacity-0 group-hover:opacity-100"
             )}>
-              {isSelected && <span className="text-white text-[10px] font-bold">&#10003;</span>}
+              {isSelected && <span className="text-white text-xs font-bold">&#10003;</span>}
             </div>
           </div>
         )}
@@ -67,19 +67,19 @@ export default function FileCard({ file, onClick, onDelete, isSelected, onToggle
         </div>
         <p className="text-xs font-medium truncate mb-1">{file.name}</p>
         <div className="flex items-center gap-1 flex-wrap">
-          <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded", formatBadgeColor(file.format))}>
+          <span className={cn("text-xs font-semibold px-1.5 py-0.5 rounded", formatBadgeColor(file.format))}>
             {file.format}
           </span>
           {file.sub_type && file.sub_type !== "uploaded" && (
-            <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded", subTypeBadgeColor(file.sub_type))}>
+            <span className={cn("text-xs font-medium px-1.5 py-0.5 rounded", subTypeBadgeColor(file.sub_type))}>
               {file.sub_type}
             </span>
           )}
           {file.file_type === "document" && file.indexed && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">indexed</span>
+            <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">indexed</span>
           )}
         </div>
-        <p className="text-[10px] text-muted-foreground mt-1 truncate">
+        <p className="text-xs text-muted-foreground mt-1 truncate">
           {file.size_label} · {file.created_at.slice(0, 10)}
         </p>
         <div

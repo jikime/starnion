@@ -129,12 +129,12 @@ export function NoteTab({ embedded = false }: { embedded?: boolean }) {
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-foreground">{format(parsed, "yyyy년 M월 d일", { locale: ko })}</span>
             {dayLabel && (
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: isCurrentToday ? "var(--priority-a-bg)" : "var(--muted)", color: isCurrentToday ? "var(--priority-a)" : "var(--muted-foreground)" }}>
+              <span className="text-xs font-semibold px-1.5 py-0.5 rounded" style={{ background: isCurrentToday ? "var(--priority-a-bg)" : "var(--muted)", color: isCurrentToday ? "var(--priority-a)" : "var(--muted-foreground)" }}>
                 {dayLabel}
               </span>
             )}
           </div>
-          <p className="text-[10px] text-muted-foreground">{format(parsed, "EEEE", { locale: ko })}</p>
+          <p className="text-xs text-muted-foreground">{format(parsed, "EEEE", { locale: ko })}</p>
         </div>
         <button onClick={goForward} className="w-7 h-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground" aria-label="다음 날">
           <ChevronRight className="w-4 h-4" />
@@ -154,9 +154,9 @@ export function NoteTab({ embedded = false }: { embedded?: boolean }) {
             const isTodayDay = isToday(d)
             const hasEntry = !!reflectionNotes[dateStr]
             return (
-              <button key={offset} onClick={() => setSelectedDate(dateStr)} className={cn("flex flex-col items-center w-8 py-1 rounded transition-colors text-[9px]", isSelected ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground")}>
+              <button key={offset} onClick={() => setSelectedDate(dateStr)} className={cn("flex flex-col items-center w-8 py-1 rounded transition-colors text-xs", isSelected ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground")}>
                 <span className={cn("font-medium", isTodayDay && !isSelected && "text-primary")}>{format(d, "EEE", { locale: ko }).slice(0, 1)}</span>
-                <span className={cn("w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-semibold mt-0.5", isSelected && "text-foreground", isTodayDay && isSelected && "bg-primary text-primary-foreground")}>{format(d, "d")}</span>
+                <span className={cn("w-5 h-5 flex items-center justify-center rounded-full text-xs font-semibold mt-0.5", isSelected && "text-foreground", isTodayDay && isSelected && "bg-primary text-primary-foreground")}>{format(d, "d")}</span>
                 {hasEntry && !isSelected && <span className="w-1 h-1 rounded-full mt-0.5" style={{ background: "var(--primary)" }} />}
               </button>
             )
@@ -191,7 +191,7 @@ export function NoteTab({ embedded = false }: { embedded?: boolean }) {
                     setEditingNote(null)
                     setDraftText("")
                   }}
-                  className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <Pencil className="w-3 h-3" />
                   수정
@@ -217,7 +217,7 @@ export function NoteTab({ embedded = false }: { embedded?: boolean }) {
                 >
                   <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">{note.text}</p>
                   {note.createdAt && (
-                    <p className="text-[10px] text-muted-foreground mt-2">
+                    <p className="text-xs text-muted-foreground mt-2">
                       {format(new Date(note.createdAt), "HH:mm")}
                     </p>
                   )}
@@ -252,20 +252,20 @@ export function NoteTab({ embedded = false }: { embedded?: boolean }) {
           </div>
         )}
 
-        {/* ─── EDIT / NEW mode ─── */}
-        {(viewMode === "edit" || viewMode === "new") && (
+        {/* ─── DIARY EDIT mode (mood + one-liner only) ─── */}
+        {viewMode === "edit" && !editingNote && (
           <div className="flex flex-col flex-1 overflow-hidden">
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
               {/* Mood picker */}
               <div className="space-y-2">
-                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">오늘의 컨디션</p>
+                <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">오늘의 컨디션</p>
                 <div className="flex gap-2">
                   {MOOD_OPTIONS.map((m) => (
                     <button
                       key={m.key}
                       onClick={() => setDraftMood(m.key)}
                       className={cn(
-                        "flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-[10px] transition-all font-medium",
+                        "flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs transition-all font-medium",
                         draftMood === m.key
                           ? "border-transparent"
                           : "border-border bg-muted/30 text-muted-foreground hover:bg-accent/30"
@@ -285,20 +285,41 @@ export function NoteTab({ embedded = false }: { embedded?: boolean }) {
 
               {/* One-liner */}
               <div className="space-y-1.5">
-                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">오늘의 한 줄</p>
+                <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">오늘의 한 줄</p>
                 <Input
                   value={draftOneLiner}
                   onChange={(e) => setDraftOneLiner(e.target.value)}
                   placeholder="오늘 하루를 한 문장으로 요약한다면?"
                   className="h-9 text-sm bg-muted border-border"
                   maxLength={80}
+                  autoFocus
                 />
-                <p className="text-[10px] text-muted-foreground text-right">{draftOneLiner.length}/80</p>
+                <p className="text-xs text-muted-foreground text-right">{draftOneLiner.length}/80</p>
               </div>
+            </div>
 
-              {/* Note body */}
+            {/* Action bar */}
+            <div className="flex gap-2 px-6 py-4 border-t border-border shrink-0">
+              <Button variant="outline" className="flex-1 gap-1.5" onClick={handleCancel}>
+                <X className="w-3.5 h-3.5" />취소
+              </Button>
+              <Button className="flex-1 gap-1.5" onClick={() => {
+                setMood(draftMood); setOneLiner(draftOneLiner)
+                setDiaryEntry(selectedDate, { mood: draftMood, oneLiner: draftOneLiner })
+                setViewMode("view")
+              }} style={{ background: "var(--priority-a)", color: "#0d1117" }}>
+                <Check className="w-3.5 h-3.5" />수정 완료
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── NOTE EDIT / NEW mode (note body only) ─── */}
+        {(viewMode === "new" || (viewMode === "edit" && editingNote)) && (
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
               <div className="space-y-1.5">
-                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">
                   {viewMode === "new" ? "노트 내용" : "노트 수정"}
                 </p>
                 <Textarea
@@ -314,16 +335,10 @@ export function NoteTab({ embedded = false }: { embedded?: boolean }) {
             {/* Action bar */}
             <div className="flex gap-2 px-6 py-4 border-t border-border shrink-0">
               <Button variant="outline" className="flex-1 gap-1.5" onClick={handleCancel}>
-                <X className="w-3.5 h-3.5" />
-                취소
+                <X className="w-3.5 h-3.5" />취소
               </Button>
-              <Button
-                className="flex-1 gap-1.5"
-                onClick={handleSave}
-                style={{ background: "var(--priority-a)", color: "#0d1117" }}
-              >
-                <Check className="w-3.5 h-3.5" />
-                {viewMode === "new" ? "저장" : "수정 완료"}
+              <Button className="flex-1 gap-1.5" onClick={handleSave} style={{ background: "var(--priority-a)", color: "#0d1117" }}>
+                <Check className="w-3.5 h-3.5" />{viewMode === "new" ? "저장" : "수정 완료"}
               </Button>
             </div>
           </div>

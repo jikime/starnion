@@ -191,7 +191,7 @@ export function LogPanel({ apiPath, streamPath, useSSE }: { apiPath: string; str
               const prev = rows[i - 1]; const showDay = i === 0 || (entry.time && prev?.time && !sameDay(entry.time, prev.time))
               return (
                 <div key={entry.time_ms ? `${entry.time_ms}-${i}` : i}>
-                  {showDay && entry.time && <div className="my-3 flex items-center gap-3 px-4"><div className="h-px flex-1 bg-white/[0.05]" /><span className="font-mono text-[11px] text-zinc-600">{dateLabel(entry.time)}</span><div className="h-px flex-1 bg-white/[0.05]" /></div>}
+                  {showDay && entry.time && <div className="my-3 flex items-center gap-3 px-4"><div className="h-px flex-1 bg-white/[0.05]" /><span className="font-mono text-xs text-zinc-600">{dateLabel(entry.time)}</span><div className="h-px flex-1 bg-white/[0.05]" /></div>}
                   <div role="button" tabIndex={0} onClick={() => handleRowClick(entry)} onKeyDown={e => e.key === "Enter" && handleRowClick(entry)}
                     className={cn("group flex items-start gap-0 transition-colors hover:bg-white/[0.04] cursor-pointer focus-visible:outline-none focus-visible:bg-white/[0.04]", c.row)}>
                     <span className={cn("w-24 shrink-0 select-none px-4 py-0.5 font-mono text-xs tabular-nums", c.time)}>{ts(entry.time)}</span>

@@ -271,7 +271,7 @@ function SpendingHeatmap({
           {weekdayLabels.map((d, i) => (
             <div
               key={i}
-              className="size-3.5 flex items-center justify-end pr-0.5 text-[9px] text-muted-foreground leading-none"
+              className="size-3.5 flex items-center justify-end pr-0.5 text-xs text-muted-foreground leading-none"
             >
               {/* 일/화/목/토만 표시 (짝수 인덱스) */}
               {i % 2 === 0 ? d : ""}

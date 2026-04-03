@@ -139,11 +139,11 @@ export default function UsagePage() {
                     <div className="flex flex-col gap-2">
                       {(() => { const maxCost = Math.max(...models.map(x => x.cost_usd), 0.0001); return displayModels.map(m => { const pct = Math.round((m.cost_usd / maxCost) * 100); return (
                         <div key={`${m.model}-${m.provider}`} className="flex flex-col gap-1">
-                          <div className="flex justify-between text-xs"><span className="truncate font-medium text-[11px]" style={{ color: providerColor(m.provider) }}>{m.model.length > 22 ? m.model.slice(0, 22) + "..." : m.model}</span><span className="text-muted-foreground tabular-nums shrink-0 ml-2">{fmtCost(m.cost_usd)}</span></div>
+                          <div className="flex justify-between text-xs"><span className="truncate font-medium text-xs" style={{ color: providerColor(m.provider) }}>{m.model.length > 22 ? m.model.slice(0, 22) + "..." : m.model}</span><span className="text-muted-foreground tabular-nums shrink-0 ml-2">{fmtCost(m.cost_usd)}</span></div>
                           <div className="h-1.5 rounded-full bg-muted overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: providerColor(m.provider) }} /></div>
-                          <p className="text-[10px] text-muted-foreground">{m.count} {t("requests")} · {fmtTokens(m.tokens)} {t("tokens")}</p>
+                          <p className="text-xs text-muted-foreground">{m.count} {t("requests")} · {fmtTokens(m.tokens)} {t("tokens")}</p>
                         </div>) }) })()}
-                      {models.length > 6 && <button onClick={() => setShowAllModels(v => !v)} className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors">{showAllModels ? <><ChevronUp className="size-3" />{t("collapse")}</> : <><ChevronDown className="size-3" />{t("showMore", { count: models.length - 6 })}</>}</button>}
+                      {models.length > 6 && <button onClick={() => setShowAllModels(v => !v)} className="mt-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">{showAllModels ? <><ChevronUp className="size-3" />{t("collapse")}</> : <><ChevronDown className="size-3" />{t("showMore", { count: models.length - 6 })}</>}</button>}
                     </div>)}
                 </Panel>
                 <Panel title={t("successVsError")} icon={CheckCircle2} iconBg="bg-emerald-500/10 text-emerald-500">

@@ -122,7 +122,7 @@ export function GlobalNav() {
       <div className="flex items-center gap-1 w-44 justify-end shrink-0">
         <button
           onClick={() => setLang((l) => (l === "ko" ? "en" : "ko"))}
-          className="flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium text-foreground/60 hover:text-foreground hover:bg-accent/40 transition-colors"
+          className="flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-foreground/60 hover:text-foreground hover:bg-accent/40 transition-colors"
           title="언어 변경"
         >
           <Globe className="w-3.5 h-3.5" />
@@ -160,7 +160,7 @@ export function GlobalNav() {
             >
               {SETTINGS_GROUPS.map((group, gi) => (
                 <div key={group.label} className={cn(gi > 0 && "mt-1")}>
-                  <p className="px-4 pt-3 pb-1.5 text-[10px] font-semibold tracking-widest text-muted-foreground">
+                  <p className="px-4 pt-3 pb-1.5 text-xs font-semibold tracking-widest text-muted-foreground">
                     {group.label}
                   </p>
                   {group.items.map(({ icon: Icon, label, href }) =>

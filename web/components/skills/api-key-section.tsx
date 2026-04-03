@@ -98,9 +98,9 @@ export function APIKeySection({ skill, onSaved, onDeleted }: {
         <div className="flex items-center gap-2">
           <Key className="size-3.5 text-amber-500 shrink-0" />
           <span className="text-xs font-semibold text-foreground">{skill.api_key_label ?? "API Key"}</span>
-          {!skill.requires_api_key && <span className="text-[10px] text-muted-foreground">({tSkills("optional")})</span>}
+          {!skill.requires_api_key && <span className="text-xs text-muted-foreground">({tSkills("optional")})</span>}
           {skill.has_api_key && !editing && (
-            <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30">
+            <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30">
               <span className="size-1.5 rounded-full bg-emerald-400" />{tSkills("configured")}
             </span>
           )}
@@ -119,11 +119,11 @@ export function APIKeySection({ skill, onSaved, onDeleted }: {
         ) : isDual ? (
           <div className="space-y-2">
             <div className="space-y-1.5">
-              <label className="text-[11px] text-muted-foreground font-medium">{skill.api_key_label_1 ?? "Key 1"}</label>
+              <label className="text-xs text-muted-foreground font-medium">{skill.api_key_label_1 ?? "Key 1"}</label>
               <Input type="text" placeholder={skill.api_key_label_1 ?? "Key 1"} value={inputVal1} onChange={e => setInputVal1(e.target.value)} className="h-8 text-xs font-mono" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] text-muted-foreground font-medium">{skill.api_key_label_2 ?? "Key 2"}</label>
+              <label className="text-xs text-muted-foreground font-medium">{skill.api_key_label_2 ?? "Key 2"}</label>
               <div className="relative">
                 <Input type={showKey ? "text" : "password"} placeholder={skill.api_key_label_2 ?? "Key 2"} value={inputVal2} onChange={e => setInputVal2(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSave()} className="h-8 text-xs pr-8 font-mono" />
                 <button type="button" onClick={() => setShowKey(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">

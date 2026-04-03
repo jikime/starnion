@@ -49,7 +49,7 @@ export function DateHeader({ rightSlot }: DateHeaderProps = {}) {
               <span className="text-sm font-semibold text-foreground">{fullDate}</span>
               {dayLabel && (
                 <span
-                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                  className="text-xs font-semibold px-1.5 py-0.5 rounded"
                   style={{
                     background: isCurrentToday ? "var(--priority-a-bg)" : "var(--muted)",
                     color: isCurrentToday ? "var(--priority-a)" : "var(--muted-foreground)",
@@ -59,7 +59,7 @@ export function DateHeader({ rightSlot }: DateHeaderProps = {}) {
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-muted-foreground">{dayOfWeek}</p>
+            <p className="text-xs text-muted-foreground">{dayOfWeek}</p>
           </div>
         </div>
 
@@ -97,7 +97,7 @@ export function DateHeader({ rightSlot }: DateHeaderProps = {}) {
                 key={offset}
                 onClick={() => setSelectedDate(dateStr)}
                 className={cn(
-                  "flex flex-col items-center w-8 py-1 rounded transition-colors text-[9px]",
+                  "flex flex-col items-center w-8 py-1 rounded transition-colors text-xs",
                   isSelected
                     ? "bg-accent text-foreground"
                     : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
@@ -110,7 +110,7 @@ export function DateHeader({ rightSlot }: DateHeaderProps = {}) {
                 </span>
                 <span
                   className={cn(
-                    "w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-semibold mt-0.5",
+                    "w-5 h-5 flex items-center justify-center rounded-full text-xs font-semibold mt-0.5",
                     isSelected && "text-foreground",
                     isTodayDay && isSelected && "bg-primary text-primary-foreground"
                   )}

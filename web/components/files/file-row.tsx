@@ -42,11 +42,11 @@ export default function FileRow({ file, onClick, onDelete, isSelected, onToggleS
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{file.name}</p>
       </div>
-      <span className={cn("text-[11px] font-semibold px-2 py-0.5 rounded shrink-0", formatBadgeColor(file.format))}>
+      <span className={cn("text-xs font-semibold px-2 py-0.5 rounded shrink-0", formatBadgeColor(file.format))}>
         {file.format}
       </span>
       {file.sub_type && file.sub_type !== "uploaded" && (
-        <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded shrink-0", subTypeBadgeColor(file.sub_type))}>
+        <span className={cn("text-xs font-medium px-2 py-0.5 rounded shrink-0", subTypeBadgeColor(file.sub_type))}>
           {file.sub_type}
         </span>
       )}

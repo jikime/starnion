@@ -38,13 +38,13 @@ export function SkillCard({ skill, isToggling, onToggle, onOpenDetail }: {
               <span className="text-sm font-medium leading-tight line-clamp-1">{skill.display_name}</span>
               <div className="flex items-center gap-1 mt-0.5">
                 {oauthExpired && (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded text-[10px] font-medium border leading-tight border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30">
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded text-xs font-medium border leading-tight border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30">
                     <AlertTriangle className="size-2.5" />{t("reconnectNeeded")}
                   </span>
                 )}
                 {!oauthExpired && (skill.requires_api_key || !!skill.api_key_provider) && (
                   <span className={cn(
-                    "inline-flex items-center gap-0.5 px-1.5 py-px rounded text-[10px] font-medium border leading-tight",
+                    "inline-flex items-center gap-0.5 px-1.5 py-px rounded text-xs font-medium border leading-tight",
                     skill.has_api_key
                       ? "border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30"
                       : skill.requires_api_key
@@ -56,7 +56,7 @@ export function SkillCard({ skill, isToggling, onToggle, onOpenDetail }: {
                   </span>
                 )}
                 {skill.uses_provider && (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded text-[10px] font-medium border leading-tight border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30">
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded text-xs font-medium border leading-tight border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30">
                     <Zap className="size-2.5" />{t("provider")}
                   </span>
                 )}

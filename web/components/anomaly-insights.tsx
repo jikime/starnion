@@ -226,7 +226,7 @@ export function AnomalyInsights({ className }: { className?: string }) {
 
       {/* Footer timestamp */}
       {data?.computed_at && (
-        <p className="text-[11px] text-muted-foreground/60 text-right">
+        <p className="text-xs text-muted-foreground/60 text-right">
           {t("lastAnalysis", { time: new Date(data.computed_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) })}
         </p>
       )}

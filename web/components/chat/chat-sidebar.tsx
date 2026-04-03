@@ -110,7 +110,7 @@ export function ChatSidebar({
                         <span className="flex flex-col min-w-0">
                           <span className="line-clamp-1">{conv.title}</span>
                           {conv.persona_name && (
-                            <span className="text-[10px] text-muted-foreground/70 flex items-center gap-0.5">
+                            <span className="text-xs text-muted-foreground/70 flex items-center gap-0.5">
                               <Bot className="size-2.5" />
                               {conv.persona_name}
                             </span>
@@ -146,7 +146,7 @@ export function ChatSidebar({
                     <span className="text-xs font-medium text-muted-foreground">
                       {meta.icon} {meta.label}
                     </span>
-                    <span className="inline-flex items-center gap-0.5 h-4 px-1 rounded-full text-[10px] font-medium border border-border bg-secondary text-secondary-foreground">
+                    <span className="inline-flex items-center gap-0.5 h-4 px-1 rounded-full text-xs font-medium border border-border bg-secondary text-secondary-foreground">
                       <Lock className="size-2.5" />
                       조회
                     </span>
@@ -165,12 +165,12 @@ export function ChatSidebar({
                       <span className="flex flex-col min-w-0">
                         <span className="line-clamp-1 font-medium">{conv.title}</span>
                         {conv.thread_id && (
-                          <span className="text-[10px] text-muted-foreground/70 truncate">
+                          <span className="text-xs text-muted-foreground/70 truncate">
                             ID: {conv.thread_id}
                           </span>
                         )}
                         {conv.persona_name && (
-                          <span className="text-[10px] text-muted-foreground/70 flex items-center gap-0.5">
+                          <span className="text-xs text-muted-foreground/70 flex items-center gap-0.5">
                             <Bot className="size-2.5" />
                             {conv.persona_name}
                           </span>

@@ -41,7 +41,7 @@ export function InboxTab() {
           <span className="text-sm font-semibold text-foreground">인박스</span>
           {inboxTasks.length > 0 && (
             <span
-              className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+              className="text-xs font-bold px-1.5 py-0.5 rounded-full"
               style={{ background: "var(--priority-a-bg)", color: "var(--priority-a)" }}
             >
               {inboxTasks.length}
@@ -72,7 +72,7 @@ export function InboxTab() {
           />
           <div className="flex gap-2">
             <Select value={newRoleId} onValueChange={setNewRoleId}>
-              <SelectTrigger className="h-6 text-[10px] bg-muted border-border flex-1">
+              <SelectTrigger className="h-6 text-xs bg-muted border-border flex-1">
                 <SelectValue placeholder="역할" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
@@ -88,7 +88,7 @@ export function InboxTab() {
             </Select>
             <button
               onClick={handleAdd}
-              className="h-6 px-3 rounded text-[10px] font-medium"
+              className="h-6 px-3 rounded text-xs font-medium"
               style={{ background: "var(--priority-a)", color: "#0d1117" }}
             >
               추가
@@ -119,7 +119,7 @@ export function InboxTab() {
                     {role && (
                       <div className="flex items-center gap-1 mt-0.5">
                         <span className="w-1.5 h-1.5 rounded-full" style={{ background: role.color }} />
-                        <span className="text-[10px] text-muted-foreground">{role.name}</span>
+                        <span className="text-xs text-muted-foreground">{role.name}</span>
                       </div>
                     )}
                   </div>
@@ -136,7 +136,7 @@ export function InboxTab() {
                     value={target}
                     onValueChange={(v) => setMoveTarget((prev) => ({ ...prev, [task.id]: v as Priority }))}
                   >
-                    <SelectTrigger className="h-6 text-[10px] bg-muted border-border w-16">
+                    <SelectTrigger className="h-6 text-xs bg-muted border-border w-16">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-popover border-border">
@@ -149,10 +149,10 @@ export function InboxTab() {
                   </Select>
                   <button
                     onClick={() => handleMove(task.id)}
-                    className="flex items-center gap-1 h-6 px-2.5 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors border border-border"
+                    className="flex items-center gap-1 h-6 px-2.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors border border-border"
                   >
                     <ArrowRight className="w-3 h-3" />
-                    과업으로
+                    업무으로
                   </button>
                 </div>
               </div>

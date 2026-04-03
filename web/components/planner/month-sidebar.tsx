@@ -37,7 +37,7 @@ export function MonthSidebar() {
   return (
     <aside className="w-20 shrink-0 flex flex-col gap-2 items-center py-4 px-1.5 border-r border-border bg-card/50">
       {/* Year and nav */}
-      <div className="flex flex-col items-center gap-1 text-center text-[10px] text-muted-foreground font-medium mb-2">
+      <div className="flex flex-col items-center gap-1 text-center text-xs text-muted-foreground font-medium mb-2">
         <div className="flex items-center justify-center gap-0.5">
           <button
             onClick={handlePrevMonth}
@@ -46,7 +46,7 @@ export function MonthSidebar() {
           >
             <ChevronLeft className="w-2.5 h-2.5" />
           </button>
-          <span className="w-8 text-[9px]">{currentYear}</span>
+          <span className="w-8 text-xs">{currentYear}</span>
           <button
             onClick={handleNextMonth}
             className="p-0.5 hover:bg-accent rounded transition-colors"
@@ -63,7 +63,7 @@ export function MonthSidebar() {
           <button
             key={idx}
             onClick={() => handleSelectMonth(idx)}
-            className="py-1 px-1 rounded text-[9px] font-semibold transition-all"
+            className="py-1 px-1 rounded text-xs font-semibold transition-all"
             style={{
               background: idx === currentMonth ? "var(--primary)" : "transparent",
               color: idx === currentMonth ? "#0d1117" : "var(--muted-foreground)",
@@ -79,7 +79,7 @@ export function MonthSidebar() {
 
       {/* Day indicator */}
       <div className="mt-auto pt-4 border-t border-border w-full text-center">
-        <div className="text-[10px] text-muted-foreground font-medium">
+        <div className="text-xs text-muted-foreground font-medium">
           Day
         </div>
         <div className="text-lg font-bold text-foreground">

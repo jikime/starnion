@@ -12,9 +12,9 @@ import { ListTodo, BookOpen, BrainCircuit } from "lucide-react"
 type DailyView = "tasks" | "note" | "intelligence"
 
 const VIEWS: { id: DailyView; label: string; icon: React.ElementType }[] = [
-  { id: "tasks",        label: "과업",        icon: ListTodo     },
+  { id: "tasks",        label: "업무",        icon: ListTodo     },
   { id: "note",         label: "노트",        icon: BookOpen     },
-  { id: "intelligence", label: "인텔리전스",  icon: BrainCircuit },
+  { id: "intelligence", label: "관리",  icon: BrainCircuit },
 ]
 
 export function DailyTab() {
@@ -27,7 +27,7 @@ export function DailyTab() {
           key={id}
           onClick={() => setView(id)}
           className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors",
+            "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
             view === id
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"

@@ -623,14 +623,14 @@ export default function FinanceMapClient() {
                       {tx.category} · {new Date(tx.created_at).toLocaleDateString("ko-KR")}
                     </p>
                     {!tx.location.lat && (
-                      <span className="text-[10px] text-muted-foreground/60 border border-muted-foreground/30 rounded px-1">{tm("noCoords")}</span>
+                      <span className="text-xs text-muted-foreground/60 border border-muted-foreground/30 rounded px-1">{tm("noCoords")}</span>
                     )}
                   </div>
                 </button>
                 {/* 가계부 링크 (hover) */}
                 <Link
                   href={`/finance?category=${encodeURIComponent(tx.category)}`}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-primary border border-primary/30 rounded px-1.5 py-0.5 hover:bg-primary/10"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-primary border border-primary/30 rounded px-1.5 py-0.5 hover:bg-primary/10"
                 >
                   {tm("financeLink")}
                 </Link>

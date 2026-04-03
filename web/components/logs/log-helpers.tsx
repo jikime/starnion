@@ -29,7 +29,7 @@ export function MessageContent({ text, q }: { text: string; q: string }) {
   return (
     <>
       <span className="text-zinc-500">{prefix}</span>
-      <span className={cn("inline-flex items-center gap-1 rounded px-1.5 py-px font-mono text-[10px] ring-1", color)}>
+      <span className={cn("inline-flex items-center gap-1 rounded px-1.5 py-px font-mono text-xs ring-1", color)}>
         ⚙ {toolName}
       </span>
       {rest && <Highlight text={rest} q={q} />}

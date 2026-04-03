@@ -36,7 +36,7 @@ export function GoalsTab() {
       <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0 bg-card/40">
         <div>
           <h2 className="text-lg font-bold text-foreground">D-Day 목표</h2>
-          <p className="text-[11px] text-muted-foreground mt-0.5">마감일이 있는 중요한 목표를 관리합니다</p>
+          <p className="text-xs text-muted-foreground mt-0.5">마감일이 있는 중요한 목표를 관리합니다</p>
         </div>
         <button
           onClick={() => setAdding(!adding)}
@@ -65,7 +65,7 @@ export function GoalsTab() {
             />
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <label className="text-[10px] text-muted-foreground">마감일</label>
+                <label className="text-xs text-muted-foreground">마감일</label>
                 <input
                   type="date"
                   value={dueDate}
@@ -74,7 +74,7 @@ export function GoalsTab() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-muted-foreground">역할</label>
+                <label className="text-xs text-muted-foreground">역할</label>
                 <select
                   value={roleId}
                   onChange={(e) => setRoleId(e.target.value)}
@@ -148,7 +148,7 @@ export function GoalsTab() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground leading-snug">{goal.title}</p>
                         {goal.description && (
-                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{goal.description}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{goal.description}</p>
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -180,7 +180,7 @@ export function GoalsTab() {
                     {/* Progress bar for goals within 60 days */}
                     {!overdue && goal.daysLeft <= 60 && (
                       <div className="space-y-1">
-                        <div className="flex justify-between text-[10px] text-muted-foreground">
+                        <div className="flex justify-between text-xs text-muted-foreground">
                           <span>{goal.dueDate} 마감</span>
                           <span>{goal.daysLeft}일 남음</span>
                         </div>

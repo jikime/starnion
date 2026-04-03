@@ -52,11 +52,11 @@ function MiniCalendar({
   const today = new Date()
   return (
     <div
-      className="text-[10px]"
+      className="text-xs"
       style={{ background: "var(--card)", minWidth: 120 }}
     >
       <button
-        className="font-semibold text-[11px] w-full text-left hover:text-primary transition-colors px-2 pt-2 pb-1"
+        className="font-semibold text-xs w-full text-left hover:text-primary transition-colors px-2 pt-2 pb-1"
         style={{ color: "var(--primary)" }}
         onClick={() => onMonthClick(year, month)}
       >
@@ -100,7 +100,7 @@ export function MonthlyTab({
   onNavigateToWeekly,
   onNavigateToMonthly,
 }: MonthlyTabProps) {
-  const { tasks, setSelectedDate } = usePlannerStore()
+  const { tasks, roles, getDdayGoals, setSelectedDate } = usePlannerStore()
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
@@ -166,7 +166,7 @@ export function MonthlyTab({
             setViewYear(today.getFullYear())
             setViewMonth(today.getMonth())
           }}
-          className="text-[11px] px-3 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          className="text-xs px-3 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         >
           오늘
         </button>
@@ -185,7 +185,7 @@ export function MonthlyTab({
               <div
                 key={d}
                 className={cn(
-                  "py-2 text-center text-[11px] font-semibold tracking-wider",
+                  "py-2 text-center text-xs font-semibold tracking-wider",
                   i === 0 ? "text-destructive" : i === 6 ? "text-primary" : "text-muted-foreground"
                 )}
               >
@@ -235,7 +235,7 @@ export function MonthlyTab({
                           >
                             {isToday ? (
                               <span
-                                className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px]"
+                                className="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs"
                                 style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
                               >
                                 {d.getDate()}
@@ -251,7 +251,7 @@ export function MonthlyTab({
                                 e.stopPropagation()
                                 handleWeekClick(d)
                               }}
-                              className="text-[9px] font-bold px-1 py-0.5 rounded-sm transition-colors hover:opacity-80"
+                              className="text-xs font-bold px-1 py-0.5 rounded-sm transition-colors hover:opacity-80"
                               style={{
                                 background: "var(--muted)",
                                 color: "var(--muted-foreground)",
@@ -319,58 +319,57 @@ export function MonthlyTab({
         </div>
       </div>
 
-      {/* Bottom: 주요업무 리스트 + 월간목표 */}
+      {/* Bottom: 주요 업무 + 월간 목표 */}
       <div className="shrink-0 border-t border-border" style={{ minHeight: 120 }}>
         <div className="grid grid-cols-2 h-full divide-x divide-border">
-          {/* 주요업무 리스트 */}
+          {/* 주요 업무 (A 우선순위 미완료) */}
           <div className="flex flex-col">
-            <div className="px-4 py-2 border-b border-border text-[11px] font-semibold text-muted-foreground tracking-wider text-center">
-              주요업무 리스트
+            <div className="px-4 py-2 border-b border-border text-xs font-semibold text-muted-foreground tracking-wider text-center">
+              주요 업무 (A)
             </div>
-            <div className="grid grid-cols-2 divide-x divide-border flex-1">
-              <div className="p-3">
-                <p className="text-[10px] text-muted-foreground mb-2 font-medium">개인</p>
-                {monthTasks
+            <div className="p-3 flex-1 overflow-y-auto">
+              {monthTasks.filter((t) => t.priority === "A" && t.status !== "done").length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">A 우선순위 미완료 업무 없음</p>
+              ) : (
+                monthTasks
                   .filter((t) => t.priority === "A" && t.status !== "done")
-                  .slice(0, 5)
-                  .map((t) => (
-                    <div key={t.id} className="text-[11px] text-foreground py-0.5 border-b border-border/50">
-                      {t.title}
-                    </div>
-                  ))}
-              </div>
-              <div className="p-3">
-                <p className="text-[10px] text-muted-foreground mb-2 font-medium">업무</p>
-                {monthTasks
-                  .filter((t) => t.priority === "B" && t.status !== "done")
-                  .slice(0, 5)
-                  .map((t) => (
-                    <div key={t.id} className="text-[11px] text-foreground py-0.5 border-b border-border/50">
-                      {t.title}
-                    </div>
-                  ))}
-              </div>
+                  .slice(0, 8)
+                  .map((t) => {
+                    const role = roles.find((r) => r.id === t.roleId)
+                    return (
+                      <div key={t.id} className="flex items-center gap-2 text-xs text-foreground py-1 border-b border-border/50">
+                        {role && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: role.color }} />}
+                        <span className="truncate flex-1">{t.title}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">{t.date.slice(5)}</span>
+                      </div>
+                    )
+                  })
+              )}
             </div>
           </div>
 
-          {/* 월간목표 */}
+          {/* 월간 목표 (D-Day 역할별) */}
           <div className="flex flex-col">
-            <div className="px-4 py-2 border-b border-border text-[11px] font-semibold text-muted-foreground tracking-wider text-center">
-              월간목표
+            <div className="px-4 py-2 border-b border-border text-xs font-semibold text-muted-foreground tracking-wider text-center">
+              월간 목표
             </div>
-            <div className="grid grid-cols-2 divide-x divide-border flex-1">
-              <div className="p-3">
-                <p className="text-[10px] text-muted-foreground mb-2 font-medium">개인</p>
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-6 border-b border-border/50" />
-                ))}
-              </div>
-              <div className="p-3">
-                <p className="text-[10px] text-muted-foreground mb-2 font-medium">업무</p>
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-6 border-b border-border/50" />
-                ))}
-              </div>
+            <div className="p-3 flex-1 overflow-y-auto">
+              {getDdayGoals().length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">등록된 목표 없음</p>
+              ) : (
+                getDdayGoals().slice(0, 6).map((g) => {
+                  const role = roles.find((r) => r.id === g.roleId)
+                  return (
+                    <div key={g.id} className="flex items-center gap-2 text-xs py-1 border-b border-border/50">
+                      {role && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: role.color }} />}
+                      <span className="truncate flex-1 text-foreground">{g.title}</span>
+                      <span className={`shrink-0 font-semibold tabular-nums ${g.urgent ? "text-destructive" : "text-muted-foreground"}`}>
+                        D{g.daysLeft > 0 ? `-${g.daysLeft}` : g.daysLeft === 0 ? "-Day" : `+${Math.abs(g.daysLeft)}`}
+                      </span>
+                    </div>
+                  )
+                })
+              )}
             </div>
           </div>
         </div>

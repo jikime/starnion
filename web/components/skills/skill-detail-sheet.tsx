@@ -111,7 +111,7 @@ export function SkillDetailSheet({
             <div className="pl-7 space-y-2">
               <p className="text-xs text-muted-foreground leading-relaxed">{t("howToUseDesc")}</p>
               <div className="rounded-lg bg-muted/50 border border-border/50 px-3 py-2 space-y-1.5">
-                <p className="text-[11px] font-medium text-muted-foreground">{t("examplePrompt")}</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("examplePrompt")}</p>
                 <div className="space-y-1">
                   <p className="text-xs text-foreground font-mono bg-background rounded px-2 py-1 border border-border/50">
                     &quot;{t("examplePrompt1", { name: skill.display_name })}&quot;
@@ -123,7 +123,7 @@ export function SkillDetailSheet({
               </div>
               {skill.requires_api_key && !skill.has_api_key && (
                 <div className="flex items-start gap-1.5 text-amber-600 dark:text-amber-400">
-                  <AlertTriangle className="size-3 shrink-0 mt-0.5" /><p className="text-[11px]">{t("apiKeyRequired")}</p>
+                  <AlertTriangle className="size-3 shrink-0 mt-0.5" /><p className="text-xs">{t("apiKeyRequired")}</p>
                 </div>
               )}
             </div>

@@ -838,15 +838,15 @@ export function ModelsView() {
 
                 // Tools note for card header
                 const toolsNoteEl = meta.toolsNote === "all" ? (
-                  <span className="inline-flex items-center gap-0.5 text-[10px] text-green-600">
+                  <span className="inline-flex items-center gap-0.5 text-xs text-green-600">
                     <Wrench className="h-2.5 w-2.5" /> {t("toolsNote.all")}
                   </span>
                 ) : meta.toolsNote === "unknown" ? (
-                  <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground">
                     <Wrench className="h-2.5 w-2.5" /> {t("toolsNote.unknown")}
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-500">
+                  <span className="inline-flex items-center gap-0.5 text-xs text-amber-500">
                     <AlertTriangle className="h-2.5 w-2.5" /> {t("toolsNote.partial")}
                   </span>
                 )
@@ -917,7 +917,7 @@ export function ModelsView() {
                             ))}
                           </div>
                           {anthropicAccessMethod === "claude_code" && (
-                            <p className="text-[11px] text-muted-foreground leading-tight">
+                            <p className="text-xs text-muted-foreground leading-tight">
                               💡 {t("accessMethod.claudeCodeHint")}
                             </p>
                           )}
@@ -993,12 +993,12 @@ export function ModelsView() {
                           </div>
                           {/* Ollama tool calling info */}
                           {customEndpointType === "ollama" && (
-                            <p className="text-[11px] text-muted-foreground leading-tight">
+                            <p className="text-xs text-muted-foreground leading-tight">
                               💡 tool calling 지원 모델이 먼저 표시돼요. 불러온 후 ✓ 표시를 확인하세요.
                             </p>
                           )}
                           {customEndpointType === "openai_compatible" && (
-                            <p className="text-[11px] text-muted-foreground leading-tight">
+                            <p className="text-xs text-muted-foreground leading-tight">
                               💡 tool calling 지원 여부는 서버 구현에 따라 다를 수 있어요.
                             </p>
                           )}
@@ -1010,7 +1010,7 @@ export function ModelsView() {
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
                             <Label className="text-xs">{t("enabledModels")}</Label>
-                            <span className="text-[10px] text-muted-foreground">{t("modelCount", { selected: enabled.size, total: meta.models.length })}</span>
+                            <span className="text-xs text-muted-foreground">{t("modelCount", { selected: enabled.size, total: meta.models.length })}</span>
                           </div>
                           <div className="relative">
                             <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
@@ -1106,12 +1106,12 @@ export function ModelsView() {
                                     >
                                       <span className="font-mono truncate">{m}</span>
                                       {toolsOk === true && (
-                                        <span className="text-[10px] text-green-600 font-medium flex items-center gap-0.5 shrink-0">
+                                        <span className="text-xs text-green-600 font-medium flex items-center gap-0.5 shrink-0">
                                           <Wrench className="h-2.5 w-2.5" /> tools
                                         </span>
                                       )}
                                       {toolsOk === false && (
-                                        <span className="text-[10px] text-amber-500 font-medium flex items-center gap-0.5 shrink-0">
+                                        <span className="text-xs text-amber-500 font-medium flex items-center gap-0.5 shrink-0">
                                           <AlertTriangle className="h-2.5 w-2.5" /> {t("toolsUnsupported")}
                                         </span>
                                       )}
@@ -1204,22 +1204,22 @@ export function ModelsView() {
                         <div className="flex items-center gap-1.5">
                           {ProviderIcon
                             ? <ProviderIcon className="size-3 text-muted-foreground shrink-0" />
-                            : <span className="text-[10px]">{PROVIDER_META[provider]?.icon}</span>
+                            : <span className="text-xs">{PROVIDER_META[provider]?.icon}</span>
                           }
                           <span className="text-xs font-medium truncate">{modelName}</span>
                           {isClaudeCode && (
-                            <span className="text-[10px] bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300 px-1.5 py-0.5 rounded font-medium shrink-0">
+                            <span className="text-xs bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300 px-1.5 py-0.5 rounded font-medium shrink-0">
                               {t("pricing.subscription")}
                             </span>
                           )}
                           {isCustom && (
-                            <span className="text-[10px] text-blue-600 dark:text-blue-400 shrink-0">
+                            <span className="text-xs text-blue-600 dark:text-blue-400 shrink-0">
                               {t("pricing.custom")}
                             </span>
                           )}
                         </div>
-                        <p className="text-[10px] text-muted-foreground font-mono mt-0.5 truncate">{modelId}</p>
-                        <p className="text-[10px] text-muted-foreground">{providerName}</p>
+                        <p className="text-xs text-muted-foreground font-mono mt-0.5 truncate">{modelId}</p>
+                        <p className="text-xs text-muted-foreground">{providerName}</p>
                       </div>
 
                       {/* Input price */}
