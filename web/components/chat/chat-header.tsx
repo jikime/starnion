@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { MessageCircle, WifiOff, Loader2, PanelLeft, Menu, Radio } from "lucide-react"
@@ -20,6 +21,7 @@ export function ChatHeader({
   connState,
 }: ChatHeaderProps) {
   const [channelsOpen, setChannelsOpen] = useState(false)
+  const t = useTranslations("chat")
 
   return (
     <>
@@ -29,7 +31,7 @@ export function ChatHeader({
             variant="ghost"
             size="icon"
             onClick={onToggleSidebar}
-            title={sidebarOpen ? "대화 목록 숨기기" : "대화 목록 보기"}
+            title={sidebarOpen ? t("hideList") : t("showList")}
             className="hidden md:inline-flex"
           >
             <PanelLeft className="size-5" />
@@ -38,14 +40,14 @@ export function ChatHeader({
             variant="ghost"
             size="icon"
             onClick={onToggleSidebar}
-            title="대화 목록"
+            title={t("conversationList")}
             className="md:hidden"
           >
             <Menu className="size-5" />
           </Button>
           <h1 className="flex items-center gap-2 text-base font-semibold md:text-lg">
             <MessageCircle className="size-4 text-primary md:size-5" />
-            채팅
+            {t("title")}
           </h1>
           {isStreaming && (
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
@@ -59,7 +61,7 @@ export function ChatHeader({
           {connState === "error" && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border border-border bg-secondary text-secondary-foreground">
               <WifiOff className="size-3" />
-              연결 오류
+              {t("connectionError")}
             </span>
           )}
           <Button
@@ -69,7 +71,7 @@ export function ChatHeader({
             onClick={() => setChannelsOpen(true)}
           >
             <Radio className="size-3.5" />
-            채널
+            {t("channels")}
           </Button>
         </div>
       </div>
@@ -79,9 +81,9 @@ export function ChatHeader({
           <SheetHeader className="px-6 py-4 border-b border-border">
             <SheetTitle className="flex items-center gap-2">
               <Radio className="size-5 text-primary" />
-              채널 관리
+              {t("channelManage")}
             </SheetTitle>
-            <SheetDescription className="sr-only">외부 메시징 채널 설정</SheetDescription>
+            <SheetDescription className="sr-only">{t("channelDescription")}</SheetDescription>
           </SheetHeader>
           <ChannelsView />
         </SheetContent>

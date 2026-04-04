@@ -36,8 +36,8 @@ export function DailyTab() {
             )}
             aria-pressed={view === id}
           >
-            <Icon className="w-3 h-3" />
-            {t(VIEW_KEYS[id])}
+            <Icon className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
+            <span className="hidden sm:inline">{t(VIEW_KEYS[id])}</span>
           </button>
         )
       })}

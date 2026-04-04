@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, memo } from "react"
+import { useTranslations } from "next-intl"
 import { usePlannerStore, type Task, type TaskStatus } from "@/lib/planner-store"
 import { cn } from "@/lib/utils"
 import {
@@ -27,38 +28,38 @@ import { CSS } from "@dnd-kit/utilities"
 
 const STATUS_CONFIG: Record<
   TaskStatus,
-  { label: string; icon: React.ReactNode; className: string; strikethrough?: boolean }
+  { tKey: string; icon: React.ReactNode; className: string; strikethrough?: boolean }
 > = {
   pending: {
-    label: "대기",
+    tKey: "pending",
     icon: <span className="w-3.5 h-3.5 rounded border border-muted-foreground inline-block" />,
     className: "text-foreground",
   },
   done: {
-    label: "완료 (V)",
+    tKey: "doneV",
     icon: <Check className="w-3.5 h-3.5" style={{ color: "var(--status-done)" }} strokeWidth={3} />,
     className: "text-muted-foreground",
     strikethrough: true,
   },
   forwarded: {
-    label: "이월 (→)",
+    tKey: "forwardedArrow",
     icon: <ArrowRight className="w-3.5 h-3.5" style={{ color: "var(--status-forwarded)" }} />,
     className: "text-muted-foreground",
     strikethrough: true,
   },
   cancelled: {
-    label: "취소 (X)",
+    tKey: "cancelledX",
     icon: <X className="w-3.5 h-3.5" style={{ color: "var(--status-cancelled)" }} />,
     className: "text-muted-foreground",
     strikethrough: true,
   },
   "in-progress": {
-    label: "진행 중 (●)",
+    tKey: "inProgressDot",
     icon: <Circle className="w-3.5 h-3.5 fill-current" style={{ color: "var(--status-in-progress)" }} />,
     className: "text-foreground",
   },
   delegated: {
-    label: "위임 (D)",
+    tKey: "delegatedDia",
     icon: (
       <span
         className="w-3.5 h-3.5 rounded border-2 text-xs font-bold inline-flex items-center justify-center"
@@ -81,6 +82,7 @@ interface TaskItemProps {
 }
 
 export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalProp }: TaskItemProps) {
+  const t = useTranslations("planner.task")
   const { updateTask, deleteTask, forwardTask, roles, getDdayGoals } = usePlannerStore()
 
   // Derive urgentGoal internally so old callers that pass undefined don't crash
@@ -176,7 +178,7 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
         {...attributes}
         {...listeners}
         className="mt-0.5 cursor-grab active:cursor-grabbing text-muted-foreground opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity shrink-0"
-        aria-label="순서 변경"
+        aria-label="reorder"
       >
         <GripVertical className="w-3.5 h-3.5" />
       </button>
@@ -186,7 +188,7 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
         <DropdownMenuTrigger asChild>
           <button
             className="mt-0.5 shrink-0 flex items-center justify-center w-4 h-4 hover:scale-110 transition-transform"
-            aria-label={`상태: ${statusConfig.label}`}
+            aria-label={t(statusConfig.tKey)}
           >
             {statusConfig.icon}
           </button>
@@ -208,7 +210,7 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
               <span className="flex items-center w-4 h-4">
                 {STATUS_CONFIG[s].icon}
               </span>
-              {STATUS_CONFIG[s].label}
+              {t(STATUS_CONFIG[s].tKey)}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -312,8 +314,8 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
                 onKeyDown={e => { if (e.key === "Enter") saveTimeBlock(); if (e.key === "Escape") setShowTimeAssign(false); if (["e","E","+","-","."].includes(e.key)) e.preventDefault() }}
                 className="w-12 h-6 text-xs text-center px-1"
               />
-              <button onClick={saveTimeBlock} className="text-xs font-medium px-1.5 py-0.5 rounded hover:opacity-80" style={{ background: "var(--priority-a)", color: "#ffffff" }}>확인</button>
-              <button onClick={() => setShowTimeAssign(false)} className="text-xs text-muted-foreground hover:text-foreground">취소</button>
+              <button onClick={saveTimeBlock} className="text-xs font-medium px-1.5 py-0.5 rounded hover:opacity-80" style={{ background: "var(--priority-a)", color: "#ffffff" }}>{t("ok")}</button>
+              <button onClick={() => setShowTimeAssign(false)} className="text-xs text-muted-foreground hover:text-foreground">{t("cancel")}</button>
             </div>
           ) : task.timeStart !== undefined ? (
             <button onClick={() => setShowTimeAssign(true)} className="flex items-center gap-0.5 hover:text-foreground transition-colors">
@@ -335,10 +337,10 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
             <button
               onClick={() => setShowMemo(!showMemo)}
               className="flex items-center gap-0.5 hover:text-foreground transition-colors"
-              aria-label="메모 보기"
+              aria-label={t("viewMemo")}
             >
               <StickyNote className="w-2.5 h-2.5" style={{ color: "var(--priority-b)" }} />
-              <span className="text-xs" style={{ color: "var(--priority-b)" }}>메모</span>
+              <span className="text-xs" style={{ color: "var(--priority-b)" }}>{t("memoLabel")}</span>
             </button>
           )}
         </div>
@@ -349,7 +351,7 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
             <Input
               value={delegateeDraft}
               onChange={(e) => setDelegateeDraft(e.target.value)}
-              placeholder="피위임자 이름"
+              placeholder={t("delegateName")}
               className="h-6 text-xs bg-muted border-border px-1.5 py-0"
               onKeyDown={(e) => {
                 if (e.key === "Enter") saveDelegatee()
@@ -363,7 +365,7 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
               style={{ background: "var(--status-delegated)", color: "#fff" }}
               onClick={saveDelegatee}
             >
-              저장
+              {t("save")}
             </Button>
           </div>
         )}
@@ -380,15 +382,15 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
             <div className="flex items-center gap-1.5">
               <StickyNote className="w-2.5 h-2.5 shrink-0" style={{ color: "var(--priority-b)" }} />
               <span className="text-xs font-medium" style={{ color: "var(--priority-b)" }}>
-                업무 메모
+                {t("taskMemo")}
               </span>
-              <span className="text-xs text-muted-foreground ml-auto">업무 맥락 기록</span>
+              <span className="text-xs text-muted-foreground ml-auto">{t("memoContext")}</span>
             </div>
             <Textarea
               value={memoDraft}
               onChange={(e) => setMemoDraft(e.target.value)}
               onBlur={saveMemo}
-              placeholder="이 업무과 관련된 아이디어, 참고사항, 진행상황을 기록하세요..."
+              placeholder={t("memoPlaceholder")}
               rows={3}
               className="text-xs resize-none bg-muted border-border text-foreground leading-relaxed"
             />
@@ -398,13 +400,13 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
                 className="h-5 px-2 rounded text-xs font-medium hover:opacity-80 transition-opacity"
                 style={{ background: "var(--priority-b)", color: "#ffffff" }}
               >
-                저장
+                {t("save")}
               </button>
               <button
                 onClick={() => setShowMemo(false)}
                 className="h-5 px-2 rounded text-xs text-muted-foreground hover:text-foreground transition-colors border border-border"
               >
-                닫기
+                {t("close")}
               </button>
             </div>
           </div>
@@ -416,7 +418,7 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
         <DropdownMenuTrigger asChild>
           <button
             className="mt-0.5 text-muted-foreground opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity shrink-0"
-            aria-label="더보기"
+            aria-label={t("more")}
           >
             <MoreHorizontal className="w-3.5 h-3.5" />
           </button>
@@ -429,21 +431,21 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
               setEditingTitle(true)
             }}
           >
-            제목 수정
+            {t("editTitle")}
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-xs gap-2 cursor-pointer"
             onClick={() => setShowTimeAssign(!showTimeAssign)}
           >
             <Clock className="w-3 h-3" />
-            시간 배정
+            {t("assignTime")}
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-xs gap-2 cursor-pointer"
             onClick={() => { setMemoDraft(task.note ?? ""); setShowMemo(!showMemo) }}
           >
             <StickyNote className="w-3 h-3" />
-            {task.note ? "메모 편집" : "메모 추가"}
+            {task.note ? t("editMemo") : t("addMemo")}
           </DropdownMenuItem>
           <DropdownMenuSeparator className="bg-border" />
           <DropdownMenuItem
@@ -452,7 +454,7 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
             style={{ color: "var(--status-forwarded)" }}
           >
             <ArrowRight className="w-3 h-3" />
-            내일로 이월
+            {t("forwardTomorrow")}
           </DropdownMenuItem>
           <DropdownMenuSeparator className="bg-border" />
           <DropdownMenuItem
@@ -461,7 +463,7 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
             onClick={() => deleteTask(task.id)}
           >
             <Trash2 className="w-3 h-3" />
-            삭제
+            {t("delete")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react"
 import { useTranslations } from "next-intl"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
@@ -416,30 +418,35 @@ export function FinanceView() {
   return (
     <div className="flex flex-col flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 w-full min-h-0">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div />
-        <div className="flex items-center w-full sm:w-auto">
-          <div className="flex-1 sm:hidden" />
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={prevMonth}>
-              <ChevronLeft className="size-4" />
-            </Button>
-            <span className="text-sm font-medium w-20 text-center">{monthLabel}</span>
-            <Button variant="outline" size="icon" onClick={nextMonth}>
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-          <div className="flex-1 flex justify-end sm:hidden">
-            <Button className="gap-2 ml-2" onClick={openNew}>
-              <Plus className="size-4" />
-              {t("addRecord")}
-            </Button>
-          </div>
-          <Button className="gap-2 ml-2 hidden sm:flex" onClick={openNew}>
-            <Plus className="size-4" />
-            {t("addRecord")}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={prevMonth}>
+            <ChevronLeft className="size-4" />
+          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="text-sm font-medium w-20 text-center hover:bg-accent/50 rounded px-1 py-0.5 transition-colors cursor-pointer">
+                {monthLabel}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="center">
+              <Calendar
+                mode="single"
+                selected={new Date(year, month - 1, 1)}
+                onSelect={(date) => { if (date) { setYear(date.getFullYear()); setMonth(date.getMonth() + 1) } }}
+                defaultMonth={new Date(year, month - 1)}
+              />
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" size="icon" onClick={nextMonth}>
+            <ChevronRight className="size-4" />
           </Button>
         </div>
+        {/* Desktop: icon + text, Mobile: icon only */}
+        <Button className="gap-2" onClick={openNew}>
+          <Plus className="size-4" />
+          <span className="hidden sm:inline">{t("addRecord")}</span>
+        </Button>
       </div>
 
       {/* Stat cards */}

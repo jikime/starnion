@@ -1,6 +1,7 @@
 "use client"
 
 import { usePlannerStore } from "@/lib/planner-store"
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
 
@@ -21,6 +22,7 @@ function pad(n: number) {
 }
 
 export function TimeBlockCalendar() {
+  const t = useTranslations("planner.timeBlock")
   const { selectedDate, getTasksForDate, roles } = usePlannerStore()
   const allTasks = getTasksForDate(selectedDate)
   const timedTasks = allTasks.filter(
@@ -42,7 +44,7 @@ export function TimeBlockCalendar() {
     <div className="flex flex-col h-full overflow-hidden">
       <div className="px-3 pt-3 pb-2 shrink-0 border-b border-border">
         <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-          타임 블로킹
+          {t("title")}
         </p>
         <p className="text-xs text-muted-foreground mt-0.5 opacity-70">
           업무 메뉴 &rsaquo; 시간 배정으로 배치
@@ -175,7 +177,7 @@ export function TimeBlockCalendar() {
               style={{ top: (9 - START_HOUR) * HOUR_HEIGHT, height: HOUR_HEIGHT * 4 }}
             >
               <div className="text-center space-y-1">
-                <p className="text-xs text-muted-foreground">시간 배정된 업무 없음</p>
+                <p className="text-xs text-muted-foreground">{t("empty")}</p>
                 <p className="text-xs text-muted-foreground opacity-60">
                   업무 메뉴 &gt; 시간 배정
                 </p>

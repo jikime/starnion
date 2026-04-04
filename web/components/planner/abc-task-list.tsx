@@ -1,6 +1,7 @@
 "use client"
 // cache-bust: v5
 import { useState, useMemo, memo } from "react"
+import { useTranslations } from "next-intl"
 import { usePlannerStore, type Priority, type Task } from "@/lib/planner-store"
 import { TaskItem } from "./task-item"
 import { MagicBar } from "./magic-bar"
@@ -32,7 +33,7 @@ import {
 const PRIORITY_CONFIG = {
   A: {
     label: "A",
-    sublabel: "필수 (Must Do)",
+    sublabelKey: "mustDo",
     badgeStyle: {
       background: "var(--priority-a-bg)",
       color: "var(--priority-a)",
@@ -42,7 +43,7 @@ const PRIORITY_CONFIG = {
   },
   B: {
     label: "B",
-    sublabel: "중요 (Should Do)",
+    sublabelKey: "shouldDo",
     badgeStyle: {
       background: "var(--priority-b-bg)",
       color: "var(--priority-b)",
@@ -52,7 +53,7 @@ const PRIORITY_CONFIG = {
   },
   C: {
     label: "C",
-    sublabel: "선택 (Nice to Do)",
+    sublabelKey: "niceToDo",
     badgeStyle: {
       background: "var(--priority-c-bg)",
       color: "var(--priority-c)",
@@ -80,6 +81,7 @@ interface PriorityGroupProps {
 }
 
 function PriorityGroup({ priority }: PriorityGroupProps) {
+  const t = useTranslations("planner.task")
   // Each PriorityGroup reads urgentGoals from store directly — no prop needed
   const { map: urgentMap } = useUrgentGoalsByRole()
   const { selectedDate, getTasksForDate, addTask, roles, reorderTasks } = usePlannerStore()
@@ -152,7 +154,7 @@ function PriorityGroup({ priority }: PriorityGroupProps) {
           {cfg.label}
         </span>
         <div className="flex-1 text-left">
-          <span className="text-xs font-semibold text-foreground">{cfg.sublabel}</span>
+          <span className="text-xs font-semibold text-foreground">{t(cfg.sublabelKey)}</span>
         </div>
         <div className="flex items-center gap-2">
           {priority === "A" && pendingACount > 0 && (

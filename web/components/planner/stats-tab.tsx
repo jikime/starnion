@@ -1,11 +1,12 @@
 // cache-bust: v3
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 import {
   BookOpen, BarChart2, Target, Map, Loader2,
-  Plus, TrendingUp, TrendingDown, Trash2, Download, ArrowUpRight,
+  Plus, TrendingUp, TrendingDown, Trash2, Download, ArrowUpRight, ChevronDown,
 } from "lucide-react"
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -188,40 +189,92 @@ function HeatmapTab() {
 
 type AssetTab = "ledger" | "insights" | "budget" | "heatmap"
 
-const ASSET_TABS: { id: AssetTab; label: string; icon: React.ElementType }[] = [
-  { id: "ledger",   label: "가계부",    icon: BookOpen },
-  { id: "insights", label: "소비 분석", icon: BarChart2 },
-  { id: "budget",   label: "예산 관리", icon: Target },
-  { id: "heatmap",  label: "소비 지도", icon: Map },
+const ASSET_TABS: { id: AssetTab; tKey: string; icon: React.ElementType }[] = [
+  { id: "ledger",   tKey: "ledger",   icon: BookOpen },
+  { id: "insights", tKey: "insights", icon: BarChart2 },
+  { id: "budget",   tKey: "budget",   icon: Target },
+  { id: "heatmap",  tKey: "heatmap",  icon: Map },
 ]
+
+const VISIBLE_ASSET_COUNT = 2
 
 export function AssetsSection() {
   const [tab, setTab] = useState<AssetTab>("ledger")
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const t = useTranslations("assets")
+
+  const visibleTabs = ASSET_TABS.slice(0, VISIBLE_ASSET_COUNT)
+  const overflowTabs = ASSET_TABS.slice(VISIBLE_ASSET_COUNT)
+  const isOverflowActive = overflowTabs.some(item => item.id === tab)
+  const activeOverflowTKey = ASSET_TABS.find(item => item.id === tab)?.tKey ?? ""
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    if (menuOpen) document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [menuOpen])
+
+  const tabButton = (item: typeof ASSET_TABS[number]) => (
+    <button key={item.id} onClick={() => { setTab(item.id); setMenuOpen(false) }}
+      className={cn(
+        "flex items-center gap-1 sm:gap-1.5 h-7 px-2 sm:px-3 rounded-lg text-xs font-medium transition-colors whitespace-nowrap",
+        tab === item.id ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
+      )}>
+      <item.icon className="w-3.5 h-3.5" />
+      {t(item.tKey)}
+    </button>
+  )
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* Section header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 px-3 sm:px-5 py-2 sm:py-3 border-b border-border bg-card/50 shrink-0">
+      <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 px-3 sm:px-5 py-2 sm:py-3 border-b border-border bg-card/50 shrink-0">
         <div className="hidden sm:block">
-          <h1 className="text-sm font-bold text-foreground tracking-tight">자산 관리</h1>
-          <p className="text-xs text-muted-foreground">StarNion Financial Intelligence</p>
+          <h1 className="text-sm font-bold text-foreground tracking-tight">{t("title")}</h1>
+          <p className="text-xs text-muted-foreground">{t("subtitle")}</p>
         </div>
-        <nav className="flex items-center gap-0.5 sm:ml-4 overflow-x-auto w-full sm:w-auto">
-          {ASSET_TABS.map(({ id, label, icon: Icon }) => (
-            <button key={id} onClick={() => setTab(id)}
-              className={cn(
-                "flex items-center gap-1 sm:gap-1.5 h-7 px-2 sm:px-3 rounded-lg text-xs font-medium transition-colors whitespace-nowrap",
-                tab === id
-                  ? "bg-accent text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
-              )}>
-              <Icon className="w-3.5 h-3.5" />
-              {label}
-            </button>
-          ))}
+
+        {/* Desktop: all tabs */}
+        <nav className="hidden sm:flex items-center gap-0.5 sm:ml-4">
+          {ASSET_TABS.map(item => tabButton(item))}
         </nav>
+
+        {/* Mobile: first 2 + overflow dropdown */}
+        <nav className="flex sm:hidden items-center gap-0.5 w-full">
+          {visibleTabs.map(item => tabButton(item))}
+          <div ref={menuRef} className="relative">
+            <button
+              onClick={() => setMenuOpen(v => !v)}
+              className={cn(
+                "flex items-center gap-1 h-7 px-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap",
+                isOverflowActive ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
+              )}
+            >
+              {isOverflowActive ? t(activeOverflowTKey) : t("more")}
+              <ChevronDown className={cn("w-3 h-3 transition-transform", menuOpen && "rotate-180")} />
+            </button>
+            {menuOpen && (
+              <div className="absolute top-full -left-4 mt-1 min-w-[120px] rounded-lg border border-border bg-card shadow-xl z-[9999] py-1">
+                {overflowTabs.map(item => (
+                  <button key={item.id} onClick={() => { setTab(item.id); setMenuOpen(false) }}
+                    className={cn(
+                      "w-full flex items-center gap-2 text-left px-4 py-2 text-xs font-medium transition-colors",
+                      tab === item.id ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                    )}>
+                    <item.icon className="w-3.5 h-3.5" />
+                    {t(item.tKey)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </nav>
+
         <button className="hidden sm:flex ml-auto items-center gap-1.5 h-7 px-2.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground transition-colors">
-          <Download className="w-3.5 h-3.5" />CSV
+          <Download className="w-3.5 h-3.5" />{t("csv")}
         </button>
       </div>
 

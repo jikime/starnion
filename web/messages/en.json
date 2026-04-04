@@ -1052,7 +1052,19 @@
     "skillGoogleMailEx1": "Summarize unread Gmail",
     "skillGoogleMailEx2": "Send meeting confirmation email to Kim Chulsoo",
     "skillGoogleMailEx3": "Tell me important emails received today",
-    "skillGoogleMailEx4": "Show last 10 emails"
+    "skillGoogleMailEx4": "Show last 10 emails",
+    "chatList": "Chats",
+    "hideList": "Hide chat list",
+    "showList": "Show chat list",
+    "conversationList": "Chat list",
+    "connectionError": "Connection error",
+    "channels": "Channels",
+    "channelManage": "Channel Management",
+    "channelDescription": "External messaging channel settings",
+    "loadMore": "Load more",
+    "micPermission": "Microphone permission required",
+    "recordError": "Cannot start recording",
+    "close": "Close"
   },
   "cron": {
     "title": "Notification Center",
@@ -1802,7 +1814,39 @@
     "simLow": "Low",
     "searchResultCount": "{count} results",
     "searchIndexingHint": "Documents must be indexed to be searchable. Use the \"Index Document\" button in the file detail panel.",
-    "sortBy": "Sort by"
+    "sortBy": "Sort by",
+    "similarityHigh": "High",
+    "similarityMedium": "Medium",
+    "similarityLow": "Low",
+    "docSearchDesc": "Perform semantic search on indexed documents.",
+    "docSearchHint": "To use document search, first index the document in the file detail panel.",
+    "searchInputPlaceholder": "Enter search query...",
+    "searchFailed": "Document search failed.",
+    "all": "All",
+    "doc": "Documents",
+    "image": "Images",
+    "audioFilter": "Audio",
+    "docSearch": "Doc Search",
+    "search": "Search",
+    "results": "{count} results",
+    "noResults": "No results found.",
+    "semanticSearch": "Semantic",
+    "fullTextSearch": "Full-text",
+    "viewFile": "View file",
+    "name": "Name",
+    "type": "Type",
+    "size": "Size",
+    "date": "Date",
+    "rename": "Rename",
+    "copy": "Copy",
+    "createdBy": "Created by",
+    "indexing": "Indexing",
+    "indexed": "Done",
+    "notIndexed": "Not indexed",
+    "duration": "Duration",
+    "camera": "Camera",
+    "location": "Location",
+    "analysis": "Analysis"
   },
   "garden": {
     "timeCapsule": "Time Capsule",
@@ -1975,7 +2019,8 @@
       "weekly": "WEEKLY",
       "monthly": "MONTHLY",
       "goals": "Goals",
-      "compass": "Compass"
+      "compass": "Compass",
+      "more": "More"
     },
     "views": {
       "tasks": "Tasks",
@@ -2000,7 +2045,7 @@
       "cancel": "Cancel",
       "save": "Save",
       "close": "Close",
-      "taskMemo": "Task memo",
+      "taskMemo": "Task Memo",
       "memoContext": "Record task context",
       "memoPlaceholder": "Record ideas, references, and progress related to this task...",
       "emptyGroup": "No tasks in {priority} group",
@@ -2008,7 +2053,29 @@
       "urgentGoal": "Promote related tasks to A priority.",
       "noTimeBlock": "No time-blocked tasks",
       "timeBlockHint": "Assign via task menu > Time block",
-      "feedbackAdded": "[{parts}] \"{title}\" added"
+      "feedbackAdded": "[{parts}] \"{title}\" added",
+      "mustDo": "Must Do (A)",
+      "shouldDo": "Should Do (B)",
+      "niceToDo": "Nice to Do (C)",
+      "pending": "Pending",
+      "doneV": "Done (V)",
+      "forwardedArrow": "Forward (→)",
+      "cancelledX": "Cancel (X)",
+      "inProgressDot": "In Progress (●)",
+      "delegatedDia": "Delegate (◈)",
+      "edit": "Edit",
+      "forward": "Tomorrow",
+      "memo": "Memo",
+      "noTasks": "No tasks",
+      "addFirst": "Add a task to get started",
+      "ok": "OK",
+      "viewMemo": "View memo",
+      "memoLabel": "Memo",
+      "delegateName": "Delegate name",
+      "more": "More",
+      "assignTime": "Assign time",
+      "editMemo": "Edit memo",
+      "addMemo": "Add memo"
     },
     "inbox": {
       "title": "Inbox",
@@ -2090,6 +2157,100 @@
       "forwarded": "Forwarded",
       "cancelled": "Cancelled",
       "delegated": "Delegated"
+    },
+    "dateHeader": {
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "yesterday": "Yesterday",
+      "goToday": "Today",
+      "prevDay": "Previous day",
+      "nextDay": "Next day"
+    },
+    "timeBlock": {
+      "title": "Time Blocking",
+      "empty": "No time-assigned tasks"
+    },
+    "weeklyCompass": {
+      "emptyTitle": "Your compass has stopped",
+      "emptyHint": "How about placing a small stone?",
+      "addBigRock": "Add a Big Rock for this week",
+      "compassStopped": "Your compass has stopped.",
+      "compassHint": "How about placing a small stone?",
+      "addBigRockLabel": "Add Big Rock",
+      "addBigRockPlaceholder": "Key goal for this week...",
+      "addBigRockHint": "Add a Big Rock for this week",
+      "add": "Add",
+      "undone": "Undo complete",
+      "markDone": "Mark complete",
+      "addAsATask": "Add as A-task to today planner",
+      "weeklyCompassTitle": "Weekly Compass",
+      "foldCompass": "Fold compass",
+      "unfoldCompass": "Unfold compass",
+      "roleBalance": "Role Balance"
+    },
+    "weeklyLegend": {
+      "pending": "Pending",
+      "inProgress": "In Progress",
+      "done": "Done",
+      "forwarded": "Forwarded",
+      "cancelled": "Cancelled"
+    },
+    "monthlyDays": {
+      "sun": "S",
+      "mon": "M",
+      "tue": "T",
+      "wed": "W",
+      "thu": "T",
+      "fri": "F",
+      "sat": "S"
+    },
+    "monthNav": {
+      "prevMonth": "Previous month",
+      "nextMonth": "Next month"
+    },
+    "journal": {
+      "reflectQ1": "What did you do best today?",
+      "reflectQ2": "Any missed A-tasks and why?",
+      "reflectQ3": "First thing to do tomorrow?",
+      "reflectQ4": "What did you learn or realize today?"
     }
+  },
+  "globalNav": {
+    "chat": "Chat",
+    "files": "My Files",
+    "planners": "Planner",
+    "assets": "Assets",
+    "analytics": "Analytics",
+    "webSearch": "Web Search",
+    "skills": "Skills",
+    "logs": "Logs",
+    "usage": "Usage",
+    "settings": "Settings",
+    "notifications": "Notifications",
+    "models": "Models",
+    "personas": "Personas",
+    "profile": "Profile",
+    "logout": "Logout",
+    "changeLanguage": "Change Language",
+    "lightMode": "Light Mode",
+    "darkMode": "Dark Mode",
+    "upload": "Upload",
+    "createNew": "Create New",
+    "more": "More"
+  },
+  "profile": {
+    "title": "Profile",
+    "email": "Email",
+    "name": "Name"
+  },
+  "assets": {
+    "title": "Asset Management",
+    "subtitle": "StarNion Financial Intelligence",
+    "ledger": "Ledger",
+    "insights": "Insights",
+    "budget": "Budget",
+    "heatmap": "Spending Map",
+    "more": "More",
+    "csv": "CSV"
   }
 }

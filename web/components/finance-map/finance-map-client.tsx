@@ -4,7 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useTranslations } from "next-intl"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, MapPin, Loader2, List, X } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { ChevronLeft, ChevronRight, MapPin, Loader2, List, X, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // Naver Maps v3 global types (loaded via script tag)
@@ -427,17 +429,35 @@ export default function FinanceMapClient() {
     // dev-maps 와 동일: 전체 높이를 명시적으로 지정
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
       {/* Header */}
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2 md:px-4 md:py-3 border-b bg-background shrink-0">
-        <div className="flex items-center gap-2 mr-auto">
-          <MapPin className="size-5 text-primary shrink-0" />
-          <h1 className="font-semibold text-base md:text-lg whitespace-nowrap">{t("finance_map")}</h1>
-        </div>
-        <div className="flex items-center gap-1.5 md:gap-2">
+      <div className="flex items-center justify-between gap-2 px-3 py-2 md:px-4 md:py-3 border-b bg-background shrink-0">
+        {/* Left: title (desktop) + date nav */}
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-2 mr-2">
+            <MapPin className="size-5 text-primary shrink-0" />
+            <h1 className="font-semibold text-base md:text-lg whitespace-nowrap">{t("finance_map")}</h1>
+          </div>
           <Button variant="outline" size="icon" className="size-8 md:size-9" onClick={prevMonth}><ChevronLeft className="size-4" /></Button>
-          <span className="text-xs md:text-sm font-medium w-20 md:w-24 text-center">{tm("monthLabel", { year, month })}</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="text-xs md:text-sm font-medium w-20 md:w-24 text-center hover:bg-accent/50 rounded px-1 py-0.5 transition-colors cursor-pointer">
+                {tm("monthLabel", { year, month })}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="center">
+              <Calendar
+                mode="single"
+                selected={new Date(year, month - 1, 1)}
+                onSelect={(date) => { if (date) { setYear(date.getFullYear()); setMonth(date.getMonth() + 1) } }}
+                defaultMonth={new Date(year, month - 1)}
+              />
+            </PopoverContent>
+          </Popover>
           <Button variant="outline" size="icon" className="size-8 md:size-9" onClick={nextMonth}><ChevronRight className="size-4" /></Button>
-          <Button variant="outline" size="sm" className="h-8 md:h-9 px-2 md:px-3 text-xs md:text-sm" onClick={() => fetchTransactions(map)} disabled={loading}>
-            {loading ? <Loader2 className="size-4 animate-spin" /> : tm("refresh")}
+        </div>
+        {/* Right: refresh + list */}
+        <div className="flex items-center gap-1.5">
+          <Button variant="outline" size="icon" className="size-8 md:size-9" onClick={() => fetchTransactions(map)} disabled={loading}>
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
           </Button>
           <Button
             variant="outline"

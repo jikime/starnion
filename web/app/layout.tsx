@@ -7,9 +7,21 @@ import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Franklin Digital Planner',
-  description: 'ABC123 우선순위 기반 프랭클린 디지털 플래너 — 소중한 것을 먼저 하기',
-  generator: 'v0.app',
+  title: {
+    default: 'StarNion AI',
+    template: '%s | StarNion AI',
+  },
+  description: 'AI 기반 개인 생산성 플랫폼 — 플래너, 자산 관리, 채팅, 파일 관리를 하나로',
+  keywords: ['StarNion', 'AI', 'Planner', 'Franklin Planner', 'Finance', 'Chat', 'Productivity'],
+  authors: [{ name: 'StarNion' }],
+  creator: 'StarNion',
+  metadataBase: new URL('https://starnion.ai'),
+  openGraph: {
+    title: 'StarNion AI',
+    description: 'AI 기반 개인 생산성 플랫폼 — 플래너, 자산 관리, 채팅, 파일 관리를 하나로',
+    type: 'website',
+    siteName: 'StarNion AI',
+  },
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: '48x48', type: 'image/x-icon' },

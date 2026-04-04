@@ -51,14 +51,14 @@ export function GuideTab() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex flex-col sm:flex-row h-full overflow-hidden">
       {/* Mission column */}
-      <div className="w-80 shrink-0 border-r border-border flex flex-col overflow-hidden">
-        <div className="px-6 py-4 border-b border-border bg-card/40 shrink-0">
+      <div className="sm:w-80 shrink-0 border-b sm:border-b-0 sm:border-r border-border flex flex-col overflow-hidden">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border bg-card/40 shrink-0">
           <h2 className="text-lg font-bold text-foreground">사명문</h2>
           <p className="text-xs text-muted-foreground mt-0.5">나는 어떤 사람이 되고 싶은가</p>
         </div>
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 sm:py-4">
           {editingMission ? (
             <div className="space-y-3">
               <Textarea
@@ -109,7 +109,7 @@ export function GuideTab() {
 
       {/* Roles column */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/40 shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-border bg-card/40 shrink-0">
           <div>
             <h2 className="text-lg font-bold text-foreground">역할</h2>
             <p className="text-xs text-muted-foreground mt-0.5">삶의 중요한 역할들을 정의하세요</p>
@@ -124,7 +124,7 @@ export function GuideTab() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 sm:py-4 space-y-3">
           {/* Add form */}
           {addingRole && (
             <div className="rounded-xl border border-border p-4 space-y-3 bg-card">
@@ -198,7 +198,7 @@ export function GuideTab() {
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: role.color }} />
                       <span className="text-sm font-semibold text-foreground">{role.name}</span>
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => startEditRole(role.id, role.name, role.mission)}
                         className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors"

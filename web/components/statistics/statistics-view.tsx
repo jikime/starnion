@@ -446,8 +446,8 @@ export function StatisticsView() {
     <div className={cn("flex flex-col flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 w-full min-h-0 transition-opacity", refreshing && "opacity-60 pointer-events-none")}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      <div className="flex items-center justify-between">
+        <div className="hidden sm:block">
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
             <TrendingUp className="size-6 text-indigo-500" />
             {t("title")}
@@ -458,16 +458,15 @@ export function StatisticsView() {
           {/* #3: 새로고침 버튼 */}
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={handleRefresh}
             disabled={refreshing}
-            className="gap-1.5"
+            className="size-8"
           >
             {refreshing
               ? <Loader2 className="size-4 animate-spin" />
               : <RefreshCw className="size-4" />
             }
-            {t("refresh")}
           </Button>
           <Select value={months} onValueChange={(v) => setMonths(v)}>
             <SelectTrigger className="w-36">

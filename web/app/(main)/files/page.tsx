@@ -6,7 +6,7 @@ import {
   Folder, FileText, Image as ImageIcon, Music, Sparkles,
   MoreVertical, Download, Pencil, Copy, Trash, Loader2,
   X, Play, Pause, FileAudio, MapPin, ExternalLink, Trash2,
-  Info, BookOpenText, AlertCircle,
+  Info, BookOpenText, AlertCircle, ChevronDown,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -29,10 +30,10 @@ interface SearchResult {
   similarity: number
 }
 
-function similarityLabel(score: number): { label: string; cls: string } {
-  if (score >= 0.8) return { label: "높음", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" }
-  if (score >= 0.5) return { label: "보통", cls: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" }
-  return { label: "낮음", cls: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" }
+function similarityLabel(score: number): { tKey: string; cls: string } {
+  if (score >= 0.8) return { tKey: "similarityHigh", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" }
+  if (score >= 0.5) return { tKey: "similarityMedium", cls: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" }
+  return { tKey: "similarityLow", cls: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" }
 }
 
 interface FileItem {
@@ -60,12 +61,12 @@ const MIME_COLORS: Record<string, string> = {
   mp3: "#E3A948", wav: "#E3A948", m4a: "#E3A948", ogg: "#E3A948",
 }
 
-const TYPE_FILTERS: { id: FileType | "search"; label: string; icon: React.ElementType }[] = [
-  { id: "all",    label: "전체",     icon: Folder },
-  { id: "doc",    label: "문서",     icon: FileText },
-  { id: "image",  label: "이미지",   icon: ImageIcon },
-  { id: "audio",  label: "오디오",   icon: Music },
-  { id: "search", label: "문서 검색", icon: Sparkles },
+const TYPE_FILTERS: { id: FileType | "search"; tKey: string; icon: React.ElementType }[] = [
+  { id: "all",    tKey: "all",       icon: Folder },
+  { id: "doc",    tKey: "doc",       icon: FileText },
+  { id: "image",  tKey: "image",     icon: ImageIcon },
+  { id: "audio",  tKey: "audioFilter", icon: Music },
+  { id: "search", tKey: "docSearch", icon: Sparkles },
 ]
 
 function formatSize(bytes: number): string {
@@ -105,6 +106,20 @@ export default function FilesPage() {
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null)
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null)
+
+  const t = useTranslations("files")
+
+  // Filter dropdown (mobile)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false)
+    }
+    if (filterOpen) document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [filterOpen])
 
   // Doc search state
   const [searchQuery, setSearchQuery] = useState("")
@@ -181,7 +196,7 @@ export default function FilesPage() {
       setSearchMode(data.search_mode ?? "")
       setSearched(true)
     } catch {
-      setSearchError("문서 검색에 실패했습니다.")
+      setSearchError(t("searchFailed"))
     } finally {
       setSearching(false)
     }
@@ -226,29 +241,31 @@ export default function FilesPage() {
     <div className="flex flex-col flex-1 overflow-hidden bg-background"
       onClick={() => setMenuId(null)}>
       {/* Top bar */}
-      <div className="flex items-center gap-3 px-5 h-12 border-b border-border shrink-0">
-        <span className="text-sm font-bold text-foreground whitespace-nowrap">내 파일</span>
+      <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-5 h-12 border-b border-border shrink-0">
+        <span className="text-sm font-bold text-foreground whitespace-nowrap hidden sm:block">{t("title")}</span>
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="파일 이름 검색..."
+            placeholder={t("searchPlaceholder")}
             className="w-full h-8 pl-8 pr-3 rounded-lg border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
 
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
           <button
             onClick={handleUploadClick}
             disabled={uploading}
-            className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border text-xs font-medium text-foreground hover:bg-accent/40 transition-colors disabled:opacity-50">
+            className="flex items-center gap-1.5 h-8 px-2 sm:px-3 rounded-lg border border-border text-xs font-medium text-foreground hover:bg-accent/40 transition-colors disabled:opacity-50"
+            title={t("upload")}>
             {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-            업로드
+            <span className="hidden sm:inline">{t("upload")}</span>
           </button>
-          <button className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold transition-colors"
-            style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}>
-            <Plus className="w-3.5 h-3.5" />새로 만들기
+          <button className="flex items-center gap-1.5 h-8 px-2 sm:px-3 rounded-lg text-xs font-semibold transition-colors"
+            style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
+            title={t("createNew")}>
+            <Plus className="w-3.5 h-3.5" /><span className="hidden sm:inline">{t("createNew")}</span>
           </button>
           <div className="w-px h-5 bg-border" />
           <button
@@ -274,31 +291,77 @@ export default function FilesPage() {
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex items-center gap-2 px-5 py-2.5 border-b border-border shrink-0 overflow-x-auto">
-        {TYPE_FILTERS.map(({ id, label, icon: Icon }) => {
-          const count = id !== "search" ? counts[id] : undefined
-          const isActive = filter === id
-          return (
-            <button key={id} onClick={() => setFilter(id as FileType | "search")}
-              className={cn(
-                "shrink-0 flex items-center gap-1.5 h-8 px-3.5 rounded-full text-xs font-medium transition-colors border",
-                isActive
-                  ? "border-transparent text-white"
-                  : "border-border bg-background text-foreground hover:bg-accent/40"
-              )}
-              style={isActive ? { background: "var(--primary)" } : {}}>
-              <Icon className="w-3.5 h-3.5" />
-              {label}
-              {count !== undefined && count > 0 && (
-                <span className={cn("text-xs font-semibold",
-                  isActive ? "opacity-80" : "text-muted-foreground")}>
-                  {count}
-                </span>
-              )}
-            </button>
-          )
-        })}
+      {/* Filter tabs — Desktop: horizontal pills, Mobile: dropdown */}
+      <div className="flex items-center gap-2 px-3 sm:px-5 py-2 sm:py-2.5 border-b border-border shrink-0">
+        {/* Mobile: custom dropdown */}
+        <div ref={filterRef} className="sm:hidden relative flex-1">
+          {(() => {
+            const active = TYPE_FILTERS.find(f => f.id === filter)
+            const ActiveIcon = active?.icon ?? Folder
+            const activeCount = filter !== "search" ? counts[filter] : undefined
+            return (
+              <button
+                onClick={() => setFilterOpen(v => !v)}
+                className="w-full h-9 flex items-center gap-2 px-3 rounded-lg border border-border bg-background text-sm font-medium text-foreground transition-colors"
+              >
+                <ActiveIcon className="w-4 h-4 shrink-0" />
+                <span className="flex-1 text-left">{active ? t(active.tKey) : t("all")}</span>
+                {activeCount !== undefined && activeCount > 0 && (
+                  <span className="text-xs text-muted-foreground">{activeCount}</span>
+                )}
+                <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", filterOpen && "rotate-180")} />
+              </button>
+            )
+          })()}
+          {filterOpen && (
+            <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-border bg-card shadow-xl z-[9999] py-1">
+              {TYPE_FILTERS.map(({ id, tKey, icon: Icon }) => {
+                const count = id !== "search" ? counts[id] : undefined
+                const isActive = filter === id
+                return (
+                  <button key={id} onClick={() => { setFilter(id as FileType | "search"); setFilterOpen(false) }}
+                    className={cn(
+                      "w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm font-medium transition-colors",
+                      isActive ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                    )}>
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="flex-1 text-left">{t(tKey)}</span>
+                    {count !== undefined && count > 0 && (
+                      <span className="text-xs text-muted-foreground">{count}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop: horizontal pills */}
+        <div className="hidden sm:flex items-center gap-2 overflow-x-auto">
+          {TYPE_FILTERS.map(({ id, tKey, icon: Icon }) => {
+            const count = id !== "search" ? counts[id] : undefined
+            const isActive = filter === id
+            return (
+              <button key={id} onClick={() => setFilter(id as FileType | "search")}
+                className={cn(
+                  "shrink-0 flex items-center gap-1.5 h-8 px-3.5 rounded-full text-xs font-medium transition-colors border",
+                  isActive
+                    ? "border-transparent text-white"
+                    : "border-border bg-background text-foreground hover:bg-accent/40"
+                )}
+                style={isActive ? { background: "var(--primary)" } : {}}>
+                <Icon className="w-3.5 h-3.5" />
+                {t(tKey)}
+                {count !== undefined && count > 0 && (
+                  <span className={cn("text-xs font-semibold",
+                    isActive ? "opacity-80" : "text-muted-foreground")}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* ── Doc Search Panel ── */}
@@ -306,18 +369,18 @@ export default function FilesPage() {
         <div className="flex flex-col flex-1 overflow-hidden">
           {/* Search bar */}
           <div className="px-6 py-4 border-b border-border shrink-0">
-            <p className="text-xs text-muted-foreground mb-2">인덱싱된 문서에서 의미 기반 검색을 수행합니다.</p>
+            <p className="text-xs text-muted-foreground mb-2">{t("docSearchDesc")}</p>
             <div className="flex items-start gap-2 text-xs bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg px-3 py-2 mb-3">
               <Info className="size-3.5 shrink-0 mt-0.5 text-blue-500" />
               <span className="text-blue-700 dark:text-blue-300 leading-relaxed">
-                문서 검색을 사용하려면 먼저 파일 상세 패널에서 문서를 인덱싱해주세요.
+                {t("docSearchHint")}
               </span>
             </div>
             <form onSubmit={e => { e.preventDefault(); doDocSearch() }} className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                 <Input
-                  placeholder="검색할 내용을 입력하세요..."
+                  placeholder={t("searchInputPlaceholder")}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -333,7 +396,7 @@ export default function FilesPage() {
               </div>
               <Button type="submit" disabled={searching || !searchQuery.trim()}>
                 {searching ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-                <span className="ml-1.5">검색</span>
+                <span className="ml-1.5">{t("search")}</span>
               </Button>
             </form>
             {searchError && (
@@ -347,10 +410,10 @@ export default function FilesPage() {
           <div className="flex-1 overflow-y-auto">
             {searched && (
               <div className="px-6 py-2 border-b border-border flex items-center justify-between text-xs text-muted-foreground">
-                <span>{searchResults.length > 0 ? `${searchResults.length}개 결과` : "검색 결과가 없습니다."}</span>
+                <span>{searchResults.length > 0 ? t("results", { count: searchResults.length }) : t("noResults")}</span>
                 {searchMode && (
                   <span className="px-2 py-0.5 bg-muted rounded-full font-medium">
-                    {searchMode === "semantic" ? "의미 검색" : searchMode === "full-text" ? "전문 검색" : searchMode}
+                    {searchMode === "semantic" ? t("semanticSearch") : searchMode === "full-text" ? t("fullTextSearch") : searchMode}
                   </span>
                 )}
               </div>
@@ -358,7 +421,7 @@ export default function FilesPage() {
             {searchResults.length === 0 && searched && !searching && (
               <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2">
                 <BookOpenText className="size-10 opacity-30" />
-                <p className="text-sm">검색 결과가 없습니다.</p>
+                <p className="text-sm">{t("noResults")}</p>
               </div>
             )}
             <div className="divide-y divide-border/50">
@@ -373,11 +436,11 @@ export default function FilesPage() {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className={cn("text-xs font-semibold px-1.5 py-0.5 rounded", sim.cls)}>
-                          {sim.label}
+                          {t(sim.tKey)}
                         </span>
                         <Button variant="ghost" size="sm" className="h-7 px-2 text-xs"
                           onClick={() => handleSearchFileSelect(r.file_id)}>
-                          파일 보기
+                          {t("viewFile")}
                         </Button>
                       </div>
                     </div>
@@ -396,7 +459,7 @@ export default function FilesPage() {
       {filter !== "search" && (
       <div className="px-5 py-2 shrink-0">
         <span className="text-xs text-muted-foreground">
-          {loading ? "불러오는 중..." : `${filtered.length}개 파일`}
+          {loading ? t("loading") : t("fileCount", { count: filtered.length })}
         </span>
       </div>
       )}
@@ -421,7 +484,7 @@ export default function FilesPage() {
           ) : (
             <div className="rounded-xl border border-border bg-card overflow-hidden">
               <div className="grid grid-cols-[2fr_1fr_1fr_1fr_40px] px-4 py-2 border-b border-border bg-muted/40">
-                {["이름", "유형", "크기", "날짜", ""].map((h, i) => (
+                {[t("name"), t("type"), t("size"), t("date"), ""].map((h, i) => (
                   <span key={i} className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</span>
                 ))}
               </div>
@@ -442,7 +505,7 @@ export default function FilesPage() {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground">
             <Folder className="w-10 h-10 opacity-30" />
-            <p className="text-sm">파일이 없습니다.</p>
+            <p className="text-sm">{t("noFiles")}</p>
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -486,20 +549,20 @@ export default function FilesPage() {
                         className="absolute top-8 right-1.5 w-36 rounded-xl border border-border bg-card shadow-xl z-20 py-1 overflow-hidden">
                         <button onClick={() => downloadFile(file)}
                           className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 transition-colors">
-                          <Download className="w-3.5 h-3.5 text-muted-foreground" />다운로드
+                          <Download className="w-3.5 h-3.5 text-muted-foreground" />{t("download")}
                         </button>
                         <button onClick={() => setMenuId(null)}
                           className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 transition-colors">
-                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />이름 변경
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />{t("rename")}
                         </button>
                         <button onClick={() => setMenuId(null)}
                           className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 transition-colors">
-                          <Copy className="w-3.5 h-3.5 text-muted-foreground" />복사
+                          <Copy className="w-3.5 h-3.5 text-muted-foreground" />{t("copy")}
                         </button>
                         <div className="border-t border-border my-1" />
                         <button onClick={() => deleteFile(file.id)}
                           className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-accent/50 transition-colors">
-                          <Trash className="w-3.5 h-3.5" />삭제
+                          <Trash className="w-3.5 h-3.5" />{t("delete")}
                         </button>
                       </div>
                     )}
@@ -523,7 +586,7 @@ export default function FilesPage() {
           /* List view */
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="grid grid-cols-[2fr_1fr_1fr_1fr_40px] px-4 py-2 border-b border-border bg-muted/40">
-              {["이름", "유형", "크기", "날짜", ""].map((h, i) => (
+              {[t("name"), t("type"), t("size"), t("date"), ""].map((h, i) => (
                 <span key={i} className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</span>
               ))}
             </div>
@@ -557,20 +620,20 @@ export default function FilesPage() {
                         className="absolute top-6 right-0 w-36 rounded-xl border border-border bg-card shadow-xl z-20 py-1 overflow-hidden">
                         <button onClick={() => downloadFile(file)}
                           className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 transition-colors">
-                          <Download className="w-3.5 h-3.5 text-muted-foreground" />다운로드
+                          <Download className="w-3.5 h-3.5 text-muted-foreground" />{t("download")}
                         </button>
                         <button onClick={() => setMenuId(null)}
                           className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 transition-colors">
-                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />이름 변경
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />{t("rename")}
                         </button>
                         <button onClick={() => setMenuId(null)}
                           className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 transition-colors">
-                          <Copy className="w-3.5 h-3.5 text-muted-foreground" />복사
+                          <Copy className="w-3.5 h-3.5 text-muted-foreground" />{t("copy")}
                         </button>
                         <div className="border-t border-border my-1" />
                         <button onClick={() => deleteFile(file.id)}
                           className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-accent/50 transition-colors">
-                          <Trash className="w-3.5 h-3.5" />삭제
+                          <Trash className="w-3.5 h-3.5" />{t("delete")}
                         </button>
                       </div>
                     )}
@@ -626,6 +689,7 @@ function DetailPanel({ file, onClose, onDelete, onDownload }: {
   onDelete: (id: number) => void
   onDownload: (f: FileItem) => void
 }) {
+  const t = useTranslations("files")
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -697,40 +761,40 @@ function DetailPanel({ file, onClose, onDelete, onDownload }: {
           {/* Details */}
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">유형</span>
+              <span className="text-muted-foreground">{t("type")}</span>
               <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: color + "22", color }}>{ext.toUpperCase()}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">크기</span>
+              <span className="text-muted-foreground">{t("size")}</span>
               <span>{file.size_label ?? formatSize(file.size)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">날짜</span>
+              <span className="text-muted-foreground">{t("date")}</span>
               <span>{formatDate(file.created_at)}</span>
             </div>
             {file.sub_type && file.sub_type !== "uploaded" && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">생성 방식</span>
+                <span className="text-muted-foreground">{t("createdBy")}</span>
                 <span className="text-xs font-medium px-2 py-0.5 rounded bg-muted">{file.sub_type}</span>
               </div>
             )}
             {file.file_type === "document" && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">인덱싱</span>
+                <span className="text-muted-foreground">{t("indexing")}</span>
                 <span className={file.indexed ? "text-emerald-600 font-medium" : "text-muted-foreground"}>
-                  {file.indexed ? "완료" : "미완료"}
+                  {file.indexed ? t("indexed") : t("notIndexed")}
                 </span>
               </div>
             )}
             {file.file_type === "audio" && (file.duration ?? 0) > 0 && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">길이</span>
+                <span className="text-muted-foreground">{t("duration")}</span>
                 <span>{fmtDuration(file.duration ?? 0)}</span>
               </div>
             )}
             {file.file_type === "image" && !!file.metadata?.camera_model && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">카메라</span>
+                <span className="text-muted-foreground">{t("camera")}</span>
                 <span className="text-right text-xs">
                   {[file.metadata.camera_make as string, file.metadata.camera_model as string].filter(Boolean).join(" ")}
                 </span>
@@ -741,7 +805,7 @@ function DetailPanel({ file, onClose, onDelete, onDownload }: {
           {/* GPS */}
           {file.file_type === "image" && !!file.metadata?.latitude && !!file.metadata?.longitude && (
             <div className="space-y-1.5">
-              <p className="text-xs font-semibold text-muted-foreground">위치</p>
+              <p className="text-xs font-semibold text-muted-foreground">{t("location")}</p>
               <div className="flex items-start gap-2 text-sm">
                 <MapPin className="size-4 text-muted-foreground shrink-0 mt-0.5" />
                 <div className="space-y-1">
@@ -761,7 +825,7 @@ function DetailPanel({ file, onClose, onDelete, onDownload }: {
           {/* Analysis / Transcript / Prompt */}
           {file.analysis && (
             <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-1">분석 결과</p>
+              <p className="text-xs font-semibold text-muted-foreground mb-1">{t("analysis")}</p>
               <div className="bg-muted/50 rounded-lg p-3 markdown-body">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{file.analysis}</ReactMarkdown>
               </div>
@@ -769,7 +833,7 @@ function DetailPanel({ file, onClose, onDelete, onDownload }: {
           )}
           {file.transcript && (
             <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-1">텍스트 변환</p>
+              <p className="text-xs font-semibold text-muted-foreground mb-1">{t("transcript")}</p>
               <div className="bg-muted/50 rounded-lg p-3 markdown-body">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{file.transcript}</ReactMarkdown>
               </div>
@@ -777,7 +841,7 @@ function DetailPanel({ file, onClose, onDelete, onDownload }: {
           )}
           {file.prompt && (
             <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-1">프롬프트</p>
+              <p className="text-xs font-semibold text-muted-foreground mb-1">{t("prompt")}</p>
               <div className="bg-muted/50 rounded-lg p-3 markdown-body">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{file.prompt}</ReactMarkdown>
               </div>
@@ -788,10 +852,10 @@ function DetailPanel({ file, onClose, onDelete, onDownload }: {
         {/* Footer actions */}
         <div className="p-4 border-t border-border flex flex-col gap-2">
           <Button variant="outline" size="sm" className="w-full" onClick={() => onDownload(file)}>
-            <Download className="size-4 mr-2" />다운로드
+            <Download className="size-4 mr-2" />{t("download")}
           </Button>
           <Button variant="destructive" size="sm" className="w-full" onClick={() => onDelete(file.id)}>
-            <Trash2 className="size-4 mr-2" />삭제
+            <Trash2 className="size-4 mr-2" />{t("delete")}
           </Button>
         </div>
       </div>

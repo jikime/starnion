@@ -51,7 +51,7 @@ export function IntelligencePanel() {
         {/* Score */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-foreground">Today completion</span>
+            <span className="text-xs font-semibold text-foreground">오늘 완료율</span>
             <span
               className="text-sm font-bold tabular-nums"
               style={{
@@ -171,7 +171,7 @@ export function IntelligencePanel() {
         {inboxTasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
             <Inbox className="w-7 h-7 opacity-30" />
-            <p className="text-xs">Inbox is empty</p>
+            <p className="text-xs">임시보관함이 비어 있습니다</p>
             <p className="text-xs opacity-60">아이디어나 요청사항을 여기에 캡처하세요</p>
           </div>
         ) : (

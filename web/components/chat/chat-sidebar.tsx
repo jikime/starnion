@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
@@ -38,6 +39,7 @@ export function ChatSidebar({
   onLoadMoreConvs,
   onClose,
 }: ChatSidebarProps) {
+  const t = useTranslations("chat")
   const handleSelect = (id: string, platform: string) => {
     onSelectThread(id, platform)
     // Auto-close on mobile
@@ -74,7 +76,7 @@ export function ChatSidebar({
             disabled={creating}
           >
             {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-            새 대화
+            {t("newConversation")}
           </Button>
         </div>
         <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -92,7 +94,7 @@ export function ChatSidebar({
 
             {!convLoading && grouped.length > 0 && (
               <div>
-                <div className="mb-2 px-2 text-xs font-medium text-muted-foreground">💬 채팅</div>
+                <div className="mb-2 px-2 text-xs font-medium text-muted-foreground">{"💬 " + t("chatList")}</div>
                 {grouped.map(({ label, items }) => (
                   <div key={label} className="mb-3">
                     <div className="mb-1 px-2 text-xs text-muted-foreground/70">{label}</div>
@@ -126,7 +128,7 @@ export function ChatSidebar({
                     disabled={loadingMoreConvs}
                     className="flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
                   >
-                    {loadingMoreConvs ? <Loader2 className="size-3 animate-spin" /> : "더 보기"}
+                    {loadingMoreConvs ? <Loader2 className="size-3 animate-spin" /> : t("loadMore")}
                   </button>
                 )}
               </div>
@@ -134,7 +136,7 @@ export function ChatSidebar({
 
             {!convLoading && webConvs.length === 0 && Object.keys(platformGroups).length === 0 && (
               <p className="px-2 py-4 text-xs text-center text-muted-foreground">
-                아직 대화가 없어요.<br />새 대화를 시작해보세요!
+                {t("noConversations")}<br />{t("startNew")}
               </p>
             )}
 
@@ -148,7 +150,7 @@ export function ChatSidebar({
                     </span>
                     <span className="inline-flex items-center gap-0.5 h-4 px-1 rounded-full text-xs font-medium border border-border bg-secondary text-secondary-foreground">
                       <Lock className="size-2.5" />
-                      조회
+                      {t("viewOnly")}
                     </span>
                   </div>
                   {items.map((conv) => (
