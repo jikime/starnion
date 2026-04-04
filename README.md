@@ -13,6 +13,11 @@ A hyper-personalized AI agent platform with Planner, finance management, and AI-
 
 [Documentation](https://jikime.github.io/starnion/) · [Installation Guide](https://jikime.github.io/starnion/en/getting-started/installation) · [Korean Docs](https://jikime.github.io/starnion/ko/)
 
+[![Release](https://img.shields.io/github/v/release/jikime/starnion)](https://github.com/jikime/starnion/releases)
+[![License](https://img.shields.io/badge/license-Private-lightgrey)](LICENSE)
+
+[Documentation](https://jikime.github.io/starnion/) · [Installation Guide](https://jikime.github.io/starnion/en/getting-started/installation) · [Korean Docs](https://jikime.github.io/starnion/ko/)
+
 </div>
 
 ---
