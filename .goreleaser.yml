@@ -20,7 +20,7 @@ before:
     - sh -c "cp -r web/.next/standalone/. .staging/web/ && mkdir -p .staging/web/.next && cp -r web/.next/static .staging/web/.next/static && cp -r web/public .staging/web/public"
     # Stage docker: compose files, Dockerfiles, env example, migrations
     - sh -c "cp docker/docker-compose.yml docker/docker-compose.prod.yml docker/Dockerfile.agent docker/Dockerfile.gateway docker/Dockerfile.web docker/.env.example docker/setup.sh .staging/docker/"
-    - sh -c "test -d docker/nginx && cp -r docker/nginx .staging/docker/nginx || true"
+    - sh -c "test -d docker/nginx && mkdir -p .staging/docker/nginx && cp docker/nginx/*.conf .staging/docker/nginx/ || true"
     - sh -c "test -d db/migrations && cp -r db/migrations .staging/docker/migrations || true"
     # Stage scripts: systemd/launchd service files
     - sh -c "cp -r scripts .staging/scripts"
