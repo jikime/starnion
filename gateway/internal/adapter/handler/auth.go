@@ -170,7 +170,7 @@ func (h *AuthHandler) generateToken(userID uuid.UUID) (string, error) {
 	claims := &JWTClaims{
 		UserID: userID.String(),
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour * 7)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(365 * 24 * time.Hour * 100)), // effectively no expiry
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}

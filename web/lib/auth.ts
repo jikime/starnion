@@ -65,6 +65,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
 
+  session: {
+    strategy: "jwt",
+    maxAge: 365 * 24 * 60 * 60 * 100, // effectively no expiry — logout only
+  },
+
   pages: {
     signIn: "/login",
   },
