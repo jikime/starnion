@@ -196,7 +196,11 @@
     "saving": "保存中...",
     "refresh": "更新",
     "copy": "コピー",
-    "copied": "コピー済み!"
+    "copied": "コピー済み!",
+    "modelDescHaiku": "高速・軽量",
+    "modelDescSonnet45": "バランス型",
+    "modelDescSonnet46": "最新バランスモデル",
+    "modelDescOpus": "最高性能"
   },
   "diary": {
     "title": "日記",
@@ -1063,7 +1067,10 @@
     "audioAttach": "添付",
     "platformTelegram": "テレグラム",
     "platformDiscord": "ディスコード",
-    "platformSlack": "スラック"
+    "platformSlack": "スラック",
+    "startNew": "新しい会話を始めましょう！",
+    "newConversation2": "新しい会話",
+    "errorOccurred": "エラーが発生しました。"
   },
   "cron": {
     "title": "通知センター",
@@ -1659,7 +1666,9 @@
       "title": "割り当て削除",
       "description": "{useCase} の割り当てを削除してデフォルトに戻しますか？",
       "confirm": "削除"
-    }
+    },
+    "toolCallHint1": "tool calling対応モデルが先に表示されます。読み込み後✓マークを確認してください。",
+    "toolCallHint2": "tool calling対応はサーバー実装により異なる場合があります。"
   },
   "personas": {
     "title": "ペルソナ",
@@ -1721,7 +1730,10 @@
       "defaultFailed": "デフォルト設定に失敗しました。",
       "deleted": "ペルソナが削除されました。",
       "noToolsWarning": "⚠️ このモデルはtool callingに対応していないため、スキル・ツール機能が制限されます。保存を続行します。"
-    }
+    },
+    "defaultPersona": "デフォルトペルソナ",
+    "toolsUnavailable": "ツール不可",
+    "charCount": "文字"
   },
   "files": {
     "title": "マイファイル",
@@ -2058,7 +2070,8 @@
     "darkMode": "ダークモード",
     "upload": "アップロード",
     "createNew": "新規作成",
-    "more": "もっと見る"
+    "more": "もっと見る",
+    "taskAdded": "追加済み"
   },
   "profile": {
     "title": "プロフィール",
@@ -2140,9 +2153,7 @@
       "addMemo": "メモ追加",
       "pendingAWarning": "未完了のAタスクが{count}個あります。Aタスクを先に処理してください。",
       "urgentGoalHint": "関連タスクをA優先度に上げてください。",
-      "taskAdded": "追加済み",
-      "timeBlockHint1": "タスクメニュー > 時間割当で配置",
-      "timeBlockHint2": "タスクメニュー > 時間割当"
+      "taskAdded": "追加済み"
     },
     "inbox": {
       "title": "Inbox",
@@ -2263,7 +2274,9 @@
     },
     "timeBlock": {
       "title": "Time Blocking",
-      "empty": "No time-assigned tasks"
+      "empty": "No time-assigned tasks",
+      "timeBlockHint1": "タスクメニュー > 時間割当で配置",
+      "timeBlockHint2": "タスクメニュー > 時間割当"
     },
     "weeklyCompass": {
       "emptyTitle": "Your compass has stopped",

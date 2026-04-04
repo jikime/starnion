@@ -145,7 +145,7 @@ function ChatPageInner() {
       const res = await fetch("/api/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: "새 대화" }),
+        body: JSON.stringify({ title: tc("newConversation") }),
       })
       if (res.ok) {
         const conv: Conversation = await res.json()

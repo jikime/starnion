@@ -97,6 +97,7 @@ export function ChatInput({
   onModelChange,
 }: ChatInputProps) {
   const t = useTranslations("chat")
+  const tc = useTranslations("common")
   const [message, setMessage] = useState("")
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
   const [showRecorder, setShowRecorder] = useState(false)
@@ -402,8 +403,8 @@ export function ChatInput({
                         <Cpu className="size-3.5 text-muted-foreground shrink-0 mt-0.5" />
                         <span className="flex flex-col min-w-0">
                           <span className="truncate">{m.label}</span>
-                          {m.description && (
-                            <span className="text-xs text-muted-foreground">{m.description}</span>
+                          {m.descriptionKey && (
+                            <span className="text-xs text-muted-foreground">{tc(m.descriptionKey as Parameters<typeof tc>[0])}</span>
                           )}
                         </span>
                       </button>

@@ -48,7 +48,7 @@ export function MagicBar() {
     const parts: string[] = [`${priority}${order || ""}`]
     if (roleName) parts.push(roleName)
     if (startHour !== null) parts.push(`${String(startHour).padStart(2, "0")}:00`)
-    setFeedback(`[${parts.join(" · ")}] "${title.trim()}" 추가됨`)
+    setFeedback(`[${parts.join(" · ")}] "${title.trim()}" ${t("taskAdded")}`)
 
     setTitle("")
     setOrder("1")

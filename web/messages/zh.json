@@ -196,7 +196,11 @@
     "saving": "保存中...",
     "refresh": "刷新",
     "copy": "复制",
-    "copied": "已复制!"
+    "copied": "已复制!",
+    "modelDescHaiku": "快速轻量",
+    "modelDescSonnet45": "均衡性能",
+    "modelDescSonnet46": "最新均衡模型",
+    "modelDescOpus": "最强性能"
   },
   "diary": {
     "title": "日记",
@@ -1063,7 +1067,10 @@
     "audioAttach": "附加",
     "platformTelegram": "电报",
     "platformDiscord": "Discord",
-    "platformSlack": "Slack"
+    "platformSlack": "Slack",
+    "startNew": "开始新对话吧！",
+    "newConversation2": "新对话",
+    "errorOccurred": "发生了错误。"
   },
   "cron": {
     "title": "通知中心",
@@ -1659,7 +1666,9 @@
       "title": "删除分配",
       "description": "要删除 {useCase} 的分配并恢复为默认值吗？",
       "confirm": "删除"
-    }
+    },
+    "toolCallHint1": "支持tool calling的模型优先显示。加载后请确认✓标记。",
+    "toolCallHint2": "tool calling支持可能因服务器实现而异。"
   },
   "personas": {
     "title": "角色",
@@ -1721,7 +1730,10 @@
       "defaultFailed": "设置默认失败。",
       "deleted": "角色已删除。",
       "noToolsWarning": "⚠️ 该模型不支持工具调用，技能和工具功能将受限。仍继续保存。"
-    }
+    },
+    "defaultPersona": "默认角色",
+    "toolsUnavailable": "不支持工具",
+    "charCount": "字"
   },
   "files": {
     "title": "我的文件",
@@ -2058,7 +2070,8 @@
     "darkMode": "深色模式",
     "upload": "上传",
     "createNew": "新建",
-    "more": "更多"
+    "more": "更多",
+    "taskAdded": "已添加"
   },
   "profile": {
     "title": "个人资料",
@@ -2140,9 +2153,7 @@
       "addMemo": "添加备注",
       "pendingAWarning": "有{count}个未完成的A任务。请先处理A任务。",
       "urgentGoalHint": "将相关任务提升为A优先级。",
-      "taskAdded": "已添加",
-      "timeBlockHint1": "任务菜单 > 分配时间来安排",
-      "timeBlockHint2": "任务菜单 > 分配时间"
+      "taskAdded": "已添加"
     },
     "inbox": {
       "title": "Inbox",
@@ -2263,7 +2274,9 @@
     },
     "timeBlock": {
       "title": "Time Blocking",
-      "empty": "No time-assigned tasks"
+      "empty": "No time-assigned tasks",
+      "timeBlockHint1": "任务菜单 > 分配时间来安排",
+      "timeBlockHint2": "任务菜单 > 分配时间"
     },
     "weeklyCompass": {
       "emptyTitle": "Your compass has stopped",

@@ -196,7 +196,11 @@
     "saving": "Saving...",
     "refresh": "Refresh",
     "copy": "Copy",
-    "copied": "Copied!"
+    "copied": "Copied!",
+    "modelDescHaiku": "Fast and light",
+    "modelDescSonnet45": "Balanced performance",
+    "modelDescSonnet46": "Latest balanced model",
+    "modelDescOpus": "Best performance"
   },
   "diary": {
     "title": "Diary",
@@ -1063,7 +1067,10 @@
     "audioAttach": "Attach",
     "platformTelegram": "Telegram",
     "platformDiscord": "Discord",
-    "platformSlack": "Slack"
+    "platformSlack": "Slack",
+    "startNew": "Start a new conversation!",
+    "newConversation2": "New Chat",
+    "errorOccurred": "An error occurred."
   },
   "cron": {
     "title": "Notification Center",
@@ -1659,7 +1666,9 @@
       "title": "Delete Assignment",
       "description": "Delete the {useCase} assignment and revert to default?",
       "confirm": "Delete"
-    }
+    },
+    "toolCallHint1": "Models supporting tool calling are shown first. Check the ✓ mark after loading.",
+    "toolCallHint2": "Tool calling support may vary by server implementation."
   },
   "personas": {
     "title": "Personas",
@@ -1721,7 +1730,10 @@
       "defaultFailed": "Failed to set as default.",
       "deleted": "Persona deleted.",
       "noToolsWarning": "⚠️ This model does not support tool calling. Skills and tools will be limited. Saving anyway."
-    }
+    },
+    "defaultPersona": "Default Persona",
+    "toolsUnavailable": "No tools",
+    "charCount": "chars"
   },
   "files": {
     "title": "My Files",
@@ -2102,9 +2114,7 @@
       "addMemo": "Add memo",
       "pendingAWarning": "{count} pending A-tasks remain. Handle A-tasks first.",
       "urgentGoalHint": "Promote related tasks to A-priority.",
-      "taskAdded": "added",
-      "timeBlockHint1": "Use task menu > Assign time",
-      "timeBlockHint2": "Task menu > Assign time"
+      "taskAdded": "added"
     },
     "inbox": {
       "title": "Inbox",
@@ -2225,7 +2235,9 @@
     },
     "timeBlock": {
       "title": "Time Blocking",
-      "empty": "No time-assigned tasks"
+      "empty": "No time-assigned tasks",
+      "timeBlockHint1": "Use task menu > Assign time",
+      "timeBlockHint2": "Task menu > Assign time"
     },
     "weeklyCompass": {
       "emptyTitle": "Your compass has stopped",
@@ -2449,7 +2461,8 @@
     "darkMode": "Dark Mode",
     "upload": "Upload",
     "createNew": "Create New",
-    "more": "More"
+    "more": "More",
+    "taskAdded": "added"
   },
   "profile": {
     "title": "Profile",

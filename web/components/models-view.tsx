@@ -990,12 +990,12 @@ export function ModelsView() {
                           {/* Ollama tool calling info */}
                           {customEndpointType === "ollama" && (
                             <p className="text-xs text-muted-foreground leading-tight">
-                              💡 tool calling 지원 모델이 먼저 표시돼요. 불러온 후 ✓ 표시를 확인하세요.
+                              💡 {t("toolCallHint1")}
                             </p>
                           )}
                           {customEndpointType === "openai_compatible" && (
                             <p className="text-xs text-muted-foreground leading-tight">
-                              💡 tool calling 지원 여부는 서버 구현에 따라 다를 수 있어요.
+                              💡 {t("toolCallHint2")}
                             </p>
                           )}
                         </div>

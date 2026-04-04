@@ -197,7 +197,11 @@
     "saving": "저장 중...",
     "refresh": "새로고침",
     "copy": "복사",
-    "copied": "복사됨!"
+    "copied": "복사됨!",
+    "modelDescHaiku": "빠르고 가벼움",
+    "modelDescSonnet45": "균형잡힌 성능",
+    "modelDescSonnet46": "최신 균형 모델",
+    "modelDescOpus": "최고 성능"
   },
   "diary": {
     "title": "일기",
@@ -1060,7 +1064,10 @@
     "audioAttach": "첨부",
     "platformTelegram": "텔레그램",
     "platformDiscord": "디스코드",
-    "platformSlack": "슬랙"
+    "platformSlack": "슬랙",
+    "startNew": "새 대화를 시작해보세요!",
+    "newConversation2": "새 대화",
+    "errorOccurred": "오류가 발생했습니다."
   },
   "cron": {
     "title": "알림 센터",
@@ -1656,7 +1663,9 @@
       "title": "배정 삭제",
       "description": "{useCase} 배정을 삭제하고 기본값으로 돌릴까요?",
       "confirm": "삭제"
-    }
+    },
+    "toolCallHint1": "tool calling 지원 모델이 먼저 표시됩니다. 불러온 후 ✓ 표시를 확인하세요.",
+    "toolCallHint2": "tool calling 지원 여부는 서버 구현에 따라 다를 수 있습니다."
   },
   "personas": {
     "title": "페르소나",
@@ -1718,7 +1727,10 @@
       "defaultFailed": "기본 설정에 실패했어요.",
       "deleted": "페르소나가 삭제됐어요.",
       "noToolsWarning": "⚠️ 이 모델은 tool calling을 지원하지 않아 스킬·도구 기능이 제한됩니다. 저장은 계속돼요."
-    }
+    },
+    "defaultPersona": "기본 페르소나",
+    "toolsUnavailable": "tools 불가",
+    "charCount": "자"
   },
   "files": {
     "title": "내 파일",
@@ -2099,9 +2111,7 @@
       "addMemo": "메모 추가",
       "pendingAWarning": "완료되지 않은 A 업무가 {count}개 있습니다. A를 먼저 처리하세요.",
       "urgentGoalHint": "관련 업무를 A등급으로 올리세요.",
-      "taskAdded": "추가됨",
-      "timeBlockHint1": "업무 메뉴 > 시간 배정으로 배치",
-      "timeBlockHint2": "업무 메뉴 > 시간 배정"
+      "taskAdded": "추가됨"
     },
     "inbox": {
       "title": "임시보관",
@@ -2222,7 +2232,9 @@
     },
     "timeBlock": {
       "title": "타임 블로킹",
-      "empty": "시간 배정된 업무 없음"
+      "empty": "시간 배정된 업무 없음",
+      "timeBlockHint1": "업무 메뉴 > 시간 배정으로 배치",
+      "timeBlockHint2": "업무 메뉴 > 시간 배정"
     },
     "weeklyCompass": {
       "emptyTitle": "역할의 나침반이 멈춰있어요",
@@ -2446,7 +2458,8 @@
     "darkMode": "다크 모드",
     "upload": "업로드",
     "createNew": "새로 만들기",
-    "more": "더보기"
+    "more": "더보기",
+    "taskAdded": "추가됨"
   },
   "profile": {
     "title": "프로필",

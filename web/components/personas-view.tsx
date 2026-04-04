@@ -498,7 +498,7 @@ export function PersonasView() {
                 {p.isDefault && (
                   <div className="flex items-center gap-1.5 px-4 py-1.5 bg-primary/5 border-b border-primary/15 text-xs text-primary font-medium">
                     <Star className="h-3 w-3 fill-primary" />
-                    기본 페르소나
+                    {t("defaultPersona")}
                   </div>
                 )}
                 {/* Card header */}
@@ -569,7 +569,7 @@ export function PersonasView() {
                     {toolsSupport === false && (
                       <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium border text-amber-500 border-amber-300">
                         <AlertTriangle className="h-3 w-3" />
-                        tools 불가
+                        {t("toolsUnavailable")}
                       </span>
                     )}
                     {p.botName && (
@@ -777,7 +777,7 @@ export function PersonasView() {
               <div className="flex items-center justify-between">
                 <Label>{t("dialog.systemPromptLabel")}</Label>
                 <span className={`text-xs tabular-nums ${form.systemPrompt.length > 2000 ? "text-destructive" : "text-muted-foreground"}`}>
-                  {form.systemPrompt.length.toLocaleString()} 자
+                  {form.systemPrompt.length.toLocaleString()} {t("charCount")}
                 </span>
               </div>
               <Textarea

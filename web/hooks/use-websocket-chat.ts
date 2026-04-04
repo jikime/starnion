@@ -353,7 +353,7 @@ export function useWebSocketChat(
             {
               id: nanoid(),
               role: "assistant",
-              text: msg.message ? `⚠️ ${msg.message}` : "⚠️ 오류가 발생했습니다.",
+              text: msg.message ? `⚠️ ${msg.message}` : "⚠️ An error occurred.",
               toolEvents: [],
               files: [],
               streaming: false,
