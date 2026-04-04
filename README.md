@@ -224,7 +224,7 @@ starnion/
 │       ├── planner-inbox/    # Inbox management
 │       ├── planner-roles/    # Role management
 │       ├── planner-goals/    # D-Day goal management
-│       ├── planner-weekly/   # Weekly Big Rocks
+│       ├── planner-weekly/   # Weekly Key Goals
 │       ├── planner-diary/    # Diary with mood
 │       ├── planner-reflection/ # Reflection notes
 │       ├── planner-mission/  # Mission statement
@@ -251,7 +251,7 @@ starnion/
 
 | Category | Features |
 |----------|----------|
-| **Planner** | ABC priority tasks · Weekly Big Rocks · Monthly calendar · D-Day goals · Mission & Roles · Diary & Reflection |
+| **Planner** | ABC priority tasks · Weekly Key Goals · Monthly calendar · D-Day goals · Mission & Roles · Diary & Reflection |
 | **Finance** | Expense tracking · Spending map (Naver Maps) · Budget management · Statistics & Analytics |
 | **AI Chat** | Multi-LLM conversations · Personas · WebSocket streaming · Telegram integration |
 | **Files** | Document & image upload · Audio transcription · AI document search · MinIO storage |
@@ -286,9 +286,9 @@ starnion/
 
 | Table | Description |
 |-------|-------------|
-| `planner_roles` | Life roles with color, mission, Big Rock |
+| `planner_roles` | Life roles with color, mission, Key Goal |
 | `planner_tasks` | Daily tasks with ABC priority + inbox items |
-| `planner_weekly_goals` | Weekly Big Rocks per role |
+| `planner_weekly_goals` | Weekly Key Goals per role |
 | `planner_goals` | D-Day goals with due dates |
 | `planner_diary` | Daily diary with mood tracking |
 | `planner_reflection_notes` | Reflection notes (JSONB) |

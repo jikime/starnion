@@ -44,23 +44,13 @@ const SKILLS: Skill[] = [
     ],
   },
   {
-    categoryKey: "skillMemo",
-    icon: "📝",
+    categoryKey: "skillPlanner",
+    icon: "📋",
     exampleKeys: [
-      "skillMemoEx1",
-      "skillMemoEx2",
-      "skillMemoEx3",
-      "skillMemoEx4",
-    ],
-  },
-  {
-    categoryKey: "skillDiary",
-    icon: "📔",
-    exampleKeys: [
-      "skillDiaryEx1",
-      "skillDiaryEx2",
-      "skillDiaryEx3",
-      "skillDiaryEx4",
+      "skillPlannerEx1",
+      "skillPlannerEx2",
+      "skillPlannerEx3",
+      "skillPlannerEx4",
     ],
   },
   {
@@ -84,23 +74,13 @@ const SKILLS: Skill[] = [
     ],
   },
   {
-    categoryKey: "skillGoals",
-    icon: "🎯",
+    categoryKey: "skillAssets",
+    icon: "💎",
     exampleKeys: [
-      "skillGoalsEx1",
-      "skillGoalsEx2",
-      "skillGoalsEx3",
-      "skillGoalsEx4",
-    ],
-  },
-  {
-    categoryKey: "skillDDay",
-    icon: "📅",
-    exampleKeys: [
-      "skillDDayEx1",
-      "skillDDayEx2",
-      "skillDDayEx3",
-      "skillDDayEx4",
+      "skillAssetsEx1",
+      "skillAssetsEx2",
+      "skillAssetsEx3",
+      "skillAssetsEx4",
     ],
   },
   {
@@ -131,16 +111,6 @@ const SKILLS: Skill[] = [
       "skillVoiceEx2",
       "skillVoiceEx3",
       "skillVoiceEx4",
-    ],
-  },
-  {
-    categoryKey: "skillMemorySearch",
-    icon: "🧠",
-    exampleKeys: [
-      "skillMemorySearchEx1",
-      "skillMemorySearchEx2",
-      "skillMemorySearchEx3",
-      "skillMemorySearchEx4",
     ],
   },
   {

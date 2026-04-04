@@ -15,6 +15,7 @@ import { format, parseISO } from "date-fns"
 import { ko } from "date-fns/locale"
 
 export function GoalsTab() {
+  const t = useTranslations("planner")
   const { goals, roles, addGoal, deleteGoal, getDdayGoals } = usePlannerStore()
   const [adding, setAdding] = useState(false)
   const [title, setTitle] = useState("")
@@ -42,8 +43,8 @@ export function GoalsTab() {
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0 bg-card/40">
         <div>
-          <h2 className="text-lg font-bold text-foreground">목표</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">마감일이 있는 중요한 목표를 관리합니다</p>
+          <h2 className="text-lg font-bold text-foreground">{t("goals.title")}</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">{t("goals.subtitle")}</p>
         </div>
         <button
           onClick={() => setAdding(!adding)}
@@ -51,7 +52,7 @@ export function GoalsTab() {
           style={{ background: "var(--priority-a)", color: "#ffffff" }}
         >
           <Plus className="w-3.5 h-3.5" />
-          목표 추가
+          {t("goals.addGoal")}
         </button>
       </div>
 
@@ -62,22 +63,22 @@ export function GoalsTab() {
             className="rounded-xl border border-border p-4 space-y-3"
             style={{ background: "var(--card)" }}
           >
-            <p className="text-xs font-semibold text-foreground">새 목표 추가</p>
+            <p className="text-xs font-semibold text-foreground">{t("goals.newGoal")}</p>
             <Input
               autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="목표 이름"
+              placeholder={t("goals.goalName")}
               className="h-8 text-sm bg-muted border-border"
             />
             <div className="grid grid-cols-[1fr_2fr] gap-2">
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">마감일</label>
+                <label className="text-xs text-muted-foreground">{t("goals.dueDate")}</label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full h-8 justify-start text-xs font-normal gap-1.5 px-2">
                       <CalendarIcon className="w-3.5 h-3.5 text-muted-foreground" />
-                      {dueDate ? format(parseISO(dueDate), "yyyy년 M월 d일", { locale: ko }) : "날짜 선택"}
+                      {dueDate ? format(parseISO(dueDate), "PPP", { locale: ko }) : t("goals.selectDate")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -91,10 +92,10 @@ export function GoalsTab() {
                 </Popover>
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">역할</label>
+                <label className="text-xs text-muted-foreground">{t("goals.role")}</label>
                 <Select value={roleId} onValueChange={setRoleId}>
                   <SelectTrigger className="h-8 text-sm">
-                    <SelectValue placeholder="역할 선택" />
+                    <SelectValue placeholder={t("goals.selectRole")} />
                   </SelectTrigger>
                   <SelectContent>
                     {roles.map((r) => (
@@ -112,7 +113,7 @@ export function GoalsTab() {
             <Input
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
-              placeholder="목표 설명 (선택)"
+              placeholder={t("goals.description")}
               className="h-8 text-sm bg-muted border-border"
             />
             <div className="flex gap-2">
@@ -122,7 +123,7 @@ export function GoalsTab() {
                 style={{ background: "var(--priority-a)", color: "#ffffff" }}
                 className="text-xs"
               >
-                추가
+                {t("goals.add")}
               </Button>
               <Button
                 size="sm"
@@ -130,7 +131,7 @@ export function GoalsTab() {
                 onClick={() => setAdding(false)}
                 className="text-xs text-muted-foreground"
               >
-                취소
+                {t("goals.cancel")}
               </Button>
             </div>
           </div>
@@ -139,8 +140,8 @@ export function GoalsTab() {
         {ddayGoals.length === 0 && !adding && (
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
             <Flag className="w-8 h-8 opacity-30" />
-            <p className="text-sm">아직 목표가 없습니다</p>
-            <p className="text-xs opacity-70">위 &lsquo;목표 추가&rsquo; 버튼으로 목표를 추가해보세요</p>
+            <p className="text-sm">{t("goals.emptyTitle")}</p>
+            <p className="text-xs opacity-70">{t("goals.emptyHint")}</p>
           </div>
         )}
 
@@ -193,7 +194,7 @@ export function GoalsTab() {
                         <button
                           onClick={() => deleteGoal(goal.id)}
                           className="opacity-0 group-hover:opacity-60 hover:opacity-100 text-muted-foreground transition-opacity"
-                          aria-label="목표 삭제"
+                          aria-label={t("goals.deleteGoal")}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -204,8 +205,8 @@ export function GoalsTab() {
                     {!overdue && goal.daysLeft <= 60 && (
                       <div className="space-y-1">
                         <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>{goal.dueDate} 마감</span>
-                          <span>{goal.daysLeft}일 남음</span>
+                          <span>{t("goals.dueLabel", { date: goal.dueDate })}</span>
+                          <span>{t("goals.daysLeft", { days: goal.daysLeft })}</span>
                         </div>
                         <div className="h-1 rounded-full bg-muted overflow-hidden">
                           <div

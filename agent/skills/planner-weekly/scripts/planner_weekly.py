@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""starnion-planner-weekly — Weekly Big Rocks management for Franklin Planner."""
+"""starnion-planner-weekly — Weekly key goals management for Planner."""
 import argparse, sys, os
 from datetime import date
 

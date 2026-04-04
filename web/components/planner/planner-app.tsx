@@ -2,6 +2,7 @@
 // cache-bust: v9
 
 import { useEffect, useRef, useState } from "react"
+import { useTranslations } from "next-intl"
 import NextImage from "next/image"
 import { cn } from "@/lib/utils"
 import { TabBar, type PlannerTab } from "./tab-bar"
@@ -35,12 +36,12 @@ import {
 
 type AppSection = "chat" | "files" | "planner" | "assets" | "analytics"
 
-const NAV_ITEMS: { id: AppSection; label: string; icon: React.ElementType; activeClass: string }[] = [
-  { id: "chat",      label: "채팅",       icon: MessageSquare,   activeClass: "bg-emerald-600 text-white" },
-  { id: "files",     label: "내 파일",    icon: FolderOpen,      activeClass: "bg-amber-600 text-white" },
-  { id: "planner",   label: "플래너",     icon: CalendarDays,    activeClass: "bg-violet-600 text-white" },
-  { id: "assets",    label: "자산",       icon: BarChart3,       activeClass: "bg-rose-600 text-white" },
-  { id: "analytics", label: "통계/분석",  icon: TrendingUp,      activeClass: "bg-cyan-600 text-white" },
+const NAV_ITEMS: { id: AppSection; labelKey: string; icon: React.ElementType; activeClass: string }[] = [
+  { id: "chat",      labelKey: "chat",      icon: MessageSquare,   activeClass: "bg-emerald-600 text-white" },
+  { id: "files",     labelKey: "myFiles",   icon: FolderOpen,      activeClass: "bg-amber-600 text-white" },
+  { id: "planner",   labelKey: "planner",   icon: CalendarDays,    activeClass: "bg-violet-600 text-white" },
+  { id: "assets",    labelKey: "assets",    icon: BarChart3,       activeClass: "bg-rose-600 text-white" },
+  { id: "analytics", labelKey: "analytics", icon: TrendingUp,      activeClass: "bg-cyan-600 text-white" },
 ]
 
 interface GlobalNavProps {
@@ -54,24 +55,24 @@ const SETTINGS_GROUPS = [
   {
     label: "TOOLS",
     items: [
-      { icon: Search,      label: "웹검색" },
-      { icon: Wrench,      label: "스킬" },
+      { icon: Search,      labelKey: "webSearch" },
+      { icon: Wrench,      labelKey: "skills" },
     ],
   },
   {
     label: "MONITORING",
     items: [
-      { icon: ScrollText,  label: "로그" },
-      { icon: Activity,    label: "사용량" },
+      { icon: ScrollText,  labelKey: "logs" },
+      { icon: Activity,    labelKey: "usage" },
     ],
   },
   {
     label: "SETTINGS",
     items: [
-      { icon: Settings,    label: "설정" },
-      { icon: Bell,        label: "알림 센터" },
-      { icon: Cpu,         label: "모델" },
-      { icon: UserSquare2, label: "페르소나" },
+      { icon: Settings,    labelKey: "settings" },
+      { icon: Bell,        labelKey: "notifications" },
+      { icon: Cpu,         labelKey: "models" },
+      { icon: UserSquare2, labelKey: "personas" },
     ],
   },
 ]
@@ -79,6 +80,7 @@ const SETTINGS_GROUPS = [
 // ── GlobalNav ──────────────────────────────────────────────────────────────
 
 function GlobalNav({ activeSection, onSectionChange }: GlobalNavProps) {
+  const t = useTranslations("planner.plannerApp")
   const [theme,       setTheme]       = useState<"dark" | "light">("dark")
   const [lang,        setLang]        = useState<"ko" | "en">("ko")
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -116,8 +118,8 @@ function GlobalNav({ activeSection, onSectionChange }: GlobalNavProps) {
       </div>
 
       {/* Centre nav */}
-      <nav className="flex items-center gap-0.5 mx-auto" aria-label="주 메뉴">
-        {NAV_ITEMS.map(({ id, label, icon: Icon, activeClass }) => (
+      <nav className="flex items-center gap-0.5 mx-auto" aria-label={t("mainMenu")}>
+        {NAV_ITEMS.map(({ id, labelKey, icon: Icon, activeClass }) => (
           <button
             key={id}
             onClick={() => onSectionChange(id)}
@@ -129,7 +131,7 @@ function GlobalNav({ activeSection, onSectionChange }: GlobalNavProps) {
             )}
           >
             <Icon className="w-3.5 h-3.5" />
-            {label}
+            {t(labelKey)}
           </button>
         ))}
       </nav>
@@ -139,7 +141,7 @@ function GlobalNav({ activeSection, onSectionChange }: GlobalNavProps) {
         <button
           onClick={() => setLang((l) => (l === "ko" ? "en" : "ko"))}
           className="flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
-          title="언어 변경"
+          title={t("changeLanguage")}
         >
           <Globe className="w-3.5 h-3.5" />
           {lang.toUpperCase()}
@@ -147,7 +149,7 @@ function GlobalNav({ activeSection, onSectionChange }: GlobalNavProps) {
         <button
           onClick={toggleTheme}
           className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
-          title={theme === "dark" ? "라이트 모드" : "다크 모드"}
+          title={theme === "dark" ? t("lightMode") : t("darkMode")}
         >
           {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
         </button>
@@ -162,7 +164,7 @@ function GlobalNav({ activeSection, onSectionChange }: GlobalNavProps) {
                 ? "bg-accent text-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
             )}
-            title="설정"
+            title={t("settings")}
             aria-expanded={settingsOpen}
             aria-haspopup="true"
           >
@@ -179,15 +181,15 @@ function GlobalNav({ activeSection, onSectionChange }: GlobalNavProps) {
                   <p className="px-4 pt-3 pb-1.5 text-xs font-semibold tracking-widest text-muted-foreground">
                     {group.label}
                   </p>
-                  {group.items.map(({ icon: Icon, label }) => (
+                  {group.items.map(({ icon: Icon, labelKey }) => (
                     <button
-                      key={label}
+                      key={labelKey}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-foreground hover:bg-accent/50 transition-colors"
                       role="menuitem"
                       onClick={() => setSettingsOpen(false)}
                     >
                       <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
-                      {label}
+                      {t(labelKey)}
                     </button>
                   ))}
                   {gi < SETTINGS_GROUPS.length - 1 && (
@@ -201,7 +203,7 @@ function GlobalNav({ activeSection, onSectionChange }: GlobalNavProps) {
 
         <button
           className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
-          title="프로필"
+          title={t("profile")}
         >
           <UserCircle2 className="w-4 h-4" />
         </button>

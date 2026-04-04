@@ -201,7 +201,7 @@ function PriorityGroup({ priority }: PriorityGroupProps) {
             >
               {tasks.length === 0 && !adding && (
                 <p className="px-3 py-3 text-xs text-muted-foreground italic">
-                  {priority} 그룹에 업무이 없습니다
+                  {t("noTasks")}
                 </p>
               )}
               {tasks.map((task, idx) => (
@@ -222,6 +222,7 @@ function PriorityGroup({ priority }: PriorityGroupProps) {
 }
 
 export function AbcTaskList() {
+  const t = useTranslations("planner.task")
   const { selectedDate, getTasksForDate, roles } = usePlannerStore()
   const { map: urgentMap, urgentGoals } = useUrgentGoalsByRole()
 
@@ -244,7 +245,7 @@ export function AbcTaskList() {
         >
           <span className="font-bold shrink-0">!</span>
           <span>
-            완료되지 않은 A 업무이 <strong>{pendingA}개</strong> 있습니다. A를 먼저 처리하세요.
+            {t("pendingAWarning", { count: pendingA })}
           </span>
         </div>
       )}
@@ -267,7 +268,7 @@ export function AbcTaskList() {
                 return `"${g.title}" (D-${g.daysLeft}${role ? ` · ${role.name}` : ""})`
               })
               .join(", ")}{" "}
-            — 관련 업무을 A등급으로 올리세요.
+            — {t("urgentGoalHint")}
           </span>
         </div>
       )}

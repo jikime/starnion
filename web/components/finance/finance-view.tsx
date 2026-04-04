@@ -520,7 +520,7 @@ export function FinanceView() {
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 11 }}
-                  tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`}
+                  tickFormatter={(v) => `${(v / 10000).toFixed(0)}${t("tickManSuffix")}`}
                   width={40}
                 />
                 <Tooltip

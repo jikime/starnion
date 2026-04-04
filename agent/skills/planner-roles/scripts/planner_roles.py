@@ -19,7 +19,7 @@ def cmd_search(args):
     for line in rows.split("\n"):
         p = line.split("|")
         if len(p) < 5: continue
-        print(f"  [{p[0].strip()}] 🎭 {p[1].strip()} — Big Rock: {p[3].strip()}")
+        print(f"  [{p[0].strip()}] 🎭 {p[1].strip()} — 핵심 목표: {p[3].strip()}")
 
 def cmd_add(args):
     name, color, br, mission = esc(args.name), args.color or "#3b6de0", esc(args.big_rock or ""), esc(args.mission or "")
@@ -35,7 +35,7 @@ def cmd_list(args):
         if len(p) < 5: continue
         rid, name, color, br, mission = [x.strip() for x in p]
         print(f"  [{rid}] {name}")
-        if br: print(f"      Big Rock: {br}")
+        if br: print(f"      핵심 목표: {br}")
         if mission: print(f"      미션: {mission}")
 
 def cmd_update(args):

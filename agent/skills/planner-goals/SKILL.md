@@ -16,7 +16,7 @@ triggers:
     - User asks about D-Day countdowns for goals
   not_for:
     - Daily tasks (use planner-tasks)
-    - Weekly big rocks (use planner-weekly)
+    - Weekly key goals (use planner-weekly)
 ---
 
 # Goal Management Skill

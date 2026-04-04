@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { usePlannerStore, type Priority } from "@/lib/planner-store"
 import { cn } from "@/lib/utils"
 import {
@@ -36,7 +37,7 @@ function BalanceBar({
 
 // ── Nion coaching tip ────────────────────────────────────────────────────────
 
-function NionCoachingTip({ unassigned }: { unassigned: string[] }) {
+function NionCoachingTip({ unassigned, t }: { unassigned: string[]; t: ReturnType<typeof useTranslations> }) {
   if (unassigned.length === 0) return null
   return (
     <div
@@ -49,8 +50,8 @@ function NionCoachingTip({ unassigned }: { unassigned: string[] }) {
     >
       <AlertCircle className="w-3 h-3 shrink-0 mt-px" />
       <span>
-        <strong>&apos;{unassigned[0]}&apos;</strong> 역할의 나침반이 멈춰있어요.
-        작은 돌 하나라도 놓아볼까요?
+        <strong>&apos;{unassigned[0]}&apos;</strong> {t("compassStopped")}
+        {" "}{t("compassHint")}
       </span>
     </div>
   )
@@ -67,6 +68,8 @@ function RoleCard({
   weekStart: string
   urgentGoalTitle?: string
 }) {
+  const t = useTranslations("planner.weeklyCompass")
+  const tTask = useTranslations("planner.task")
   const {
     roles,
     weeklyGoals,
@@ -141,7 +144,7 @@ function RoleCard({
           <button
             onClick={() => setAdding(!adding)}
             className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Big Rock 추가"
+            aria-label="Add key goal"
           >
             <Plus className="w-3 h-3" />
           </button>
@@ -156,11 +159,11 @@ function RoleCard({
         </p>
       )}
 
-      {/* Big Rocks list */}
+      {/* Key goals list */}
       <div className="space-y-1">
         {goals.length === 0 && !adding && (
           <p className="text-xs text-muted-foreground italic text-center py-1">
-            이번 주 Big Rock을 추가하세요
+            {/* TODO: i18n */}
           </p>
         )}
         {goals.map((g) => (
@@ -181,7 +184,7 @@ function RoleCard({
                   : "border-muted-foreground hover:border-foreground"
               )}
               style={g.done ? { background: role.color } : undefined}
-              aria-label={g.done ? "완료 취소" : "완료 표시"}
+              aria-label={g.done ? t("undone") : t("markDone")}
             >
               {g.done && <Check className="w-2 h-2 text-background" />}
             </button>
@@ -207,7 +210,7 @@ function RoleCard({
                     background: "var(--priority-a-bg)",
                     color: "var(--priority-a)",
                   }}
-                  title="A 업무으로 오늘 플래너에 추가"
+                  title={t("addAsATask")}
                 >
                   <Zap className="w-2 h-2" />
                   A
@@ -216,7 +219,7 @@ function RoleCard({
                 <button
                   onClick={() => deleteWeeklyGoal(g.id)}
                   className="text-muted-foreground hover:text-destructive transition-colors"
-                  aria-label="삭제"
+                  aria-label={tTask("delete")}
                 >
                   <Trash2 className="w-2.5 h-2.5" />
                 </button>
@@ -226,13 +229,13 @@ function RoleCard({
         ))}
       </div>
 
-      {/* Add Big Rock input */}
+      {/* Add key goal input */}
       {adding && (
         <div className="flex gap-1.5">
           <Input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="이번 주 핵심 목표..."
+            placeholder={t("addBigRockPlaceholder")}
             className="h-7 text-xs bg-muted border-border flex-1"
             onKeyDown={(e) => {
               if (e.key === "Enter") handleAdd()
@@ -246,7 +249,7 @@ function RoleCard({
             onClick={handleAdd}
             style={{ background: role.color, color: "#ffffff" }}
           >
-            추가
+            {t("add")}
           </Button>
         </div>
       )}
@@ -270,6 +273,7 @@ function RoleCard({
 // ── Main export ──────────────────────────────────────────────────────────────
 
 export function WeeklyCompass() {
+  const t = useTranslations("planner.weeklyCompass")
   const { roles, getWeekBalance, getUnassignedRoles, weeklyGoals } = usePlannerStore()
   const [open, setOpen] = useState(true)
 
@@ -291,13 +295,13 @@ export function WeeklyCompass() {
         <div className="flex items-center gap-1.5">
           <Compass className="w-3 h-3 text-muted-foreground" />
           <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-            주간 나침반
+            {t("weeklyCompassTitle")}
           </span>
         </div>
         <button
           onClick={() => setOpen(!open)}
           className="text-muted-foreground hover:text-foreground transition-colors"
-          aria-label={open ? "나침반 접기" : "나침반 펼치기"}
+          aria-label={open ? t("foldCompass") : t("unfoldCompass")}
         >
           {open ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
@@ -309,7 +313,7 @@ export function WeeklyCompass() {
           {totalWeekGoals > 0 && (
             <div className="space-y-1.5 mb-3">
               <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-                역할 균형
+                {t("roleBalance")}
               </p>
               {roles.map((role) => {
                 const count = weekBalance[role.id] ?? 0
@@ -342,7 +346,7 @@ export function WeeklyCompass() {
           )}
 
           {/* Nion coaching tip */}
-          <NionCoachingTip unassigned={unassignedRoles.map((r) => r.name)} />
+          <NionCoachingTip unassigned={unassignedRoles.map((r) => r.name)} t={t} />
 
           {/* Role cards */}
           <div className="space-y-2.5 pb-4">

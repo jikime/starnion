@@ -16,11 +16,12 @@ export interface Persona {
   isDefault: boolean
 }
 
-export const PLATFORM_META: Record<string, { icon: string; label: string }> = {
-  telegram: { icon: "📱", label: "텔레그램" },
-  discord:  { icon: "🎮", label: "디스코드" },
-  slack:    { icon: "💬", label: "슬랙" },
-  cli:      { icon: "💻", label: "CLI" },
+/** Translation key-based platform metadata. Resolve labels via t(`platform_${key}`) or t(tKey) at render time. */
+export const PLATFORM_META: Record<string, { icon: string; tKey: string }> = {
+  telegram: { icon: "📱", tKey: "platform_telegram" },
+  discord:  { icon: "🎮", tKey: "platform_discord" },
+  slack:    { icon: "💬", tKey: "platform_slack" },
+  cli:      { icon: "💻", tKey: "platform_cli" },
 }
 
 export interface ConversationGroup {
@@ -28,25 +29,37 @@ export interface ConversationGroup {
   items: Conversation[]
 }
 
-export function groupByDate(conversations: Conversation[]): ConversationGroup[] {
+/**
+ * Groups conversations by date. Labels use translation key tokens
+ * ("dateToday", "dateYesterday", "dateLast7Days") or "{year}/{month}" for older dates.
+ * Resolve the label at render time via t(label) for known keys, or display as-is for month labels.
+ */
+export function groupByDate(
+  conversations: Conversation[],
+  t?: (key: string, params?: Record<string, string | number>) => string,
+): ConversationGroup[] {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const yesterday = new Date(today.getTime() - 86400000)
   const sevenDaysAgo = new Date(today.getTime() - 7 * 86400000)
 
+  const todayLabel = t ? t("dateToday") : "Today"
+  const yesterdayLabel = t ? t("dateYesterday") : "Yesterday"
+  const last7Label = t ? t("dateLast7Days") : "Last 7 days"
+
   const groups: Record<string, Conversation[]> = {}
   for (const conv of conversations) {
     const d = new Date(conv.updated_at)
     let label: string
-    if (d >= today) label = "오늘"
-    else if (d >= yesterday) label = "어제"
-    else if (d >= sevenDaysAgo) label = "지난 7일"
-    else label = `${d.getFullYear()}년 ${d.getMonth() + 1}월`
+    if (d >= today) label = todayLabel
+    else if (d >= yesterday) label = yesterdayLabel
+    else if (d >= sevenDaysAgo) label = last7Label
+    else label = t ? t("dateMonthYear", { year: d.getFullYear(), month: d.getMonth() + 1 }) : `${d.getFullYear()}/${d.getMonth() + 1}`
     if (!groups[label]) groups[label] = []
     groups[label].push(conv)
   }
 
-  const order = ["오늘", "어제", "지난 7일"]
+  const order = [todayLabel, yesterdayLabel, last7Label]
   const result: ConversationGroup[] = []
   for (const label of order) {
     if (groups[label]) { result.push({ label, items: groups[label] }); delete groups[label] }

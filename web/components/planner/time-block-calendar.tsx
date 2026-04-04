@@ -47,7 +47,7 @@ export function TimeBlockCalendar() {
           {t("title")}
         </p>
         <p className="text-xs text-muted-foreground mt-0.5 opacity-70">
-          업무 메뉴 &rsaquo; 시간 배정으로 배치
+          {t("timeBlockHint1")}
         </p>
       </div>
 
@@ -179,7 +179,7 @@ export function TimeBlockCalendar() {
               <div className="text-center space-y-1">
                 <p className="text-xs text-muted-foreground">{t("empty")}</p>
                 <p className="text-xs text-muted-foreground opacity-60">
-                  업무 메뉴 &gt; 시간 배정
+                  {t("timeBlockHint2")}
                 </p>
               </div>
             </div>

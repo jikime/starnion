@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { useTranslations } from "next-intl"
 import { usePlannerStore } from "@/lib/planner-store"
 import { cn } from "@/lib/utils"
 import {
@@ -19,7 +20,7 @@ import {
 import { ko } from "date-fns/locale"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
-const DOW_LABELS = ["일", "월", "화", "수", "목", "금", "토"]
+const DOW_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const
 
 function getCalendarDays(year: number, month: number): Date[][] {
   const first = startOfMonth(new Date(year, month, 1))
@@ -100,6 +101,10 @@ export function MonthlyTab({
   onNavigateToWeekly,
   onNavigateToMonthly,
 }: MonthlyTabProps) {
+  const tDays = useTranslations("planner.monthlyDays")
+  const tNav = useTranslations("planner.monthNav")
+  const tMonthly = useTranslations("planner.monthly")
+  const tTab = useTranslations("planner.monthlyTab")
   const { tasks, roles, getDdayGoals, setSelectedDate } = usePlannerStore()
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
@@ -153,7 +158,7 @@ export function MonthlyTab({
           <button
             onClick={handlePrev}
             className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-            aria-label="이전 달"
+            aria-label={tNav("prevMonth")}
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -163,7 +168,7 @@ export function MonthlyTab({
           <button
             onClick={handleNext}
             className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-            aria-label="다음 달"
+            aria-label={tNav("nextMonth")}
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -175,7 +180,7 @@ export function MonthlyTab({
           }}
           className="text-xs px-3 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         >
-          오늘
+          {tMonthly("today")}
         </button>
       </div>
 
@@ -188,15 +193,15 @@ export function MonthlyTab({
             className="grid shrink-0 border-b border-border"
             style={{ gridTemplateColumns: "repeat(7, 1fr)" }}
           >
-            {DOW_LABELS.map((d, i) => (
+            {DOW_KEYS.map((key, i) => (
               <div
-                key={d}
+                key={key}
                 className={cn(
                   "py-2 text-center text-xs font-semibold tracking-wider",
                   i === 0 ? "text-destructive" : i === 6 ? "text-primary" : "text-muted-foreground"
                 )}
               >
-                {d}
+                {tDays(key)}
               </div>
             ))}
           </div>
@@ -263,7 +268,7 @@ export function MonthlyTab({
                                 background: "var(--muted)",
                                 color: "var(--muted-foreground)",
                               }}
-                              title="주간계획으로 이동"
+                              title={tMonthly("weekPlan")}
                             >
                               W
                             </button>
@@ -304,7 +309,7 @@ export function MonthlyTab({
                               })}
                               {dayTasks.length > 3 && (
                                 <span className="text-xs text-muted-foreground px-1 leading-tight">
-                                  +{dayTasks.length - 3}개
+                                  {tTab("moreItems", { count: dayTasks.length - 3 })}
                                 </span>
                               )}
                             </div>
@@ -348,11 +353,11 @@ export function MonthlyTab({
           {/* 주요 업무 (A 우선순위 미완료) */}
           <div className="flex flex-col">
             <div className="px-4 py-2 border-b border-border text-xs font-semibold text-muted-foreground tracking-wider text-center">
-              주요 업무 (A)
+              {tMonthly("mainTasks")}
             </div>
             <div className="p-3 flex-1 overflow-y-auto">
               {monthTasks.filter((t) => t.priority === "A" && t.status !== "done").length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">A 우선순위 미완료 업무 없음</p>
+                <p className="text-xs text-muted-foreground text-center py-4">{tMonthly("noATasks")}</p>
               ) : (
                 monthTasks
                   .filter((t) => t.priority === "A" && t.status !== "done")
@@ -374,11 +379,11 @@ export function MonthlyTab({
           {/* 월간 목표 (D-Day 역할별) */}
           <div className="flex flex-col">
             <div className="px-4 py-2 border-b border-border text-xs font-semibold text-muted-foreground tracking-wider text-center">
-              월간 목표
+              {tMonthly("monthlyGoals")}
             </div>
             <div className="p-3 flex-1 overflow-y-auto">
               {getDdayGoals().length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">등록된 목표 없음</p>
+                <p className="text-xs text-muted-foreground text-center py-4">{tMonthly("noGoals")}</p>
               ) : (
                 getDdayGoals().slice(0, 6).map((g) => {
                   const role = roles.find((r) => r.id === g.roleId)

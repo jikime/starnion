@@ -1,11 +1,14 @@
 "use client"
 
+import { useTranslations } from "next-intl"
 import { usePlannerStore } from "@/lib/planner-store"
 import { format, parse } from "date-fns"
 import { ko } from "date-fns/locale"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 export function MonthSidebar() {
+  const t = useTranslations("planner.monthNav")
+  const tSidebar = useTranslations("planner.monthSidebar")
   const { selectedDate, setSelectedDate } = usePlannerStore()
   
   const currentDate = parse(selectedDate, "yyyy-MM-dd", new Date())
@@ -42,7 +45,7 @@ export function MonthSidebar() {
           <button
             onClick={handlePrevMonth}
             className="p-0.5 hover:bg-accent rounded transition-colors"
-            aria-label="이전 달"
+            aria-label={t("prevMonth")}
           >
             <ChevronLeft className="w-2.5 h-2.5" />
           </button>
@@ -50,7 +53,7 @@ export function MonthSidebar() {
           <button
             onClick={handleNextMonth}
             className="p-0.5 hover:bg-accent rounded transition-colors"
-            aria-label="다음 달"
+            aria-label={t("nextMonth")}
           >
             <ChevronRight className="w-2.5 h-2.5" />
           </button>
@@ -70,7 +73,7 @@ export function MonthSidebar() {
               borderRadius: "4px",
             }}
             aria-pressed={idx === currentMonth}
-            aria-label={`${month} 선택`}
+            aria-label={tSidebar("selectMonth", { month })}
           >
             {month}
           </button>

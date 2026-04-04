@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { usePlannerStore, type Priority } from "@/lib/planner-store"
 import { Inbox, Plus, Trash2, ArrowRight } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -16,6 +17,8 @@ const PRIORITY_COLORS: Record<Priority, string> = {
 }
 
 export function InboxTab() {
+  const t = useTranslations("planner.inbox")
+  const tTask = useTranslations("planner.task")
   const { inboxTasks, roles, addInboxTask, deleteInboxTask, moveInboxToTasks, selectedDate } = usePlannerStore()
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState("")
@@ -38,7 +41,7 @@ export function InboxTab() {
       <div className="flex items-center justify-between px-6 py-3 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <Inbox className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm font-semibold text-foreground">인박스</span>
+          <span className="text-sm font-semibold text-foreground">{t("title")}</span>
           {inboxTasks.length > 0 && (
             <span
               className="text-xs font-bold px-1.5 py-0.5 rounded-full"
@@ -51,7 +54,7 @@ export function InboxTab() {
         <button
           onClick={() => setAdding(!adding)}
           className="text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="인박스 추가"
+          aria-label={t("title")}
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -63,7 +66,7 @@ export function InboxTab() {
             autoFocus
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="빠르게 캡처..."
+            placeholder={t("capturePlaceholder")}
             className="h-8 text-xs bg-muted border-border"
             onKeyDown={(e) => {
               if (e.key === "Enter") handleAdd()
@@ -73,7 +76,7 @@ export function InboxTab() {
           <div className="flex gap-2">
             <Select value={newRoleId} onValueChange={setNewRoleId}>
               <SelectTrigger className="h-6 text-xs bg-muted border-border flex-1">
-                <SelectValue placeholder="역할" />
+                <SelectValue placeholder={tTask("role")} />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
                 {roles.map((r) => (
@@ -91,7 +94,7 @@ export function InboxTab() {
               className="h-6 px-3 rounded text-xs font-medium"
               style={{ background: "var(--priority-a)", color: "#ffffff" }}
             >
-              추가
+              {tTask("add")}
             </button>
           </div>
         </div>
@@ -101,8 +104,8 @@ export function InboxTab() {
         {inboxTasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2 text-muted-foreground">
             <Inbox className="w-8 h-8 opacity-30" />
-            <p className="text-sm">인박스가 비어 있습니다</p>
-            <p className="text-xs opacity-60">빠른 아이디어나 요청사항을 여기에 캡처하세요</p>
+            <p className="text-sm">{t("empty")}</p>
+            <p className="text-xs opacity-60">{t("emptyHint")}</p>
           </div>
         ) : (
           inboxTasks.map((task) => {
@@ -126,7 +129,7 @@ export function InboxTab() {
                   <button
                     onClick={() => deleteInboxTask(task.id)}
                     className="opacity-0 group-hover:opacity-60 hover:opacity-100 text-muted-foreground transition-opacity shrink-0"
-                    aria-label="삭제"
+                    aria-label={tTask("delete")}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -152,7 +155,7 @@ export function InboxTab() {
                     className="flex items-center gap-1 h-6 px-2.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors border border-border"
                   >
                     <ArrowRight className="w-3 h-3" />
-                    업무으로
+                    {t("promoteToTask")}
                   </button>
                 </div>
               </div>

@@ -101,24 +101,14 @@ const LEVEL_COLORS: Record<string, string> = {
   maintenance: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
 }
 
-// #5 레벨 설명 (Tooltip용)
-const LEVEL_DESCRIPTIONS: Record<string, string> = {
-  rule:        "사전 정의된 규칙에 따라 고정 주기로 실행됩니다.",
-  pattern:     "데이터 패턴을 분석해 주기적으로 실행됩니다.",
-  autonomous:  "AI가 상황에 따라 자율적으로 판단해 실행됩니다.",
-  runner:      "작업을 순차적으로 처리하는 실행 담당 잡입니다.",
-  maintenance: "시스템 유지 관리를 위한 백그라운드 잡입니다.",
+// #5 Level description keys (Tooltip)
+const LEVEL_DESC_KEYS: Record<string, string> = {
+  rule:        "levelDesc.rule",
+  pattern:     "levelDesc.pattern",
+  autonomous:  "levelDesc.autonomous",
+  runner:      "levelDesc.runner",
+  maintenance: "levelDesc.maintenance",
 }
-
-// #3 시간 선택 옵션 생성
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => ({
-  value: String(i),
-  label: String(i).padStart(2, "0") + "시",
-}))
-const MINUTE_OPTIONS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => ({
-  value: String(m),
-  label: String(m).padStart(2, "0") + "분",
-}))
 
 const emptyCronForm = () => ({
   title: "", type: "recurring", report_type: "custom_reminder",
@@ -129,6 +119,16 @@ const emptyCronForm = () => ({
 
 export default function CronPage() {
   const t = useTranslations("cron")
+
+  const HOUR_OPTIONS = useMemo(() => Array.from({ length: 24 }, (_, i) => ({
+    value: String(i),
+    label: String(i).padStart(2, "0") + t("hourSuffix"),
+  })), [t])
+
+  const MINUTE_OPTIONS = useMemo(() => [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => ({
+    value: String(m),
+    label: String(m).padStart(2, "0") + t("minuteSuffix"),
+  })), [t])
 
   const REPORT_TYPES = useMemo(() => [
     { value: "custom_reminder", label: t("reportTypes.custom_reminder") },
@@ -190,7 +190,7 @@ export default function CronPage() {
           </span>
         </TooltipTrigger>
         <TooltipContent side="top">
-          일회성 알림이 이미 발송되어 완료된 상태입니다. 수정하려면 새로 만드세요.
+          {t("completedTooltip")}
         </TooltipContent>
       </Tooltip>
     )
@@ -276,21 +276,21 @@ export default function CronPage() {
         const res = await fetch(`/api/cron/schedules/${cronEditTarget.id}`, {
           method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
         })
-        if (!res.ok) throw new Error("수정 실패")
-        toast.success("알림 일정이 수정되었습니다.")
+        if (!res.ok) throw new Error("update failed")
+        toast.success(t("toast.updateSuccess"))
       } else {
         const res = await fetch("/api/cron/schedules", {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
         })
-        if (!res.ok) throw new Error("저장 실패")
-        toast.success("알림 일정이 추가되었습니다.")
+        if (!res.ok) throw new Error("save failed")
+        toast.success(t("toast.createSuccess"))
       }
       setCronDialogOpen(false)
       setCronEditTarget(null)
       setCronForm(emptyCronForm())
       fetchSchedules()
     } catch {
-      toast.error(cronEditTarget ? "일정 수정에 실패했습니다." : "일정 저장에 실패했습니다.")
+      toast.error(cronEditTarget ? t("toast.updateFailed") : t("toast.createFailed"))
     } finally {
       setCronSaving(false)
     }
@@ -304,9 +304,9 @@ export default function CronPage() {
       if (!res.ok) throw new Error()
       const { status } = await res.json()
       setSchedules((prev) => prev.map((s) => s.id === id ? { ...s, status } : s))
-      toast.success(status === "active" ? "알림을 활성화했습니다." : "알림을 일시정지했습니다.")
+      toast.success(status === "active" ? t("toast.toggleActive") : t("toast.togglePaused"))
     } catch {
-      toast.error("상태 변경에 실패했습니다.")
+      toast.error(t("toast.toggleFailed"))
     } finally {
       setTogglingId(null)
     }
@@ -320,9 +320,9 @@ export default function CronPage() {
       if (!res.ok) throw new Error()
       const { enabled } = await res.json()
       setSystemJobs((prev) => prev.map((j) => j.id === id ? { ...j, enabled } : j))
-      toast.success(enabled ? "시스템 잡을 활성화했습니다." : "시스템 잡을 비활성화했습니다.")
+      toast.success(enabled ? t("toast.systemToggleActive") : t("toast.systemToggleInactive"))
     } catch {
-      toast.error("시스템 잡 상태 변경에 실패했습니다.")
+      toast.error(t("toast.systemToggleFailed"))
     } finally {
       setTogglingSystemId(null)
     }
@@ -336,9 +336,9 @@ export default function CronPage() {
       const res = await fetch(`/api/cron/schedules/${deleteTarget.id}`, { method: "DELETE" })
       if (!res.ok) throw new Error()
       setSchedules((prev) => prev.filter((s) => s.id !== deleteTarget.id))
-      toast.success(`"${deleteTarget.title}" 알림이 삭제되었습니다.`)
+      toast.success(t("toast.deleteSuccess", { title: deleteTarget.title }))
     } catch {
-      toast.error("알림 삭제에 실패했습니다.")
+      toast.error(t("toast.deleteFailed"))
     } finally {
       setCronDeletingId(null)
       setDeleteTarget(null)
@@ -445,7 +445,7 @@ export default function CronPage() {
                               <BanIcon className="size-4 text-muted-foreground shrink-0 cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent side="top">
-                              완료된 일정은 수정할 수 없습니다.
+                              {t("completedLocked")}
                             </TooltipContent>
                           </Tooltip>
                         )}
@@ -514,7 +514,7 @@ export default function CronPage() {
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent side="top">
-                                {LEVEL_DESCRIPTIONS[job.level] ?? "시스템 잡입니다."}
+                                {t(LEVEL_DESC_KEYS[job.level] ?? "levelDesc.defaultDesc")}
                               </TooltipContent>
                             </Tooltip>
                           </div>
@@ -542,7 +542,7 @@ export default function CronPage() {
                               </span>
                             </TooltipTrigger>
                             <TooltipContent side="top">
-                              이 잡은 시스템 필수 프로세스로 비활성화할 수 없습니다.
+                              {t("systemRequired")}
                             </TooltipContent>
                           </Tooltip>
                         )}

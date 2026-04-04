@@ -141,7 +141,8 @@ export function ChatSidebar({
             )}
 
             {!convLoading && Object.entries(platformGroups).map(([platform, items]) => {
-              const meta = PLATFORM_META[platform] ?? { icon: "🔗", label: platform }
+              const rawMeta = PLATFORM_META[platform] ?? { icon: "🔗", tKey: "" }
+              const meta = { icon: rawMeta.icon, label: rawMeta.tKey ? t(rawMeta.tKey) : platform }
               return (
                 <div key={platform}>
                   <div className="mb-2 px-2 flex items-center gap-1.5">

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useTranslations } from "next-intl"
+import { useTranslations, useLocale } from "next-intl"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -109,7 +109,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   공과금: "#64748b", 기타: "#6b7280",
 }
 const categoryColor = (cat: string) => CATEGORY_COLORS[cat] ?? "#6b7280"
-const formatAmount = (amount: number) => `${Math.abs(amount).toLocaleString()}원`
 
 function makeMarkerIcon(color: string, size: number, selected: boolean): naver.maps.MarkerIcon {
   const half = size / 2
@@ -133,6 +132,9 @@ type IntegrationStatus = "loading" | "not_configured" | "ready"
 export default function FinanceMapClient() {
   const t = useTranslations("nav")
   const tm = useTranslations("finance.map")
+  const locale = useLocale()
+  const amountSuffix = tm("amountSuffix")
+  const formatAmount = (amount: number) => `${Math.abs(amount).toLocaleString()}${amountSuffix}`
   const now = new Date()
   const [year, setYear]   = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -223,7 +225,7 @@ export default function FinanceMapClient() {
       content: `<div style="padding:8px 12px;min-width:140px;font-size:13px;line-height:1.6;
         background:hsl(var(--background));color:hsl(var(--foreground));border-radius:4px">
         <strong>${tx.location.name ?? tx.category}</strong><br>
-        <span style="color:hsl(var(--muted-foreground))">${tx.category} · ${new Date(tx.created_at).toLocaleDateString("ko-KR")}</span><br>
+        <span style="color:hsl(var(--muted-foreground))">${tx.category} · ${new Date(tx.created_at).toLocaleDateString(locale)}</span><br>
         <span style="color:${tx.amount < 0 ? "#ef4444" : "#10b981"};font-weight:700">
           ${tx.amount < 0 ? "-" : "+"}${formatAmount(tx.amount)}
         </span>
@@ -547,7 +549,7 @@ export default function FinanceMapClient() {
                 <div className="size-8 rounded-full shrink-0 mt-0.5" style={{ background: categoryColor(selected.category) }} />
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm truncate">{selected.location.name ?? selected.category}</p>
-                  <p className="text-xs text-muted-foreground">{selected.category} · {new Date(selected.created_at).toLocaleDateString("ko-KR")}</p>
+                  <p className="text-xs text-muted-foreground">{selected.category} · {new Date(selected.created_at).toLocaleDateString(locale)}</p>
                   {selected.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{selected.description}</p>}
                   <p className={cn("font-bold mt-1", selected.amount < 0 ? "text-rose-500" : "text-emerald-500")}>
                     {selected.amount < 0 ? "-" : "+"}{formatAmount(selected.amount)}
@@ -640,7 +642,7 @@ export default function FinanceMapClient() {
                   </div>
                   <div className="flex items-center gap-1 ml-4 mt-0.5">
                     <p className="text-xs text-muted-foreground">
-                      {tx.category} · {new Date(tx.created_at).toLocaleDateString("ko-KR")}
+                      {tx.category} · {new Date(tx.created_at).toLocaleDateString(locale)}
                     </p>
                     {!tx.location.lat && (
                       <span className="text-xs text-muted-foreground/60 border border-muted-foreground/30 rounded px-1">{tm("noCoords")}</span>
@@ -750,7 +752,7 @@ export default function FinanceMapClient() {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground ml-5 mt-0.5">
-                      {tx.category} · {new Date(tx.created_at).toLocaleDateString("ko-KR")}
+                      {tx.category} · {new Date(tx.created_at).toLocaleDateString(locale)}
                       {!tx.location.lat && ` · ${tm("noLocation")}`}
                     </p>
                   </button>

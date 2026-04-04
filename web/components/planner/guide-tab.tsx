@@ -15,6 +15,7 @@ const ROLE_COLORS = [
 ]
 
 export function GuideTab() {
+  const t = useTranslations("planner")
   const {
     missionStatement, setMissionStatement,
     roles, addRole, updateRole, deleteRole,
@@ -55,8 +56,8 @@ export function GuideTab() {
       {/* Mission column */}
       <div className="sm:w-80 shrink-0 border-b sm:border-b-0 sm:border-r border-border flex flex-col overflow-hidden">
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border bg-card/40 shrink-0">
-          <h2 className="text-lg font-bold text-foreground">사명문</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">나는 어떤 사람이 되고 싶은가</p>
+          <h2 className="text-lg font-bold text-foreground">{t("guide.missionTitle")}</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">{t("guide.missionSubtitle")}</p>
         </div>
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 sm:py-4">
           {editingMission ? (
@@ -67,7 +68,7 @@ export function GuideTab() {
                 onChange={(e) => setMissionDraft(e.target.value)}
                 rows={8}
                 className="text-sm bg-muted border-border resize-none"
-                placeholder="나의 사명문을 작성하세요..."
+                placeholder={t("guide.missionPlaceholder")}
               />
               <div className="flex gap-2">
                 <Button
@@ -76,14 +77,14 @@ export function GuideTab() {
                   style={{ background: "var(--priority-a)", color: "#ffffff" }}
                   className="text-xs"
                 >
-                  저장
+                  {t("guide.save")}
                 </Button>
                 <Button
                   size="sm" variant="ghost"
                   onClick={() => { setMissionDraft(missionStatement); setEditingMission(false) }}
                   className="text-xs text-muted-foreground"
                 >
-                  취소
+                  {t("guide.cancel")}
                 </Button>
               </div>
             </div>
@@ -93,14 +94,14 @@ export function GuideTab() {
                 className="border-l-2 pl-4 py-1 text-sm leading-relaxed text-foreground italic"
                 style={{ borderColor: "var(--primary)" }}
               >
-                {missionStatement || "아직 사명문이 없습니다. 버튼을 눌러 작성해보세요."}
+                {missionStatement || t("guide.missionEmpty")}
               </blockquote>
               <button
                 onClick={() => { setMissionDraft(missionStatement); setEditingMission(true) }}
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Pencil className="w-3 h-3" />
-                사명문 편집
+                {t("guide.editMission")}
               </button>
             </div>
           )}
@@ -111,8 +112,8 @@ export function GuideTab() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-border bg-card/40 shrink-0">
           <div>
-            <h2 className="text-lg font-bold text-foreground">역할</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">삶의 중요한 역할들을 정의하세요</p>
+            <h2 className="text-lg font-bold text-foreground">{t("guide.rolesTitle")}</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">{t("guide.rolesSubtitle")}</p>
           </div>
           <button
             onClick={() => setAddingRole(!addingRole)}
@@ -120,7 +121,7 @@ export function GuideTab() {
             style={{ background: "var(--priority-a)", color: "#ffffff" }}
           >
             <Plus className="w-3.5 h-3.5" />
-            역할 추가
+            {t("guide.addRole")}
           </button>
         </div>
 
@@ -128,13 +129,13 @@ export function GuideTab() {
           {/* Add form */}
           {addingRole && (
             <div className="rounded-xl border border-border p-4 space-y-3 bg-card">
-              <p className="text-xs font-semibold text-foreground">새 역할</p>
+              <p className="text-xs font-semibold text-foreground">{t("guide.newRole")}</p>
               <div className="flex gap-2">
                 <Input
                   autoFocus
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  placeholder="역할 이름 (예: Mentor)"
+                  placeholder={t("guide.roleNamePlaceholder")}
                   className="h-8 text-sm bg-muted border-border flex-1"
                   onKeyDown={(e) => e.key === "Enter" && handleAddRole()}
                 />
@@ -155,12 +156,12 @@ export function GuideTab() {
               <Input
                 value={newMission}
                 onChange={(e) => setNewMission(e.target.value)}
-                placeholder="이 역할로서의 사명 (선택)"
+                placeholder={t("guide.roleMissionPlaceholder")}
                 className="h-8 text-sm bg-muted border-border"
               />
               <div className="flex gap-2">
-                <Button size="sm" onClick={handleAddRole} style={{ background: "var(--priority-a)", color: "#ffffff" }} className="text-xs">추가</Button>
-                <Button size="sm" variant="ghost" onClick={() => setAddingRole(false)} className="text-xs text-muted-foreground">취소</Button>
+                <Button size="sm" onClick={handleAddRole} style={{ background: "var(--priority-a)", color: "#ffffff" }} className="text-xs">{t("guide.add")}</Button>
+                <Button size="sm" variant="ghost" onClick={() => setAddingRole(false)} className="text-xs text-muted-foreground">{t("guide.cancel")}</Button>
               </div>
             </div>
           )}
@@ -183,12 +184,12 @@ export function GuideTab() {
                   <Input
                     value={roleDraft.mission}
                     onChange={(e) => setRoleDraft((d) => ({ ...d, mission: e.target.value }))}
-                    placeholder="역할 사명"
+                    placeholder={t("guide.editRoleMissionPlaceholder")}
                     className="h-7 text-sm bg-muted border-border"
                   />
                   <div className="flex gap-1.5">
-                    <Button size="sm" onClick={() => saveEditRole(role.id)} className="h-6 text-xs px-2" style={{ background: "var(--priority-a)", color: "#ffffff" }}>저장</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEditingRoleId(null)} className="h-6 text-xs px-2 text-muted-foreground">취소</Button>
+                    <Button size="sm" onClick={() => saveEditRole(role.id)} className="h-6 text-xs px-2" style={{ background: "var(--priority-a)", color: "#ffffff" }}>{t("guide.save")}</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditingRoleId(null)} className="h-6 text-xs px-2 text-muted-foreground">{t("guide.cancel")}</Button>
                   </div>
                 </div>
               ) : (
@@ -202,14 +203,14 @@ export function GuideTab() {
                       <button
                         onClick={() => startEditRole(role.id, role.name, role.mission)}
                         className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors"
-                        aria-label="편집"
+                        aria-label={t("guide.editLabel")}
                       >
                         <Pencil className="w-3 h-3" />
                       </button>
                       <button
                         onClick={() => deleteRole?.(role.id)}
                         className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors"
-                        aria-label="삭제"
+                        aria-label={t("guide.deleteLabel")}
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>

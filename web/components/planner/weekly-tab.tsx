@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useMemo, memo } from "react"
+import { useTranslations } from "next-intl"
 import { usePlannerStore, type Priority, type Task } from "@/lib/planner-store"
 import { WeeklyCompass } from "./weekly-compass"
 import { cn } from "@/lib/utils"
@@ -13,12 +14,12 @@ import { ChevronLeft, ChevronRight, Plus, Check, ArrowRight, X, Circle } from "l
 const STATUS_CYCLE = ["pending", "in-progress", "done", "forwarded", "cancelled"] as const
 type CycleStatus = typeof STATUS_CYCLE[number]
 
-const STATUS_SYMBOLS: Record<CycleStatus, { char: string; color: string; label: string }> = {
-  pending:    { char: "○", color: "var(--muted-foreground)", label: "대기" },
-  "in-progress": { char: "●", color: "var(--status-in-progress)", label: "진행" },
-  done:       { char: "✓", color: "var(--status-done)", label: "완료" },
-  forwarded:  { char: "→", color: "var(--status-forwarded)", label: "이월" },
-  cancelled:  { char: "✕", color: "var(--status-cancelled)", label: "취소" },
+const STATUS_SYMBOLS: Record<CycleStatus, { char: string; color: string; labelKey: string }> = {
+  pending:    { char: "○", color: "var(--muted-foreground)", labelKey: "pending" },
+  "in-progress": { char: "●", color: "var(--status-in-progress)", labelKey: "inProgress" },
+  done:       { char: "✓", color: "var(--status-done)", labelKey: "done" },
+  forwarded:  { char: "→", color: "var(--status-forwarded)", labelKey: "forwarded" },
+  cancelled:  { char: "✕", color: "var(--status-cancelled)", labelKey: "cancelled" },
 }
 
 const PRIORITY_COLOR: Record<Priority, string> = {
@@ -42,6 +43,8 @@ const DayColumn = memo(function DayColumn({
   label?: string
   extraDateStr?: string
 }) {
+  const tLegend = useTranslations("planner.weeklyLegend")
+  const tWeekly = useTranslations("planner.weeklyTab")
   const { tasks, addTask, updateTask, roles, selectedDate, setSelectedDate } = usePlannerStore()
   const [addingPriority, setAddingPriority] = useState<Priority | null>(null)
   const [newTitle, setNewTitle] = useState("")
@@ -119,7 +122,7 @@ const DayColumn = memo(function DayColumn({
               className="text-xs font-bold px-1 rounded"
               style={{ background: "var(--priority-a)", color: "#ffffff" }}
             >
-              오늘
+              {tWeekly("today")}
             </span>
           )}
         </div>
@@ -141,7 +144,7 @@ const DayColumn = memo(function DayColumn({
             <tr className="border-b border-border/50">
               <th className="w-5 py-1 text-center text-[8px] text-muted-foreground font-normal border-r border-border/30">○</th>
               <th className="w-5 py-1 text-center text-[8px] text-muted-foreground font-normal border-r border-border/30">ABC</th>
-              <th className="py-1 px-1.5 text-left text-[8px] text-muted-foreground font-normal">업무</th>
+              <th className="py-1 px-1.5 text-left text-[8px] text-muted-foreground font-normal">{tWeekly("task")}</th>
             </tr>
           </thead>
           <tbody>
@@ -160,7 +163,7 @@ const DayColumn = memo(function DayColumn({
                       onClick={() => cycleStatus(task)}
                       className="w-full h-full flex items-center justify-center text-xs font-mono"
                       style={{ color: sym.color }}
-                      title={sym.label}
+                      title={tLegend(sym.labelKey)}
                     >
                       {sym.char}
                     </button>
@@ -203,7 +206,7 @@ const DayColumn = memo(function DayColumn({
                       if (e.key === "Escape") { setAddingPriority(null); setNewTitle("") }
                     }}
                     onBlur={() => handleAddTask(addingPriority)}
-                    placeholder="업무 입력 후 Enter"
+                    placeholder={tWeekly("quickAddPlaceholder")}
                     className="w-full bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/60"
                   />
                 </td>
@@ -221,7 +224,7 @@ const DayColumn = memo(function DayColumn({
             onClick={() => { setAddingPriority(p); setNewTitle("") }}
             className="flex-1 py-1 text-xs font-bold hover:bg-accent/50 transition-colors text-center"
             style={{ color: PRIORITY_COLOR[p] }}
-            title={`${p} 업무 추가`}
+            title={tWeekly("addTaskTitle", { p })}
           >
             +{p}
           </button>
@@ -242,6 +245,7 @@ function WeekHeader({
   onPrev: () => void
   onNext: () => void
 }) {
+  const t = useTranslations("planner.weeklyTab")
   const start = parseISO(weekStart)
   const end = addDays(start, 6)
   const label = `${format(start, "yyyy.M.d", { locale: ko })} ~ ${format(end, "M.d", { locale: ko })}`
@@ -251,23 +255,23 @@ function WeekHeader({
     <div className="flex items-center justify-between px-6 py-3 border-b border-border shrink-0 bg-card/40">
       <div>
         <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
-          {format(start, "yyyy년 M월", { locale: ko })}
+          {format(start, "yyyy.M", { locale: ko })}
         </p>
-        <h2 className="text-lg font-bold text-foreground leading-tight">주간계획</h2>
+        <h2 className="text-lg font-bold text-foreground leading-tight">{t("weeklyPlan")}</h2>
         <p className="text-xs text-muted-foreground">{label}</p>
       </div>
       <div className="flex items-center gap-2">
         <button
           onClick={onPrev}
           className="w-7 h-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-          aria-label="이전 주"
+          aria-label={t("prevWeek")}
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
         <button
           onClick={onNext}
           className="w-7 h-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-          aria-label="다음 주"
+          aria-label={t("nextWeek")}
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -279,6 +283,7 @@ function WeekHeader({
 // ── WeeklyTab ──────────────────────────────────────────────────────────────
 
 export function WeeklyTab({ onNavigateToDaily }: { onNavigateToDaily: () => void }) {
+  const t = useTranslations("planner.weeklyTab")
   const { selectedDate, setSelectedDate } = usePlannerStore()
 
   // Derive week start from selectedDate
@@ -362,8 +367,8 @@ export function WeeklyTab({ onNavigateToDaily }: { onNavigateToDaily: () => void
           style={{ background: "var(--sidebar)" }}
         >
           <div className="px-4 pt-4 pb-2">
-            <h3 className="text-lg font-bold text-foreground">위클리콤파스</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">역할별 이번 주 목표</p>
+            <h3 className="text-lg font-bold text-foreground">{t("weeklyCompassTitle")}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">{t("weeklyCompassSubtitle")}</p>
           </div>
           <WeeklyCompass />
         </div>

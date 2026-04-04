@@ -35,7 +35,7 @@ triggers:
     - User says "오늘 업무 뭐 있어" or "보고서 완료 처리해줘"
   not_for:
     - Long-term goals with due dates (use planner-goals)
-    - Weekly big rocks (use planner-weekly)
+    - Weekly key goals (use planner-weekly)
     - Inbox/temporary items (use planner-inbox)
 ---
 

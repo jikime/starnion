@@ -17,6 +17,7 @@ const PRIORITY_COLORS: Record<Priority, string> = {
 }
 
 export function IntelligencePanel() {
+  const t = useTranslations("planner")
   const {
     selectedDate, tasks, inboxTasks, roles,
     addInboxTask, deleteInboxTask, moveInboxToTasks,
@@ -51,7 +52,7 @@ export function IntelligencePanel() {
         {/* Score */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-foreground">오늘 완료율</span>
+            <span className="text-xs font-semibold text-foreground">{t("score.todayRate")}</span>
             <span
               className="text-sm font-bold tabular-nums"
               style={{
@@ -72,10 +73,10 @@ export function IntelligencePanel() {
           </div>
           <div className="flex gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
-              <Check className="w-3 h-3 text-green-500" />완료 {doneTasks.length}개
+              <Check className="w-3 h-3 text-green-500" />{t("score.done", { count: doneTasks.length })}
             </span>
             <span className="flex items-center gap-1">
-              <AlertCircle className="w-3 h-3 text-amber-500" />미완 {pendingTasks.length}개
+              <AlertCircle className="w-3 h-3 text-amber-500" />{t("score.pending", { count: pendingTasks.length })}
             </span>
           </div>
         </div>
@@ -83,7 +84,7 @@ export function IntelligencePanel() {
         {/* Pending tasks — forward to inbox */}
         {pendingTasks.length > 0 && (
           <div className="space-y-1.5">
-            <p className="text-xs font-semibold text-foreground">미완료 업무 이월</p>
+            <p className="text-xs font-semibold text-foreground">{t("inbox.pendingForward")}</p>
             <div className="space-y-1">
               {pendingTasks.map((task) => {
                 const role = roles.find((r) => r.id === task.roleId)
@@ -94,7 +95,7 @@ export function IntelligencePanel() {
                     {role && <span className="text-xs text-muted-foreground shrink-0">{role.name}</span>}
                     <button
                       className="text-muted-foreground hover:text-primary transition-colors shrink-0"
-                      title="임시보관으로 이월"
+                      title={t("inbox.forwardToInbox")}
                       onClick={() => addInboxTask(task.title, task.roleId)}
                     >
                       <Forward className="w-3.5 h-3.5" />
@@ -111,7 +112,7 @@ export function IntelligencePanel() {
       <div className="flex items-center justify-between px-4 py-2 shrink-0">
         <div className="flex items-center gap-1.5">
           <Inbox className="w-3.5 h-3.5 text-muted-foreground" />
-          <p className="text-xs font-semibold text-foreground">임시보관</p>
+          <p className="text-xs font-semibold text-foreground">{t("inbox.title")}</p>
           {inboxTasks.length > 0 && (
             <span className="text-xs text-muted-foreground">({inboxTasks.length})</span>
           )}
@@ -119,7 +120,7 @@ export function IntelligencePanel() {
         <button
           onClick={() => setAdding(!adding)}
           className="text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="추가"
+          aria-label={t("inbox.addLabel")}
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -132,7 +133,7 @@ export function IntelligencePanel() {
             autoFocus
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="빠르게 캡처..."
+            placeholder={t("inbox.capturePlaceholder")}
             className="h-8 text-xs"
             onKeyDown={(e) => {
               if (e.key === "Enter") handleAddInbox()
@@ -142,7 +143,7 @@ export function IntelligencePanel() {
           <div className="flex gap-2">
             <Select value={newRoleId} onValueChange={setNewRoleId}>
               <SelectTrigger className="h-6 text-xs flex-1">
-                <SelectValue placeholder="역할" />
+                <SelectValue placeholder={t("inbox.rolePlaceholder")} />
               </SelectTrigger>
               <SelectContent>
                 {roles.map((r) => (
@@ -160,7 +161,7 @@ export function IntelligencePanel() {
               className="h-6 px-3 rounded text-xs font-medium"
               style={{ background: "var(--priority-a)", color: "#ffffff" }}
             >
-              추가
+              {t("inbox.add")}
             </button>
           </div>
         </div>
@@ -171,8 +172,8 @@ export function IntelligencePanel() {
         {inboxTasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
             <Inbox className="w-7 h-7 opacity-30" />
-            <p className="text-xs">임시보관함이 비어 있습니다</p>
-            <p className="text-xs opacity-60">아이디어나 요청사항을 여기에 캡처하세요</p>
+            <p className="text-xs">{t("inbox.empty")}</p>
+            <p className="text-xs opacity-60">{t("inbox.emptyHint")}</p>
           </div>
         ) : (
           inboxTasks.map((task) => {
@@ -193,7 +194,7 @@ export function IntelligencePanel() {
                   <button
                     onClick={() => deleteInboxTask(task.id)}
                     className="opacity-0 group-hover:opacity-50 hover:opacity-100 text-muted-foreground transition-opacity"
-                    aria-label="삭제"
+                    aria-label={t("inbox.deleteLabel")}
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -219,7 +220,7 @@ export function IntelligencePanel() {
                     className="flex items-center gap-1 h-6 px-2 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-accent border border-border transition-colors"
                   >
                     <ArrowRight className="w-3 h-3" />
-                    업무로
+                    {t("inbox.promoteToTask")}
                   </button>
                 </div>
               </div>

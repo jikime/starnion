@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
+import { useTranslations } from "next-intl"
 import WaveSurfer from "wavesurfer.js"
 import RecordPlugin from "wavesurfer.js/dist/plugins/record"
 import { Square, Play, Pause, Trash2, Check, FileText, Loader2 } from "lucide-react"
@@ -33,6 +34,7 @@ interface AudioRecorderProps {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function AudioRecorder({ onAttach, onCancel, onTranscribe, isTranscribing = false }: AudioRecorderProps) {
+  const t = useTranslations("chat")
   // Separate DOM nodes for recording and playback — never shared.
   const recordContainerRef = useRef<HTMLDivElement>(null)
   const playContainerRef   = useRef<HTMLDivElement>(null)
@@ -118,8 +120,8 @@ export function AudioRecorder({ onAttach, onCancel, onTranscribe, isTranscribing
       const msg = err instanceof Error ? err.message : String(err)
       setErrorMsg(
         msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("denied")
-          ? "마이크 권한이 필요합니다"
-          : "녹음을 시작할 수 없습니다"
+          ? t("audioMicPermission")
+          : t("audioRecordError")
       )
       setState("error")
     })
@@ -173,7 +175,7 @@ export function AudioRecorder({ onAttach, onCancel, onTranscribe, isTranscribing
       <div className="flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
         <span className="flex-1">{errorMsg}</span>
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} className="h-6 px-2 text-xs">
-          닫기
+          {t("audioClose")}
         </Button>
       </div>
     )
@@ -227,7 +229,7 @@ export function AudioRecorder({ onAttach, onCancel, onTranscribe, isTranscribing
           onClick={stopRecording}
         >
           <Square className="size-3 fill-current" />
-          <span className="sr-only">녹음 중지</span>
+          <span className="sr-only">{t("audioStopRecording")}</span>
         </Button>
       )}
 
@@ -242,7 +244,7 @@ export function AudioRecorder({ onAttach, onCancel, onTranscribe, isTranscribing
             onClick={togglePlay}
           >
             {isPlaying ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
-            <span className="sr-only">{isPlaying ? "일시정지" : "재생"}</span>
+            <span className="sr-only">{isPlaying ? t("audioPause") : t("audioPlay")}</span>
           </Button>
 
           <Button
@@ -254,7 +256,7 @@ export function AudioRecorder({ onAttach, onCancel, onTranscribe, isTranscribing
             onClick={onCancel}
           >
             <Trash2 className="size-3.5" />
-            <span className="sr-only">삭제</span>
+            <span className="sr-only">{t("audioDelete")}</span>
           </Button>
 
           {onTranscribe && (
@@ -263,14 +265,14 @@ export function AudioRecorder({ onAttach, onCancel, onTranscribe, isTranscribing
               size="icon"
               variant="ghost"
               disabled={isTranscribing}
-              title="텍스트로 변환"
+              title={t("audioTranscribe")}
               className="size-7 shrink-0 rounded-full text-primary hover:text-primary"
               onClick={() => blobRef.current && onTranscribe(blobRef.current, blobRef.current.type || "audio/webm")}
             >
               {isTranscribing
                 ? <Loader2 className="size-3.5 animate-spin" />
                 : <FileText className="size-3.5" />}
-              <span className="sr-only">텍스트로 변환</span>
+              <span className="sr-only">{t("audioTranscribe")}</span>
             </Button>
           )}
 
@@ -282,7 +284,7 @@ export function AudioRecorder({ onAttach, onCancel, onTranscribe, isTranscribing
             onClick={handleAttach}
           >
             <Check className="size-3.5" />
-            <span className="sr-only">첨부</span>
+            <span className="sr-only">{t("audioAttach")}</span>
           </Button>
         </>
       )}

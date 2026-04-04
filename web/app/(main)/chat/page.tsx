@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState, useEffect, useCallback, Suspense } from "react"
+import { useTranslations } from "next-intl"
 import { useSearchParams, useRouter } from "next/navigation"
 import { ChatMessages } from "@/components/chat/chat-messages"
 import { ChatInput, type AttachedFile } from "@/components/chat/chat-input"
@@ -13,6 +14,7 @@ import { type Conversation, type Persona, groupByDate } from "@/components/chat/
 function ChatPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const tc = useTranslations("chat")
   const urlId = searchParams.get("id")
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -181,7 +183,7 @@ function ChatPageInner() {
 
   const webConvs = conversations.filter((c) => c.platform === "web")
   const platformConvs = conversations.filter((c) => c.platform !== "web")
-  const grouped = groupByDate(webConvs)
+  const grouped = groupByDate(webConvs, tc)
   const platformGroups: Record<string, Conversation[]> = {}
   for (const conv of platformConvs) {
     if (!platformGroups[conv.platform]) platformGroups[conv.platform] = []

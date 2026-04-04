@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useTranslations } from "next-intl"
 import { usePlannerStore, type Priority, type Task } from "@/lib/planner-store"
 import { cn } from "@/lib/utils"
 import {
@@ -44,24 +45,17 @@ const PRIORITY_CONFIG = {
   },
 }
 
-const REFLECTION_PROMPTS = [
-  "오늘 가장 잘한 일은 무엇인가?",
-  "놓친 A 업무이 있다면 이유는 무엇인가?",
-  "내일 가장 먼저 해야 할 일은?",
-  "오늘 나의 역할을 얼마나 충실히 이행했는가?",
-]
+const REFLECTION_PROMPT_KEYS = ["reflectQ1", "reflectQ2", "reflectQ3", "reflectQ4Extra"] as const
 
-const MOOD_OPTIONS = [
-  { key: "great" as const, label: "최고", symbol: "★★★" },
-  { key: "good" as const, label: "좋음", symbol: "★★" },
-  { key: "neutral" as const, label: "보통", symbol: "★" },
-  { key: "tired" as const, label: "피곤", symbol: "△" },
-  { key: "rough" as const, label: "힘듦", symbol: "▽" },
-]
+const MOOD_KEYS = ["great", "good", "neutral", "tired", "rough"] as const
+const MOOD_SYMBOLS: Record<string, string> = {
+  great: "★★★", good: "★★", neutral: "★", tired: "△", rough: "▽",
+}
 
 // ─── Nion End-of-Day Popup ────────────────────────────────────────────────────
 
 function NionPopup({ onClose }: { onClose: () => void }) {
+  const t = useTranslations("planner.rightPanel")
   const { selectedDate, getTasksForDate, forwardTask, updateTask } = usePlannerStore()
   const tasks = getTasksForDate(selectedDate)
   const remaining = tasks.filter(
@@ -100,49 +94,49 @@ function NionPopup({ onClose }: { onClose: () => void }) {
               N
             </span>
             <div>
-              <p className="text-xs font-semibold text-foreground">Nion의 하루 마감</p>
-              <p className="text-xs text-muted-foreground">미완료 업무을 처리해주세요</p>
+              <p className="text-xs font-semibold text-foreground">{t("nionTitle")}</p>
+              <p className="text-xs text-muted-foreground">{t("nionSubtitle")}</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors" aria-label="닫기">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors" aria-label={t("closeLabel")}>
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="px-4 py-3 space-y-2 max-h-72 overflow-y-auto">
           {remaining.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-4">모든 업무이 처리되었습니다!</p>
+            <p className="text-xs text-muted-foreground text-center py-4">{t("allTasksDone")}</p>
           ) : (
-            remaining.map((t) => (
-              <div key={t.id} className="border border-border rounded-lg p-2.5 space-y-2">
+            remaining.map((task) => (
+              <div key={task.id} className="border border-border rounded-lg p-2.5 space-y-2">
                 <div className="flex items-start gap-2">
-                  <span className="text-xs font-bold px-1 rounded shrink-0 mt-px" style={PRIORITY_CONFIG[t.priority].badgeStyle}>
-                    {t.priority}
+                  <span className="text-xs font-bold px-1 rounded shrink-0 mt-px" style={PRIORITY_CONFIG[task.priority].badgeStyle}>
+                    {task.priority}
                   </span>
-                  <p className="text-xs text-foreground leading-snug flex-1">{t.title}</p>
+                  <p className="text-xs text-foreground leading-snug flex-1">{task.title}</p>
                 </div>
                 <div className="flex gap-1.5">
                   <button
-                    onClick={() => setDecisions((d) => ({ ...d, [t.id]: "forward" }))}
+                    onClick={() => setDecisions((d) => ({ ...d, [task.id]: "forward" }))}
                     className={cn(
                       "flex items-center gap-1 flex-1 h-6 rounded text-xs justify-center font-medium transition-colors border",
-                      decisions[t.id] === "forward" ? "text-foreground" : "border-border text-muted-foreground hover:text-foreground"
+                      decisions[task.id] === "forward" ? "text-foreground" : "border-border text-muted-foreground hover:text-foreground"
                     )}
-                    style={decisions[t.id] === "forward" ? { background: "var(--status-forwarded)", color: "#ffffff", borderColor: "var(--status-forwarded)" } : undefined}
+                    style={decisions[task.id] === "forward" ? { background: "var(--status-forwarded)", color: "#ffffff", borderColor: "var(--status-forwarded)" } : undefined}
                   >
                     <ArrowRight className="w-3 h-3" />
-                    내일로 이월 (→)
+                    {t("forwardTomorrow")}
                   </button>
                   <button
-                    onClick={() => setDecisions((d) => ({ ...d, [t.id]: "cancel" }))}
+                    onClick={() => setDecisions((d) => ({ ...d, [task.id]: "cancel" }))}
                     className={cn(
                       "flex items-center gap-1 flex-1 h-6 rounded text-xs justify-center font-medium transition-colors border",
-                      decisions[t.id] === "cancel" ? "text-foreground" : "border-border text-muted-foreground hover:text-foreground"
+                      decisions[task.id] === "cancel" ? "text-foreground" : "border-border text-muted-foreground hover:text-foreground"
                     )}
-                    style={decisions[t.id] === "cancel" ? { background: "var(--status-cancelled)", color: "#fff", borderColor: "var(--status-cancelled)" } : undefined}
+                    style={decisions[task.id] === "cancel" ? { background: "var(--status-cancelled)", color: "#fff", borderColor: "var(--status-cancelled)" } : undefined}
                   >
                     <X className="w-3 h-3" />
-                    취소 (X)
+                    {t("cancelTask")}
                   </button>
                 </div>
               </div>
@@ -157,10 +151,10 @@ function NionPopup({ onClose }: { onClose: () => void }) {
             disabled={!allDecided && remaining.length > 0}
             onClick={handleApply}
           >
-            {remaining.length === 0 ? "닫기" : "적용하기"}
+            {remaining.length === 0 ? t("closeLabel") : t("apply")}
           </Button>
           <Button variant="ghost" className="h-8 text-xs text-muted-foreground" onClick={onClose}>
-            나중에
+            {t("later")}
           </Button>
         </div>
       </div>
@@ -171,6 +165,8 @@ function NionPopup({ onClose }: { onClose: () => void }) {
 // ─── Inbox Panel ──────────────────────────────────────────────────────────────
 
 function InboxPanel() {
+  const t = useTranslations("planner.rightPanel")
+  const tTask = useTranslations("planner.task")
   const { inboxTasks, addInboxTask, moveInboxToTasks, deleteInboxTask, roles } = usePlannerStore()
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState("")
@@ -197,14 +193,14 @@ function InboxPanel() {
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <Inbox className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="text-xs font-semibold text-foreground">인박스</span>
+          <span className="text-xs font-semibold text-foreground">{t("inboxLabel")}</span>
           {inboxTasks.length > 0 && (
             <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ background: "var(--priority-a-bg)", color: "var(--priority-a)" }}>
               {inboxTasks.length}
             </span>
           )}
         </div>
-        <button onClick={() => setAdding(!adding)} className="text-muted-foreground hover:text-foreground transition-colors" aria-label="인박스 업무 추가">
+        <button onClick={() => setAdding(!adding)} className="text-muted-foreground hover:text-foreground transition-colors" aria-label={t("inboxAddTask")}>
           <Plus className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -214,7 +210,7 @@ function InboxPanel() {
           <Input
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="떠오른 생각, 요청사항, 아이디어..."
+            placeholder={t("inputPlaceholder")}
             className="h-7 text-xs bg-muted border-border"
             onKeyDown={(e) => {
               if (e.key === "Enter") handleAdd()
@@ -225,7 +221,7 @@ function InboxPanel() {
           <div className="flex gap-2">
             <Select value={newRoleId} onValueChange={setNewRoleId}>
               <SelectTrigger className="h-6 text-xs bg-muted border-border flex-1">
-                <SelectValue placeholder="역할" />
+                <SelectValue placeholder={tTask("role")} />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
                 {roles.map((r) => (
@@ -239,7 +235,7 @@ function InboxPanel() {
               </SelectContent>
             </Select>
             <button onClick={handleAdd} className="h-6 px-2 rounded text-xs font-medium shrink-0 hover:opacity-80 transition-opacity" style={{ background: "var(--priority-a)", color: "#ffffff" }}>
-              추가
+              {tTask("add")}
             </button>
           </div>
         </div>
@@ -250,9 +246,9 @@ function InboxPanel() {
           <div className="flex flex-col items-center justify-center h-full gap-2 py-8">
             <Inbox className="w-8 h-8 text-muted-foreground opacity-30" />
             <p className="text-xs text-muted-foreground text-center">
-              인박스가 비어 있습니다.
+              {t("inboxEmpty")}
               <br />
-              <span className="text-xs opacity-60">빠르게 떠오른 것들을 여기에 캡처하세요</span>
+              <span className="text-xs opacity-60">{t("inboxEmptyHint")}</span>
             </p>
           </div>
         ) : (
@@ -271,7 +267,7 @@ function InboxPanel() {
                       </div>
                     )}
                   </div>
-                  <button onClick={() => deleteInboxTask(task.id)} className="text-muted-foreground opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity shrink-0 mt-0.5" aria-label="삭제">
+                  <button onClick={() => deleteInboxTask(task.id)} className="text-muted-foreground opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity shrink-0 mt-0.5" aria-label={tTask("delete")}>
                     <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
@@ -290,7 +286,7 @@ function InboxPanel() {
                   </Select>
                   <button onClick={() => handleMove(task.id)} className="flex items-center gap-1 h-5 px-2 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
                     <ArrowRight className="w-2.5 h-2.5" />
-                    업무으로
+                    {t("toTask")}
                   </button>
                 </div>
               </div>
@@ -301,7 +297,7 @@ function InboxPanel() {
 
       <div className="px-4 py-2 border-t border-border shrink-0">
         <p className="text-xs text-muted-foreground italic leading-snug">
-          &ldquo;인박스는 수집 도구입니다. 정기적으로 비워두세요.&rdquo;
+          &ldquo;{t("inboxQuote")}&rdquo;
         </p>
       </div>
     </div>
@@ -311,6 +307,9 @@ function InboxPanel() {
 // ─── Diary Panel (merged Reflection + mood + one-liner) ───────────────────────
 
 function DiaryPanel() {
+  const t = useTranslations("planner.rightPanel")
+  const tJournal = useTranslations("planner.journal")
+  const tMood = useTranslations("planner.mood")
   const { selectedDate, diaryEntries, setDiaryEntry, reflectionNotes, setReflectionNote } = usePlannerStore()
   const entry = diaryEntries[selectedDate]
   const legacyNote = reflectionNotes[selectedDate] ?? ""
@@ -338,26 +337,26 @@ function DiaryPanel() {
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
         <BookMarked className="w-3.5 h-3.5 text-muted-foreground" />
-        <span className="text-xs font-semibold text-foreground">하루 일기</span>
+        <span className="text-xs font-semibold text-foreground">{t("diaryTitle")}</span>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
         {/* Mood picker */}
         <div className="space-y-1.5">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">오늘의 컨디션</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{t("todayCondition")}</p>
           <div className="flex gap-1.5">
-            {MOOD_OPTIONS.map((m) => (
+            {MOOD_KEYS.map((key) => (
               <button
-                key={m.key}
-                onClick={() => setMood(m.key)}
+                key={key}
+                onClick={() => setMood(key)}
                 className={cn(
                   "flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-lg border text-xs transition-all",
-                  mood === m.key ? "border-transparent" : "border-border bg-muted/40 text-muted-foreground"
+                  mood === key ? "border-transparent" : "border-border bg-muted/40 text-muted-foreground"
                 )}
-                style={mood === m.key ? { background: "var(--priority-a-bg)", color: "var(--priority-a)", border: "1px solid var(--priority-a)" } : {}}
+                style={mood === key ? { background: "var(--priority-a-bg)", color: "var(--priority-a)", border: "1px solid var(--priority-a)" } : {}}
               >
-                <span className="text-sm leading-none">{m.symbol}</span>
-                <span>{m.label}</span>
+                <span className="text-sm leading-none">{MOOD_SYMBOLS[key]}</span>
+                <span>{tMood(key)}</span>
               </button>
             ))}
           </div>
@@ -365,11 +364,11 @@ function DiaryPanel() {
 
         {/* One-liner */}
         <div className="space-y-1.5">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">오늘의 한 줄</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{t("todayOneLiner")}</p>
           <Input
             value={oneLiner}
             onChange={(e) => setOneLiner(e.target.value)}
-            placeholder="오늘 하루를 한 문장으로 요약한다면?"
+            placeholder={t("oneLinerPlaceholder")}
             className="h-8 text-xs bg-muted border-border"
             maxLength={80}
           />
@@ -378,35 +377,38 @@ function DiaryPanel() {
 
         {/* Reflection prompts */}
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">성찰 질문</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{t("reflectionQuestions")}</p>
           <div className="space-y-1">
-            {REFLECTION_PROMPTS.map((prompt, i) => (
-              <div
-                key={i}
-                className="flex items-start gap-2 px-2 py-1.5 rounded hover:bg-accent/30 transition-colors cursor-pointer"
-                onClick={() => {
-                  const prefix = `${i + 1}. ${prompt}\n`
-                  if (!fullNote.includes(prompt)) {
-                    setFullNote((d) => (d ? `${d}\n\n${prefix}` : prefix))
-                  }
-                }}
-              >
-                <span className="w-4 h-4 rounded text-xs font-bold flex items-center justify-center shrink-0 mt-px" style={{ background: "var(--priority-a-bg)", color: "var(--priority-a)" }}>
-                  {i + 1}
-                </span>
-                <p className="text-xs text-muted-foreground leading-snug">{prompt}</p>
-              </div>
-            ))}
+            {REFLECTION_PROMPT_KEYS.map((key, i) => {
+              const prompt = tJournal(key)
+              return (
+                <div
+                  key={key}
+                  className="flex items-start gap-2 px-2 py-1.5 rounded hover:bg-accent/30 transition-colors cursor-pointer"
+                  onClick={() => {
+                    const prefix = `${i + 1}. ${prompt}\n`
+                    if (!fullNote.includes(prompt)) {
+                      setFullNote((d) => (d ? `${d}\n\n${prefix}` : prefix))
+                    }
+                  }}
+                >
+                  <span className="w-4 h-4 rounded text-xs font-bold flex items-center justify-center shrink-0 mt-px" style={{ background: "var(--priority-a-bg)", color: "var(--priority-a)" }}>
+                    {i + 1}
+                  </span>
+                  <p className="text-xs text-muted-foreground leading-snug">{prompt}</p>
+                </div>
+              )
+            })}
           </div>
         </div>
 
         {/* Full note */}
         <div className="space-y-1.5">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">자유 기록</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{t("freeRecord")}</p>
           <Textarea
             value={fullNote}
             onChange={(e) => setFullNote(e.target.value)}
-            placeholder={"오늘 하루를 돌아보며 자유롭게 기록하세요\n질문을 클릭하면 자동으로 추가됩니다"}
+            placeholder={t("freeRecordPlaceholder")}
             rows={8}
             className="text-xs resize-none bg-muted border-border text-foreground leading-relaxed"
           />
@@ -415,10 +417,10 @@ function DiaryPanel() {
 
       <div className="px-4 py-3 border-t border-border shrink-0 flex items-center justify-between">
         <p className={cn("text-xs transition-opacity duration-300", saved ? "opacity-100" : "opacity-0")} style={{ color: "var(--status-done)" }}>
-          저장되었습니다
+          {t("savedMessage")}
         </p>
         <Button size="sm" className="h-7 text-xs px-3" style={{ background: "var(--priority-a)", color: "#ffffff" }} onClick={handleSave}>
-          저장
+          {t("save")}
         </Button>
       </div>
     </div>
@@ -428,6 +430,8 @@ function DiaryPanel() {
 // ─── Timeline Panel ───────────────────────────────────────────────────────────
 
 function TimelinePanel() {
+  const t = useTranslations("planner.rightPanel")
+  const tMood = useTranslations("planner.mood")
   const { tasks, diaryEntries, goals, roles, getDdayGoals } = usePlannerStore()
   const ddayGoals = getDdayGoals()
 
@@ -444,9 +448,10 @@ function TimelinePanel() {
     return `${d.getMonth() + 1}/${d.getDate()}`
   }
 
+  const tDays = useTranslations("planner.monthlyDays")
   const dayLabel = (dateStr: string) => {
-    const days2 = ["일", "월", "화", "수", "목", "금", "토"]
-    return days2[new Date(dateStr).getDay()]
+    const dayKeys = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const
+    return tDays(dayKeys[new Date(dateStr).getDay()])
   }
 
   const STATUS_COLORS: Record<string, string> = {
@@ -462,15 +467,15 @@ function TimelinePanel() {
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
         <Clock3 className="w-3.5 h-3.5 text-muted-foreground" />
-        <span className="text-xs font-semibold text-foreground">통합 타임라인</span>
-        <span className="text-xs text-muted-foreground ml-auto">과거 7일</span>
+        <span className="text-xs font-semibold text-foreground">{t("timelineTitle")}</span>
+        <span className="text-xs text-muted-foreground ml-auto">{t("last7days")}</span>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5">
         {/* Upcoming D-Day Goals */}
         {ddayGoals.filter((g) => g.daysLeft >= 0 && g.daysLeft <= 30).length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">D-Day 목표</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{t("ddayGoals")}</p>
             <div className="space-y-1.5">
               {ddayGoals.filter((g) => g.daysLeft >= 0 && g.daysLeft <= 30).map((goal) => {
                 const role = roles.find((r) => r.id === goal.roleId)
@@ -507,7 +512,7 @@ function TimelinePanel() {
 
         {/* Daily timeline */}
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">일별 기록</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{t("dailyRecord")}</p>
           <div className="space-y-4">
             {[...days].reverse().map((dateStr) => {
               const dayTasks = tasks.filter((t) => t.date === dateStr)
@@ -540,12 +545,12 @@ function TimelinePanel() {
                       </span>
                       {isToday && (
                         <span className="text-xs px-1 rounded font-medium" style={{ background: "var(--priority-a)", color: "#ffffff" }}>
-                          오늘
+                          {t("today")}
                         </span>
                       )}
                       {total > 0 && (
                         <span className="text-xs text-muted-foreground ml-auto">
-                          {doneTasks.length}/{total} 완료
+                          {t("doneOfTotal", { done: doneTasks.length, total })}
                         </span>
                       )}
                     </div>
@@ -581,7 +586,7 @@ function TimelinePanel() {
                           </span>
                         ))}
                         {total > 8 && (
-                          <span className="text-xs text-muted-foreground">+{total - 8}개</span>
+                          <span className="text-xs text-muted-foreground">{t("moreItems", { count: total - 8 })}</span>
                         )}
                       </div>
                     )}
@@ -596,7 +601,7 @@ function TimelinePanel() {
                         <p className="text-xs text-foreground leading-snug italic">&ldquo;{diary.oneLiner}&rdquo;</p>
                         {diary.mood && (
                           <span className="text-xs ml-auto shrink-0 text-muted-foreground">
-                            {MOOD_OPTIONS.find((m) => m.key === diary.mood)?.symbol}
+                            {diary.mood ? MOOD_SYMBOLS[diary.mood] : ""}
                           </span>
                         )}
                       </div>
@@ -615,6 +620,7 @@ function TimelinePanel() {
 // ─── Stats Panel ──────────────────────────────────────────────────────────────
 
 function StatsPanel() {
+  const t = useTranslations("planner.rightPanel")
   const { selectedDate, getTasksForDate, roles, getCompletionScore } = usePlannerStore()
   const tasks = getTasksForDate(selectedDate)
   const score = getCompletionScore(selectedDate)
@@ -638,9 +644,9 @@ function StatsPanel() {
   }))
   const maxRoleCount = Math.max(...roleTaskCounts.map((r) => r.count), 1)
 
-  const STATUS_LABELS: Record<string, string> = {
-    pending: "대기", "in-progress": "진행 중", done: "완료",
-    forwarded: "이월", cancelled: "취소", delegated: "위임",
+  const STATUS_LABEL_KEYS: Record<string, string> = {
+    pending: "statusPending", "in-progress": "statusInProgress", done: "statusDone",
+    forwarded: "statusForwarded", cancelled: "statusCancelled", delegated: "statusDelegated",
   }
   const STATUS_COLORS: Record<string, string> = {
     pending: "var(--muted-foreground)", "in-progress": "var(--status-in-progress)",
@@ -669,19 +675,19 @@ function StatsPanel() {
     <div className="flex flex-col h-full overflow-y-auto">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
         <BarChart2 className="w-3.5 h-3.5 text-muted-foreground" />
-        <span className="text-xs font-semibold text-foreground">하루 통계</span>
+        <span className="text-xs font-semibold text-foreground">{t("dailyStats")}</span>
       </div>
 
       <div className="px-4 py-4 space-y-5">
         {/* Score */}
         <div className="rounded-lg border border-border p-3 space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">종합 성취도</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{t("overallScore")}</p>
             <span
               className="text-xl font-bold tabular-nums"
               style={{ color: score >= 70 ? "var(--status-done)" : score >= 40 ? "var(--priority-a)" : "var(--status-cancelled)" }}
             >
-              {score}<span className="text-sm font-normal text-muted-foreground">점</span>
+              {score}<span className="text-sm font-normal text-muted-foreground">{t("scoreUnit")}</span>
             </span>
           </div>
           <div className="h-2 rounded-full bg-muted overflow-hidden">
@@ -694,23 +700,23 @@ function StatsPanel() {
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            A 업무 가중치 60% · 전체 완료 40%
+            {t("scoreDescription")}
           </p>
         </div>
 
         {/* Priority bars */}
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">우선순위별 완료율</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{t("priorityCompletion")}</p>
           <div className="space-y-2.5">
-            <PriorityBar label="A — 필수" done={aDone} total={aTotal} color="var(--priority-a)" />
-            <PriorityBar label="B — 중요" done={bDone} total={bTotal} color="var(--priority-b)" />
-            <PriorityBar label="C — 선택" done={cDone} total={cTotal} color="var(--priority-c)" />
+            <PriorityBar label={t("priorityALabel")} done={aDone} total={aTotal} color="var(--priority-a)" />
+            <PriorityBar label={t("priorityBLabel")} done={bDone} total={bTotal} color="var(--priority-b)" />
+            <PriorityBar label={t("priorityCLabel")} done={cDone} total={cTotal} color="var(--priority-c)" />
           </div>
         </div>
 
         {/* Status breakdown */}
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">상태별 현황</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{t("statusBreakdown")}</p>
           <div className="grid grid-cols-3 gap-1.5">
             {Object.entries(statusCounts).map(([status, count]) => (
               <div
@@ -719,7 +725,7 @@ function StatsPanel() {
                 style={{ background: `color-mix(in oklch, ${STATUS_COLORS[status]} 10%, var(--muted))` }}
               >
                 <p className="text-sm font-bold tabular-nums" style={{ color: STATUS_COLORS[status] }}>{count}</p>
-                <p className="text-xs text-muted-foreground">{STATUS_LABELS[status] ?? status}</p>
+                <p className="text-xs text-muted-foreground">{STATUS_LABEL_KEYS[status] ? t(STATUS_LABEL_KEYS[status]) : status}</p>
               </div>
             ))}
           </div>
@@ -727,7 +733,7 @@ function StatsPanel() {
 
         {/* Role balance */}
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">역할 균형</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{t("roleBalance")}</p>
           <div className="space-y-2">
             {roleTaskCounts.filter((r) => r.count > 0).map((r) => (
               <div key={r.id} className="space-y-1">
@@ -756,6 +762,7 @@ function StatsPanel() {
 // ─── Right Panel ──────────────────────────────────────────────────────────────
 
 export function RightPanel() {
+  const t = useTranslations("planner.rightPanel")
   const { selectedDate, getTasksForDate } = usePlannerStore()
   const [activeTab, setActiveTab] = useState<Tab>("inbox")
   const [showNion, setShowNion] = useState(false)
@@ -773,10 +780,10 @@ export function RightPanel() {
   }, [selectedDate, getTasksForDate])
 
   const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: "inbox", label: "인박스", icon: <Inbox className="w-3 h-3" /> },
-    { key: "diary", label: "일기", icon: <BookMarked className="w-3 h-3" /> },
-    { key: "timeline", label: "타임라인", icon: <Clock3 className="w-3 h-3" /> },
-    { key: "stats", label: "통계", icon: <BarChart2 className="w-3 h-3" /> },
+    { key: "inbox", label: t("tabInbox"), icon: <Inbox className="w-3 h-3" /> },
+    { key: "diary", label: t("tabDiary"), icon: <BookMarked className="w-3 h-3" /> },
+    { key: "timeline", label: t("tabTimeline"), icon: <Clock3 className="w-3 h-3" /> },
+    { key: "stats", label: t("tabStats"), icon: <BarChart2 className="w-3 h-3" /> },
   ]
 
   return (
@@ -805,7 +812,7 @@ export function RightPanel() {
         {/* Nion trigger button */}
         <div className="px-3 py-2 border-b border-border shrink-0 flex items-center justify-between">
           <span className="text-xs text-muted-foreground italic">
-            하루를 마감할 준비가 됐나요?
+            {t("nionReadyPrompt")}
           </span>
           <button
             onClick={() => setShowNion(true)}
