@@ -227,46 +227,22 @@ func (h *SearchHandler) HybridSearch(c echo.Context) error {
 
 	ilike := "%" + q + "%"
 
-	// ── FTS: Diary entries ─────────────────────────────────────────────────
+	// ── FTS: Planner diary ────────────────────────────────────────────────
 	dRows, _ := h.db.QueryContext(ctx,
-		`SELECT id::text, 'diary' AS type, title, content, entry_date::text AS date,
-		        ts_rank(content_tsv, plainto_tsquery('simple', $2)) AS rank
-		 FROM diary_entries
+		`SELECT id::text, 'diary' AS type, one_liner AS title,
+		        COALESCE(full_note, '') AS content, entry_date::text AS date
+		 FROM planner_diary
 		 WHERE user_id = $1
-		   AND (content_tsv @@ plainto_tsquery('simple', $2) OR content ILIKE $3)
-		 ORDER BY rank DESC, entry_date DESC
-		 LIMIT $4`,
-		userID, q, ilike, limit,
+		   AND (one_liner ILIKE $2 OR full_note ILIKE $2)
+		 ORDER BY entry_date DESC
+		 LIMIT $3`,
+		userID, ilike, limit,
 	)
 	if dRows != nil {
 		defer dRows.Close()
 		for dRows.Next() {
 			var id, typ, title, content, date string
-			var rank float64
-			if dRows.Scan(&id, &typ, &title, &content, &date, &rank) == nil {
-				snippet := snippetRune(content, 200)
-				addResult(map[string]any{
-					"id": id, "type": typ, "title": title,
-					"text": snippet, "date": date, "score": rank,
-				})
-			}
-		}
-	}
-
-	// ── FTS: Memos (ILIKE — no tsvector on memos table) ───────────────────
-	mRows, _ := h.db.QueryContext(ctx,
-		`SELECT id::text, 'memo' AS type, title, content, created_at::text AS date
-		 FROM memos
-		 WHERE user_id = $1 AND (title ILIKE $2 OR content ILIKE $2)
-		 ORDER BY updated_at DESC
-		 LIMIT $3`,
-		userID, ilike, limit,
-	)
-	if mRows != nil {
-		defer mRows.Close()
-		for mRows.Next() {
-			var id, typ, title, content, date string
-			if mRows.Scan(&id, &typ, &title, &content, &date) == nil {
+			if dRows.Scan(&id, &typ, &title, &content, &date) == nil {
 				snippet := snippetRune(content, 200)
 				addResult(map[string]any{
 					"id": id, "type": typ, "title": title,
@@ -306,11 +282,12 @@ func (h *SearchHandler) HybridSearch(c echo.Context) error {
 	if vec, embErr := generateEmbeddingAuto(ctx, h.db, userID.String(), h.config.EncryptionKey, q); embErr == nil {
 		vecLit := vectorLiteral(vec)
 
-			// Vector search: diary entries (cosine similarity, lower distance = better match)
+			// Vector search: planner diary
 			dvRows, _ := h.db.QueryContext(ctx,
-				`SELECT id::text, 'diary' AS type, title, content, entry_date::text AS date,
+				`SELECT id::text, 'diary' AS type, one_liner AS title,
+				        COALESCE(full_note, '') AS content, entry_date::text AS date,
 				        1 - (embedding <=> $2::vector) AS score
-				 FROM diary_entries
+				 FROM planner_diary
 				 WHERE user_id = $1 AND embedding IS NOT NULL
 				 ORDER BY embedding <=> $2::vector
 				 LIMIT $3`,

@@ -369,11 +369,11 @@ func RunSetup() error {
 	fmt.Println(centreInWidth(sGold.Render("✦  설정 완료  ✦"), tw))
 	fmt.Println(sSuccess.Render(strings.Repeat("═", tw)))
 	fmt.Println()
-	PrintInfo("설정 파일: " + ConfigPath())
+	PrintInfo(setupMsg(adminLanguage, "configFile") + ConfigPath())
 	fmt.Println()
 
 	// ── Next steps ────────────────────────────────────────────────────────────
-	PrintInlineHeader("다음 단계")
+	PrintInlineHeader(setupMsg(adminLanguage, "nextSteps"))
 	fmt.Println()
 
 	type nextStep struct {
@@ -392,30 +392,30 @@ func RunSetup() error {
 
 	steps := []nextStep{
 		{
-			title: "서비스 시작",
+			title: setupMsg(adminLanguage, "startTitle"),
 			cmd:   "starnion start",
-			desc:  fmt.Sprintf("Gateway :%d + Agent :%d + Web :%d 모든 서비스를 한 번에 실행", cfg.Gateway.Port, cfg.Gateway.GRPCPort, cfg.UI.Port),
+			desc:  fmt.Sprintf(setupMsg(adminLanguage, "startDesc"), cfg.Gateway.Port, cfg.Gateway.GRPCPort, cfg.UI.Port),
 		},
 		{
-			title: "웹 브라우저 접속",
-			desc:  fmt.Sprintf("http://localhost:%d 에서 로그인 후 사용", cfg.UI.Port),
+			title: setupMsg(adminLanguage, "browserTitle"),
+			desc:  fmt.Sprintf(setupMsg(adminLanguage, "browserDesc"), cfg.UI.Port),
 		},
 	}
 	steps = append(steps, nextStep{
-		title: "Telegram 연결 (선택)",
-		desc:  "Settings → Channels → Telegram 봇 토큰 입력 후 연결",
+		title: setupMsg(adminLanguage, "telegramTitle"),
+		desc:  setupMsg(adminLanguage, "telegramDesc"),
 	})
 	if cfg.Embedding.APIKey == "" {
 		steps = append(steps, nextStep{
-			title: "임베딩 엔진 (선택)",
+			title: setupMsg(adminLanguage, "embeddingTitle"),
 			cmd:   "starnion config embedding",
-			desc:  "OpenAI(권장) 또는 Gemini 선택 후 API Key 입력",
+			desc:  setupMsg(adminLanguage, "embeddingDesc"),
 		})
 	}
 	steps = append(steps, nextStep{
-		title: "Docker로 실행하려면",
+		title: setupMsg(adminLanguage, "dockerTitle"),
 		cmd:   "starnion docker up -d",
-		desc:  "Docker Compose로 모든 서비스를 컨테이너로 실행 (starnion start 대신 사용 가능)",
+		desc:  setupMsg(adminLanguage, "dockerDesc"),
 	})
 
 	for i, s := range steps {
@@ -423,7 +423,7 @@ func RunSetup() error {
 	}
 
 	fmt.Println(sNebula.Render(strings.Repeat("─", tw)))
-	fmt.Printf("  %s  %s\n\n", sSuccess.Render("▶"), sBold.Render("StarNion 준비 완료!"))
+	fmt.Printf("  %s  %s\n\n", sSuccess.Render("▶"), sBold.Render(setupMsg(adminLanguage, "ready")))
 
 	return nil
 }
@@ -870,3 +870,94 @@ func detectProjectRoot() string {
 	return ""
 }
 
+// setupMsg returns a localized setup message by key.
+var setupMessages = map[string]map[string]string{
+	"configFile": {
+		"ko": "설정 파일: ",
+		"en": "Config file: ",
+		"ja": "設定ファイル: ",
+		"zh": "配置文件: ",
+	},
+	"nextSteps": {
+		"ko": "다음 단계",
+		"en": "Next Steps",
+		"ja": "次のステップ",
+		"zh": "下一步",
+	},
+	"startTitle": {
+		"ko": "서비스 시작",
+		"en": "Start Services",
+		"ja": "サービス開始",
+		"zh": "启动服务",
+	},
+	"startDesc": {
+		"ko": "Gateway :%d + Agent :%d + Web :%d 모든 서비스를 한 번에 실행",
+		"en": "Run all services at once — Gateway :%d + Agent :%d + Web :%d",
+		"ja": "すべてのサービスを一度に実行 — Gateway :%d + Agent :%d + Web :%d",
+		"zh": "一次运行所有服务 — Gateway :%d + Agent :%d + Web :%d",
+	},
+	"browserTitle": {
+		"ko": "웹 브라우저 접속",
+		"en": "Open Web Browser",
+		"ja": "ウェブブラウザでアクセス",
+		"zh": "打开浏览器",
+	},
+	"browserDesc": {
+		"ko": "http://localhost:%d 에서 로그인 후 사용",
+		"en": "Login at http://localhost:%d to get started",
+		"ja": "http://localhost:%d にログイ��して使用開始",
+		"zh": "访问 http://localhost:%d 登录后使用",
+	},
+	"telegramTitle": {
+		"ko": "Telegram 연결 (선택)",
+		"en": "Connect Telegram (optional)",
+		"ja": "Telegram 接続 (任意)",
+		"zh": "连接 Telegram (可选)",
+	},
+	"telegramDesc": {
+		"ko": "채팅 → 채널 → Telegram 봇 토큰 입력 후 연결",
+		"en": "Chat → Channels → Enter Telegram bot token to connect",
+		"ja": "チャット → チャンネル → Telegram ボットトークンを入力して接続",
+		"zh": "聊天 → 频道 → 输入 Telegram 机器人令牌后连接",
+	},
+	"embeddingTitle": {
+		"ko": "임베딩 엔진 (선택)",
+		"en": "Embedding Engine (optional)",
+		"ja": "埋め込みエンジン (任意)",
+		"zh": "嵌入引擎 (可选)",
+	},
+	"embeddingDesc": {
+		"ko": "OpenAI(권장) 또는 Gemini 선택 후 API Key 입력",
+		"en": "Select OpenAI (recommended) or Gemini, then enter API Key",
+		"ja": "OpenAI(推奨) または Gemini を選択して API Key を入力",
+		"zh": "选择 OpenAI(推荐) 或 Gemini，然后输入 API Key",
+	},
+	"dockerTitle": {
+		"ko": "Docker로 실행하려면",
+		"en": "Run with Docker",
+		"ja": "Dockerで実行する場合",
+		"zh": "使用 Docker 运行",
+	},
+	"dockerDesc": {
+		"ko": "Docker Compose로 모든 서비스를 컨테이너로 실행 (starnion start 대신 사용 가능)",
+		"en": "Run all services in containers via Docker Compose (alternative to starnion start)",
+		"ja": "Docker Compose ですべてのサービスをコンテナで実行 (starnion start の代替)",
+		"zh": "通过 Docker Compose 在容器中运行所有服务 (可替代 starnion start)",
+	},
+	"ready": {
+		"ko": "StarNion 준비 완료!",
+		"en": "StarNion is ready!",
+		"ja": "StarNion 準備完了！",
+		"zh": "StarNion 准备就绪！",
+	},
+}
+
+func setupMsg(lang, key string) string {
+	if m, ok := setupMessages[key]; ok {
+		if v, ok := m[lang]; ok {
+			return v
+		}
+		return m["en"]
+	}
+	return key
+}

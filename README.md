@@ -6,7 +6,7 @@
 
 **Your Stellar Companion in Every Task.**
 
-A hyper-personalized AI agent platform with Franklin Planner, finance management, and AI-powered daily life assistance — accessible from Web and Telegram.
+A hyper-personalized AI agent platform with Planner, finance management, and AI-powered daily life assistance — accessible from Web and Telegram.
 
 [![Release](https://img.shields.io/github/v/release/jikime/starnion)](https://github.com/jikime/starnion/releases)
 [![License](https://img.shields.io/badge/license-Private-lightgrey)](LICENSE)
@@ -22,7 +22,7 @@ A hyper-personalized AI agent platform with Franklin Planner, finance management
 StarNion is a self-hosted personal AI agent platform. All your data stays on your own server while AI helps you manage your daily life more smartly — accessible from **Web UI**, **Telegram**, and a native **CLI**.
 
 **Key highlights:**
-- **Franklin Digital Planner** — ABC priority-based daily/weekly/monthly planning with roles, goals, and mission statement
+- **Planner** — ABC priority-based daily/weekly/monthly planning with roles, goals, and mission statement
 - **Finance & Assets** — expense tracking, spending map, budget management, statistics & analytics
 - **AI Chat** — multi-provider LLM with personas, web search, and file management
 - **Multi-provider LLM** — Anthropic Claude, Google Gemini, OpenAI, GLM (Z.AI), Ollama support
@@ -201,7 +201,7 @@ starnion/
 ├── web/                  # Next.js 16 Web UI  (:3893)
 │   ├── app/(main)/       # Route pages (chat, files, planners, assets, analytics, ...)
 │   ├── components/       # Feature-based components
-│   │   ├── planner/      # Franklin Planner components
+│   │   ├── planner/      # Planner components
 │   │   ├── chat/         # Chat components
 │   │   ├── files/        # File management components
 │   │   ├── search/       # Web search components
@@ -246,7 +246,7 @@ starnion/
 
 | Category | Features |
 |----------|----------|
-| **Planner** | Franklin ABC priority tasks · Weekly Big Rocks · Monthly calendar · D-Day goals · Mission & Roles · Diary & Reflection |
+| **Planner** | ABC priority tasks · Weekly Big Rocks · Monthly calendar · D-Day goals · Mission & Roles · Diary & Reflection |
 | **Finance** | Expense tracking · Spending map (Naver Maps) · Budget management · Statistics & Analytics |
 | **AI Chat** | Multi-LLM conversations · Personas · WebSocket streaming · Telegram integration |
 | **Files** | Document & image upload · Audio transcription · AI document search · MinIO storage |
@@ -263,7 +263,7 @@ starnion/
 |------|-------|-------------|
 | Chat | `/chat` | AI chat with sidebar, model selection, personas |
 | Files | `/files` | File management with grid/list view, search, upload |
-| Planner | `/planners` | Franklin Digital Planner (daily/weekly/monthly/goals/compass) |
+| Planner | `/planners` | Planner (daily/weekly/monthly/goals/compass) |
 | Assets | `/assets` | Finance ledger · Statistics · Budget · Spending map |
 | Analytics | `/analytics` | Message analytics · Channel breakdown · Anomaly detection |
 | Search | `/search` | AI web search with history |

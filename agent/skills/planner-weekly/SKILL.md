@@ -1,7 +1,7 @@
 ---
 name: python3 planner-weekly/scripts/planner_weekly.py
 display_name: 주간 목표
-description: "Manage weekly Big Rocks in Franklin Planner. Add, toggle, delete weekly goals per role."
+description: "Manage weekly Big Rocks in Planner. Add, toggle, delete weekly goals per role."
 version: 1.0.0
 emoji: "🪨"
 category: productivity

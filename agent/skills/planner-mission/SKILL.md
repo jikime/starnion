@@ -1,7 +1,7 @@
 ---
 name: python3 planner-mission/scripts/planner_mission.py
 display_name: 사명문
-description: "Set and view personal mission statement in Franklin Planner."
+description: "Set and view personal mission statement in Planner."
 version: 1.0.0
 emoji: "🧭"
 category: personal

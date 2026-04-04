@@ -1487,10 +1487,11 @@ func (h *TelegramHandler) LinkTelegram(c echo.Context) error {
 
 		// Migrate finance_records
 		h.db.ExecContext(ctx, `UPDATE finance_records SET user_id = $1 WHERE user_id = $2`, userID, ghostID)
-		// Migrate diary_entries
-		h.db.ExecContext(ctx, `UPDATE diary_entries SET user_id = $1 WHERE user_id = $2`, userID, ghostID)
-		// Migrate goals
-		h.db.ExecContext(ctx, `UPDATE goals SET user_id = $1 WHERE user_id = $2`, userID, ghostID)
+		// Migrate planner data
+		h.db.ExecContext(ctx, `UPDATE planner_tasks SET user_id = $1 WHERE user_id = $2`, userID, ghostID)
+		h.db.ExecContext(ctx, `UPDATE planner_roles SET user_id = $1 WHERE user_id = $2`, userID, ghostID)
+		h.db.ExecContext(ctx, `UPDATE planner_goals SET user_id = $1 WHERE user_id = $2`, userID, ghostID)
+		h.db.ExecContext(ctx, `UPDATE planner_diary SET user_id = $1 WHERE user_id = $2`, userID, ghostID)
 		// Migrate chat_sessions (and cascade to chat_messages via FK)
 		h.db.ExecContext(ctx, `UPDATE chat_sessions SET user_id = $1 WHERE user_id = $2`, userID, ghostID)
 		// Migrate conversations (and cascade to messages via FK)
@@ -1565,7 +1566,7 @@ func (h *TelegramHandler) LinkTelegramByCode(c echo.Context) error {
 	}
 
 	// Migrate ghost user's data to the current web account.
-	for _, tbl := range []string{"finance_records", "diary_entries", "goals", "chat_sessions", "conversations", "memos", "dday_events"} {
+	for _, tbl := range []string{"finance_records", "planner_tasks", "planner_roles", "planner_goals", "planner_diary", "conversations", "knowledge_base"} {
 		h.db.ExecContext(ctx, fmt.Sprintf(`UPDATE %s SET user_id = $1 WHERE user_id = $2`, tbl), userID, ghostID)
 	}
 	h.db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, ghostID)

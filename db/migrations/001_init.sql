@@ -77,7 +77,17 @@ CREATE TABLE IF NOT EXISTS daily_logs (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── (reports and knowledge_base removed) ─────────────────────
+-- ── Knowledge Base (used by scheduler, cron, search) ────────
+CREATE TABLE IF NOT EXISTS knowledge_base (
+    id          BIGSERIAL   NOT NULL PRIMARY KEY,
+    user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key         TEXT        NOT NULL,
+    value       TEXT        NOT NULL,
+    source      TEXT,
+    embedding   vector(768),
+    content_tsv tsvector,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 -- ── Skills (catalog + per-user settings) ─────────────────────
 CREATE TABLE IF NOT EXISTS user_skills (
@@ -323,6 +333,8 @@ CREATE TABLE IF NOT EXISTS planner_diary (
     mood        TEXT        NOT NULL DEFAULT 'neutral'
                 CHECK (mood IN ('great','good','neutral','tired','rough')),
     full_note   TEXT,
+    embedding   vector(768),
+    content_tsv tsvector,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (user_id, entry_date)
@@ -482,7 +494,10 @@ CREATE INDEX IF NOT EXISTS idx_daily_logs_embedding    ON daily_logs
     USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 CREATE INDEX IF NOT EXISTS idx_daily_logs_content_tsv  ON daily_logs USING gin(content_tsv);
 
--- (reports and knowledge_base indexes removed)
+-- knowledge_base
+CREATE INDEX IF NOT EXISTS idx_knowledge_base_user_id    ON knowledge_base(user_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_base_user_key   ON knowledge_base(user_id, key);
+CREATE INDEX IF NOT EXISTS idx_knowledge_base_content_tsv ON knowledge_base USING gin(content_tsv);
 
 -- conversations
 CREATE INDEX IF NOT EXISTS conversations_user_id_updated_at ON conversations (user_id, updated_at DESC);
@@ -542,7 +557,10 @@ CREATE INDEX IF NOT EXISTS idx_planner_goals_user        ON planner_goals(user_i
 CREATE INDEX IF NOT EXISTS idx_planner_goals_user_status ON planner_goals(user_id, status);
 
 -- planner_diary
-CREATE INDEX IF NOT EXISTS idx_planner_diary_user_date ON planner_diary(user_id, entry_date);
+CREATE INDEX IF NOT EXISTS idx_planner_diary_user_date   ON planner_diary(user_id, entry_date);
+CREATE INDEX IF NOT EXISTS idx_planner_diary_embedding   ON planner_diary
+    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+CREATE INDEX IF NOT EXISTS idx_planner_diary_content_tsv ON planner_diary USING gin(content_tsv);
 
 -- planner_reflection_notes
 CREATE INDEX IF NOT EXISTS idx_planner_reflections_user_date ON planner_reflection_notes(user_id, note_date);
@@ -625,7 +643,21 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- (knowledge_base_tsv_trigger, diary_entries_tsv_trigger, memos_tsv_trigger removed)
+CREATE OR REPLACE FUNCTION knowledge_base_tsv_trigger() RETURNS trigger AS $$
+BEGIN
+    NEW.content_tsv := to_tsvector('simple',
+        COALESCE(NEW.key, '') || ' ' || COALESCE(NEW.value, ''));
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION planner_diary_tsv_trigger() RETURNS trigger AS $$
+BEGIN
+    NEW.content_tsv := to_tsvector('simple',
+        COALESCE(NEW.one_liner, '') || ' ' || COALESCE(NEW.full_note, ''));
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION searches_tsv_trigger() RETURNS trigger AS $$
 BEGIN
@@ -747,7 +779,15 @@ CREATE TRIGGER trg_daily_logs_tsv
     BEFORE INSERT OR UPDATE OF content ON daily_logs
     FOR EACH ROW EXECUTE FUNCTION daily_logs_tsv_trigger();
 
--- (knowledge_base, diary_entries, memos triggers removed)
+DROP TRIGGER IF EXISTS trg_knowledge_base_tsv ON knowledge_base;
+CREATE TRIGGER trg_knowledge_base_tsv
+    BEFORE INSERT OR UPDATE OF key, value ON knowledge_base
+    FOR EACH ROW EXECUTE FUNCTION knowledge_base_tsv_trigger();
+
+DROP TRIGGER IF EXISTS trg_planner_diary_tsv ON planner_diary;
+CREATE TRIGGER trg_planner_diary_tsv
+    BEFORE INSERT OR UPDATE OF one_liner, full_note ON planner_diary
+    FOR EACH ROW EXECUTE FUNCTION planner_diary_tsv_trigger();
 
 DROP TRIGGER IF EXISTS trg_searches_tsv ON searches;
 CREATE TRIGGER trg_searches_tsv

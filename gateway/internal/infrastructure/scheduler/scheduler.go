@@ -483,7 +483,7 @@ func (s *Scheduler) smartPatternInsight(ctx context.Context, userID string) (str
 
 	var diaryCount int
 	s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM diary_entries
+		`SELECT COUNT(*) FROM planner_diary
 		 WHERE user_id = $1::uuid
 		   AND entry_date >= CURRENT_DATE - INTERVAL '7 days'`,
 		userID,
@@ -491,7 +491,7 @@ func (s *Scheduler) smartPatternInsight(ctx context.Context, userID string) (str
 
 	var activeGoals int
 	s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM goals
+		`SELECT COUNT(*) FROM planner_goals
 		 WHERE user_id = $1::uuid AND status = 'active'`,
 		userID,
 	).Scan(&activeGoals)

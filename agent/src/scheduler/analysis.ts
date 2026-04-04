@@ -235,11 +235,11 @@ async function getActiveUserIds(): Promise<string[]> {
   try {
     const rows = await query<{ user_id: string }>(`
       SELECT DISTINCT user_id::text FROM (
-        SELECT user_id FROM diary_entries WHERE created_at > NOW() - INTERVAL '30 days'
+        SELECT user_id FROM finances       WHERE created_at > NOW() - INTERVAL '30 days'
         UNION
-        SELECT user_id FROM finances      WHERE created_at > NOW() - INTERVAL '30 days'
+        SELECT user_id FROM conversations  WHERE created_at > NOW() - INTERVAL '30 days'
         UNION
-        SELECT user_id FROM memos         WHERE created_at > NOW() - INTERVAL '30 days'
+        SELECT user_id FROM planner_tasks  WHERE created_at > NOW() - INTERVAL '30 days'
       ) t
     `);
     return rows.map((r) => r.user_id);
@@ -278,8 +278,8 @@ async function analyzeConversation(userId: string): Promise<void> {
   const entries = await query<{
     entry_date: string; title: string; content: string; mood: string;
   }>(
-    `SELECT entry_date::text, title, content, mood
-     FROM diary_entries WHERE user_id = $1 AND entry_date = $2 ORDER BY created_at`,
+    `SELECT entry_date::text, one_liner AS title, COALESCE(full_note, '') AS content, mood
+     FROM planner_diary WHERE user_id = $1 AND entry_date = $2 ORDER BY created_at`,
     [userId, today],
   );
   if (entries.length === 0) return; // no diary today — skip silently
@@ -361,8 +361,8 @@ async function analyzePatterns(userId: string): Promise<void> {
     [userId],
   );
   const diaryMoods = await query<{ entry_date: string; mood: string; content: string }>(
-    `SELECT entry_date::text, mood, LEFT(content, 80) AS content
-     FROM diary_entries WHERE user_id = $1 ORDER BY entry_date DESC LIMIT 10`,
+    `SELECT entry_date::text, mood, LEFT(COALESCE(full_note, one_liner), 80) AS content
+     FROM planner_diary WHERE user_id = $1 ORDER BY entry_date DESC LIMIT 10`,
     [userId],
   );
   const insights = await query<{ key: string; value: string }>(
@@ -420,8 +420,8 @@ async function compactMemory(userId: string): Promise<void> {
   const entries = await query<{
     id: string; entry_date: string; title: string; content: string; mood: string;
   }>(
-    `SELECT id::text, entry_date::text, title, content, mood
-     FROM diary_entries WHERE user_id = $1 AND entry_date < $2 AND entry_date >= $3
+    `SELECT id::text, entry_date::text, one_liner AS title, COALESCE(full_note, '') AS content, mood
+     FROM planner_diary WHERE user_id = $1 AND entry_date < $2 AND entry_date >= $3
      ORDER BY entry_date`,
     [userId, cutoff, veryOld],
   );
@@ -465,7 +465,7 @@ async function compactMemory(userId: string): Promise<void> {
   for (const s of summaries) await kbUpsert(userId, s.key, s.value, "memory_compactor");
 
   const allIds = summaries.flatMap((s) => s.ids);
-  await query(`DELETE FROM diary_entries WHERE user_id = $1 AND id = ANY($2::uuid[])`, [userId, allIds]);
+  await query(`DELETE FROM planner_diary WHERE user_id = $1 AND id = ANY($2::bigint[])`, [userId, allIds]);
   log(`memory_compaction: ${summaries.length} weeks, ${allIds.length} entries removed (user=${userId.slice(0, 8)}…)`);
 }
 
