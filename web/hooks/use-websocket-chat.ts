@@ -88,11 +88,14 @@ function getWsBase(): string {
   if (typeof window === "undefined") return ""
   const override = process.env.NEXT_PUBLIC_GATEWAY_WS_URL
   if (override) return override
-  // dev: Next.js :3000 → Gateway :8080
-  return window.location.origin
-    .replace(/^https/, "wss")
-    .replace(/^http/, "ws")
-    .replace(/:\d+$/, ":8080")
+  const { protocol, hostname, port } = window.location
+  const wsProto = protocol === "https:" ? "wss" : "ws"
+  if (port) {
+    // dev: Next.js :3000 → Gateway :8080
+    return `${wsProto}://${hostname}:8080`
+  }
+  // production: same origin (nginx proxies /ws → gateway)
+  return `${wsProto}://${hostname}`
 }
 
 const MAX_RECONNECT = 5
