@@ -4,7 +4,10 @@ import { useState, useEffect } from "react"
 import { useTranslations } from "next-intl"
 import { usePlannerStore } from "@/lib/planner-store"
 import { cn } from "@/lib/utils"
-import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, Check, Calendar } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, Check, Calendar, Eye, PenLine } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import rehypeSanitize from "rehype-sanitize"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
@@ -71,6 +74,7 @@ export function NoteTab({ embedded = false }: { embedded?: boolean }) {
   const [draftText, setDraftText] = useState("")
   const [draftOneLiner, setDraftOneLiner] = useState("")
   const [draftMood, setDraftMood] = useState<typeof MOOD_KEYS[number]>("neutral")
+  const [showPreview, setShowPreview] = useState(false)
 
   useEffect(() => {
     const e = diaryEntries[selectedDate]
@@ -221,7 +225,11 @@ export function NoteTab({ embedded = false }: { embedded?: boolean }) {
                   key={note.id}
                   className="group relative rounded-xl border border-border bg-card px-5 py-4 hover:border-primary/30 transition-colors"
                 >
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">{note.text}</p>
+                  <div className="text-sm leading-relaxed text-foreground markdown-body">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                      {note.text}
+                    </ReactMarkdown>
+                  </div>
                   {note.createdAt && (
                     <p className="text-xs text-muted-foreground mt-2">
                       {format(new Date(note.createdAt), "HH:mm")}
@@ -300,22 +308,22 @@ export function NoteTab({ embedded = false }: { embedded?: boolean }) {
                   maxLength={80}
                   autoFocus
                 />
-                <p className="text-xs text-muted-foreground text-right">{draftOneLiner.length}/80</p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs text-muted-foreground">{draftOneLiner.length}/80</p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={handleCancel}>
+                      <X className="w-3 h-3" />{t("note.cancel")}
+                    </Button>
+                    <Button size="sm" className="h-7 gap-1 text-xs" onClick={() => {
+                      setMood(draftMood); setOneLiner(draftOneLiner)
+                      setDiaryEntry(selectedDate, { mood: draftMood, oneLiner: draftOneLiner })
+                      setViewMode("view")
+                    }} style={{ background: "var(--priority-a)", color: "#ffffff" }}>
+                      <Check className="w-3 h-3" />{t("note.editDone")}
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </div>
-
-            {/* Action bar */}
-            <div className="flex gap-2 px-6 py-4 border-t border-border shrink-0">
-              <Button variant="outline" className="flex-1 gap-1.5" onClick={handleCancel}>
-                <X className="w-3.5 h-3.5" />{t("note.cancel")}
-              </Button>
-              <Button className="flex-1 gap-1.5" onClick={() => {
-                setMood(draftMood); setOneLiner(draftOneLiner)
-                setDiaryEntry(selectedDate, { mood: draftMood, oneLiner: draftOneLiner })
-                setViewMode("view")
-              }} style={{ background: "var(--priority-a)", color: "#ffffff" }}>
-                <Check className="w-3.5 h-3.5" />{t("note.editDone")}
-              </Button>
             </div>
           </div>
         )}
@@ -325,27 +333,51 @@ export function NoteTab({ embedded = false }: { embedded?: boolean }) {
           <div className="flex flex-col flex-1 overflow-hidden">
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
               <div className="space-y-1.5">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">
-                  {viewMode === "new" ? t("note.noteContent") : t("note.noteEdit")}
-                </p>
-                <Textarea
-                  value={draftText}
-                  onChange={(e) => setDraftText(e.target.value)}
-                  placeholder={t("note.notePlaceholder")}
-                  className="text-sm bg-muted border-border resize-none leading-relaxed min-h-48"
-                  autoFocus
-                />
+                <div className="flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">
+                    {viewMode === "new" ? t("note.noteContent") : t("note.noteEdit")}
+                  </p>
+                  <button
+                    onClick={() => setShowPreview(!showPreview)}
+                    className={cn(
+                      "flex items-center gap-1 text-xs px-2 py-0.5 rounded transition-colors",
+                      showPreview
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    {showPreview ? <PenLine className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    {showPreview ? t("note.noteEdit") : t("note.preview")}
+                  </button>
+                </div>
+                {showPreview ? (
+                  <div className="rounded-lg border border-border bg-card px-4 py-3 min-h-48 overflow-y-auto text-sm leading-relaxed markdown-body">
+                    {draftText.trim() ? (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                        {draftText}
+                      </ReactMarkdown>
+                    ) : (
+                      <p className="text-muted-foreground italic">{t("note.previewEmpty")}</p>
+                    )}
+                  </div>
+                ) : (
+                  <Textarea
+                    value={draftText}
+                    onChange={(e) => setDraftText(e.target.value)}
+                    placeholder={t("note.notePlaceholder")}
+                    className="text-sm bg-muted border-border resize-none leading-relaxed min-h-48"
+                    autoFocus
+                  />
+                )}
+                <div className="flex justify-end gap-2 mt-1">
+                  <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => { setShowPreview(false); handleCancel() }}>
+                    <X className="w-3 h-3" />{t("note.cancel")}
+                  </Button>
+                  <Button size="sm" className="h-7 gap-1 text-xs" onClick={() => { setShowPreview(false); handleSave() }} style={{ background: "var(--priority-a)", color: "#ffffff" }}>
+                    <Check className="w-3 h-3" />{viewMode === "new" ? t("note.save") : t("note.editDone")}
+                  </Button>
+                </div>
               </div>
-            </div>
-
-            {/* Action bar */}
-            <div className="flex gap-2 px-6 py-4 border-t border-border shrink-0">
-              <Button variant="outline" className="flex-1 gap-1.5" onClick={handleCancel}>
-                <X className="w-3.5 h-3.5" />{t("note.cancel")}
-              </Button>
-              <Button className="flex-1 gap-1.5" onClick={handleSave} style={{ background: "var(--priority-a)", color: "#ffffff" }}>
-                <Check className="w-3.5 h-3.5" />{viewMode === "new" ? t("note.save") : t("note.editDone")}
-              </Button>
             </div>
           </div>
         )}

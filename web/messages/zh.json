@@ -2187,7 +2187,9 @@
       "goToday": "Today",
       "cancel": "取消",
       "save": "保存",
-      "edit": "编辑"
+      "edit": "编辑",
+      "preview": "预览",
+      "previewEmpty": "没有可预览的内容。"
     },
     "mood": {
       "great": "最好",

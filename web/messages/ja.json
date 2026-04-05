@@ -2187,7 +2187,9 @@
       "goToday": "Today",
       "cancel": "キャンセル",
       "save": "保存",
-      "edit": "編集"
+      "edit": "編集",
+      "preview": "プレビュー",
+      "previewEmpty": "プレビューする内容がありません。"
     },
     "mood": {
       "great": "最高",

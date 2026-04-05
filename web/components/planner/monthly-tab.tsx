@@ -348,7 +348,7 @@ export function MonthlyTab({
       </div>
 
       {/* Bottom: 주요 업무 + 월간 목표 */}
-      <div className="shrink-0 border-t border-border" style={{ minHeight: 120 }}>
+      <div className="border-t border-border overflow-hidden" style={{ height: "20%", minHeight: 120 }}>
         <div className="grid grid-cols-1 sm:grid-cols-2 h-full sm:divide-x divide-border">
           {/* 주요 업무 (A 우선순위 미완료) */}
           <div className="flex flex-col">

@@ -2145,7 +2145,9 @@
       "goToday": "오늘로",
       "cancel": "취소",
       "save": "저장",
-      "edit": "수정"
+      "edit": "수정",
+      "preview": "미리보기",
+      "previewEmpty": "미리볼 내용이 없습니다."
     },
     "mood": {
       "great": "최고",

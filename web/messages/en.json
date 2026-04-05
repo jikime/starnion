@@ -2148,7 +2148,9 @@
       "goToday": "Today",
       "cancel": "Cancel",
       "save": "Save",
-      "edit": "Edit"
+      "edit": "Edit",
+      "preview": "Preview",
+      "previewEmpty": "Nothing to preview."
     },
     "mood": {
       "great": "Great",
