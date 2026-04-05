@@ -63,6 +63,7 @@ def cmd_add(args):
     pri, order = parse_priority(args.priority)
     title = esc(args.title)
     role_clause = f"'{args.role_id}'" if args.role_id else "NULL"
+    wg_clause = f"'{args.weekly_goal_id}'" if args.weekly_goal_id else "NULL"
     ts = f"'{args.time_start}:00'" if args.time_start else "NULL"
     te = f"'{args.time_end}:00'" if args.time_end else "NULL"
     if order is not None:
@@ -73,8 +74,8 @@ def cmd_add(args):
             f"WHERE user_id='{args.user_id}' AND task_date='{d}' AND priority='{pri}' AND is_inbox=FALSE)"
         )
     sql = (
-        f"INSERT INTO planner_tasks (user_id, title, priority, role_id, task_date, time_start, time_end, sort_order) "
-        f"VALUES ('{args.user_id}', '{title}', '{pri}', {role_clause}, '{d}', {ts}, {te}, {order_clause}) "
+        f"INSERT INTO planner_tasks (user_id, title, priority, role_id, task_date, time_start, time_end, sort_order, weekly_goal_id) "
+        f"VALUES ('{args.user_id}', '{title}', '{pri}', {role_clause}, '{d}', {ts}, {te}, {order_clause}, {wg_clause}) "
         f"RETURNING id, sort_order;"
     )
     result = psql(sql)
@@ -236,6 +237,7 @@ p_add.add_argument("--role-id")
 p_add.add_argument("--date")
 p_add.add_argument("--time-start", type=int)
 p_add.add_argument("--time-end", type=int)
+p_add.add_argument("--weekly-goal-id", help="Link to weekly key plan")
 
 p_list = sub.add_parser("list")
 p_list.add_argument("--date")

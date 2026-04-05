@@ -46,6 +46,7 @@ Examples:
 \`\`\`bash
 python3 finance/scripts/finance.py --user-id ${userId} save --amount -12000 --category 식비 --description "점심"
 python3 planner-tasks/scripts/planner_tasks.py --user-id ${userId} add --title "보고서 작성" --priority A
+python3 planner-tasks/scripts/planner_tasks.py --user-id ${userId} add --title "API 스키마 작성" --priority A --weekly-goal-id 42
 python3 planner-diary/scripts/planner_diary.py --user-id ${userId} write --text "오늘 하루 요약" --mood good
 python3 planner-goals/scripts/planner_goals.py --user-id ${userId} add --title "유럽 여행" --due-date 2026-12-31
 \`\`\`

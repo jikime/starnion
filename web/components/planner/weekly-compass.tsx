@@ -162,6 +162,13 @@ function InlineAddTaskForm({
           onChange={(e) => setDate(e.target.value)}
           className="h-5 text-xs bg-muted border border-border rounded px-1 text-foreground flex-1 min-w-0"
         />
+        {/* Cancel */}
+        <button
+          onClick={onClose}
+          className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+        >
+          <X className="w-2.5 h-2.5" />
+        </button>
         {/* Submit */}
         <Button
           size="sm"
@@ -462,6 +469,12 @@ function RoleCard({
             }}
             autoFocus
           />
+          <button
+            onClick={() => { setAdding(false); setDraft("") }}
+            className="h-7 w-7 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+          >
+            <X className="w-3 h-3" />
+          </button>
           <Button
             size="sm"
             className="h-7 text-xs px-2 shrink-0"

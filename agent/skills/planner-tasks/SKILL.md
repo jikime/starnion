@@ -59,9 +59,11 @@ python3 planner-tasks/scripts/planner_tasks.py --user-id UID search --keyword "�
 
 ### add — Add a new task
 `--priority` accepts `A`, `A1`, `B2`, `C3` format. The number sets the sort order (1-based).
+`--weekly-goal-id` links the task to a weekly key plan (optional).
 ```bash
-python3 planner-tasks/scripts/planner_tasks.py --user-id UID add --title "보고서 작성" --priority A1 [--role-id 1] [--date 2026-04-03] [--time-start 9] [--time-end 11]
+python3 planner-tasks/scripts/planner_tasks.py --user-id UID add --title "보고서 작성" --priority A1 [--role-id 1] [--date 2026-04-03] [--time-start 9] [--time-end 11] [--weekly-goal-id 42]
 # Examples: --priority A (auto order), --priority A1 (first A task), --priority B2 (second B task)
+# Link to weekly plan: --weekly-goal-id 42 (get ID from planner-weekly list)
 ```
 
 ### list — List tasks for a date

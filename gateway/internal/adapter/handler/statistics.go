@@ -297,7 +297,7 @@ func (h *StatisticsHandler) GetAnalytics(c echo.Context) error {
 	lastMonth := now.AddDate(0, -1, 0).Format("2006-01")
 
 	// ── Summary ───────────────────────────────────────────────────────────────
-	// Web chat messages (messages table via conversations)
+	// Web chat messages (messages table via conversations, web platform only)
 	var webTotal, webUser, webAI, webThisMonth, webLastMonth int
 	h.db.QueryRowContext(ctx,
 		`SELECT COUNT(*),
@@ -307,18 +307,26 @@ func (h *StatisticsHandler) GetAnalytics(c echo.Context) error {
 		        COALESCE(SUM(CASE WHEN TO_CHAR(m.created_at,'YYYY-MM')=$3 THEN 1 ELSE 0 END),0)
 		 FROM messages m
 		 JOIN conversations c ON c.id = m.conversation_id
-		 WHERE c.user_id = $1`, userID, thisMonth, lastMonth,
+		 WHERE c.user_id = $1 AND c.platform = 'web'`, userID, thisMonth, lastMonth,
 	).Scan(&webTotal, &webUser, &webAI, &webThisMonth, &webLastMonth)
 
-	// Telegram / session messages (chat_messages table)
+	// Telegram messages (messages table via conversations, telegram platform)
+	// + legacy chat_messages table for older sessions
 	var tgTotal, tgUser, tgAI, tgThisMonth, tgLastMonth int
 	h.db.QueryRowContext(ctx,
 		`SELECT COUNT(*),
 		        COALESCE(SUM(CASE WHEN role='user'      THEN 1 ELSE 0 END),0),
 		        COALESCE(SUM(CASE WHEN role='assistant' THEN 1 ELSE 0 END),0),
-		        COALESCE(SUM(CASE WHEN TO_CHAR(created_at,'YYYY-MM')=$2 THEN 1 ELSE 0 END),0),
-		        COALESCE(SUM(CASE WHEN TO_CHAR(created_at,'YYYY-MM')=$3 THEN 1 ELSE 0 END),0)
-		 FROM chat_messages WHERE user_id = $1`, userID, thisMonth, lastMonth,
+		        COALESCE(SUM(CASE WHEN TO_CHAR(ca,'YYYY-MM')=$2 THEN 1 ELSE 0 END),0),
+		        COALESCE(SUM(CASE WHEN TO_CHAR(ca,'YYYY-MM')=$3 THEN 1 ELSE 0 END),0)
+		 FROM (
+		   SELECT m.role, m.created_at AS ca FROM messages m
+		   JOIN conversations c ON c.id = m.conversation_id
+		   WHERE c.user_id = $1 AND c.platform = 'telegram'
+		   UNION ALL
+		   SELECT role, created_at AS ca FROM chat_messages
+		   WHERE user_id = $1
+		 ) combined`, userID, thisMonth, lastMonth,
 	).Scan(&tgTotal, &tgUser, &tgAI, &tgThisMonth, &tgLastMonth)
 
 	totalMessages := webTotal + tgTotal
@@ -456,13 +464,19 @@ func (h *StatisticsHandler) GetAnalytics(c echo.Context) error {
 	// ── Platform breakdown ────────────────────────────────────────────────────
 	var webConvCount int
 	h.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM conversations WHERE user_id = $1`, userID,
+		`SELECT COUNT(*) FROM conversations WHERE user_id = $1 AND platform = 'web'`, userID,
 	).Scan(&webConvCount)
 
 	var tgConvCount int
 	h.db.QueryRowContext(ctx,
-		`SELECT COUNT(DISTINCT session_id) FROM chat_messages WHERE user_id = $1`, userID,
+		`SELECT COUNT(*) FROM conversations WHERE user_id = $1 AND platform = 'telegram'`, userID,
 	).Scan(&tgConvCount)
+	// Add legacy chat_sessions count
+	var legacyTgCount int
+	h.db.QueryRowContext(ctx,
+		`SELECT COUNT(DISTINCT session_id) FROM chat_messages WHERE user_id = $1`, userID,
+	).Scan(&legacyTgCount)
+	tgConvCount += legacyTgCount
 
 	platforms := []map[string]any{
 		{"platform": "web", "messages": webTotal, "conversations": webConvCount},

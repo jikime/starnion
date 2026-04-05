@@ -379,21 +379,31 @@ export function BudgetView() {
   }
 
   // ── derived ──────────────────────────────────────────────────────────────
+  const budgetItems = data?.budgets ?? []
+
+  // Filter out "전체" — it's not a real category, just the total
+  const categoryItems = budgetItems.filter(b => b.category !== "전체")
+
+  // Recompute totals from real categories only (gateway may include "전체" in aggregates)
+  const realTotalSpent = categoryItems.reduce((s, b) => s + b.spent, 0)
+  const realTotalBudget = categoryItems.reduce((s, b) => s + b.budget, 0)
+  const realTotalRemaining = realTotalBudget - realTotalSpent
+  const realTotalPercent = realTotalBudget > 0 ? (realTotalSpent / realTotalBudget) * 100 : 0
+
   const chart = data?.monthly_spend_chart ?? []
   const prevMonthSpent = chart.length >= 2 ? chart[chart.length - 2].spent : 0
-  const curMonthSpent = data?.total_spent ?? 0
+  const curMonthSpent = realTotalSpent
   const spentDelta = prevMonthSpent > 0
     ? ((curMonthSpent - prevMonthSpent) / prevMonthSpent) * 100
     : 0
 
-  const budgetItems = data?.budgets ?? []
-  const overItems = budgetItems.filter(b => b.percent >= (data?.danger_threshold ?? 90))
-  const warnItems = budgetItems.filter(
+  const overItems = categoryItems.filter(b => b.percent >= (data?.danger_threshold ?? 90))
+  const warnItems = categoryItems.filter(
     b => b.percent >= (data?.warning_threshold ?? 70) && b.percent < (data?.danger_threshold ?? 90)
   )
 
   // ⑨ 정렬 기준 반영
-  const sortedItems = [...budgetItems].sort((a, b) => {
+  const sortedItems = [...categoryItems].sort((a, b) => {
     if (sortBy === "percent") return b.percent - a.percent
     if (sortBy === "remaining") {
       const remA = (a.budget > 0 ? a.budget : 0) - a.spent
@@ -402,17 +412,17 @@ export function BudgetView() {
     }
     return b.spent - a.spent  // default: 지출 금액
   })
-  const maxSpent = [...budgetItems].sort((a, b) => b.spent - a.spent)[0]?.spent || 1
+  const maxSpent = [...categoryItems].sort((a, b) => b.spent - a.spent)[0]?.spent || 1
 
-  const hasBudgets = budgetItems.some(b => b.budget > 0)
-  const totalPct = data?.total_percent ?? 0
-  const totalOverAmt = (data?.total_spent ?? 0) - (data?.total_budget ?? 0)
+  const hasBudgets = categoryItems.some(b => b.budget > 0)
+  const totalPct = realTotalPercent
+  const totalOverAmt = realTotalSpent - realTotalBudget
 
   // ⑩ 잔여예산 의미있는 표시값
-  const remainingPct = data?.total_budget
-    ? (data.total_remaining / data.total_budget) * 100
+  const remainingPct = realTotalBudget > 0
+    ? (realTotalRemaining / realTotalBudget) * 100
     : 0
-  const remainingSub = data?.total_budget
+  const remainingSub = realTotalBudget > 0
     ? remainingPct >= 0
       ? t("remainingPctLabel", { pct: remainingPct.toFixed(0) })
       : t("overPctLabel", { pct: Math.abs(remainingPct).toFixed(0) })
@@ -561,11 +571,11 @@ export function BudgetView() {
         {/* ① 총예산: 카테고리별 예산 분포 차트 */}
         <MetricCard
           label={t("totalBudget")}
-          value={KRW(data?.total_budget ?? 0)}
-          sub={t("categoriesConfigured", { n: budgetItems.filter(b => b.budget > 0).length, total: CATEGORIES.length })}
+          value={KRW(realTotalBudget)}
+          sub={t("categoriesConfigured", { n: categoryItems.filter(b => b.budget > 0).length, total: CATEGORIES.length })}
           chart={
             <div className="text-blue-500">
-              <BudgetAllocChart items={budgetItems} />
+              <BudgetAllocChart items={categoryItems} />
             </div>
           }
           color=""
@@ -586,7 +596,7 @@ export function BudgetView() {
         {/* ⑩ 잔여예산: 의미있는 sub + delta 제거 */}
         <MetricCard
           label={t("remainingBudget")}
-          value={KRW(data?.total_remaining ?? 0)}
+          value={KRW(realTotalRemaining)}
           sub={remainingSub}
           chart={
             <div className="text-emerald-500">
@@ -602,7 +612,7 @@ export function BudgetView() {
         <IconCard
           icon={Wallet}
           iconBg="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-          value={`${(data?.total_percent ?? 0).toFixed(1)}%`}
+          value={`${realTotalPercent.toFixed(1)}%`}
           label={t("totalUsageRate")}
           period={monthLabel}
           delta={spentDelta}
@@ -784,7 +794,7 @@ export function BudgetView() {
           <p className="font-semibold text-base">{t("totalProgress")}</p>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">
-              {KRW(data?.total_spent ?? 0)} / {KRW(data?.total_budget ?? 0)}
+              {KRW(realTotalSpent)} / {KRW(realTotalBudget)}
             </span>
             {totalPct > 100 && totalOverAmt > 0 && (
               <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
@@ -820,8 +830,8 @@ export function BudgetView() {
           <span>{t("used")} {totalPct.toFixed(1)}%</span>
           <span>
             {totalPct > 100
-              ? <span className="text-rose-600 font-medium">{t("overSpentLabel", { amount: KRW(Math.abs(data?.total_remaining ?? 0)) })}</span>
-              : <>{t("remaining")} {KRW(data?.total_remaining ?? 0)}</>
+              ? <span className="text-rose-600 font-medium">{t("overSpentLabel", { amount: KRW(Math.abs(realTotalRemaining)) })}</span>
+              : <>{t("remaining")} {KRW(realTotalRemaining)}</>
             }
           </span>
         </div>

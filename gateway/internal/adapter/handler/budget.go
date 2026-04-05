@@ -65,8 +65,8 @@ func (h *BudgetHandler) GetBudget(c echo.Context) error {
 			}
 		}
 	}
-	// '전체' is a special total-budget category — map it to sum of all expenses
-	spendMap["전체"] = totalSpendAll
+	// '전체' is NOT a category — it's the total across all categories.
+	// Tracked separately and returned as a top-level field.
 
 	// ── Budget limits ─────────────────────────────────────────────────────
 	limitMap := map[string]int64{}
@@ -112,6 +112,10 @@ func (h *BudgetHandler) GetBudget(c echo.Context) error {
 	}
 
 	// ── Build budget items (union of categories with spend or limit) ──────
+	// Exclude "전체" — it's a UI-level total, not a real category.
+	delete(spendMap, "전체")
+	delete(limitMap, "전체")
+
 	seen := map[string]bool{}
 	var budgets []map[string]any
 	for cat, spent := range spendMap {
