@@ -211,9 +211,19 @@ export function useWebSocketChat(
         const newMsgs: Array<{ id: string; role: string; content: string; created_at: string; attachments?: FileAttachment[]; bot_name?: string; model_used?: string; input_tokens?: number; output_tokens?: number; context_tokens?: number; context_window?: number; tool_events?: string }> = data.messages ?? []
         if (newMsgs.length === 0) return
 
-        // Deduplicate by id
+        // Deduplicate by id + content similarity (client uses nanoid, server uses DB id)
         const existingIds = new Set(msgs.map((m: ChatMessage) => m.id))
-        const filtered = newMsgs.filter(m => !existingIds.has(m.id))
+        const filtered = newMsgs.filter(m => {
+          if (existingIds.has(m.id)) return false
+          if (m.role === "user") {
+            const isDupe = msgs.some(
+              (e: ChatMessage) => e.role === "user" && e.text === m.content &&
+                Math.abs(new Date(m.created_at).getTime() - e.timestamp.getTime()) < 30000
+            )
+            if (isDupe) return false
+          }
+          return true
+        })
         if (filtered.length === 0) return
 
         setHistoryMessages(prev => [...prev, ...filtered.map(toMessage)])

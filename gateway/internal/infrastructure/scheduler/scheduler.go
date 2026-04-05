@@ -115,8 +115,7 @@ var builtinJobs = []systemJob{
 	// Level 3: Autonomous
 	{id: "goal_evaluation", cronExpr: "0 7 * * *", actionType: "report", reportType: "goals"},
 	{id: "goal_status", cronExpr: "0 12 * * 3", actionType: "report", reportType: "goals"},
-	{id: "dday_notification", cronExpr: "0 8 * * *", actionType: "notify",
-		notifType: "dday_notification", message: "오늘의 D-Day를 확인해보세요."},
+	// dday_notification removed — D-Day is now part of planner_goals
 	// Level 5: Maintenance
 	{id: "memory_compaction", cronExpr: "0 5 * * 1", actionType: "maintenance"},
 }
@@ -773,9 +772,9 @@ func (s *Scheduler) smartAnomalyInsights(ctx context.Context, userID string) (st
 	// ── Signal 3: Stalled goals ───────────────────────────────────────────────
 	{
 		rows, err := s.db.QueryContext(ctx, `
-			SELECT title, updated_at, target_date
-			FROM goals
-			WHERE user_id = $1::uuid AND status = 'active' AND progress < 100`, userID)
+			SELECT title, updated_at, due_date
+			FROM planner_goals
+			WHERE user_id = $1::uuid AND status = 'active'`, userID)
 		if err == nil {
 			now := time.Now()
 			for rows.Next() {

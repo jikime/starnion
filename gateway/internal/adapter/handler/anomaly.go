@@ -262,18 +262,17 @@ func (h *AnomalyHandler) GetAnomalies(c echo.Context) error {
 
 	// ── 3. Stalled goals detection ────────────────────────────────────────────
 	goalRows, err := h.db.QueryContext(ctx, `
-		SELECT title, progress, target_date, updated_at
-		FROM goals
-		WHERE user_id = $1 AND status = 'active' AND progress < 100`, userID)
+		SELECT title, due_date, updated_at
+		FROM planner_goals
+		WHERE user_id = $1 AND status = 'active'`, userID)
 	if err == nil {
 		defer goalRows.Close()
 		now := time.Now()
 		for goalRows.Next() {
 			var title string
-			var progress int
 			var targetDate *time.Time
 			var updatedAt time.Time
-			if goalRows.Scan(&title, &progress, &targetDate, &updatedAt) != nil {
+			if goalRows.Scan(&title, &targetDate, &updatedAt) != nil {
 				continue
 			}
 

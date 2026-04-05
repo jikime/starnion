@@ -78,6 +78,16 @@ func New(logger *zap.Logger) (*Server, error) {
 		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization, "X-Request-ID"},
 	}))
 
+	// ── Gzip Compression ──────────────────────────────────────────────────────
+	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{
+		Level: 6,
+		Skipper: func(c echo.Context) bool {
+			// Skip SSE and WebSocket — streaming must not be buffered
+			return c.Request().Header.Get("Accept") == "text/event-stream" ||
+				c.Request().Header.Get("Upgrade") == "websocket"
+		},
+	}))
+
 	// ── Security Headers ──────────────────────────────────────────────────────
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {

@@ -1,10 +1,14 @@
-import { NextRequest } from "next/server"
+import { auth } from "@/lib/auth"
+import { NextRequest, NextResponse } from "next/server"
 
 import { gatewayFetch } from "@/lib/gateway"
 
 export const dynamic = "force-dynamic"
 
 export async function GET(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+
   const upstreamRes = await gatewayFetch(`/api/v1/logs/stream`, {
     cache: "no-store",
     headers: { Accept: "text/event-stream" },

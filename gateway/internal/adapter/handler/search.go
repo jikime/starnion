@@ -178,7 +178,7 @@ func (h *SearchHandler) Delete(c echo.Context) error {
 }
 
 // GET /api/v1/search/hybrid?q=...&limit=20
-// Hybrid search across diary entries, memos, and knowledge base.
+// Hybrid search across planner diary and knowledge base.
 // Uses PostgreSQL FTS (tsvector + ts_rank) AND, when the user has a Gemini API
 // key stored, also runs pgvector cosine-similarity search to surface semantically
 // related results. Deduplicates by (type, id) and sorts by descending score.

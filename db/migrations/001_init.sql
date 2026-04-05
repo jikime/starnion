@@ -497,6 +497,8 @@ CREATE INDEX IF NOT EXISTS idx_daily_logs_content_tsv  ON daily_logs USING gin(c
 -- knowledge_base
 CREATE INDEX IF NOT EXISTS idx_knowledge_base_user_id    ON knowledge_base(user_id);
 CREATE INDEX IF NOT EXISTS idx_knowledge_base_user_key   ON knowledge_base(user_id, key);
+CREATE INDEX IF NOT EXISTS idx_knowledge_base_embedding  ON knowledge_base
+    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 CREATE INDEX IF NOT EXISTS idx_knowledge_base_content_tsv ON knowledge_base USING gin(content_tsv);
 
 -- conversations

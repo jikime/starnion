@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import ReactMarkdown from "react-markdown"
+import rehypeSanitize from "rehype-sanitize"
 import remarkGfm from "remark-gfm"
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
@@ -827,7 +828,7 @@ function DetailPanel({ file, onClose, onDelete, onDownload }: {
             <div>
               <p className="text-xs font-semibold text-muted-foreground mb-1">{t("analysis")}</p>
               <div className="bg-muted/50 rounded-lg p-3 markdown-body">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{file.analysis}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{file.analysis}</ReactMarkdown>
               </div>
             </div>
           )}
@@ -835,7 +836,7 @@ function DetailPanel({ file, onClose, onDelete, onDownload }: {
             <div>
               <p className="text-xs font-semibold text-muted-foreground mb-1">{t("transcript")}</p>
               <div className="bg-muted/50 rounded-lg p-3 markdown-body">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{file.transcript}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{file.transcript}</ReactMarkdown>
               </div>
             </div>
           )}
@@ -843,7 +844,7 @@ function DetailPanel({ file, onClose, onDelete, onDownload }: {
             <div>
               <p className="text-xs font-semibold text-muted-foreground mb-1">{t("prompt")}</p>
               <div className="bg-muted/50 rounded-lg p-3 markdown-body">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{file.prompt}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{file.prompt}</ReactMarkdown>
               </div>
             </div>
           )}

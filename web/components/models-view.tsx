@@ -28,7 +28,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
-import { siAnthropic, siGooglegemini, siOllama } from "simple-icons"
+import { siAnthropic, siGooglegemini, siOllama } from "@/lib/simple-icons"
 
 // ── Provider brand icons ─────────────────────────────────────────────────────
 

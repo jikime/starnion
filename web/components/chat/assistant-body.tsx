@@ -2,6 +2,7 @@
 
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import rehypeSanitize from "rehype-sanitize"
 import { CodeBlock } from "@/components/chat/code-block"
 import { DocDownloadCard, DOC_FILE_RE } from "@/components/chat/file-preview"
 import type { ChatMessage } from "@/hooks/use-chat"
@@ -12,6 +13,7 @@ export function AssistantBody({ message }: { message: ChatMessage }) {
     <div className="chat-prose">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeSanitize]}
         components={{
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           a: ({ href, children, ...props }: any) => {

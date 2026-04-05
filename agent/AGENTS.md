@@ -10,15 +10,12 @@ Use this table to decide which skill to use BEFORE reading individual SKILL.md f
 
 | User intent keywords | Skill | Subcommand |
 |---------------------|-------|------------|
-| "메모해줘", "적어줘", "기록해줘", "노트해줘", "남겨줘", "저장해줘" | diary | `log` |
-| "일기 써줘", "오늘 일기", "일기 작성" | diary | `save` |
-| "일기 보여줘", "최근 일기", "메모 보여줘" | diary | `list` |
-| "지출", "수입", "가계부", "얼마 썼어", "돈", "결제", "샀어" | finance | `add` or `list` |
-| "목표", "goal", "달성", "진행률" | goals | `add`, `list`, or `update` |
-| "디데이", "d-day", "며칠 남았", "날짜 계산" | dday | `add` or `list` |
+| "일기 써줘", "오늘 일기", "기록해줘" | planner-diary | `write` |
+| "일기 보여줘", "최근 일기" | planner-diary | `read` |
+| "업무 추가", "할일", "태스크" | planner-tasks | `add` |
+| "목표", "goal", "달성" | planner-goals | `add`, `list` |
+| "지출", "수입", "가계부", "얼마 썼어", "돈" | finance | `add` or `list` |
 | `[audio:name:url]` tag in message | audio | `transcribe` |
-
-**CRITICAL RULE**: "메모해줘", "기록해줘", "적어줘" → ALWAYS use diary `log` subcommand, NOT `save`.
 
 ## Attached Files
 
@@ -36,8 +33,8 @@ The `log` subcommand is for quick memos. The `save` subcommand is ONLY for full 
 - For financial records: expenses are negative numbers, income is positive
 - When recording data, confirm what was saved
 - Tools are Python scripts inside each skill's `scripts/` folder — run them with `python3`:
-  - Finance: `python3 finance/scripts/starnion-finance.py`
-  - Diary:   `python3 diary/scripts/starnion-diary.py`
-  - Goals:   `python3 goals/scripts/starnion-goals.py`
-  - D-Day:   `python3 dday/scripts/starnion-dday.py`
+  - Finance: `python3 finance/scripts/finance.py`
+  - Planner Tasks: `python3 planner-tasks/scripts/planner_tasks.py`
+  - Planner Diary: `python3 planner-diary/scripts/planner_diary.py`
+  - Planner Goals: `python3 planner-goals/scripts/planner_goals.py`
 - Each SKILL.md documents exact flags — do NOT run `--help` to discover them, use SKILL.md instead

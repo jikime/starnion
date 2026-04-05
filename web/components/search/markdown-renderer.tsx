@@ -1,11 +1,13 @@
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import rehypeSanitize from "rehype-sanitize"
 import { Separator } from "@/components/ui/separator"
 
 export function Md({ content }: { content: string }) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
+      rehypePlugins={[rehypeSanitize]}
       components={{
         a: ({ href, children }) => (
           <a href={href} target="_blank" rel="noopener noreferrer"
