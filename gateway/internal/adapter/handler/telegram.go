@@ -1566,8 +1566,17 @@ func (h *TelegramHandler) LinkTelegramByCode(c echo.Context) error {
 	}
 
 	// Migrate ghost user's data to the current web account.
-	for _, tbl := range []string{"finance_records", "planner_tasks", "planner_roles", "planner_goals", "planner_diary", "conversations", "knowledge_base"} {
-		h.db.ExecContext(ctx, fmt.Sprintf(`UPDATE %s SET user_id = $1 WHERE user_id = $2`, tbl), userID, ghostID)
+	migrateTables := []string{
+		`UPDATE finance_records SET user_id = $1 WHERE user_id = $2`,
+		`UPDATE planner_tasks SET user_id = $1 WHERE user_id = $2`,
+		`UPDATE planner_roles SET user_id = $1 WHERE user_id = $2`,
+		`UPDATE planner_goals SET user_id = $1 WHERE user_id = $2`,
+		`UPDATE planner_diary SET user_id = $1 WHERE user_id = $2`,
+		`UPDATE conversations SET user_id = $1 WHERE user_id = $2`,
+		`UPDATE knowledge_base SET user_id = $1 WHERE user_id = $2`,
+	}
+	for _, q := range migrateTables {
+		h.db.ExecContext(ctx, q, userID, ghostID)
 	}
 	h.db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, ghostID)
 

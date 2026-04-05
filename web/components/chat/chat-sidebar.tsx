@@ -68,7 +68,7 @@ export function ChatSidebar({
           open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
       >
-        <div className="p-3 border-b border-border">
+        <div className="flex items-center h-[49px] md:h-[57px] px-3 md:px-4 border-b border-border shrink-0">
           <Button
             className="w-full gap-2"
             size="sm"

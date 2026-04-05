@@ -10,6 +10,7 @@ import (
 	"github.com/newstarnion/gateway/config"
 	"github.com/newstarnion/gateway/internal/infrastructure/database"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 type PlannerHandler struct {
@@ -33,33 +34,55 @@ func (h *PlannerHandler) Snapshot(c echo.Context) error {
 	uid := userID.String()
 
 	today := time.Now().Format("2006-01-02")
+	monday := mondayOf(time.Now()).Format("2006-01-02")
 
-	// Roles
-	roles := []map[string]any{}
-	rows, err := h.db.QueryContext(ctx, `SELECT id, name, color, big_rock, COALESCE(mission,'') as mission, sort_order FROM planner_roles WHERE user_id = $1 ORDER BY sort_order`, uid)
-	if err == nil {
+	// Result variables — each goroutine writes to its own slice/string.
+	var (
+		roles       []map[string]any
+		tasks       []map[string]any
+		inbox       []map[string]any
+		wgoals      []map[string]any
+		goals       []map[string]any
+		diary       []map[string]any
+		reflections []map[string]any
+		mission     string
+	)
+
+	g, gctx := errgroup.WithContext(ctx)
+
+	// 1. Roles
+	g.Go(func() error {
+		rows, err := h.db.QueryContext(gctx, `SELECT id, name, color, big_rock, COALESCE(mission,'') as mission, sort_order FROM planner_roles WHERE user_id = $1 ORDER BY sort_order`, uid)
+		if err != nil {
+			h.logger.Warn("snapshot: roles query failed", zap.Error(err))
+			return nil
+		}
 		defer rows.Close()
 		for rows.Next() {
 			var id int64
-			var name, color, bigRock, mission string
+			var name, color, bigRock, m string
 			var sortOrder int
-			if err := rows.Scan(&id, &name, &color, &bigRock, &mission, &sortOrder); err != nil {
+			if err := rows.Scan(&id, &name, &color, &bigRock, &m, &sortOrder); err != nil {
 				continue
 			}
-			roles = append(roles, map[string]any{"id": id, "name": name, "color": color, "bigRock": bigRock, "mission": mission, "sortOrder": sortOrder})
+			roles = append(roles, map[string]any{"id": id, "name": name, "color": color, "bigRock": bigRock, "mission": m, "sortOrder": sortOrder})
 		}
-	}
+		return nil
+	})
 
-	// Tasks (today ± 7 days)
-	tasks := []map[string]any{}
-	tRows, err := h.db.QueryContext(ctx, `SELECT id, title, status, priority, sort_order, COALESCE(role_id,0), COALESCE(time_start,''), COALESCE(time_end,''), COALESCE(delegatee,''), COALESCE(note,''), task_date::text, COALESCE(forwarded_from_id,0) FROM planner_tasks WHERE user_id = $1 AND is_inbox = FALSE AND task_date BETWEEN ($2::date - 7) AND ($2::date + 7) ORDER BY task_date, priority, sort_order`, uid, today)
-	if err == nil {
-		defer tRows.Close()
-		for tRows.Next() {
+	// 2. Tasks (today +/- 7 days)
+	g.Go(func() error {
+		rows, err := h.db.QueryContext(gctx, `SELECT id, title, status, priority, sort_order, COALESCE(role_id,0), COALESCE(time_start,''), COALESCE(time_end,''), COALESCE(delegatee,''), COALESCE(note,''), task_date::text, COALESCE(forwarded_from_id,0) FROM planner_tasks WHERE user_id = $1 AND is_inbox = FALSE AND task_date BETWEEN ($2::date - 7) AND ($2::date + 7) ORDER BY task_date, priority, sort_order`, uid, today)
+		if err != nil {
+			h.logger.Warn("snapshot: tasks query failed", zap.Error(err))
+			return nil
+		}
+		defer rows.Close()
+		for rows.Next() {
 			var id, roleID, fwdID int64
 			var title, status, priority, timeStart, timeEnd, delegatee, note, date string
 			var sortOrder int
-			if err := tRows.Scan(&id, &title, &status, &priority, &sortOrder, &roleID, &timeStart, &timeEnd, &delegatee, &note, &date, &fwdID); err != nil {
+			if err := rows.Scan(&id, &title, &status, &priority, &sortOrder, &roleID, &timeStart, &timeEnd, &delegatee, &note, &date, &fwdID); err != nil {
 				continue
 			}
 			t := map[string]any{"id": id, "title": title, "status": status, "priority": priority, "order": sortOrder, "timeStart": timeStart, "timeEnd": timeEnd, "delegatee": delegatee, "note": note, "date": date}
@@ -71,101 +94,153 @@ func (h *PlannerHandler) Snapshot(c echo.Context) error {
 			}
 			tasks = append(tasks, t)
 		}
-	}
+		return nil
+	})
 
-	// Inbox
-	inbox := []map[string]any{}
-	iRows, err := h.db.QueryContext(ctx, `SELECT id, title, priority, sort_order FROM planner_tasks WHERE user_id = $1 AND is_inbox = TRUE ORDER BY sort_order`, uid)
-	if err == nil {
-		defer iRows.Close()
-		for iRows.Next() {
+	// 3. Inbox
+	g.Go(func() error {
+		rows, err := h.db.QueryContext(gctx, `SELECT id, title, priority, sort_order FROM planner_tasks WHERE user_id = $1 AND is_inbox = TRUE ORDER BY sort_order`, uid)
+		if err != nil {
+			h.logger.Warn("snapshot: inbox query failed", zap.Error(err))
+			return nil
+		}
+		defer rows.Close()
+		for rows.Next() {
 			var id int64
 			var title, priority string
 			var sortOrder int
-			if err := iRows.Scan(&id, &title, &priority, &sortOrder); err != nil {
+			if err := rows.Scan(&id, &title, &priority, &sortOrder); err != nil {
 				continue
 			}
 			inbox = append(inbox, map[string]any{"id": id, "title": title, "priority": priority, "order": sortOrder})
 		}
-	}
+		return nil
+	})
 
-	// Weekly Goals (current week)
-	monday := mondayOf(time.Now()).Format("2006-01-02")
-	wgoals := []map[string]any{}
-	wRows, err := h.db.QueryContext(ctx, `SELECT id, role_id, title, done, week_start::text FROM planner_weekly_goals WHERE user_id = $1 AND week_start = $2 ORDER BY id`, uid, monday)
-	if err == nil {
-		defer wRows.Close()
-		for wRows.Next() {
+	// 4. Weekly Goals (current week)
+	g.Go(func() error {
+		rows, err := h.db.QueryContext(gctx, `SELECT id, role_id, title, done, week_start::text FROM planner_weekly_goals WHERE user_id = $1 AND week_start = $2 ORDER BY id`, uid, monday)
+		if err != nil {
+			h.logger.Warn("snapshot: weekly goals query failed", zap.Error(err))
+			return nil
+		}
+		defer rows.Close()
+		for rows.Next() {
 			var id, roleID int64
 			var title, weekStart string
 			var done bool
-			if err := wRows.Scan(&id, &roleID, &title, &done, &weekStart); err != nil {
+			if err := rows.Scan(&id, &roleID, &title, &done, &weekStart); err != nil {
 				continue
 			}
 			wgoals = append(wgoals, map[string]any{"id": id, "roleId": roleID, "title": title, "done": done, "weekStart": weekStart})
 		}
-	}
+		return nil
+	})
 
-	// Goals (active)
-	goals := []map[string]any{}
-	gRows, err := h.db.QueryContext(ctx, `SELECT id, title, COALESCE(role_id,0), due_date::text, COALESCE(description,''), status FROM planner_goals WHERE user_id = $1 AND status = 'active' ORDER BY due_date`, uid)
-	if err == nil {
-		defer gRows.Close()
-		for gRows.Next() {
+	// 5. Goals (active)
+	g.Go(func() error {
+		rows, err := h.db.QueryContext(gctx, `SELECT id, title, COALESCE(role_id,0), due_date::text, COALESCE(description,''), status FROM planner_goals WHERE user_id = $1 AND status = 'active' ORDER BY due_date`, uid)
+		if err != nil {
+			h.logger.Warn("snapshot: goals query failed", zap.Error(err))
+			return nil
+		}
+		defer rows.Close()
+		for rows.Next() {
 			var id, roleID int64
 			var title, dueDate, description, status string
-			if err := gRows.Scan(&id, &title, &roleID, &dueDate, &description, &status); err != nil {
+			if err := rows.Scan(&id, &title, &roleID, &dueDate, &description, &status); err != nil {
 				continue
 			}
-			g := map[string]any{"id": id, "title": title, "dueDate": dueDate, "description": description, "status": status}
+			gl := map[string]any{"id": id, "title": title, "dueDate": dueDate, "description": description, "status": status}
 			if roleID != 0 {
-				g["roleId"] = roleID
+				gl["roleId"] = roleID
 			}
-			goals = append(goals, g)
+			goals = append(goals, gl)
 		}
-	}
+		return nil
+	})
 
-	// Diary (last 7 days)
-	diary := []map[string]any{}
-	dRows, err := h.db.QueryContext(ctx, `SELECT entry_date::text, one_liner, mood, COALESCE(full_note,'') FROM planner_diary WHERE user_id = $1 AND entry_date >= ($2::date - 7) ORDER BY entry_date DESC`, uid, today)
-	if err == nil {
-		defer dRows.Close()
-		for dRows.Next() {
+	// 6. Diary (last 7 days)
+	g.Go(func() error {
+		rows, err := h.db.QueryContext(gctx, `SELECT entry_date::text, one_liner, mood, COALESCE(full_note,'') FROM planner_diary WHERE user_id = $1 AND entry_date >= ($2::date - 7) ORDER BY entry_date DESC`, uid, today)
+		if err != nil {
+			h.logger.Warn("snapshot: diary query failed", zap.Error(err))
+			return nil
+		}
+		defer rows.Close()
+		for rows.Next() {
 			var date, oneLiner, mood, fullNote string
-			if err := dRows.Scan(&date, &oneLiner, &mood, &fullNote); err != nil {
+			if err := rows.Scan(&date, &oneLiner, &mood, &fullNote); err != nil {
 				continue
 			}
 			diary = append(diary, map[string]any{"date": date, "oneLiner": oneLiner, "mood": mood, "fullNote": fullNote})
 		}
-	}
+		return nil
+	})
 
-	// Reflections (last 7 days)
-	reflections := []map[string]any{}
-	rRows, err := h.db.QueryContext(ctx, `SELECT note_date::text, notes FROM planner_reflection_notes WHERE user_id = $1 AND note_date >= ($2::date - 7) ORDER BY note_date DESC`, uid, today)
-	if err == nil {
-		defer rRows.Close()
-		for rRows.Next() {
+	// 7. Reflections (last 7 days)
+	g.Go(func() error {
+		rows, err := h.db.QueryContext(gctx, `SELECT note_date::text, notes FROM planner_reflection_notes WHERE user_id = $1 AND note_date >= ($2::date - 7) ORDER BY note_date DESC`, uid, today)
+		if err != nil {
+			h.logger.Warn("snapshot: reflections query failed", zap.Error(err))
+			return nil
+		}
+		defer rows.Close()
+		for rows.Next() {
 			var date string
 			var notesJSON []byte
-			if err := rRows.Scan(&date, &notesJSON); err != nil {
+			if err := rows.Scan(&date, &notesJSON); err != nil {
 				continue
 			}
 			var notes any
 			json.Unmarshal(notesJSON, &notes)
 			reflections = append(reflections, map[string]any{"date": date, "notes": notes})
 		}
-	}
+		return nil
+	})
 
-	// Mission
-	mission := ""
-	var prefsJSON []byte
-	if err := h.db.QueryRowContext(ctx, `SELECT COALESCE(preferences,'{}') FROM users WHERE id = $1`, uid).Scan(&prefsJSON); err == nil {
+	// 8. Mission / preferences
+	g.Go(func() error {
+		var prefsJSON []byte
+		if err := h.db.QueryRowContext(gctx, `SELECT COALESCE(preferences,'{}') FROM users WHERE id = $1`, uid).Scan(&prefsJSON); err != nil {
+			h.logger.Warn("snapshot: mission query failed", zap.Error(err))
+			return nil
+		}
 		var prefs map[string]json.RawMessage
 		if json.Unmarshal(prefsJSON, &prefs) == nil {
 			if raw, ok := prefs["planner_mission"]; ok {
 				json.Unmarshal(raw, &mission)
 			}
 		}
+		return nil
+	})
+
+	// Wait for all goroutines — errors are logged per-query, not propagated.
+	if err := g.Wait(); err != nil {
+		h.logger.Error("snapshot: unexpected errgroup error", zap.Error(err))
+	}
+
+	// Ensure nil slices are returned as empty JSON arrays.
+	if roles == nil {
+		roles = []map[string]any{}
+	}
+	if tasks == nil {
+		tasks = []map[string]any{}
+	}
+	if inbox == nil {
+		inbox = []map[string]any{}
+	}
+	if wgoals == nil {
+		wgoals = []map[string]any{}
+	}
+	if goals == nil {
+		goals = []map[string]any{}
+	}
+	if diary == nil {
+		diary = []map[string]any{}
+	}
+	if reflections == nil {
+		reflections = []map[string]any{}
 	}
 
 	return c.JSON(http.StatusOK, map[string]any{

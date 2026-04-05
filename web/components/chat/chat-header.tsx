@@ -25,7 +25,7 @@ export function ChatHeader({
 
   return (
     <>
-      <div className="flex items-center justify-between border-b border-border px-3 py-2.5 md:px-4 md:py-3">
+      <div className="flex items-center justify-between border-b border-border h-[49px] md:h-[57px] px-3 md:px-4 shrink-0">
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"

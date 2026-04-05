@@ -47,14 +47,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
 
   callbacks: {
-    jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, trigger, session }) {
       if (user?.id) token.userId = user.id
       if (user && "token" in user && user.token) {
         token.gatewayToken = user.token as string
+        token.gatewayTokenExp = Date.now() + 23 * 60 * 60 * 1000 // ~23h (1h before 24h expiry)
       }
       // Allow session update to refresh userId after account linking.
       if (trigger === "update" && session?.userId) {
         token.userId = session.userId as string
+      }
+      // Auto-refresh gateway token when it's about to expire
+      if (token.gatewayToken && token.gatewayTokenExp && Date.now() > (token.gatewayTokenExp as number)) {
+        try {
+          const res = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token.gatewayToken}` },
+          })
+          if (res.ok) {
+            const data = await res.json()
+            token.gatewayToken = data.token as string
+            token.gatewayTokenExp = Date.now() + 23 * 60 * 60 * 1000
+          }
+        } catch { /* keep existing token */ }
       }
       return token
     },
@@ -67,7 +82,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   session: {
     strategy: "jwt",
-    maxAge: 365 * 24 * 60 * 60 * 100, // effectively no expiry — logout only
+    maxAge: 30 * 24 * 60 * 60, // 30 days session, gateway token refreshed automatically
   },
 
   pages: {

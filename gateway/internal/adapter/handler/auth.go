@@ -170,7 +170,7 @@ func (h *AuthHandler) generateToken(userID uuid.UUID) (string, error) {
 	claims := &JWTClaims{
 		UserID: userID.String(),
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(365 * 24 * time.Hour * 100)), // effectively no expiry
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
@@ -298,6 +298,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	})
 }
 
+// RefreshToken issues a new JWT if the current one is still valid.
 func (h *AuthHandler) RefreshToken(c echo.Context) error {
 	authHeader := c.Request().Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
