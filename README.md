@@ -13,11 +13,6 @@ A hyper-personalized AI agent platform with Planner, finance management, and AI-
 
 [Documentation](https://jikime.github.io/starnion/) · [Installation Guide](https://jikime.github.io/starnion/en/getting-started/installation) · [Korean Docs](https://jikime.github.io/starnion/ko/)
 
-[![Release](https://img.shields.io/github/v/release/jikime/starnion)](https://github.com/jikime/starnion/releases)
-[![License](https://img.shields.io/badge/license-Private-lightgrey)](LICENSE)
-
-[Documentation](https://jikime.github.io/starnion/) · [Installation Guide](https://jikime.github.io/starnion/en/getting-started/installation) · [Korean Docs](https://jikime.github.io/starnion/ko/)
-
 </div>
 
 ---
@@ -27,7 +22,7 @@ A hyper-personalized AI agent platform with Planner, finance management, and AI-
 StarNion is a self-hosted personal AI agent platform. All your data stays on your own server while AI helps you manage your daily life more smartly — accessible from **Web UI**, **Telegram**, and a native **CLI**.
 
 **Key highlights:**
-- **Planner** — ABC priority-based daily/weekly/monthly planning with roles, goals, and mission statement
+- **Planner** — ABC priority tasks linked to weekly key plans, monthly calendar, D-Day goals, roles & mission
 - **Finance & Assets** — expense tracking, spending map, budget management, statistics & analytics
 - **AI Chat** — multi-provider LLM with personas, web search, and file management
 - **Multi-provider LLM** — Anthropic Claude, Google Gemini, OpenAI, GLM (Z.AI), Ollama support
@@ -185,7 +180,7 @@ curl http://localhost:8080/healthz
 | Layer | Technology |
 |-------|------------|
 | Web UI | Next.js 16 · React 19 · Tailwind CSS 4 · shadcn/ui · Pretendard |
-| Auth | NextAuth.js v5 (Credentials) |
+| Auth | NextAuth.js v5 (Credentials) · JWT 24h + auto-refresh · proxy.ts middleware |
 | Theme | next-themes (dark / light) |
 | Gateway | Go · Echo · go-telegram-bot-api |
 | Agent | TypeScript · Vercel AI SDK v5 · gRPC |
@@ -204,6 +199,7 @@ curl http://localhost:8080/healthz
 ```
 starnion/
 ├── web/                  # Next.js 16 Web UI  (:3893)
+│   ├── app/(auth)/       # Login & Register pages
 │   ├── app/(main)/       # Route pages (chat, files, planners, assets, analytics, ...)
 │   ├── components/       # Feature-based components
 │   │   ├── planner/      # Planner components
@@ -242,6 +238,7 @@ starnion/
 └── docker/
     ├── docker-compose.yml
     ├── docker-compose.prod.yml
+    ├── nginx/              # Production Nginx configs
     └── .env.example
 ```
 
@@ -251,7 +248,7 @@ starnion/
 
 | Category | Features |
 |----------|----------|
-| **Planner** | ABC priority tasks · Weekly Key Goals · Monthly calendar · D-Day goals · Mission & Roles · Diary & Reflection |
+| **Planner** | ABC priority tasks linked to weekly key plans (1:N) · Monthly calendar · D-Day goals · Mission & Roles · Diary (markdown) & Reflection |
 | **Finance** | Expense tracking · Spending map (Naver Maps) · Budget management · Statistics & Analytics |
 | **AI Chat** | Multi-LLM conversations · Personas · WebSocket streaming · Telegram integration |
 | **Files** | Document & image upload · Audio transcription · AI document search · MinIO storage |
@@ -259,6 +256,42 @@ starnion/
 | **Skills** | 30+ AI skills · API key management · Google OAuth · Per-skill toggle |
 | **Channels** | Web chat · Telegram bot · Channel management · Pairing requests |
 | **Settings** | Model providers · Pricing · Account · Notifications · System logs · Usage analytics |
+
+---
+
+## Security & Performance
+
+| Area | Implementation |
+|------|---------------|
+| **Auth** | JWT 24h expiry + auto-refresh · NextAuth v5 · proxy.ts middleware |
+| **Password** | bcrypt · 10+ chars · upper/lower/digit/special required · 5-attempt lockout |
+| **API** | Parameterized SQL · per-user rate limiting (120 req/min) · CORS whitelist |
+| **XSS** | rehype-sanitize on all ReactMarkdown renderers |
+| **WebSocket** | JWT auth · 64KB frame limit · 5 streams/user · origin validation |
+| **File Upload** | MIME whitelist · 100MB limit · path traversal prevention |
+| **Encryption** | AES-256-GCM for API keys, OAuth tokens, bot tokens |
+| **Compression** | Gateway Gzip (SSE/WS excluded) · HNSW vector indexes |
+| **DB** | 45+ indexes · connection pooling (50 max) · errgroup parallel queries |
+
+---
+
+## Production Deployment (Nginx)
+
+An Nginx reverse proxy config is included at `docker/nginx/lets.ai.kr.conf`:
+
+```bash
+sudo cp ~/.starnion/docker/nginx/lets.ai.kr.conf /etc/nginx/sites-available/yourdomain.conf
+# Edit: replace lets.ai.kr with your domain
+sudo ln -s /etc/nginx/sites-available/yourdomain.conf /etc/nginx/sites-enabled/
+sudo certbot --nginx -d yourdomain.com
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Key proxy routes:
+- `/ws` → Gateway :8080 (WebSocket, 24h timeout)
+- `/api/chat`, `/api/logs/gateway/stream` → Next.js (SSE, no buffering)
+- `/` → Next.js :3893 (Web UI)
+- `/_next/static/` → Next.js (1-year cache)
 
 ---
 
@@ -279,6 +312,9 @@ starnion/
 | Notifications | `/cron` | Scheduled notifications & system jobs |
 | Models | `/models` | LLM provider configuration & pricing |
 | Personas | `/personas` | AI personality management |
+| Login | `/login` | Authentication with brand panel |
+| Register | `/register` | Account registration |
+| Profile | `/profile` | User profile & logout |
 
 ---
 
@@ -287,8 +323,8 @@ starnion/
 | Table | Description |
 |-------|-------------|
 | `planner_roles` | Life roles with color, mission, Key Goal |
-| `planner_tasks` | Daily tasks with ABC priority + inbox items |
-| `planner_weekly_goals` | Weekly Key Goals per role |
+| `planner_tasks` | Daily tasks with ABC priority + inbox items + `weekly_goal_id` FK |
+| `planner_weekly_goals` | Weekly key plans per role (1:N → daily tasks) |
 | `planner_goals` | D-Day goals with due dates |
 | `planner_diary` | Daily diary with mood tracking |
 | `planner_reflection_notes` | Reflection notes (JSONB) |
