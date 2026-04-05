@@ -98,7 +98,7 @@ export function GlobalNav() {
 
   return (
     <>
-      <header className="flex items-center h-11 px-2 sm:px-4 border-b border-border bg-header shrink-0 z-10">
+      <header className="sticky top-0 flex items-center h-11 px-2 sm:px-4 border-b border-border bg-header shrink-0 z-20">
         {/* Mobile hamburger */}
         <button
           onClick={() => setMobileMenuOpen(v => !v)}

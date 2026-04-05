@@ -72,17 +72,17 @@ func (h *PlannerHandler) Snapshot(c echo.Context) error {
 
 	// 2. Tasks (today +/- 7 days)
 	g.Go(func() error {
-		rows, err := h.db.QueryContext(gctx, `SELECT id, title, status, priority, sort_order, COALESCE(role_id,0), COALESCE(time_start,''), COALESCE(time_end,''), COALESCE(delegatee,''), COALESCE(note,''), task_date::text, COALESCE(forwarded_from_id,0) FROM planner_tasks WHERE user_id = $1 AND is_inbox = FALSE AND task_date BETWEEN ($2::date - 7) AND ($2::date + 7) ORDER BY task_date, priority, sort_order`, uid, today)
+		rows, err := h.db.QueryContext(gctx, `SELECT id, title, status, priority, sort_order, COALESCE(role_id,0), COALESCE(time_start,''), COALESCE(time_end,''), COALESCE(delegatee,''), COALESCE(note,''), task_date::text, COALESCE(forwarded_from_id,0), COALESCE(weekly_goal_id,0) FROM planner_tasks WHERE user_id = $1 AND is_inbox = FALSE AND task_date BETWEEN ($2::date - 7) AND ($2::date + 7) ORDER BY task_date, priority, sort_order`, uid, today)
 		if err != nil {
 			h.logger.Warn("snapshot: tasks query failed", zap.Error(err))
 			return nil
 		}
 		defer rows.Close()
 		for rows.Next() {
-			var id, roleID, fwdID int64
+			var id, roleID, fwdID, weeklyGoalID int64
 			var title, status, priority, timeStart, timeEnd, delegatee, note, date string
 			var sortOrder int
-			if err := rows.Scan(&id, &title, &status, &priority, &sortOrder, &roleID, &timeStart, &timeEnd, &delegatee, &note, &date, &fwdID); err != nil {
+			if err := rows.Scan(&id, &title, &status, &priority, &sortOrder, &roleID, &timeStart, &timeEnd, &delegatee, &note, &date, &fwdID, &weeklyGoalID); err != nil {
 				continue
 			}
 			t := map[string]any{"id": id, "title": title, "status": status, "priority": priority, "order": sortOrder, "timeStart": timeStart, "timeEnd": timeEnd, "delegatee": delegatee, "note": note, "date": date}
@@ -91,6 +91,9 @@ func (h *PlannerHandler) Snapshot(c echo.Context) error {
 			}
 			if fwdID != 0 {
 				t["forwardedFromId"] = fwdID
+			}
+			if weeklyGoalID != 0 {
+				t["weeklyGoalId"] = weeklyGoalID
 			}
 			tasks = append(tasks, t)
 		}
@@ -218,6 +221,30 @@ func (h *PlannerHandler) Snapshot(c echo.Context) error {
 	// Wait for all goroutines — errors are logged per-query, not propagated.
 	if err := g.Wait(); err != nil {
 		h.logger.Error("snapshot: unexpected errgroup error", zap.Error(err))
+	}
+
+	// Enrich weekly goals with task counts (taskCount, doneCount).
+	if len(wgoals) > 0 {
+		rows, err := h.db.QueryContext(ctx, `SELECT weekly_goal_id, COUNT(*) AS total, COUNT(*) FILTER (WHERE status = 'done') AS done_count FROM planner_tasks WHERE user_id = $1 AND weekly_goal_id IS NOT NULL GROUP BY weekly_goal_id`, uid)
+		if err == nil {
+			defer rows.Close()
+			counts := map[int64][2]int{} // [total, done]
+			for rows.Next() {
+				var wgID int64
+				var total, done int
+				if err := rows.Scan(&wgID, &total, &done); err == nil {
+					counts[wgID] = [2]int{total, done}
+				}
+			}
+			for i, wg := range wgoals {
+				if id, ok := wg["id"].(int64); ok {
+					if c, found := counts[id]; found {
+						wgoals[i]["taskCount"] = c[0]
+						wgoals[i]["doneCount"] = c[1]
+					}
+				}
+			}
+		}
 	}
 
 	// Ensure nil slices are returned as empty JSON arrays.
@@ -351,19 +378,20 @@ func (h *PlannerHandler) ListTasks(c echo.Context) error {
 		date = time.Now().Format("2006-01-02")
 	}
 	tasks := []map[string]any{}
-	rows, err := h.db.QueryContext(ctx, `SELECT id, title, status, priority, sort_order, COALESCE(role_id,0), COALESCE(time_start,''), COALESCE(time_end,''), COALESCE(delegatee,''), COALESCE(note,''), task_date::text, COALESCE(forwarded_from_id,0) FROM planner_tasks WHERE user_id=$1 AND is_inbox=FALSE AND task_date=$2 ORDER BY priority, sort_order`, uid.String(), date)
+	rows, err := h.db.QueryContext(ctx, `SELECT id, title, status, priority, sort_order, COALESCE(role_id,0), COALESCE(time_start,''), COALESCE(time_end,''), COALESCE(delegatee,''), COALESCE(note,''), task_date::text, COALESCE(forwarded_from_id,0), COALESCE(weekly_goal_id,0) FROM planner_tasks WHERE user_id=$1 AND is_inbox=FALSE AND task_date=$2 ORDER BY priority, sort_order`, uid.String(), date)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to list tasks"})
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var id, roleID, fwdID int64
+		var id, roleID, fwdID, weeklyGoalID int64
 		var title, status, priority, ts, te, del, note, d string
 		var so int
-		rows.Scan(&id, &title, &status, &priority, &so, &roleID, &ts, &te, &del, &note, &d, &fwdID)
+		rows.Scan(&id, &title, &status, &priority, &so, &roleID, &ts, &te, &del, &note, &d, &fwdID, &weeklyGoalID)
 		t := map[string]any{"id": id, "title": title, "status": status, "priority": priority, "order": so, "timeStart": ts, "timeEnd": te, "delegatee": del, "note": note, "date": d}
 		if roleID != 0 { t["roleId"] = roleID }
 		if fwdID != 0 { t["forwardedFromId"] = fwdID }
+		if weeklyGoalID != 0 { t["weeklyGoalId"] = weeklyGoalID }
 		tasks = append(tasks, t)
 	}
 	return c.JSON(http.StatusOK, tasks)
@@ -376,13 +404,14 @@ func (h *PlannerHandler) CreateTask(c echo.Context) error {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 	var req struct {
-		Title     string `json:"title"`
-		Priority  string `json:"priority"`
-		RoleID    *int64 `json:"roleId"`
-		Date      string `json:"date"`
-		TimeStart string `json:"timeStart"`
-		TimeEnd   string `json:"timeEnd"`
-		Note      string `json:"note"`
+		Title        string `json:"title"`
+		Priority     string `json:"priority"`
+		RoleID       *int64 `json:"roleId"`
+		Date         string `json:"date"`
+		TimeStart    string `json:"timeStart"`
+		TimeEnd      string `json:"timeEnd"`
+		Note         string `json:"note"`
+		WeeklyGoalID *int64 `json:"weekly_goal_id"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid body"})
@@ -390,7 +419,7 @@ func (h *PlannerHandler) CreateTask(c echo.Context) error {
 	if req.Date == "" { req.Date = time.Now().Format("2006-01-02") }
 	if req.Priority == "" { req.Priority = "C" }
 	var id int64
-	err = h.db.QueryRowContext(ctx, `INSERT INTO planner_tasks (user_id, title, priority, role_id, task_date, time_start, time_end, note, sort_order) VALUES ($1,$2,$3,$4,$5,NULLIF($6,''),NULLIF($7,''),NULLIF($8,''), (SELECT COALESCE(MAX(sort_order),0)+1 FROM planner_tasks WHERE user_id=$1 AND task_date=$5 AND priority=$3 AND is_inbox=FALSE)) RETURNING id`, uid.String(), req.Title, req.Priority, req.RoleID, req.Date, req.TimeStart, req.TimeEnd, req.Note).Scan(&id)
+	err = h.db.QueryRowContext(ctx, `INSERT INTO planner_tasks (user_id, title, priority, role_id, task_date, time_start, time_end, note, weekly_goal_id, sort_order) VALUES ($1,$2,$3,$4,$5,NULLIF($6,''),NULLIF($7,''),NULLIF($8,''),$9, (SELECT COALESCE(MAX(sort_order),0)+1 FROM planner_tasks WHERE user_id=$1 AND task_date=$5 AND priority=$3 AND is_inbox=FALSE)) RETURNING id`, uid.String(), req.Title, req.Priority, req.RoleID, req.Date, req.TimeStart, req.TimeEnd, req.Note, req.WeeklyGoalID).Scan(&id)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create task"})
 	}
@@ -427,6 +456,12 @@ func (h *PlannerHandler) UpdateTask(c echo.Context) error {
 	if v, ok := req["roleId"]; ok {
 		if sets != "" { sets += ", " }
 		sets += "role_id = $" + strconv.Itoa(idx)
+		args = append(args, v)
+		idx++
+	}
+	if v, ok := req["weeklyGoalId"]; ok {
+		if sets != "" { sets += ", " }
+		sets += "weekly_goal_id = $" + strconv.Itoa(idx)
 		args = append(args, v)
 		idx++
 	}
@@ -616,6 +651,33 @@ func (h *PlannerHandler) DeleteWeeklyGoal(c echo.Context) error {
 	}
 	h.db.ExecContext(ctx, `DELETE FROM planner_weekly_goals WHERE id=$1 AND user_id=$2`, c.Param("id"), uid.String())
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *PlannerHandler) GetWeeklyGoalTasks(c echo.Context) error {
+	ctx := c.Request().Context()
+	uid, err := getUserIDFromContext(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+	goalID := c.Param("id")
+	tasks := []map[string]any{}
+	rows, err := h.db.QueryContext(ctx, `SELECT id, title, status, priority, sort_order, COALESCE(role_id,0), COALESCE(time_start,''), COALESCE(time_end,''), COALESCE(delegatee,''), COALESCE(note,''), task_date::text, COALESCE(forwarded_from_id,0), COALESCE(weekly_goal_id,0) FROM planner_tasks WHERE user_id=$1 AND weekly_goal_id=$2 ORDER BY task_date, priority, sort_order`, uid.String(), goalID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to list tasks for weekly goal"})
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, roleID, fwdID, weeklyGoalID int64
+		var title, status, priority, ts, te, del, note, d string
+		var so int
+		rows.Scan(&id, &title, &status, &priority, &so, &roleID, &ts, &te, &del, &note, &d, &fwdID, &weeklyGoalID)
+		t := map[string]any{"id": id, "title": title, "status": status, "priority": priority, "order": so, "timeStart": ts, "timeEnd": te, "delegatee": del, "note": note, "date": d}
+		if roleID != 0 { t["roleId"] = roleID }
+		if fwdID != 0 { t["forwardedFromId"] = fwdID }
+		if weeklyGoalID != 0 { t["weeklyGoalId"] = weeklyGoalID }
+		tasks = append(tasks, t)
+	}
+	return c.JSON(http.StatusOK, tasks)
 }
 
 // ── Goals ────────────────────────────────────────────────────────────────────

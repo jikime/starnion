@@ -241,6 +241,7 @@ func (r *Router) Register(e *echo.Echo) {
 	// Weekly Goals
 	protected.GET("/planner/weekly-goals", r.planner.ListWeeklyGoals)
 	protected.POST("/planner/weekly-goals", r.planner.CreateWeeklyGoal)
+	protected.GET("/planner/weekly-goals/:id/tasks", r.planner.GetWeeklyGoalTasks)
 	protected.PATCH("/planner/weekly-goals/:id/toggle", r.planner.ToggleWeeklyGoal)
 	protected.DELETE("/planner/weekly-goals/:id", r.planner.DeleteWeeklyGoal)
 	// Goals

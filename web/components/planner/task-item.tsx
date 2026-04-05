@@ -260,6 +260,28 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
             </div>
           )}
 
+          {/* Weekly goal tag */}
+          {task.weeklyGoalId && (() => {
+            const weeklyGoals = usePlannerStore.getState().weeklyGoals
+            const wg = weeklyGoals.find(g => g.id === task.weeklyGoalId)
+            if (!wg) return null
+            const goalRole = roles.find(r => r.id === wg.roleId)
+            return (
+              <span
+                className="text-xs px-1.5 py-0.5 rounded max-w-[100px] truncate"
+                style={{
+                  background: goalRole
+                    ? `color-mix(in oklch, ${goalRole.color} 15%, transparent)`
+                    : "var(--muted)",
+                  color: goalRole?.color ?? "var(--muted-foreground)",
+                }}
+                title={wg.title}
+              >
+                {wg.title.length > 15 ? wg.title.slice(0, 15) + "\u2026" : wg.title}
+              </span>
+            )
+          })()}
+
           {urgentGoal && (
             <div
               className="flex items-center gap-1 px-1.5 py-0.5 rounded"
@@ -417,7 +439,7 @@ export const TaskItem = memo(function TaskItem({ task, urgentGoal: urgentGoalPro
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
-            className="mt-0.5 text-muted-foreground opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity shrink-0"
+            className="mt-0.5 text-muted-foreground opacity-60 sm:opacity-0 sm:group-hover:opacity-60 hover:opacity-100 transition-opacity shrink-0"
             aria-label={t("more")}
           >
             <MoreHorizontal className="w-3.5 h-3.5" />

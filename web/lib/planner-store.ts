@@ -26,6 +26,7 @@ export interface Task {
   note?: string
   date: string
   forwardedFromId?: string
+  weeklyGoalId?: string
 }
 
 export interface Role {
@@ -42,6 +43,8 @@ export interface WeeklyGoal {
   title: string
   done: boolean
   weekStart: string
+  taskCount?: number
+  doneCount?: number
 }
 
 export interface Goal {
@@ -120,6 +123,7 @@ function mapTask(t: Record<string, unknown>): Task {
     note: (t.note as string) || undefined,
     date: String(t.date ?? getToday()),
     forwardedFromId: t.forwardedFromId ? String(t.forwardedFromId) : undefined,
+    weeklyGoalId: t.weeklyGoalId ? String(t.weeklyGoalId) : undefined,
   }
 }
 
@@ -128,7 +132,7 @@ function mapRole(r: Record<string, unknown>): Role {
 }
 
 function mapWeeklyGoal(g: Record<string, unknown>): WeeklyGoal {
-  return { id: String(g.id), roleId: String(g.roleId ?? ""), title: String(g.title ?? ""), done: Boolean(g.done), weekStart: String(g.weekStart ?? getWeekStart()) }
+  return { id: String(g.id), roleId: String(g.roleId ?? ""), title: String(g.title ?? ""), done: Boolean(g.done), weekStart: String(g.weekStart ?? getWeekStart()), taskCount: g.taskCount != null ? Number(g.taskCount) : undefined, doneCount: g.doneCount != null ? Number(g.doneCount) : undefined }
 }
 
 function mapGoal(g: Record<string, unknown>): Goal {
@@ -178,7 +182,7 @@ interface PlannerStore {
   addWeeklyGoal: (roleId: string, title: string, weekStart?: string) => void
   toggleWeeklyGoal: (id: string) => void
   deleteWeeklyGoal: (id: string) => void
-  addWeeklyGoalAsTask: (id: string, priority: Priority) => void
+  addWeeklyGoalAsTask: (id: string, priority: Priority, date?: string) => void
 
   // Goals
   addGoal: (title: string, roleId: string, dueDate: string, description?: string) => void
@@ -196,6 +200,8 @@ interface PlannerStore {
   getDdayGoals: () => (Goal & { daysLeft: number; urgent: boolean })[]
   getWeekBalance: (weekStart?: string) => Record<string, number>
   getUnassignedRoles: (weekStart?: string) => Role[]
+  getTasksForWeeklyGoal: (goalId: string) => Task[]
+  getWeeklyGoalProgress: (goalId: string) => { total: number; done: number }
 }
 
 export const usePlannerStore = create<PlannerStore>()(
@@ -272,6 +278,7 @@ export const usePlannerStore = create<PlannerStore>()(
         if (updates.note !== undefined) body.note = updates.note
         if (updates.roleId !== undefined) body.roleId = updates.roleId ? Number(updates.roleId) : null
         if (updates.date !== undefined) body.date = updates.date
+        if (updates.weeklyGoalId !== undefined) body.weeklyGoalId = updates.weeklyGoalId ? Number(updates.weeklyGoalId) : null
         if (Object.keys(body).length > 0) api.put(`/api/planner/tasks/${id}`, body)
       },
 
@@ -378,15 +385,16 @@ export const usePlannerStore = create<PlannerStore>()(
         api.del(`/api/planner/weekly-goals/${id}`)
       },
 
-      addWeeklyGoalAsTask: (id, priority) => {
+      addWeeklyGoalAsTask: (id, priority, date?: string) => {
         const { weeklyGoals, tasks, selectedDate } = get()
         const wg = weeklyGoals.find(g => g.id === id)
         if (!wg) return
-        const samePriority = tasks.filter(t => t.priority === priority && t.date === selectedDate)
+        const targetDate = date ?? selectedDate
+        const samePriority = tasks.filter(t => t.priority === priority && t.date === targetDate)
         const tempId = uid()
-        const newTask: Task = { id: tempId, title: wg.title, status: "pending", priority, order: samePriority.length, roleId: wg.roleId, date: selectedDate }
+        const newTask: Task = { id: tempId, title: wg.title, status: "pending", priority, order: samePriority.length, roleId: wg.roleId, date: targetDate, weeklyGoalId: wg.id }
         set(s => ({ tasks: [...s.tasks, newTask] }))
-        api.post("/api/planner/tasks", { title: wg.title, priority, roleId: Number(wg.roleId), date: selectedDate }).then(res => {
+        api.post("/api/planner/tasks", { title: wg.title, priority, roleId: Number(wg.roleId), date: targetDate, weekly_goal_id: Number(wg.id) }).then(res => {
           if (res?.id) set(s => ({ tasks: s.tasks.map(t => t.id === tempId ? { ...t, id: String(res.id) } : t) }))
         })
       },
@@ -472,6 +480,15 @@ export const usePlannerStore = create<PlannerStore>()(
         const ws = weekStart ?? getWeekStart()
         const rolesWithGoals = new Set(get().weeklyGoals.filter(g => g.weekStart === ws).map(g => g.roleId))
         return get().roles.filter(r => !rolesWithGoals.has(r.id))
+      },
+
+      getTasksForWeeklyGoal: (goalId) => {
+        return get().tasks.filter(t => t.weeklyGoalId === goalId)
+      },
+
+      getWeeklyGoalProgress: (goalId) => {
+        const linked = get().tasks.filter(t => t.weeklyGoalId === goalId)
+        return { total: linked.length, done: linked.filter(t => t.status === "done").length }
       },
     })
 )

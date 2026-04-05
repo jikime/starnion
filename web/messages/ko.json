@@ -2157,7 +2157,7 @@
       "rough": "힘듦"
     },
     "weekly": {
-      "bigRocks": "이번 주 핵심 목표",
+      "bigRocks": "이번 주 핵심 계획",
       "roleBalance": "역할 균형",
       "addAsATask": "A 업무로 오늘 플래너에 추가",
       "unassignedRoles": "아직 핵심 목표가 없는 역할",
@@ -2245,7 +2245,7 @@
       "compassStopped": "역할의 나침반이 멈춰있어요.",
       "compassHint": "작은 돌 하나라도 놓아볼까요?",
       "addBigRockLabel": "핵심 목표 추가",
-      "addBigRockPlaceholder": "이번 주 핵심 목표...",
+      "addBigRockPlaceholder": "이번 주 핵심 계획...",
       "addBigRockHint": "이번 주 핵심 목표를 추가하세요",
       "add": "추가",
       "undone": "완료 취소",
@@ -2254,7 +2254,13 @@
       "weeklyCompassTitle": "주간 나침반",
       "foldCompass": "나침반 접기",
       "unfoldCompass": "나침반 펼치기",
-      "roleBalance": "역할 균형"
+      "roleBalance": "역할 균형",
+      "addDailyTask": "일일 업무 추가",
+      "linkedTasks": "연결된 업무",
+      "progress": "진행률",
+      "noLinkedTasks": "연결된 업무 없음",
+      "taskTitle": "업무 제목",
+      "selectDate": "날짜 선택"
     },
     "weeklyLegend": {
       "pending": "대기",

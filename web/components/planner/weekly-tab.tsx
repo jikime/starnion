@@ -7,7 +7,13 @@ import { WeeklyCompass } from "./weekly-compass"
 import { cn } from "@/lib/utils"
 import { format, addDays, parseISO, isToday, startOfWeek } from "date-fns"
 import { ko } from "date-fns/locale"
-import { ChevronLeft, ChevronRight, Plus, Check, ArrowRight, X, Circle } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus, Check, ArrowRight, X, Circle, Compass } from "lucide-react"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 
 // ── Status symbol cycle ────────────────────────────────────────────────────
 
@@ -240,16 +246,17 @@ function WeekHeader({
   weekStart,
   onPrev,
   onNext,
+  onOpenCompass,
 }: {
   weekStart: string
   onPrev: () => void
   onNext: () => void
+  onOpenCompass?: () => void
 }) {
   const t = useTranslations("planner.weeklyTab")
   const start = parseISO(weekStart)
   const end = addDays(start, 6)
   const label = `${format(start, "yyyy.M.d", { locale: ko })} ~ ${format(end, "M.d", { locale: ko })}`
-  const monthLabel = format(start, "MMMM", { locale: ko })
 
   return (
     <div className="flex items-center justify-between px-6 py-3 border-b border-border shrink-0 bg-card/40">
@@ -261,6 +268,16 @@ function WeekHeader({
         <p className="text-xs text-muted-foreground">{label}</p>
       </div>
       <div className="flex items-center gap-2">
+        {/* Mobile compass button */}
+        {onOpenCompass && (
+          <button
+            onClick={onOpenCompass}
+            className="lg:hidden w-7 h-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+            aria-label={t("weeklyCompassTitle")}
+          >
+            <Compass className="w-4 h-4" />
+          </button>
+        )}
         <button
           onClick={onPrev}
           className="w-7 h-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
@@ -285,6 +302,7 @@ function WeekHeader({
 export function WeeklyTab({ onNavigateToDaily }: { onNavigateToDaily: () => void }) {
   const t = useTranslations("planner.weeklyTab")
   const { selectedDate, setSelectedDate } = usePlannerStore()
+  const [compassOpen, setCompassOpen] = useState(false)
 
   // Derive week start from selectedDate
   const getWeekStartFromDate = (dateStr: string) => {
@@ -322,34 +340,18 @@ export function WeeklyTab({ onNavigateToDaily }: { onNavigateToDaily: () => void
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden min-h-0">
-      <WeekHeader weekStart={weekStart} onPrev={goToPrevWeek} onNext={goToNextWeek} />
+      <WeekHeader weekStart={weekStart} onPrev={goToPrevWeek} onNext={goToNextWeek} onOpenCompass={() => setCompassOpen(true)} />
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Day grid: 2 rows layout with flexible columns */}
         <div className="flex flex-col flex-1 overflow-hidden min-h-0 p-2 sm:p-4 gap-2 sm:gap-4">
-          {/* Row 1: Mon Tue Wed */}
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 overflow-hidden min-h-0 flex-1">
-            {days.slice(0, 3).map(({ dateStr, isWeekend }) => (
-              <div key={dateStr} className="flex-1 min-w-0">
-                <DayColumn
-                  dateStr={dateStr}
-                  isWeekend={isWeekend}
-                  onNavigate={handleNavigate}
-                />
+          {/* Mobile: horizontal scroll, single row */}
+          <div className="flex sm:hidden gap-2 overflow-x-auto flex-1 min-h-0 planner-scroll pb-1">
+            {days.slice(0, 5).map(({ dateStr, isWeekend }) => (
+              <div key={dateStr} className="shrink-0 w-44">
+                <DayColumn dateStr={dateStr} isWeekend={isWeekend} onNavigate={handleNavigate} />
               </div>
             ))}
-          </div>
-          {/* Row 2: Thu Fri Sat+Sun */}
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 overflow-hidden min-h-0 flex-1">
-            {days.slice(3, 5).map(({ dateStr, isWeekend }) => (
-              <div key={dateStr} className="flex-1 min-w-0">
-                <DayColumn
-                  dateStr={dateStr}
-                  isWeekend={isWeekend}
-                  onNavigate={handleNavigate}
-                />
-              </div>
-            ))}
-            <div className="flex-1 min-w-0">
+            <div className="shrink-0 w-44">
               <DayColumn
                 dateStr={days[5].dateStr}
                 isWeekend={true}
@@ -357,6 +359,35 @@ export function WeeklyTab({ onNavigateToDaily }: { onNavigateToDaily: () => void
                 label={`${format(parseISO(days[5].dateStr), "EEE", { locale: ko })}/${format(parseISO(days[6].dateStr), "EEE", { locale: ko })}`}
                 extraDateStr={days[6].dateStr}
               />
+            </div>
+          </div>
+
+          {/* Desktop: 2 rows layout */}
+          <div className="hidden sm:flex flex-col gap-3 flex-1 overflow-hidden min-h-0">
+            {/* Row 1: Mon Tue Wed */}
+            <div className="flex gap-3 overflow-hidden min-h-0 flex-1">
+              {days.slice(0, 3).map(({ dateStr, isWeekend }) => (
+                <div key={dateStr} className="flex-1 min-w-0">
+                  <DayColumn dateStr={dateStr} isWeekend={isWeekend} onNavigate={handleNavigate} />
+                </div>
+              ))}
+            </div>
+            {/* Row 2: Thu Fri Sat+Sun */}
+            <div className="flex gap-3 overflow-hidden min-h-0 flex-1">
+              {days.slice(3, 5).map(({ dateStr, isWeekend }) => (
+                <div key={dateStr} className="flex-1 min-w-0">
+                  <DayColumn dateStr={dateStr} isWeekend={isWeekend} onNavigate={handleNavigate} />
+                </div>
+              ))}
+              <div className="flex-1 min-w-0">
+                <DayColumn
+                  dateStr={days[5].dateStr}
+                  isWeekend={true}
+                  onNavigate={handleNavigate}
+                  label={`${format(parseISO(days[5].dateStr), "EEE", { locale: ko })}/${format(parseISO(days[6].dateStr), "EEE", { locale: ko })}`}
+                  extraDateStr={days[6].dateStr}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -373,6 +404,17 @@ export function WeeklyTab({ onNavigateToDaily }: { onNavigateToDaily: () => void
           <WeeklyCompass />
         </div>
       </div>
+
+      {/* Mobile compass sheet */}
+      <Sheet open={compassOpen} onOpenChange={setCompassOpen}>
+        <SheetContent side="right" className="w-80 sm:w-96 overflow-y-auto p-0">
+          <SheetHeader className="px-4 pt-4 pb-2">
+            <SheetTitle className="text-lg font-bold">{t("weeklyCompassTitle")}</SheetTitle>
+            <p className="text-xs text-muted-foreground">{t("weeklyCompassSubtitle")}</p>
+          </SheetHeader>
+          <WeeklyCompass />
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

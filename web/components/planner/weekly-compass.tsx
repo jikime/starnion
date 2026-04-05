@@ -6,7 +6,8 @@ import { usePlannerStore, type Priority } from "@/lib/planner-store"
 import { cn } from "@/lib/utils"
 import {
   Check, Plus, Trash2, ChevronDown, ChevronUp,
-  Compass, Zap, AlertCircle,
+  Compass, AlertCircle, ChevronRight,
+  Circle, ArrowRight, X,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -57,6 +58,123 @@ function NionCoachingTip({ unassigned, t }: { unassigned: string[]; t: ReturnTyp
   )
 }
 
+// ── Status icon for linked tasks ────────────────────────────────────────────
+
+const TASK_STATUS_ICON: Record<string, React.ReactNode> = {
+  pending: <Circle className="w-2.5 h-2.5 text-muted-foreground" />,
+  "in-progress": <Circle className="w-2.5 h-2.5 fill-current" style={{ color: "var(--status-in-progress)" }} />,
+  done: <Check className="w-2.5 h-2.5" style={{ color: "var(--status-done)" }} strokeWidth={3} />,
+  forwarded: <ArrowRight className="w-2.5 h-2.5" style={{ color: "var(--status-forwarded)" }} />,
+  cancelled: <X className="w-2.5 h-2.5" style={{ color: "var(--status-cancelled)" }} />,
+}
+
+const PRIORITY_COLORS: Record<Priority, { bg: string; fg: string }> = {
+  A: { bg: "var(--priority-a-bg)", fg: "var(--priority-a)" },
+  B: { bg: "color-mix(in oklch, var(--priority-b) 15%, transparent)", fg: "var(--priority-b)" },
+  C: { bg: "var(--muted)", fg: "var(--muted-foreground)" },
+}
+
+// ── Inline add task form ────────────────────────────────────────────────────
+
+function InlineAddTaskForm({
+  goalId,
+  onClose,
+}: {
+  goalId: string
+  onClose: () => void
+}) {
+  const t = useTranslations("planner.weeklyCompass")
+  const { addWeeklyGoalAsTask } = usePlannerStore()
+  const [title, setTitle] = useState("")
+  const [priority, setPriority] = useState<Priority>("A")
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+  const [date, setDate] = useState(todayStr)
+
+  const handleSubmit = () => {
+    if (!title.trim()) return
+    // Create a custom task using addWeeklyGoalAsTask logic but with custom title
+    const { weeklyGoals, tasks } = usePlannerStore.getState()
+    const wg = weeklyGoals.find(g => g.id === goalId)
+    if (!wg) return
+    const samePriority = tasks.filter(t => t.priority === priority && t.date === date)
+    const tempId = Math.random().toString(36).slice(2, 10)
+    const newTask = {
+      id: tempId,
+      title: title.trim(),
+      status: "pending" as const,
+      priority,
+      order: samePriority.length,
+      roleId: wg.roleId,
+      date,
+      weeklyGoalId: goalId,
+    }
+    usePlannerStore.setState(s => ({ tasks: [...s.tasks, newTask] }))
+    fetch("/api/planner/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title.trim(), priority, roleId: Number(wg.roleId), date, weeklyGoalId: goalId }),
+    }).then(r => r.ok ? r.json() : null).then(res => {
+      if (res?.id) usePlannerStore.setState(s => ({ tasks: s.tasks.map(t => t.id === tempId ? { ...t, id: String(res.id) } : t) }))
+    }).catch(() => {})
+    setTitle("")
+    onClose()
+  }
+
+  return (
+    <div className="space-y-1.5 pt-1.5 border-t border-border/30">
+      <Input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder={t("taskTitle")}
+        className="h-6 text-xs bg-muted border-border"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSubmit()
+          if (e.key === "Escape") onClose()
+        }}
+        autoFocus
+      />
+      <div className="flex items-center gap-1.5">
+        {/* Priority select */}
+        <div className="flex gap-0.5">
+          {(["A", "B", "C"] as Priority[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPriority(p)}
+              className={cn(
+                "w-5 h-5 rounded text-xs font-bold transition-all",
+                priority === p ? "ring-1 ring-offset-1 ring-offset-background" : "opacity-50 hover:opacity-80"
+              )}
+              style={{
+                background: PRIORITY_COLORS[p].bg,
+                color: PRIORITY_COLORS[p].fg,
+                ...(priority === p ? { ringColor: PRIORITY_COLORS[p].fg } : {}),
+              }}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+        {/* Date input */}
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="h-5 text-xs bg-muted border border-border rounded px-1 text-foreground flex-1 min-w-0"
+        />
+        {/* Submit */}
+        <Button
+          size="sm"
+          className="h-5 text-xs px-2 shrink-0"
+          onClick={handleSubmit}
+        >
+          {t("add")}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 // ── Role card ────────────────────────────────────────────────────────────────
 
 function RoleCard({
@@ -73,6 +191,7 @@ function RoleCard({
   const {
     roles,
     weeklyGoals,
+    tasks,
     addWeeklyGoal,
     toggleWeeklyGoal,
     deleteWeeklyGoal,
@@ -90,7 +209,23 @@ function RoleCard({
 
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState("")
-  const [expandPriority, setExpandPriority] = useState<string | null>(null)
+  const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null)
+  const [addingTaskForGoal, setAddingTaskForGoal] = useState<string | null>(null)
+
+  // Compute week date range for filtering linked tasks
+  const weekEndDate = (() => {
+    const d = new Date(weekStart)
+    d.setDate(d.getDate() + 6)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+  })()
+
+  const getLinkedTasks = (goalId: string) =>
+    tasks.filter(t => t.weeklyGoalId === goalId)
+
+  const getProgress = (goalId: string) => {
+    const linked = getLinkedTasks(goalId)
+    return { total: linked.length, done: linked.filter(t => t.status === "done").length }
+  }
 
   const handleAdd = () => {
     if (!draft.trim()) return
@@ -166,67 +301,151 @@ function RoleCard({
             {/* TODO: i18n */}
           </p>
         )}
-        {goals.map((g) => (
-          <div
-            key={g.id}
-            className={cn(
-              "group flex items-start gap-2 rounded px-2 py-1.5 transition-colors",
-              g.done ? "opacity-50" : "hover:bg-accent/40"
-            )}
-          >
-            {/* Checkbox */}
-            <button
-              onClick={() => toggleWeeklyGoal(g.id)}
-              className={cn(
-                "w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0 mt-px transition-colors",
-                g.done
-                  ? "border-transparent"
-                  : "border-muted-foreground hover:border-foreground"
-              )}
-              style={g.done ? { background: role.color } : undefined}
-              aria-label={g.done ? t("undone") : t("markDone")}
-            >
-              {g.done && <Check className="w-2 h-2 text-background" />}
-            </button>
+        {goals.map((g) => {
+          const isExpanded = expandedGoalId === g.id
+          const progress = getProgress(g.id)
+          const linkedTasks = getLinkedTasks(g.id)
 
-            {/* Title */}
-            <span
-              className={cn(
-                "text-xs flex-1 leading-snug",
-                g.done ? "line-through text-muted-foreground" : "text-foreground"
-              )}
-            >
-              {g.title}
-            </span>
-
-            {/* Actions on hover */}
-            {!g.done && (
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                {/* Add as A task */}
+          return (
+            <div key={g.id} className="space-y-0">
+              <div
+                className={cn(
+                  "group flex items-start gap-2 rounded px-2 py-1.5 transition-colors",
+                  g.done ? "opacity-50" : "hover:bg-accent/40",
+                  isExpanded && !g.done && "bg-accent/30"
+                )}
+              >
+                {/* Checkbox */}
                 <button
-                  onClick={() => addWeeklyGoalAsTask(g.id, "A")}
-                  className="flex items-center gap-0.5 rounded px-1 py-0.5 text-xs font-bold transition-colors hover:opacity-80"
-                  style={{
-                    background: "var(--priority-a-bg)",
-                    color: "var(--priority-a)",
+                  onClick={() => toggleWeeklyGoal(g.id)}
+                  className={cn(
+                    "w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0 mt-px transition-colors",
+                    g.done
+                      ? "border-transparent"
+                      : "border-muted-foreground hover:border-foreground"
+                  )}
+                  style={g.done ? { background: role.color } : undefined}
+                  aria-label={g.done ? t("undone") : t("markDone")}
+                >
+                  {g.done && <Check className="w-2 h-2 text-background" />}
+                </button>
+
+                {/* Title - clickable to expand */}
+                <button
+                  onClick={() => {
+                    if (!g.done) setExpandedGoalId(isExpanded ? null : g.id)
                   }}
-                  title={t("addAsATask")}
+                  className={cn(
+                    "text-xs flex-1 leading-snug text-left",
+                    g.done ? "line-through text-muted-foreground" : "text-foreground hover:underline cursor-pointer"
+                  )}
                 >
-                  <Zap className="w-2 h-2" />
-                  A
+                  {g.title}
                 </button>
-                {/* Delete */}
-                <button
-                  onClick={() => deleteWeeklyGoal(g.id)}
-                  className="text-muted-foreground hover:text-destructive transition-colors"
-                  aria-label={tTask("delete")}
-                >
-                  <Trash2 className="w-2.5 h-2.5" />
-                </button>
+
+                {/* Progress indicator (collapsed) + actions */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {!g.done && progress.total > 0 && (
+                    <span
+                      className="text-xs tabular-nums px-1 py-0.5 rounded"
+                      style={{
+                        background: progress.done === progress.total && progress.total > 0
+                          ? "color-mix(in oklch, var(--status-done) 15%, transparent)"
+                          : "var(--muted)",
+                        color: progress.done === progress.total && progress.total > 0
+                          ? "var(--status-done)"
+                          : "var(--muted-foreground)",
+                      }}
+                    >
+                      {progress.done}/{progress.total}
+                    </span>
+                  )}
+
+                  {/* Expand/collapse toggle */}
+                  {!g.done && (
+                    <button
+                      onClick={() => setExpandedGoalId(isExpanded ? null : g.id)}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={isExpanded ? t("foldCompass") : t("unfoldCompass")}
+                    >
+                      <ChevronRight className={cn(
+                        "w-2.5 h-2.5 transition-transform duration-200",
+                        isExpanded && "rotate-90"
+                      )} />
+                    </button>
+                  )}
+
+                  {/* Delete (on hover) */}
+                  {!g.done && (
+                    <button
+                      onClick={() => deleteWeeklyGoal(g.id)}
+                      className="text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                      aria-label={tTask("delete")}
+                    >
+                      <Trash2 className="w-2.5 h-2.5" />
+                    </button>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-        ))}
+
+              {/* Expanded: linked tasks + add form */}
+              {isExpanded && !g.done && (
+                <div className="ml-6 mr-1 mb-1.5 space-y-1 rounded-md bg-accent/20 p-2">
+                  {linkedTasks.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">
+                      {t("noLinkedTasks")}
+                    </p>
+                  ) : (
+                    <div className="space-y-0.5">
+                      {linkedTasks.map((task) => (
+                        <div key={task.id} className="flex items-center gap-1.5 text-xs">
+                          {/* Priority badge */}
+                          <span
+                            className="w-4 text-center font-bold text-xs shrink-0"
+                            style={{ color: PRIORITY_COLORS[task.priority].fg }}
+                          >
+                            {task.priority}
+                          </span>
+                          {/* Status icon */}
+                          <span className="shrink-0">
+                            {TASK_STATUS_ICON[task.status] ?? TASK_STATUS_ICON.pending}
+                          </span>
+                          {/* Title */}
+                          <span className={cn(
+                            "flex-1 truncate",
+                            task.status === "done" && "line-through text-muted-foreground"
+                          )}>
+                            {task.title}
+                          </span>
+                          {/* Date */}
+                          <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                            {task.date.slice(5)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add daily task button / form */}
+                  {addingTaskForGoal === g.id ? (
+                    <InlineAddTaskForm
+                      goalId={g.id}
+                      onClose={() => setAddingTaskForGoal(null)}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setAddingTaskForGoal(g.id)}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors pt-1"
+                    >
+                      <Plus className="w-2.5 h-2.5" />
+                      {t("addDailyTask")}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {/* Add key goal input */}

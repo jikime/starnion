@@ -293,6 +293,7 @@ CREATE TABLE IF NOT EXISTS planner_tasks (
     task_date         DATE        NOT NULL DEFAULT CURRENT_DATE,
     is_inbox          BOOLEAN     NOT NULL DEFAULT FALSE,
     forwarded_from_id BIGINT      REFERENCES planner_tasks(id) ON DELETE SET NULL,
+    weekly_goal_id    BIGINT      REFERENCES planner_weekly_goals(id) ON DELETE SET NULL,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -550,6 +551,7 @@ CREATE INDEX IF NOT EXISTS idx_planner_roles_user ON planner_roles(user_id);
 CREATE INDEX IF NOT EXISTS idx_planner_tasks_user_date   ON planner_tasks(user_id, task_date);
 CREATE INDEX IF NOT EXISTS idx_planner_tasks_user_inbox  ON planner_tasks(user_id, is_inbox) WHERE is_inbox = TRUE;
 CREATE INDEX IF NOT EXISTS idx_planner_tasks_user_status ON planner_tasks(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_planner_tasks_weekly_goal ON planner_tasks(weekly_goal_id) WHERE weekly_goal_id IS NOT NULL;
 
 -- planner_weekly_goals
 CREATE INDEX IF NOT EXISTS idx_planner_wgoals_user_week ON planner_weekly_goals(user_id, week_start);

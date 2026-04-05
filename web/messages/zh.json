@@ -2199,7 +2199,7 @@
       "rough": "困难"
     },
     "weekly": {
-      "bigRocks": "本周核心目标",
+      "bigRocks": "本周核心计划",
       "roleBalance": "Role Balance",
       "addAsATask": "Add as A task to today's planner",
       "unassignedRoles": "还没有核心目标的角色",
@@ -2287,7 +2287,7 @@
       "compassStopped": "角色的指南针已停止。",
       "compassHint": "放一块小石头怎么样？",
       "addBigRockLabel": "添加核心目标",
-      "addBigRockPlaceholder": "本周核心目标...",
+      "addBigRockPlaceholder": "本周核心计划...",
       "addBigRockHint": "为本周添加一个核心目标",
       "add": "添加",
       "undone": "取消完成",
@@ -2296,7 +2296,13 @@
       "weeklyCompassTitle": "周指南针",
       "foldCompass": "折叠指南针",
       "unfoldCompass": "展开指南针",
-      "roleBalance": "角色平衡"
+      "roleBalance": "角色平衡",
+      "addDailyTask": "添加日常任务",
+      "linkedTasks": "关联任务",
+      "progress": "进度",
+      "noLinkedTasks": "无关联任务",
+      "taskTitle": "任务标题",
+      "selectDate": "选择日期"
     },
     "weeklyLegend": {
       "pending": "Pending",

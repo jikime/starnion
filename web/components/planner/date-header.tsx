@@ -101,7 +101,7 @@ export function DateHeader({ rightSlot }: DateHeaderProps = {}) {
             className="flex items-center gap-1.5 h-7 px-2.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors border border-border"
           >
             <CalendarIcon className="w-3 h-3" />
-            {t("goToday")}
+            <span className="hidden sm:inline">{t("goToday")}</span>
           </button>
         )}
 

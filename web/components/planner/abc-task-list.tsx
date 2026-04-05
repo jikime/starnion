@@ -277,7 +277,7 @@ export function AbcTaskList() {
       <MagicBar />
 
       {/* Priority groups — no prop passing needed */}
-      <div className="flex flex-col gap-3 flex-1 overflow-y-auto px-2 sm:px-4 pb-4">
+      <div className="flex flex-col gap-3 flex-1 overflow-y-auto px-2 sm:px-4 pb-4 planner-scroll">
         <PriorityGroup priority="A" />
         <PriorityGroup priority="B" />
         <PriorityGroup priority="C" />

@@ -2160,7 +2160,7 @@
       "rough": "Rough"
     },
     "weekly": {
-      "bigRocks": "This Week's Key Goals",
+      "bigRocks": "This Week's Key Plans",
       "roleBalance": "Role Balance",
       "addAsATask": "Add as A task to today's planner",
       "unassignedRoles": "Roles without key goals yet",
@@ -2248,7 +2248,7 @@
       "compassStopped": "Your compass has stopped.",
       "compassHint": "How about placing a small stone?",
       "addBigRockLabel": "Add Key Goal",
-      "addBigRockPlaceholder": "Key goal for this week...",
+      "addBigRockPlaceholder": "Key plan for this week...",
       "addBigRockHint": "Add a key goal for this week",
       "add": "Add",
       "undone": "Undo complete",
@@ -2257,7 +2257,13 @@
       "weeklyCompassTitle": "Weekly Compass",
       "foldCompass": "Fold compass",
       "unfoldCompass": "Unfold compass",
-      "roleBalance": "Role Balance"
+      "roleBalance": "Role Balance",
+      "addDailyTask": "Add daily task",
+      "linkedTasks": "Linked tasks",
+      "progress": "Progress",
+      "noLinkedTasks": "No linked tasks",
+      "taskTitle": "Task title",
+      "selectDate": "Select date"
     },
     "weeklyLegend": {
       "pending": "Pending",

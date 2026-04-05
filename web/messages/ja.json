@@ -2199,7 +2199,7 @@
       "rough": "つらい"
     },
     "weekly": {
-      "bigRocks": "今週の重要目標",
+      "bigRocks": "今週の重要計画",
       "roleBalance": "Role Balance",
       "addAsATask": "Add as A task to today's planner",
       "unassignedRoles": "まだ重要目標がない役割",
@@ -2287,7 +2287,7 @@
       "compassStopped": "役割のコンパスが止まっています。",
       "compassHint": "小さな石を一つ置いてみませんか？",
       "addBigRockLabel": "重要目標追加",
-      "addBigRockPlaceholder": "今週の重要目標...",
+      "addBigRockPlaceholder": "今週の重要計画...",
       "addBigRockHint": "今週の重要目標を追加しましょう",
       "add": "追加",
       "undone": "完了取消",
@@ -2296,7 +2296,13 @@
       "weeklyCompassTitle": "週間コンパス",
       "foldCompass": "コンパスを閉じる",
       "unfoldCompass": "コンパスを開く",
-      "roleBalance": "役割バランス"
+      "roleBalance": "役割バランス",
+      "addDailyTask": "日次タスク追加",
+      "linkedTasks": "関連タスク",
+      "progress": "進捗",
+      "noLinkedTasks": "関連タスクなし",
+      "taskTitle": "タスク名",
+      "selectDate": "日付選択"
     },
     "weeklyLegend": {
       "pending": "Pending",
