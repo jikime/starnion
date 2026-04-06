@@ -10,6 +10,7 @@ import (
 	"github.com/newstarnion/gateway/config"
 	"github.com/newstarnion/gateway/internal/infrastructure/database"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 type StatisticsHandler struct {
@@ -36,56 +37,223 @@ func (h *StatisticsHandler) GetStatistics(c echo.Context) error {
 	since := time.Now().AddDate(0, -months, 0)
 	ctx := c.Request().Context()
 
-	// ── Monthly trend (income vs expense per month) ───────────────────────────
-	trendRows, err := h.db.QueryContext(ctx, `
-		SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month,
-		       COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS income,
-		       COALESCE(ABS(SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END)), 0) AS expense
-		FROM finances
-		WHERE user_id = $1 AND created_at >= $2
-		GROUP BY month ORDER BY month`, userID, since)
-	var monthlyTrend []map[string]any
-	if err == nil {
-		defer trendRows.Close()
-		for trendRows.Next() {
-			var month string
-			var income, expense int64
-			if trendRows.Scan(&month, &income, &expense) == nil {
-				monthlyTrend = append(monthlyTrend, map[string]any{
-					"month": month, "income": income, "expense": expense,
-				})
-			}
-		}
-	}
-	if monthlyTrend == nil {
-		monthlyTrend = []map[string]any{}
-	}
+	thisMonthStr := time.Now().Format("2006-01")
+	lastMonthStr := time.Now().AddDate(0, -1, 0).Format("2006-01")
 
-	// ── Category breakdown ────────────────────────────────────────────────────
-	catRows, err := h.db.QueryContext(ctx, `
-		SELECT category,
-		       ABS(SUM(amount)) AS amount,
-		       COUNT(*) AS cnt
-		FROM finances
-		WHERE user_id = $1 AND amount < 0 AND created_at >= $2
-		GROUP BY category ORDER BY amount DESC LIMIT 10`, userID, since)
+	// Result variables — each goroutine writes to its own variable.
 	type catItem struct {
 		cat    string
 		amount int64
 		cnt    int
 	}
-	var catItems []catItem
-	var totalCatAmt int64
-	if err == nil {
-		defer catRows.Close()
-		for catRows.Next() {
+	var (
+		monthlyTrend      []map[string]any
+		catItems          []catItem
+		totalCatAmt       int64
+		weekdaySpending   []map[string]any
+		heatmap           []map[string]any
+		totalExpense      int64
+		txCount           int
+		topCategory       string
+		topCategoryAmt    int64
+		thisMonthExpense  int64
+		lastMonthExpense  int64
+		totalMessages     int
+		thisMonthMessages int
+		userMessages      int
+		convCount         int
+	)
+
+	g, gctx := errgroup.WithContext(ctx)
+
+	// 1. Monthly trend (income vs expense per month)
+	g.Go(func() error {
+		rows, err := h.db.QueryContext(gctx, `
+			SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month,
+			       COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS income,
+			       COALESCE(ABS(SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END)), 0) AS expense
+			FROM finances
+			WHERE user_id = $1 AND created_at >= $2
+			GROUP BY month ORDER BY month`, userID, since)
+		if err != nil {
+			h.logger.Warn("statistics: monthly trend query failed", zap.Error(err))
+			return nil
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var month string
+			var income, expense int64
+			if rows.Scan(&month, &income, &expense) == nil {
+				monthlyTrend = append(monthlyTrend, map[string]any{
+					"month": month, "income": income, "expense": expense,
+				})
+			}
+		}
+		return nil
+	})
+
+	// 2. Category breakdown
+	g.Go(func() error {
+		rows, err := h.db.QueryContext(gctx, `
+			SELECT category,
+			       ABS(SUM(amount)) AS amount,
+			       COUNT(*) AS cnt
+			FROM finances
+			WHERE user_id = $1 AND amount < 0 AND created_at >= $2
+			GROUP BY category ORDER BY amount DESC LIMIT 10`, userID, since)
+		if err != nil {
+			h.logger.Warn("statistics: category breakdown query failed", zap.Error(err))
+			return nil
+		}
+		defer rows.Close()
+		for rows.Next() {
 			var ci catItem
-			if catRows.Scan(&ci.cat, &ci.amount, &ci.cnt) == nil {
+			if rows.Scan(&ci.cat, &ci.amount, &ci.cnt) == nil {
 				catItems = append(catItems, ci)
 				totalCatAmt += ci.amount
 			}
 		}
+		return nil
+	})
+
+	// 3. Weekday spending pattern (last 90 days)
+	g.Go(func() error {
+		rows, err := h.db.QueryContext(gctx, `
+			SELECT EXTRACT(DOW FROM created_at)::int AS weekday,
+			       ABS(SUM(amount)) AS total,
+			       ABS(AVG(amount))::int AS avg,
+			       COUNT(*) AS cnt
+			FROM finances
+			WHERE user_id = $1 AND amount < 0 AND created_at >= NOW() - INTERVAL '90 days'
+			GROUP BY weekday ORDER BY weekday`, userID)
+		if err != nil {
+			h.logger.Warn("statistics: weekday spending query failed", zap.Error(err))
+			return nil
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var weekday, cnt int
+			var total, avg int64
+			if rows.Scan(&weekday, &total, &avg, &cnt) == nil {
+				weekdaySpending = append(weekdaySpending, map[string]any{
+					"weekday": weekday, "total": total, "avg": avg, "count": cnt,
+				})
+			}
+		}
+		return nil
+	})
+
+	// 4. 90-day spending heatmap
+	g.Go(func() error {
+		rows, err := h.db.QueryContext(gctx, `
+			SELECT DATE(created_at) AS date, ABS(SUM(amount)) AS total
+			FROM finances
+			WHERE user_id = $1 AND amount < 0 AND created_at >= NOW() - INTERVAL '90 days'
+			GROUP BY date ORDER BY date`, userID)
+		if err != nil {
+			h.logger.Warn("statistics: heatmap query failed", zap.Error(err))
+			return nil
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var date time.Time
+			var total int64
+			if rows.Scan(&date, &total) == nil {
+				heatmap = append(heatmap, map[string]any{
+					"date": date.Format("2006-01-02"), "total": total,
+				})
+			}
+		}
+		return nil
+	})
+
+	// 5. Summary stats (total expense + tx count)
+	g.Go(func() error {
+		if err := h.db.QueryRowContext(gctx,
+			`SELECT COALESCE(ABS(SUM(amount)), 0), COUNT(*)
+			 FROM finances WHERE user_id = $1 AND amount < 0 AND created_at >= $2`,
+			userID, since,
+		).Scan(&totalExpense, &txCount); err != nil {
+			h.logger.Warn("statistics: summary stats query failed", zap.Error(err))
+		}
+		return nil
+	})
+
+	// 6. Top category in period
+	g.Go(func() error {
+		if err := h.db.QueryRowContext(gctx, `
+			SELECT category, ABS(SUM(amount)) AS amt FROM finances
+			WHERE user_id = $1 AND amount < 0 AND created_at >= $2
+			GROUP BY category ORDER BY amt DESC LIMIT 1`,
+			userID, since,
+		).Scan(&topCategory, &topCategoryAmt); err != nil {
+			h.logger.Warn("statistics: top category query failed", zap.Error(err))
+		}
+		return nil
+	})
+
+	// 7. This month expense
+	g.Go(func() error {
+		if err := h.db.QueryRowContext(gctx,
+			`SELECT COALESCE(ABS(SUM(amount)), 0) FROM finances
+			 WHERE user_id = $1 AND amount < 0 AND TO_CHAR(created_at, 'YYYY-MM') = $2`,
+			userID, thisMonthStr,
+		).Scan(&thisMonthExpense); err != nil {
+			h.logger.Warn("statistics: this month expense query failed", zap.Error(err))
+		}
+		return nil
+	})
+
+	// 8. Last month expense
+	g.Go(func() error {
+		if err := h.db.QueryRowContext(gctx,
+			`SELECT COALESCE(ABS(SUM(amount)), 0) FROM finances
+			 WHERE user_id = $1 AND amount < 0 AND TO_CHAR(created_at, 'YYYY-MM') = $2`,
+			userID, lastMonthStr,
+		).Scan(&lastMonthExpense); err != nil {
+			h.logger.Warn("statistics: last month expense query failed", zap.Error(err))
+		}
+		return nil
+	})
+
+	// 9. Conversation stats (4 queries in one goroutine — all write to separate vars)
+	g.Go(func() error {
+		if err := h.db.QueryRowContext(gctx,
+			`SELECT COUNT(*) FROM conversations WHERE user_id = $1 AND created_at >= $2`, userID, since,
+		).Scan(&convCount); err != nil {
+			h.logger.Warn("statistics: conversation count query failed", zap.Error(err))
+		}
+		if err := h.db.QueryRowContext(gctx,
+			`SELECT COUNT(*) FROM messages m
+			 JOIN conversations c ON c.id = m.conversation_id
+			 WHERE c.user_id = $1 AND m.created_at >= $2`, userID, since,
+		).Scan(&totalMessages); err != nil {
+			h.logger.Warn("statistics: total messages query failed", zap.Error(err))
+		}
+		if err := h.db.QueryRowContext(gctx,
+			`SELECT COUNT(*) FROM messages m
+			 JOIN conversations c ON c.id = m.conversation_id
+			 WHERE c.user_id = $1 AND m.role = 'user' AND m.created_at >= $2`, userID, since,
+		).Scan(&userMessages); err != nil {
+			h.logger.Warn("statistics: user messages query failed", zap.Error(err))
+		}
+		if err := h.db.QueryRowContext(gctx,
+			`SELECT COUNT(*) FROM messages m
+			 JOIN conversations c ON c.id = m.conversation_id
+			 WHERE c.user_id = $1
+			   AND DATE_TRUNC('month', m.created_at) = DATE_TRUNC('month', NOW())`, userID,
+		).Scan(&thisMonthMessages); err != nil {
+			h.logger.Warn("statistics: this month messages query failed", zap.Error(err))
+		}
+		return nil
+	})
+
+	// Wait for all goroutines — errors are logged per-query, not propagated.
+	if err := g.Wait(); err != nil {
+		h.logger.Error("statistics: unexpected errgroup error", zap.Error(err))
 	}
+
+	// Build category breakdown from catItems (depends on goroutine 2 completing).
 	var categoryBreakdown []map[string]any
 	for _, ci := range catItems {
 		pct := 0.0
@@ -96,126 +264,31 @@ func (h *StatisticsHandler) GetStatistics(c echo.Context) error {
 			"category": ci.cat, "amount": ci.amount, "percent": pct, "count": ci.cnt,
 		})
 	}
-	if categoryBreakdown == nil {
-		categoryBreakdown = []map[string]any{}
-	}
 
-	// ── Weekday spending pattern (last 90 days) ───────────────────────────────
-	wdRows, err := h.db.QueryContext(ctx, `
-		SELECT EXTRACT(DOW FROM created_at)::int AS weekday,
-		       ABS(SUM(amount)) AS total,
-		       ABS(AVG(amount))::int AS avg,
-		       COUNT(*) AS cnt
-		FROM finances
-		WHERE user_id = $1 AND amount < 0 AND created_at >= NOW() - INTERVAL '90 days'
-		GROUP BY weekday ORDER BY weekday`, userID)
-	var weekdaySpending []map[string]any
-	if err == nil {
-		defer wdRows.Close()
-		for wdRows.Next() {
-			var weekday, cnt int
-			var total, avg int64
-			if wdRows.Scan(&weekday, &total, &avg, &cnt) == nil {
-				weekdaySpending = append(weekdaySpending, map[string]any{
-					"weekday": weekday, "total": total, "avg": avg, "count": cnt,
-				})
-			}
-		}
-	}
-	if weekdaySpending == nil {
-		weekdaySpending = []map[string]any{}
-	}
-
-	// ── 90-day spending heatmap ───────────────────────────────────────────────
-	hmRows, err := h.db.QueryContext(ctx, `
-		SELECT DATE(created_at) AS date, ABS(SUM(amount)) AS total
-		FROM finances
-		WHERE user_id = $1 AND amount < 0 AND created_at >= NOW() - INTERVAL '90 days'
-		GROUP BY date ORDER BY date`, userID)
-	var heatmap []map[string]any
-	if err == nil {
-		defer hmRows.Close()
-		for hmRows.Next() {
-			var date time.Time
-			var total int64
-			if hmRows.Scan(&date, &total) == nil {
-				heatmap = append(heatmap, map[string]any{
-					"date": date.Format("2006-01-02"), "total": total,
-				})
-			}
-		}
-	}
-	if heatmap == nil {
-		heatmap = []map[string]any{}
-	}
-
-	// ── Summary stats ─────────────────────────────────────────────────────────
-	var totalExpense int64
-	var txCount int
-	h.db.QueryRowContext(ctx,
-		`SELECT COALESCE(ABS(SUM(amount)), 0), COUNT(*)
-		 FROM finances WHERE user_id = $1 AND amount < 0 AND created_at >= $2`,
-		userID, since,
-	).Scan(&totalExpense, &txCount)
-
-	// avg daily = total / days in period
+	// Compute derived values.
 	dayCount := time.Since(since).Hours() / 24
 	var avgDaily int64
 	if dayCount > 0 {
 		avgDaily = int64(float64(totalExpense) / dayCount)
 	}
-
-	// Top category in period
-	var topCategory string
-	var topCategoryAmt int64
-	h.db.QueryRowContext(ctx, `
-		SELECT category, ABS(SUM(amount)) AS amt FROM finances
-		WHERE user_id = $1 AND amount < 0 AND created_at >= $2
-		GROUP BY category ORDER BY amt DESC LIMIT 1`,
-		userID, since,
-	).Scan(&topCategory, &topCategoryAmt)
-
-	// This month vs last month
-	thisMonthStr := time.Now().Format("2006-01")
-	lastMonthStr := time.Now().AddDate(0, -1, 0).Format("2006-01")
-	var thisMonthExpense, lastMonthExpense int64
-	h.db.QueryRowContext(ctx,
-		`SELECT COALESCE(ABS(SUM(amount)), 0) FROM finances
-		 WHERE user_id = $1 AND amount < 0 AND TO_CHAR(created_at, 'YYYY-MM') = $2`,
-		userID, thisMonthStr,
-	).Scan(&thisMonthExpense)
-	h.db.QueryRowContext(ctx,
-		`SELECT COALESCE(ABS(SUM(amount)), 0) FROM finances
-		 WHERE user_id = $1 AND amount < 0 AND TO_CHAR(created_at, 'YYYY-MM') = $2`,
-		userID, lastMonthStr,
-	).Scan(&lastMonthExpense)
-
 	var mom float64
 	if lastMonthExpense > 0 {
 		mom = float64(thisMonthExpense-lastMonthExpense) / float64(lastMonthExpense) * 100
 	}
 
-	// ── Conversation stats ────────────────────────────────────────────────────
-	var totalMessages, thisMonthMessages, userMessages, convCount int
-	h.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM conversations WHERE user_id = $1 AND created_at >= $2`, userID, since,
-	).Scan(&convCount)
-	h.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM messages m
-		 JOIN conversations c ON c.id = m.conversation_id
-		 WHERE c.user_id = $1 AND m.created_at >= $2`, userID, since,
-	).Scan(&totalMessages)
-	h.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM messages m
-		 JOIN conversations c ON c.id = m.conversation_id
-		 WHERE c.user_id = $1 AND m.role = 'user' AND m.created_at >= $2`, userID, since,
-	).Scan(&userMessages)
-	h.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM messages m
-		 JOIN conversations c ON c.id = m.conversation_id
-		 WHERE c.user_id = $1
-		   AND DATE_TRUNC('month', m.created_at) = DATE_TRUNC('month', NOW())`, userID,
-	).Scan(&thisMonthMessages)
+	// Ensure nil slices are returned as empty JSON arrays.
+	if monthlyTrend == nil {
+		monthlyTrend = []map[string]any{}
+	}
+	if categoryBreakdown == nil {
+		categoryBreakdown = []map[string]any{}
+	}
+	if weekdaySpending == nil {
+		weekdaySpending = []map[string]any{}
+	}
+	if heatmap == nil {
+		heatmap = []map[string]any{}
+	}
 
 	return c.JSON(http.StatusOK, map[string]any{
 		"period_months": months,
@@ -296,39 +369,220 @@ func (h *StatisticsHandler) GetAnalytics(c echo.Context) error {
 	thisMonth := now.Format("2006-01")
 	lastMonth := now.AddDate(0, -1, 0).Format("2006-01")
 
-	// ── Summary ───────────────────────────────────────────────────────────────
-	// Web chat messages (messages table via conversations, web platform only)
-	var webTotal, webUser, webAI, webThisMonth, webLastMonth int
-	h.db.QueryRowContext(ctx,
-		`SELECT COUNT(*),
-		        COALESCE(SUM(CASE WHEN m.role='user'      THEN 1 ELSE 0 END),0),
-		        COALESCE(SUM(CASE WHEN m.role='assistant' THEN 1 ELSE 0 END),0),
-		        COALESCE(SUM(CASE WHEN TO_CHAR(m.created_at,'YYYY-MM')=$2 THEN 1 ELSE 0 END),0),
-		        COALESCE(SUM(CASE WHEN TO_CHAR(m.created_at,'YYYY-MM')=$3 THEN 1 ELSE 0 END),0)
-		 FROM messages m
-		 JOIN conversations c ON c.id = m.conversation_id
-		 WHERE c.user_id = $1 AND c.platform = 'web'`, userID, thisMonth, lastMonth,
-	).Scan(&webTotal, &webUser, &webAI, &webThisMonth, &webLastMonth)
+	// Result variables — each goroutine writes to its own variable.
+	var (
+		webTotal, webUser, webAI, webThisMonth, webLastMonth int
+		tgTotal, tgUser, tgAI, tgThisMonth, tgLastMonth     int
+		totalConv, activeConv                                 int
+		dailyTrend                                            []map[string]any
+		hourlyDist                                            []map[string]any
+		weeklyTrend                                           []map[string]any
+		webConvCount                                          int
+		tgConvCount                                           int
+		legacyTgCount                                         int
+	)
 
-	// Telegram messages (messages table via conversations, telegram platform)
-	// + legacy chat_messages table for older sessions
-	var tgTotal, tgUser, tgAI, tgThisMonth, tgLastMonth int
-	h.db.QueryRowContext(ctx,
-		`SELECT COUNT(*),
-		        COALESCE(SUM(CASE WHEN role='user'      THEN 1 ELSE 0 END),0),
-		        COALESCE(SUM(CASE WHEN role='assistant' THEN 1 ELSE 0 END),0),
-		        COALESCE(SUM(CASE WHEN TO_CHAR(ca,'YYYY-MM')=$2 THEN 1 ELSE 0 END),0),
-		        COALESCE(SUM(CASE WHEN TO_CHAR(ca,'YYYY-MM')=$3 THEN 1 ELSE 0 END),0)
-		 FROM (
-		   SELECT m.role, m.created_at AS ca FROM messages m
-		   JOIN conversations c ON c.id = m.conversation_id
-		   WHERE c.user_id = $1 AND c.platform = 'telegram'
-		   UNION ALL
-		   SELECT role, created_at AS ca FROM chat_messages
-		   WHERE user_id = $1
-		 ) combined`, userID, thisMonth, lastMonth,
-	).Scan(&tgTotal, &tgUser, &tgAI, &tgThisMonth, &tgLastMonth)
+	g, gctx := errgroup.WithContext(ctx)
 
+	// 1. Web chat messages
+	g.Go(func() error {
+		if err := h.db.QueryRowContext(gctx,
+			`SELECT COUNT(*),
+			        COALESCE(SUM(CASE WHEN m.role='user'      THEN 1 ELSE 0 END),0),
+			        COALESCE(SUM(CASE WHEN m.role='assistant' THEN 1 ELSE 0 END),0),
+			        COALESCE(SUM(CASE WHEN TO_CHAR(m.created_at,'YYYY-MM')=$2 THEN 1 ELSE 0 END),0),
+			        COALESCE(SUM(CASE WHEN TO_CHAR(m.created_at,'YYYY-MM')=$3 THEN 1 ELSE 0 END),0)
+			 FROM messages m
+			 JOIN conversations c ON c.id = m.conversation_id
+			 WHERE c.user_id = $1 AND c.platform = 'web'`, userID, thisMonth, lastMonth,
+		).Scan(&webTotal, &webUser, &webAI, &webThisMonth, &webLastMonth); err != nil {
+			h.logger.Warn("analytics: web messages query failed", zap.Error(err))
+		}
+		return nil
+	})
+
+	// 2. Telegram messages (+ legacy chat_messages)
+	g.Go(func() error {
+		if err := h.db.QueryRowContext(gctx,
+			`SELECT COUNT(*),
+			        COALESCE(SUM(CASE WHEN role='user'      THEN 1 ELSE 0 END),0),
+			        COALESCE(SUM(CASE WHEN role='assistant' THEN 1 ELSE 0 END),0),
+			        COALESCE(SUM(CASE WHEN TO_CHAR(ca,'YYYY-MM')=$2 THEN 1 ELSE 0 END),0),
+			        COALESCE(SUM(CASE WHEN TO_CHAR(ca,'YYYY-MM')=$3 THEN 1 ELSE 0 END),0)
+			 FROM (
+			   SELECT m.role, m.created_at AS ca FROM messages m
+			   JOIN conversations c ON c.id = m.conversation_id
+			   WHERE c.user_id = $1 AND c.platform = 'telegram'
+			   UNION ALL
+			   SELECT role, created_at AS ca FROM chat_messages
+			   WHERE user_id = $1
+			 ) combined`, userID, thisMonth, lastMonth,
+		).Scan(&tgTotal, &tgUser, &tgAI, &tgThisMonth, &tgLastMonth); err != nil {
+			h.logger.Warn("analytics: telegram messages query failed", zap.Error(err))
+		}
+		return nil
+	})
+
+	// 3. Conversation counts
+	g.Go(func() error {
+		if err := h.db.QueryRowContext(gctx,
+			`SELECT COUNT(*),
+			        COALESCE(SUM(CASE WHEN updated_at >= NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END),0)
+			 FROM conversations WHERE user_id = $1`, userID,
+		).Scan(&totalConv, &activeConv); err != nil {
+			h.logger.Warn("analytics: conversation counts query failed", zap.Error(err))
+		}
+		return nil
+	})
+
+	// 4. Daily trend (last 30 days, ASC)
+	g.Go(func() error {
+		rows, err := h.db.QueryContext(gctx,
+			`SELECT d::date AS day,
+			        COALESCE(web.cnt, 0) + COALESCE(tg.cnt, 0) AS count
+			 FROM generate_series(NOW()-INTERVAL '29 days', NOW(), INTERVAL '1 day') AS d
+			 LEFT JOIN (
+			   SELECT DATE(m.created_at) AS day, COUNT(*) AS cnt
+			   FROM messages m JOIN conversations c ON c.id = m.conversation_id
+			   WHERE c.user_id = $1 AND m.created_at >= NOW()-INTERVAL '30 days'
+			   GROUP BY DATE(m.created_at)
+			 ) web ON web.day = d::date
+			 LEFT JOIN (
+			   SELECT DATE(created_at) AS day, COUNT(*) AS cnt
+			   FROM chat_messages WHERE user_id = $1 AND created_at >= NOW()-INTERVAL '30 days'
+			   GROUP BY DATE(created_at)
+			 ) tg ON tg.day = d::date
+			 ORDER BY day ASC`, userID,
+		)
+		if err != nil {
+			h.logger.Warn("analytics: daily trend query failed", zap.Error(err))
+			return nil
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var day time.Time
+			var count int
+			if rows.Scan(&day, &count) == nil {
+				dailyTrend = append(dailyTrend, map[string]any{
+					"date":  day.Format("2006-01-02"),
+					"count": count,
+				})
+			}
+		}
+		return nil
+	})
+
+	// 5. Hourly distribution (last 30 days)
+	g.Go(func() error {
+		rows, err := h.db.QueryContext(gctx,
+			`SELECT h AS hour,
+			        COALESCE(web.cnt, 0) + COALESCE(tg.cnt, 0) AS count
+			 FROM generate_series(0, 23) AS h
+			 LEFT JOIN (
+			   SELECT EXTRACT(HOUR FROM m.created_at)::int AS hour, COUNT(*) AS cnt
+			   FROM messages m JOIN conversations c ON c.id = m.conversation_id
+			   WHERE c.user_id = $1 AND m.created_at >= NOW()-INTERVAL '30 days'
+			   GROUP BY EXTRACT(HOUR FROM m.created_at)::int
+			 ) web ON web.hour = h
+			 LEFT JOIN (
+			   SELECT EXTRACT(HOUR FROM created_at)::int AS hour, COUNT(*) AS cnt
+			   FROM chat_messages WHERE user_id = $1 AND created_at >= NOW()-INTERVAL '30 days'
+			   GROUP BY EXTRACT(HOUR FROM created_at)::int
+			 ) tg ON tg.hour = h
+			 ORDER BY h`, userID,
+		)
+		if err != nil {
+			h.logger.Warn("analytics: hourly distribution query failed", zap.Error(err))
+			return nil
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var hour, count int
+			if rows.Scan(&hour, &count) == nil {
+				hourlyDist = append(hourlyDist, map[string]any{
+					"hour": hour, "count": count,
+				})
+			}
+		}
+		return nil
+	})
+
+	// 6. Weekly trend (last 8 weeks, ASC)
+	g.Go(func() error {
+		rows, err := h.db.QueryContext(gctx,
+			`SELECT TO_CHAR(DATE_TRUNC('week', d), 'MM/DD') AS week,
+			        COALESCE(web.cnt, 0) + COALESCE(tg.cnt, 0) AS count
+			 FROM generate_series(
+			   DATE_TRUNC('week', NOW()-INTERVAL '7 weeks'),
+			   DATE_TRUNC('week', NOW()),
+			   INTERVAL '1 week'
+			 ) AS d
+			 LEFT JOIN (
+			   SELECT DATE_TRUNC('week', m.created_at) AS wk, COUNT(*) AS cnt
+			   FROM messages m JOIN conversations c ON c.id = m.conversation_id
+			   WHERE c.user_id = $1 AND m.created_at >= NOW()-INTERVAL '8 weeks'
+			   GROUP BY wk
+			 ) web ON web.wk = DATE_TRUNC('week', d)
+			 LEFT JOIN (
+			   SELECT DATE_TRUNC('week', created_at) AS wk, COUNT(*) AS cnt
+			   FROM chat_messages WHERE user_id = $1 AND created_at >= NOW()-INTERVAL '8 weeks'
+			   GROUP BY wk
+			 ) tg ON tg.wk = DATE_TRUNC('week', d)
+			 ORDER BY d ASC`, userID,
+		)
+		if err != nil {
+			h.logger.Warn("analytics: weekly trend query failed", zap.Error(err))
+			return nil
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var week string
+			var count int
+			if rows.Scan(&week, &count) == nil {
+				weeklyTrend = append(weeklyTrend, map[string]any{
+					"week": week, "count": count,
+				})
+			}
+		}
+		return nil
+	})
+
+	// 7. Platform breakdown — web conversations
+	g.Go(func() error {
+		if err := h.db.QueryRowContext(gctx,
+			`SELECT COUNT(*) FROM conversations WHERE user_id = $1 AND platform = 'web'`, userID,
+		).Scan(&webConvCount); err != nil {
+			h.logger.Warn("analytics: web conversation count query failed", zap.Error(err))
+		}
+		return nil
+	})
+
+	// 8. Platform breakdown — telegram conversations
+	g.Go(func() error {
+		if err := h.db.QueryRowContext(gctx,
+			`SELECT COUNT(*) FROM conversations WHERE user_id = $1 AND platform = 'telegram'`, userID,
+		).Scan(&tgConvCount); err != nil {
+			h.logger.Warn("analytics: telegram conversation count query failed", zap.Error(err))
+		}
+		return nil
+	})
+
+	// 9. Platform breakdown — legacy telegram sessions
+	g.Go(func() error {
+		if err := h.db.QueryRowContext(gctx,
+			`SELECT COUNT(DISTINCT session_id) FROM chat_messages WHERE user_id = $1`, userID,
+		).Scan(&legacyTgCount); err != nil {
+			h.logger.Warn("analytics: legacy telegram count query failed", zap.Error(err))
+		}
+		return nil
+	})
+
+	// Wait for all goroutines — errors are logged per-query, not propagated.
+	if err := g.Wait(); err != nil {
+		h.logger.Error("analytics: unexpected errgroup error", zap.Error(err))
+	}
+
+	// Compute derived values.
 	totalMessages := webTotal + tgTotal
 	userMessages := webUser + tgUser
 	aiMessages := webAI + tgAI
@@ -340,147 +594,27 @@ func (h *StatisticsHandler) GetAnalytics(c echo.Context) error {
 		mom = float64(thisMonthTotal-lastMonthTotal) / float64(lastMonthTotal) * 100
 	}
 
-	var totalConv, activeConv int
-	h.db.QueryRowContext(ctx,
-		`SELECT COUNT(*),
-		        COALESCE(SUM(CASE WHEN updated_at >= NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END),0)
-		 FROM conversations WHERE user_id = $1`, userID,
-	).Scan(&totalConv, &activeConv)
-
 	avgPerDay := 0
 	if totalMessages > 0 {
 		avgPerDay = totalMessages / 30
 	}
 
-	// ── Daily trend (last 30 days, ASC) ─────────────────────────────────────
-	dailyRows, err := h.db.QueryContext(ctx,
-		`SELECT d::date AS day,
-		        COALESCE(web.cnt, 0) + COALESCE(tg.cnt, 0) AS count
-		 FROM generate_series(NOW()-INTERVAL '29 days', NOW(), INTERVAL '1 day') AS d
-		 LEFT JOIN (
-		   SELECT DATE(m.created_at) AS day, COUNT(*) AS cnt
-		   FROM messages m JOIN conversations c ON c.id = m.conversation_id
-		   WHERE c.user_id = $1 AND m.created_at >= NOW()-INTERVAL '30 days'
-		   GROUP BY DATE(m.created_at)
-		 ) web ON web.day = d::date
-		 LEFT JOIN (
-		   SELECT DATE(created_at) AS day, COUNT(*) AS cnt
-		   FROM chat_messages WHERE user_id = $1 AND created_at >= NOW()-INTERVAL '30 days'
-		   GROUP BY DATE(created_at)
-		 ) tg ON tg.day = d::date
-		 ORDER BY day ASC`, userID,
-	)
-	var dailyTrend []map[string]any
-	if err == nil {
-		defer dailyRows.Close()
-		for dailyRows.Next() {
-			var day time.Time
-			var count int
-			if dailyRows.Scan(&day, &count) == nil {
-				dailyTrend = append(dailyTrend, map[string]any{
-					"date":  day.Format("2006-01-02"),
-					"count": count,
-				})
-			}
-		}
-	}
-	if dailyTrend == nil {
-		dailyTrend = []map[string]any{}
-	}
-
-	// ── Hourly distribution (last 30 days) ───────────────────────────────────
-	hourlyRows, err := h.db.QueryContext(ctx,
-		`SELECT h AS hour,
-		        COALESCE(web.cnt, 0) + COALESCE(tg.cnt, 0) AS count
-		 FROM generate_series(0, 23) AS h
-		 LEFT JOIN (
-		   SELECT EXTRACT(HOUR FROM m.created_at)::int AS hour, COUNT(*) AS cnt
-		   FROM messages m JOIN conversations c ON c.id = m.conversation_id
-		   WHERE c.user_id = $1 AND m.created_at >= NOW()-INTERVAL '30 days'
-		   GROUP BY EXTRACT(HOUR FROM m.created_at)::int
-		 ) web ON web.hour = h
-		 LEFT JOIN (
-		   SELECT EXTRACT(HOUR FROM created_at)::int AS hour, COUNT(*) AS cnt
-		   FROM chat_messages WHERE user_id = $1 AND created_at >= NOW()-INTERVAL '30 days'
-		   GROUP BY EXTRACT(HOUR FROM created_at)::int
-		 ) tg ON tg.hour = h
-		 ORDER BY h`, userID,
-	)
-	var hourlyDist []map[string]any
-	if err == nil {
-		defer hourlyRows.Close()
-		for hourlyRows.Next() {
-			var hour, count int
-			if hourlyRows.Scan(&hour, &count) == nil {
-				hourlyDist = append(hourlyDist, map[string]any{
-					"hour": hour, "count": count,
-				})
-			}
-		}
-	}
-	if hourlyDist == nil {
-		hourlyDist = []map[string]any{}
-	}
-
-	// ── Weekly trend (last 8 weeks, ASC) ─────────────────────────────────────
-	weeklyRows, err := h.db.QueryContext(ctx,
-		`SELECT TO_CHAR(DATE_TRUNC('week', d), 'MM/DD') AS week,
-		        COALESCE(web.cnt, 0) + COALESCE(tg.cnt, 0) AS count
-		 FROM generate_series(
-		   DATE_TRUNC('week', NOW()-INTERVAL '7 weeks'),
-		   DATE_TRUNC('week', NOW()),
-		   INTERVAL '1 week'
-		 ) AS d
-		 LEFT JOIN (
-		   SELECT DATE_TRUNC('week', m.created_at) AS wk, COUNT(*) AS cnt
-		   FROM messages m JOIN conversations c ON c.id = m.conversation_id
-		   WHERE c.user_id = $1 AND m.created_at >= NOW()-INTERVAL '8 weeks'
-		   GROUP BY wk
-		 ) web ON web.wk = DATE_TRUNC('week', d)
-		 LEFT JOIN (
-		   SELECT DATE_TRUNC('week', created_at) AS wk, COUNT(*) AS cnt
-		   FROM chat_messages WHERE user_id = $1 AND created_at >= NOW()-INTERVAL '8 weeks'
-		   GROUP BY wk
-		 ) tg ON tg.wk = DATE_TRUNC('week', d)
-		 ORDER BY d ASC`, userID,
-	)
-	var weeklyTrend []map[string]any
-	if err == nil {
-		defer weeklyRows.Close()
-		for weeklyRows.Next() {
-			var week string
-			var count int
-			if weeklyRows.Scan(&week, &count) == nil {
-				weeklyTrend = append(weeklyTrend, map[string]any{
-					"week": week, "count": count,
-				})
-			}
-		}
-	}
-	if weeklyTrend == nil {
-		weeklyTrend = []map[string]any{}
-	}
-
-	// ── Platform breakdown ────────────────────────────────────────────────────
-	var webConvCount int
-	h.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM conversations WHERE user_id = $1 AND platform = 'web'`, userID,
-	).Scan(&webConvCount)
-
-	var tgConvCount int
-	h.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM conversations WHERE user_id = $1 AND platform = 'telegram'`, userID,
-	).Scan(&tgConvCount)
-	// Add legacy chat_sessions count
-	var legacyTgCount int
-	h.db.QueryRowContext(ctx,
-		`SELECT COUNT(DISTINCT session_id) FROM chat_messages WHERE user_id = $1`, userID,
-	).Scan(&legacyTgCount)
 	tgConvCount += legacyTgCount
 
 	platforms := []map[string]any{
 		{"platform": "web", "messages": webTotal, "conversations": webConvCount},
 		{"platform": "telegram", "messages": tgTotal, "conversations": tgConvCount},
+	}
+
+	// Ensure nil slices are returned as empty JSON arrays.
+	if dailyTrend == nil {
+		dailyTrend = []map[string]any{}
+	}
+	if hourlyDist == nil {
+		hourlyDist = []map[string]any{}
+	}
+	if weeklyTrend == nil {
+		weeklyTrend = []map[string]any{}
 	}
 
 	return c.JSON(http.StatusOK, map[string]any{

@@ -8,12 +8,15 @@ from starnion_utils import psql as _shared_psql
 DB_URL = os.environ.get("DATABASE_URL", "")
 if not DB_URL: print("❌ DATABASE_URL is not set.", file=sys.stderr); sys.exit(1)
 
-def psql(sql): return _shared_psql(sql, DB_URL)
-def esc(s): return (s or "").replace("'", "''")
+def psql(sql, params=None): return _shared_psql(sql, DB_URL, params)
 
 def cmd_search(args):
-    kw = esc(args.keyword)
-    rows = psql(f"SELECT id, name, color, big_rock, COALESCE(mission,'') FROM planner_roles WHERE user_id='{args.user_id}' AND name ILIKE '%{kw}%' ORDER BY sort_order;")
+    kw = args.keyword
+    rows = psql(
+        "SELECT id, name, color, big_rock, COALESCE(mission,'') FROM planner_roles "
+        "WHERE user_id=%s AND name ILIKE %s ORDER BY sort_order;",
+        (args.user_id, f'%{kw}%')
+    )
     if not rows: print(f"🔍 '{args.keyword}' 역할 없음."); return
     print(f"🔍 역할 검색 '{args.keyword}':\n")
     for line in rows.split("\n"):
@@ -22,12 +25,24 @@ def cmd_search(args):
         print(f"  [{p[0].strip()}] 🎭 {p[1].strip()} — 핵심 목표: {p[3].strip()}")
 
 def cmd_add(args):
-    name, color, br, mission = esc(args.name), args.color or "#3b6de0", esc(args.big_rock or ""), esc(args.mission or "")
-    psql(f"INSERT INTO planner_roles (user_id, name, color, big_rock, mission, sort_order) VALUES ('{args.user_id}', '{name}', '{color}', '{br}', '{mission}', (SELECT COALESCE(MAX(sort_order),0)+1 FROM planner_roles WHERE user_id='{args.user_id}'));")
+    name = args.name
+    color = args.color or "#3b6de0"
+    br = args.big_rock or ""
+    mission = args.mission or ""
+    psql(
+        "INSERT INTO planner_roles (user_id, name, color, big_rock, mission, sort_order) "
+        "VALUES (%s, %s, %s, %s, %s, "
+        "(SELECT COALESCE(MAX(sort_order),0)+1 FROM planner_roles WHERE user_id=%s));",
+        (args.user_id, name, color, br, mission, args.user_id)
+    )
     print(f"✅ 역할 추가됨: 🎭 {args.name}")
 
 def cmd_list(args):
-    rows = psql(f"SELECT id, name, color, big_rock, COALESCE(mission,'') FROM planner_roles WHERE user_id='{args.user_id}' ORDER BY sort_order;")
+    rows = psql(
+        "SELECT id, name, color, big_rock, COALESCE(mission,'') FROM planner_roles "
+        "WHERE user_id=%s ORDER BY sort_order;",
+        (args.user_id,)
+    )
     if not rows: print("🎭 등록된 역할이 없습니다."); return
     print("🎭 역할 목록:\n")
     for line in rows.split("\n"):
@@ -40,18 +55,34 @@ def cmd_list(args):
 
 def cmd_update(args):
     sets = []
-    if args.name: sets.append(f"name='{esc(args.name)}'")
-    if args.color: sets.append(f"color='{args.color}'")
-    if args.big_rock: sets.append(f"big_rock='{esc(args.big_rock)}'")
-    if args.mission: sets.append(f"mission='{esc(args.mission)}'")
+    params = []
+    if args.name:
+        sets.append("name=%s")
+        params.append(args.name)
+    if args.color:
+        sets.append("color=%s")
+        params.append(args.color)
+    if args.big_rock:
+        sets.append("big_rock=%s")
+        params.append(args.big_rock)
+    if args.mission:
+        sets.append("mission=%s")
+        params.append(args.mission)
     if not sets: print("❌ 수정할 항목이 없습니다."); return
     sets.append("updated_at=NOW()")
-    result = psql(f"UPDATE planner_roles SET {','.join(sets)} WHERE id={args.id} AND user_id='{args.user_id}' RETURNING name;")
+    params.extend([args.id, args.user_id])
+    result = psql(
+        f"UPDATE planner_roles SET {','.join(sets)} WHERE id=%s AND user_id=%s RETURNING name;",
+        tuple(params)
+    )
     if not result: print("❌ 해당 역할을 찾을 수 없습니다."); return
     print(f"✅ 역할 수정됨: {result.strip()}")
 
 def cmd_delete(args):
-    result = psql(f"DELETE FROM planner_roles WHERE id={args.id} AND user_id='{args.user_id}' RETURNING name;")
+    result = psql(
+        "DELETE FROM planner_roles WHERE id=%s AND user_id=%s RETURNING name;",
+        (args.id, args.user_id)
+    )
     if not result: print("❌ 해당 역할을 찾을 수 없습니다."); return
     print(f"🗑️ 역할 삭제됨: {result.strip()}")
 

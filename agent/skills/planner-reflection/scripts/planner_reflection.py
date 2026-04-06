@@ -9,17 +9,18 @@ from starnion_utils import psql as _shared_psql
 DB_URL = os.environ.get("DATABASE_URL", "")
 if not DB_URL: print("❌ DATABASE_URL is not set.", file=sys.stderr); sys.exit(1)
 
-def psql(sql): return _shared_psql(sql, DB_URL)
-def esc(s): return (s or "").replace("'", "''")
+def psql(sql, params=None): return _shared_psql(sql, DB_URL, params)
 def today(): return date.today().isoformat()
 
 def cmd_add(args):
     d = args.date or today()
-    text = esc(args.text)
     ts = __import__("datetime").datetime.now().isoformat() + "Z"
     new_note = json.dumps({"id": str(int(__import__("time").time() * 1000)), "text": args.text, "createdAt": ts})
     # Read existing notes
-    row = psql(f"SELECT notes FROM planner_reflection_notes WHERE user_id='{args.user_id}' AND note_date='{d}';")
+    row = psql(
+        "SELECT notes FROM planner_reflection_notes WHERE user_id=%s AND note_date=%s;",
+        (args.user_id, d)
+    )
     if row and row.strip():
         try:
             existing = json.loads(row.strip())
@@ -32,14 +33,21 @@ def cmd_add(args):
             notes_json = json.dumps([json.loads(new_note)])
     else:
         notes_json = json.dumps([json.loads(new_note)])
-    notes_escaped = esc(notes_json)
-    psql(f"INSERT INTO planner_reflection_notes (user_id, note_date, notes) VALUES ('{args.user_id}', '{d}', '{notes_escaped}'::jsonb) ON CONFLICT (user_id, note_date) DO UPDATE SET notes='{notes_escaped}'::jsonb, updated_at=NOW();")
+    psql(
+        "INSERT INTO planner_reflection_notes (user_id, note_date, notes) "
+        "VALUES (%s, %s, %s::jsonb) "
+        "ON CONFLICT (user_id, note_date) DO UPDATE SET notes=%s::jsonb, updated_at=NOW();",
+        (args.user_id, d, notes_json, notes_json)
+    )
     print(f"💭 성찰 노트 추가됨 ({d})")
     print(f"  {args.text[:80]}{'...' if len(args.text) > 80 else ''}")
 
 def cmd_list(args):
     d = args.date or today()
-    row = psql(f"SELECT notes FROM planner_reflection_notes WHERE user_id='{args.user_id}' AND note_date='{d}';")
+    row = psql(
+        "SELECT notes FROM planner_reflection_notes WHERE user_id=%s AND note_date=%s;",
+        (args.user_id, d)
+    )
     if not row or not row.strip(): print(f"💭 {d} 성찰 노트가 없습니다."); return
     try:
         notes = json.loads(row.strip())

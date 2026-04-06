@@ -66,14 +66,15 @@ export interface DiaryEntry {
 
 // ── Helpers ──────────────────────────���───────────────────────────────────────
 
-function uid() { return Math.random().toString(36).slice(2, 10) }
+function uid() { return crypto.randomUUID() }
 function getToday() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
-const TODAY = getToday()
+// Computed dynamically on each access to avoid stale value after midnight
+const TODAY = getToday() // initial value; store.selectedDate resets on hydrate
 
-function addDaysStr(dateStr: string, n: number): string {
+function _addDaysStr(dateStr: string, n: number): string {
   const d = new Date(dateStr)
   d.setDate(d.getDate() + n)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
@@ -87,14 +88,18 @@ function getWeekStart(dateStr?: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
-// ── API helpers (fire-and-forget for mutations) ─────────────────────────────
+// ── API helpers (optimistic mutations with error logging) ────────────────────
+
+function logApiError(method: string, path: string, err: unknown) {
+  console.error(`[planner-api] ${method} ${path} failed:`, err)
+}
 
 const api = {
-  get: (path: string) => fetch(path).then(r => r.ok ? r.json() : null).catch(() => null),
-  post: (path: string, body: unknown) => fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.ok ? r.json() : null).catch(() => null),
-  put: (path: string, body: unknown) => fetch(path, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.ok ? r.json() : null).catch(() => null),
-  patch: (path: string) => fetch(path, { method: "PATCH" }).then(r => r.ok ? r.json() : null).catch(() => null),
-  del: (path: string) => fetch(path, { method: "DELETE" }).catch(() => null),
+  get: (path: string) => fetch(path).then(r => r.ok ? r.json() : null).catch(e => { logApiError("GET", path, e); return null }),
+  post: (path: string, body: unknown) => fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => { if (!r.ok) logApiError("POST", path, r.status); return r.ok ? r.json() : null }).catch(e => { logApiError("POST", path, e); return null }),
+  put: (path: string, body: unknown) => fetch(path, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => { if (!r.ok) logApiError("PUT", path, r.status); return r.ok ? r.json() : null }).catch(e => { logApiError("PUT", path, e); return null }),
+  patch: (path: string) => fetch(path, { method: "PATCH" }).then(r => { if (!r.ok) logApiError("PATCH", path, r.status); return r.ok ? r.json() : null }).catch(e => { logApiError("PATCH", path, e); return null }),
+  del: (path: string) => fetch(path, { method: "DELETE" }).then(r => { if (!r.ok) logApiError("DELETE", path, r.status); return r }).catch(e => { logApiError("DELETE", path, e); return null }),
 }
 
 // Convert API time "HH:MM" to hour number, and vice versa

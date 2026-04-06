@@ -11,8 +11,7 @@ if not DB_URL:
     print("❌ DATABASE_URL is not set.", file=sys.stderr)
     sys.exit(1)
 
-def psql(sql): return _shared_psql(sql, DB_URL)
-def esc(s): return (s or "").replace("'", "''")
+def psql(sql, params=None): return _shared_psql(sql, DB_URL, params)
 def today(): return date.today().isoformat()
 
 PRIORITY_EMOJI = {"A": "🔴", "B": "🔵", "C": "⚪"}
@@ -32,18 +31,20 @@ def parse_priority(val):
 
 def cmd_search(args):
     d = args.date or today()
-    kw = esc(args.keyword)
+    kw = args.keyword
     sql = (
-        f"SELECT t.id, t.title, t.priority, t.sort_order, t.status, t.task_date::text, "
-        f"COALESCE(r.name,'') as role_name "
-        f"FROM planner_tasks t LEFT JOIN planner_roles r ON t.role_id = r.id "
-        f"WHERE t.user_id = '{args.user_id}' AND t.is_inbox = FALSE "
-        f"AND t.title ILIKE '%{kw}%' "
+        "SELECT t.id, t.title, t.priority, t.sort_order, t.status, t.task_date::text, "
+        "COALESCE(r.name,'') as role_name "
+        "FROM planner_tasks t LEFT JOIN planner_roles r ON t.role_id = r.id "
+        "WHERE t.user_id = %s AND t.is_inbox = FALSE "
+        "AND t.title ILIKE %s "
     )
+    params = [args.user_id, f'%{kw}%']
     if args.date:
-        sql += f"AND t.task_date = '{d}' "
+        sql += "AND t.task_date = %s "
+        params.append(d)
     sql += "ORDER BY t.task_date DESC, t.priority, t.sort_order LIMIT 10;"
-    rows = psql(sql)
+    rows = psql(sql, tuple(params))
     if not rows:
         print(f"🔍 '{args.keyword}' 검색 결과가 없습니다.")
         return
@@ -61,24 +62,27 @@ def cmd_search(args):
 def cmd_add(args):
     d = args.date or today()
     pri, order = parse_priority(args.priority)
-    title = esc(args.title)
-    role_clause = f"'{args.role_id}'" if args.role_id else "NULL"
-    wg_clause = f"'{args.weekly_goal_id}'" if args.weekly_goal_id else "NULL"
-    ts = f"'{args.time_start}:00'" if args.time_start else "NULL"
-    te = f"'{args.time_end}:00'" if args.time_end else "NULL"
+    role_id = args.role_id if args.role_id else None
+    wg_id = args.weekly_goal_id if args.weekly_goal_id else None
+    ts = f"{args.time_start}:00" if args.time_start else None
+    te = f"{args.time_end}:00" if args.time_end else None
     if order is not None:
-        order_clause = str(order)
-    else:
-        order_clause = (
-            f"(SELECT COALESCE(MAX(sort_order),0)+1 FROM planner_tasks "
-            f"WHERE user_id='{args.user_id}' AND task_date='{d}' AND priority='{pri}' AND is_inbox=FALSE)"
+        sql = (
+            "INSERT INTO planner_tasks (user_id, title, priority, role_id, task_date, time_start, time_end, sort_order, weekly_goal_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            "RETURNING id, sort_order;"
         )
-    sql = (
-        f"INSERT INTO planner_tasks (user_id, title, priority, role_id, task_date, time_start, time_end, sort_order, weekly_goal_id) "
-        f"VALUES ('{args.user_id}', '{title}', '{pri}', {role_clause}, '{d}', {ts}, {te}, {order_clause}, {wg_clause}) "
-        f"RETURNING id, sort_order;"
-    )
-    result = psql(sql)
+        params = (args.user_id, args.title, pri, role_id, d, ts, te, order, wg_id)
+    else:
+        sql = (
+            "INSERT INTO planner_tasks (user_id, title, priority, role_id, task_date, time_start, time_end, sort_order, weekly_goal_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, "
+            "(SELECT COALESCE(MAX(sort_order),0)+1 FROM planner_tasks "
+            "WHERE user_id=%s AND task_date=%s AND priority=%s AND is_inbox=FALSE), %s) "
+            "RETURNING id, sort_order;"
+        )
+        params = (args.user_id, args.title, pri, role_id, d, ts, te, args.user_id, d, pri, wg_id)
+    result = psql(sql, params)
     parts = result.strip().split("|") if result else ["?", "0"]
     tid = parts[0].strip()
     final_order = int(parts[1].strip()) + 1 if len(parts) > 1 else "?"
@@ -92,14 +96,14 @@ def cmd_add(args):
 def cmd_list(args):
     d = args.date or today()
     sql = (
-        f"SELECT t.id, t.title, t.priority, t.sort_order, t.status, "
-        f"COALESCE(t.time_start,''), COALESCE(t.time_end,''), "
-        f"COALESCE(r.name,''), COALESCE(t.note,'') "
-        f"FROM planner_tasks t LEFT JOIN planner_roles r ON t.role_id = r.id "
-        f"WHERE t.user_id = '{args.user_id}' AND t.is_inbox = FALSE AND t.task_date = '{d}' "
-        f"ORDER BY t.priority, t.sort_order;"
+        "SELECT t.id, t.title, t.priority, t.sort_order, t.status, "
+        "COALESCE(t.time_start,''), COALESCE(t.time_end,''), "
+        "COALESCE(r.name,''), COALESCE(t.note,'') "
+        "FROM planner_tasks t LEFT JOIN planner_roles r ON t.role_id = r.id "
+        "WHERE t.user_id = %s AND t.is_inbox = FALSE AND t.task_date = %s "
+        "ORDER BY t.priority, t.sort_order;"
     )
-    rows = psql(sql)
+    rows = psql(sql, (args.user_id, d))
     if not rows:
         print(f"📋 {d} 업무가 없습니다.")
         return
@@ -122,26 +126,31 @@ def cmd_list(args):
 
 def cmd_update(args):
     sets = []
+    params = []
     if args.status:
         valid = ("pending", "in-progress", "done", "forwarded", "cancelled", "delegated")
         if args.status not in valid:
             print(f"❌ 상태는 {', '.join(valid)} 중 하나여야 합니다.")
             return
-        sets.append(f"status = '{args.status}'")
+        sets.append("status = %s")
+        params.append(args.status)
     if args.title:
-        sets.append(f"title = '{esc(args.title)}'")
+        sets.append("title = %s")
+        params.append(args.title)
     if args.priority:
-        sets.append(f"priority = '{args.priority.upper()}'")
+        sets.append("priority = %s")
+        params.append(args.priority.upper())
     if not sets:
         print("❌ 수정할 항목이 없습니다. --status, --title, --priority 중 하나를 지정하세요.")
         return
     sets.append("updated_at = NOW()")
+    params.extend([args.id, args.user_id])
     sql = (
         f"UPDATE planner_tasks SET {', '.join(sets)} "
-        f"WHERE id = {args.id} AND user_id = '{args.user_id}' AND is_inbox = FALSE "
-        f"RETURNING title, status;"
+        "WHERE id = %s AND user_id = %s AND is_inbox = FALSE "
+        "RETURNING title, status;"
     )
-    result = psql(sql)
+    result = psql(sql, tuple(params))
     if not result:
         print("❌ 해당 업무를 찾을 수 없습니다.")
         return
@@ -154,10 +163,10 @@ def cmd_update(args):
 
 def cmd_delete(args):
     sql = (
-        f"DELETE FROM planner_tasks WHERE id = {args.id} AND user_id = '{args.user_id}' AND is_inbox = FALSE "
-        f"RETURNING title;"
+        "DELETE FROM planner_tasks WHERE id = %s AND user_id = %s AND is_inbox = FALSE "
+        "RETURNING title;"
     )
-    result = psql(sql)
+    result = psql(sql, (args.id, args.user_id))
     if not result:
         print("❌ 해당 업무를 찾을 수 없습니다.")
         return
@@ -167,11 +176,11 @@ def cmd_delete(args):
 def cmd_forward(args):
     # Mark as forwarded
     sql1 = (
-        f"UPDATE planner_tasks SET status = 'forwarded', updated_at = NOW() "
-        f"WHERE id = {args.id} AND user_id = '{args.user_id}' AND is_inbox = FALSE "
-        f"RETURNING title, task_date::text;"
+        "UPDATE planner_tasks SET status = 'forwarded', updated_at = NOW() "
+        "WHERE id = %s AND user_id = %s AND is_inbox = FALSE "
+        "RETURNING title, task_date::text;"
     )
-    result = psql(sql1)
+    result = psql(sql1, (args.id, args.user_id))
     if not result:
         print("❌ 해당 업무를 찾을 수 없습니다.")
         return
@@ -180,12 +189,12 @@ def cmd_forward(args):
     old_date = parts[1].strip()
     # Create copy for tomorrow
     sql2 = (
-        f"INSERT INTO planner_tasks (user_id, title, priority, role_id, time_start, time_end, note, sort_order, task_date, forwarded_from_id) "
-        f"SELECT user_id, title, priority, role_id, time_start, time_end, note, sort_order, task_date + 1, id "
-        f"FROM planner_tasks WHERE id = {args.id} "
-        f"RETURNING id, task_date::text;"
+        "INSERT INTO planner_tasks (user_id, title, priority, role_id, time_start, time_end, note, sort_order, task_date, forwarded_from_id) "
+        "SELECT user_id, title, priority, role_id, time_start, time_end, note, sort_order, task_date + 1, id "
+        "FROM planner_tasks WHERE id = %s "
+        "RETURNING id, task_date::text;"
     )
-    result2 = psql(sql2)
+    result2 = psql(sql2, (args.id,))
     new_parts = result2.strip().split("|") if result2 else ["?", "?"]
     new_date = new_parts[1].strip() if len(new_parts) > 1 else "?"
     print(f"➡️ 이월됨: {title}")
@@ -193,13 +202,12 @@ def cmd_forward(args):
 
 
 def cmd_memo(args):
-    text = esc(args.text)
     sql = (
-        f"UPDATE planner_tasks SET note = '{text}', updated_at = NOW() "
-        f"WHERE id = {args.id} AND user_id = '{args.user_id}' AND is_inbox = FALSE "
-        f"RETURNING title;"
+        "UPDATE planner_tasks SET note = %s, updated_at = NOW() "
+        "WHERE id = %s AND user_id = %s AND is_inbox = FALSE "
+        "RETURNING title;"
     )
-    result = psql(sql)
+    result = psql(sql, (args.text, args.id, args.user_id))
     if not result:
         print("❌ 해당 업무를 찾을 수 없습니다.")
         return
@@ -209,11 +217,11 @@ def cmd_memo(args):
 
 def cmd_memo_clear(args):
     sql = (
-        f"UPDATE planner_tasks SET note = NULL, updated_at = NOW() "
-        f"WHERE id = {args.id} AND user_id = '{args.user_id}' AND is_inbox = FALSE "
-        f"RETURNING title;"
+        "UPDATE planner_tasks SET note = NULL, updated_at = NOW() "
+        "WHERE id = %s AND user_id = %s AND is_inbox = FALSE "
+        "RETURNING title;"
     )
-    result = psql(sql)
+    result = psql(sql, (args.id, args.user_id))
     if not result:
         print("❌ 해당 업무를 찾을 수 없습니다.")
         return

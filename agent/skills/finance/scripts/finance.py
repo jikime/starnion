@@ -16,11 +16,7 @@ if not DB_URL:
     print("❌ DATABASE_URL is not set.", file=sys.stderr)
     sys.exit(1)
 
-def psql(sql): return _shared_psql(sql, DB_URL)
-
-def esc(s: str) -> str:
-    """Escape single quotes for SQL."""
-    return str(s).replace("'", "''")
+def psql(sql, params=None): return _shared_psql(sql, DB_URL, params)
 
 ENCRYPTION_KEY = os.environ.get("ENCRYPTION_KEY", "")
 if not ENCRYPTION_KEY:
@@ -46,8 +42,9 @@ def _get_naver_search_creds(user_id: str) -> tuple[str, str] | None:
     try:
         print(f"[geocode] 🔑 looking up naver_search credentials for user_id='{user_id}'", file=sys.stderr)
         row = psql(
-            f"SELECT api_key FROM integration_keys "
-            f"WHERE user_id = '{esc(user_id)}' AND provider = 'naver_search' LIMIT 1;"
+            "SELECT api_key FROM integration_keys "
+            "WHERE user_id = %s AND provider = 'naver_search' LIMIT 1;",
+            (user_id,)
         )
         if not row:
             print("[geocode] ⚠️  naver_search credentials not registered in DB", file=sys.stderr)
@@ -222,9 +219,11 @@ def extract_location_from_description(desc: str) -> str | None:
 
 
 def build_location_sql(args) -> tuple[str, str | None]:
-    """Build the location JSON value for SQL.
-    Returns (sql_value, resolved_location_label) where label is for display.
-    sql_value is either a quoted JSON string or 'NULL'.
+    """Build the location JSON value and params for SQL.
+    Returns (sql_fragment, resolved_location_label) where sql_fragment is '%s' or 'NULL',
+    and the actual value should be added to params externally.
+    NOTE: This function still returns raw SQL fragments for location because the value
+    is a complex JSON that gets embedded. The caller handles parameterization of other fields.
     """
     lat     = getattr(args, "lat",           None)
     lng     = getattr(args, "lng",           None)
@@ -247,10 +246,10 @@ def build_location_sql(args) -> tuple[str, str | None]:
             loc = {**coords, "name": address}
             label = f"{address} ({coords['lat']:.4f},{coords['lng']:.4f})"
             print(f"[location] ✅ address geocoded → {label}", file=sys.stderr)
-            return f"'{esc(json.dumps(loc, ensure_ascii=False))}'", label
+            return json.dumps(loc, ensure_ascii=False), label
         loc = {"name": address}
         print(f"[location] ⚠️  address geocoding failed, name-only", file=sys.stderr)
-        return f"'{esc(json.dumps(loc, ensure_ascii=False))}'", address
+        return json.dumps(loc, ensure_ascii=False), address
 
     # Fallback 1: extract from --text
     if not name and not (lat and lng):
@@ -270,8 +269,6 @@ def build_location_sql(args) -> tuple[str, str | None]:
                 print(f"[location] 🔍 extracted from description (suffix): '{name}'", file=sys.stderr)
             else:
                 # Fallback 2b: description 토큰을 점진적으로 줄여가며 장소명으로 시도
-                # "양재 나주곰탕 나주우거지곰탕" → "양재 나주곰탕" → "양재" 순서
-                # 에이전트가 --text 없이 description에 가게명+메뉴명을 섞어 넣는 경우 대응
                 toks = desc_text.split()
                 for n in range(len(toks), 0, -1):
                     candidate = " ".join(toks[:n])
@@ -281,19 +278,19 @@ def build_location_sql(args) -> tuple[str, str | None]:
                         loc = {**coords, "name": candidate}
                         label = f"{candidate} ({coords['lat']:.4f},{coords['lng']:.4f})"
                         print(f"[location] ✅ geocoded via description slice → {label}", file=sys.stderr)
-                        return f"'{esc(json.dumps(loc, ensure_ascii=False))}'", label
+                        return json.dumps(loc, ensure_ascii=False), label
                 # 모두 실패 → 이름만 저장
                 print(f"[location] ⚠️  all description slices failed, name-only: '{toks[0] if toks else desc_text}'", file=sys.stderr)
                 name = toks[0] if len(toks) > 1 else desc_text
 
     # Case 1: explicit coordinates
     if lat and lng:
-        loc: dict = {"lat": float(lat), "lng": float(lng)}
+        loc_dict: dict = {"lat": float(lat), "lng": float(lng)}
         if name:
-            loc["name"] = name
+            loc_dict["name"] = name
         label = f"{name or ''} ({lat},{lng})"
         print(f"[location] ✅ using explicit coords: {label}", file=sys.stderr)
-        return f"'{esc(json.dumps(loc, ensure_ascii=False))}'", label
+        return json.dumps(loc_dict, ensure_ascii=False), label
 
     # Case 2: name → geocode
     if name:
@@ -307,35 +304,49 @@ def build_location_sql(args) -> tuple[str, str | None]:
             loc = {"name": name}
             label = f"{name} (좌표 없음)"
             print(f"[location] ⚠️  geocoding failed, name-only: '{name}'", file=sys.stderr)
-        return f"'{esc(json.dumps(loc, ensure_ascii=False))}'", label
+        return json.dumps(loc, ensure_ascii=False), label
 
     print(f"[location] ℹ️  no location data → NULL", file=sys.stderr)
-    return "NULL", None
+    return None, None
 
 def cmd_save(args):
-    location_sql, location_label = build_location_sql(args)
-    desc = esc(args.description or args.category)
-    cat  = esc(args.category)
-    sql = (
-        f"INSERT INTO finances (user_id, amount, category, description, location) "
-        f"VALUES ('{args.user_id}', {int(args.amount)}, "
-        f"'{cat}', '{desc}', {location_sql});"
-    )
-    psql(sql)
+    location_json, location_label = build_location_sql(args)
+    desc = args.description or args.category
+    cat  = args.category
+    if location_json is not None:
+        sql = (
+            "INSERT INTO finances (user_id, amount, category, description, location) "
+            "VALUES (%s, %s, %s, %s, %s);"
+        )
+        psql(sql, (args.user_id, int(args.amount), cat, desc, location_json))
+    else:
+        sql = (
+            "INSERT INTO finances (user_id, amount, category, description, location) "
+            "VALUES (%s, %s, %s, %s, NULL);"
+        )
+        psql(sql, (args.user_id, int(args.amount), cat, desc))
     word = "expense" if int(args.amount) < 0 else "income"
     loc_note = f" 📍 {location_label}" if location_label else ""
     print(f"✅ {word} recorded: {args.category} {abs(int(args.amount)):,}{loc_note}")
 
 def cmd_monthly(args):
     month = args.month or datetime.now().strftime("%Y-%m")
-    cat_filter = f"AND category = '{esc(args.category)}'" if args.category else ""
-    sql = (
-        f"SELECT category, SUM(amount), COUNT(*) FROM finances "
-        f"WHERE user_id = '{args.user_id}' "
-        f"AND TO_CHAR(created_at, 'YYYY-MM') = '{month}' "
-        f"{cat_filter} GROUP BY category ORDER BY SUM(amount);"
-    )
-    rows = psql(sql)
+    if args.category:
+        sql = (
+            "SELECT category, SUM(amount), COUNT(*) FROM finances "
+            "WHERE user_id = %s "
+            "AND TO_CHAR(created_at, 'YYYY-MM') = %s "
+            "AND category = %s GROUP BY category ORDER BY SUM(amount);"
+        )
+        rows = psql(sql, (args.user_id, month, args.category))
+    else:
+        sql = (
+            "SELECT category, SUM(amount), COUNT(*) FROM finances "
+            "WHERE user_id = %s "
+            "AND TO_CHAR(created_at, 'YYYY-MM') = %s "
+            "GROUP BY category ORDER BY SUM(amount);"
+        )
+        rows = psql(sql, (args.user_id, month))
     if not rows:
         print(f"📊 {month}: no records")
         return
@@ -352,11 +363,11 @@ def cmd_monthly(args):
 def cmd_list(args):
     limit = args.limit or 10
     sql = (
-        f"SELECT created_at, category, amount, description FROM finances "
-        f"WHERE user_id = '{args.user_id}' "
-        f"ORDER BY created_at DESC LIMIT {limit};"
+        "SELECT created_at, category, amount, description FROM finances "
+        "WHERE user_id = %s "
+        "ORDER BY created_at DESC LIMIT %s;"
     )
-    rows = psql(sql)
+    rows = psql(sql, (args.user_id, limit))
     if not rows:
         print("📋 No records found.")
         return
@@ -372,13 +383,14 @@ def cmd_set_budget(args):
     category = args.category or "total"
     period = args.period or "monthly"
     sql = (
-        f"INSERT INTO budgets (user_id, category, amount, period) "
-        f"VALUES ('{args.user_id}', '{esc(category)}', {int(args.amount)}, '{period}') "
-        f"ON CONFLICT (user_id, category, period) "
-        f"DO UPDATE SET amount = {int(args.amount)}, updated_at = NOW();"
+        "INSERT INTO budgets (user_id, category, amount, period) "
+        "VALUES (%s, %s, %s, %s) "
+        "ON CONFLICT (user_id, category, period) "
+        "DO UPDATE SET amount = %s, updated_at = NOW();"
     )
-    psql(sql)
-    print(f"✅ Budget set for '{category}': {int(args.amount):,} ({period})")
+    amt = int(args.amount)
+    psql(sql, (args.user_id, category, amt, period, amt))
+    print(f"✅ Budget set for '{category}': {amt:,} ({period})")
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 parser = argparse.ArgumentParser()

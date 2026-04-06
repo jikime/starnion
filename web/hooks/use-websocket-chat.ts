@@ -38,7 +38,7 @@ interface WsIncoming {
 }
 
 function nanoid(): string {
-  return Math.random().toString(36).slice(2, 10)
+  return crypto.randomUUID()
 }
 
 function toMessage(m: {
@@ -189,7 +189,7 @@ export function useWebSocketChat(
   useEffect(() => {
     if (!activeThreadId) return
 
-    const POLL_INTERVAL = 10_000 // 10 seconds
+    const POLL_INTERVAL = 30_000 // 30 seconds (external message sync only)
 
     const poll = async () => {
       // Skip while streaming (assistant is responding)

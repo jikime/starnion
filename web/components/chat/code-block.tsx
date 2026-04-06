@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { createLowlight, common } from "lowlight"
 import { toHtml } from "hast-util-to-html"
+import DOMPurify from "dompurify"
 import { Copy, Check } from "lucide-react"
 
 const lowlight = createLowlight(common)
@@ -38,11 +39,11 @@ export function CodeBlock({ language, code }: { language: string; code: string }
       </div>
       <pre className="code-block-pre">
         <code dangerouslySetInnerHTML={{
-          __html: toHtml(
+          __html: DOMPurify.sanitize(toHtml(
             lowlight.registered(language)
               ? lowlight.highlight(language, code)
               : lowlight.highlightAuto(code)
-          )
+          ))
         }} />
       </pre>
     </div>

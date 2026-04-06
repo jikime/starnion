@@ -8,17 +8,23 @@ from starnion_utils import psql as _shared_psql
 DB_URL = os.environ.get("DATABASE_URL", "")
 if not DB_URL: print("❌ DATABASE_URL is not set.", file=sys.stderr); sys.exit(1)
 
-def psql(sql): return _shared_psql(sql, DB_URL)
-def esc(s): return (s or "").replace("'", "''")
+def psql(sql, params=None): return _shared_psql(sql, DB_URL, params)
 
 def cmd_set(args):
     mission_json = json.dumps(args.text)
-    psql(f"UPDATE users SET preferences = jsonb_set(COALESCE(preferences,'{{}}'::jsonb), '{{planner_mission}}', '{esc(mission_json)}'::jsonb) WHERE id = '{args.user_id}';")
+    psql(
+        "UPDATE users SET preferences = jsonb_set(COALESCE(preferences,'{}'::jsonb), '{planner_mission}', %s::jsonb) "
+        "WHERE id = %s;",
+        (mission_json, args.user_id)
+    )
     print(f"🧭 사명문 저장됨:")
     print(f"  \"{args.text}\"")
 
 def cmd_get(args):
-    row = psql(f"SELECT COALESCE(preferences,'{{}}'::jsonb) FROM users WHERE id='{args.user_id}';")
+    row = psql(
+        "SELECT COALESCE(preferences,'{}'::jsonb) FROM users WHERE id=%s;",
+        (args.user_id,)
+    )
     if not row: print("🧭 사명문이 설정되지 않았습니다."); return
     try:
         prefs = json.loads(row.strip())

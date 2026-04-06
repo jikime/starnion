@@ -110,7 +110,7 @@ def encrypt_value(val: str, master_key: str) -> str:
 
 # ── DB helper ─────────────────────────────────────────────────────────────────
 
-def psql(sql: str, db_url: str) -> str:
+def psql(sql: str, db_url: str, params: tuple | list | None = None) -> str:
     """Execute a SQL query and return results as pipe-delimited text.
 
     Uses psycopg2 (pure Python) instead of the psql CLI to avoid
@@ -126,7 +126,7 @@ def psql(sql: str, db_url: str) -> str:
     try:
         import psycopg2
     except ImportError:
-        # Fallback to psql CLI if psycopg2 is not installed
+        # Fallback to psql CLI if psycopg2 is not installed (no params support)
         result = subprocess.run(
             ["psql", db_url, "-t", "-A", "-q", "-c", sql],
             capture_output=True, text=True,
@@ -139,7 +139,10 @@ def psql(sql: str, db_url: str) -> str:
         conn = psycopg2.connect(db_url)
         conn.autocommit = True
         cur = conn.cursor()
-        cur.execute(sql)
+        if params:
+            cur.execute(sql, params)
+        else:
+            cur.execute(sql)
 
         # For queries that return rows (SELECT, RETURNING, etc.)
         if cur.description:

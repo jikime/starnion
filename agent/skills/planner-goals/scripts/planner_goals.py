@@ -9,13 +9,17 @@ from starnion_utils import psql as _shared_psql
 DB_URL = os.environ.get("DATABASE_URL", "")
 if not DB_URL: print("❌ DATABASE_URL is not set.", file=sys.stderr); sys.exit(1)
 
-def psql(sql): return _shared_psql(sql, DB_URL)
-def esc(s): return (s or "").replace("'", "''")
+def psql(sql, params=None): return _shared_psql(sql, DB_URL, params)
 def days_left(due): return (date.fromisoformat(due) - date.today()).days
 
 def cmd_search(args):
-    kw = esc(args.keyword)
-    rows = psql(f"SELECT g.id, g.title, g.due_date::text, g.status, COALESCE(r.name,'') FROM planner_goals g LEFT JOIN planner_roles r ON g.role_id=r.id WHERE g.user_id='{args.user_id}' AND g.title ILIKE '%{kw}%' ORDER BY g.due_date LIMIT 10;")
+    kw = args.keyword
+    rows = psql(
+        "SELECT g.id, g.title, g.due_date::text, g.status, COALESCE(r.name,'') "
+        "FROM planner_goals g LEFT JOIN planner_roles r ON g.role_id=r.id "
+        "WHERE g.user_id=%s AND g.title ILIKE %s ORDER BY g.due_date LIMIT 10;",
+        (args.user_id, f'%{kw}%')
+    )
     if not rows: print(f"🔍 '{args.keyword}' 목표 없음."); return
     print(f"🔍 목표 검색 '{args.keyword}':\n")
     for line in rows.split("\n"):
@@ -27,15 +31,31 @@ def cmd_search(args):
         print(f"  [{gid}] 🎯 {title} ({dday}) [{role}] — {status}")
 
 def cmd_add(args):
-    title, due, desc = esc(args.title), args.due_date, esc(args.description or "")
-    role_clause = f"'{args.role_id}'" if args.role_id else "NULL"
-    result = psql(f"INSERT INTO planner_goals (user_id, title, role_id, due_date, description) VALUES ('{args.user_id}', '{title}', {role_clause}, '{due}', '{desc}') RETURNING id;")
+    title, due, desc = args.title, args.due_date, args.description or ""
+    role_id = args.role_id if args.role_id else None
+    result = psql(
+        "INSERT INTO planner_goals (user_id, title, role_id, due_date, description) "
+        "VALUES (%s, %s, %s, %s, %s) RETURNING id;",
+        (args.user_id, title, role_id, due, desc)
+    )
     dl = days_left(due)
     print(f"✅ 목표 추가됨: 🎯 {args.title} (D-{dl})")
 
 def cmd_list(args):
-    status_filter = f"AND status='{args.status}'" if args.status else ""
-    rows = psql(f"SELECT g.id, g.title, g.due_date::text, g.status, COALESCE(g.description,''), COALESCE(r.name,'') FROM planner_goals g LEFT JOIN planner_roles r ON g.role_id=r.id WHERE g.user_id='{args.user_id}' {status_filter} ORDER BY g.due_date;")
+    if args.status:
+        sql = (
+            "SELECT g.id, g.title, g.due_date::text, g.status, COALESCE(g.description,''), COALESCE(r.name,'') "
+            "FROM planner_goals g LEFT JOIN planner_roles r ON g.role_id=r.id "
+            "WHERE g.user_id=%s AND status=%s ORDER BY g.due_date;"
+        )
+        rows = psql(sql, (args.user_id, args.status))
+    else:
+        sql = (
+            "SELECT g.id, g.title, g.due_date::text, g.status, COALESCE(g.description,''), COALESCE(r.name,'') "
+            "FROM planner_goals g LEFT JOIN planner_roles r ON g.role_id=r.id "
+            "WHERE g.user_id=%s ORDER BY g.due_date;"
+        )
+        rows = psql(sql, (args.user_id,))
     if not rows: print("🎯 등록된 목표가 없습니다."); return
     print("🎯 목표 목록:\n")
     for line in rows.split("\n"):
@@ -50,18 +70,34 @@ def cmd_list(args):
 
 def cmd_update(args):
     sets = []
-    if args.title: sets.append(f"title='{esc(args.title)}'")
-    if args.due_date: sets.append(f"due_date='{args.due_date}'")
-    if args.description: sets.append(f"description='{esc(args.description)}'")
-    if args.status: sets.append(f"status='{args.status}'")
+    params = []
+    if args.title:
+        sets.append("title=%s")
+        params.append(args.title)
+    if args.due_date:
+        sets.append("due_date=%s")
+        params.append(args.due_date)
+    if args.description:
+        sets.append("description=%s")
+        params.append(args.description)
+    if args.status:
+        sets.append("status=%s")
+        params.append(args.status)
     if not sets: print("❌ 수정할 항목 없음."); return
     sets.append("updated_at=NOW()")
-    result = psql(f"UPDATE planner_goals SET {','.join(sets)} WHERE id={args.id} AND user_id='{args.user_id}' RETURNING title;")
+    params.extend([args.id, args.user_id])
+    result = psql(
+        f"UPDATE planner_goals SET {','.join(sets)} WHERE id=%s AND user_id=%s RETURNING title;",
+        tuple(params)
+    )
     if not result: print("❌ 목표를 찾을 수 없습니다."); return
     print(f"✅ 목표 수정됨: {result.strip()}")
 
 def cmd_delete(args):
-    result = psql(f"DELETE FROM planner_goals WHERE id={args.id} AND user_id='{args.user_id}' RETURNING title;")
+    result = psql(
+        "DELETE FROM planner_goals WHERE id=%s AND user_id=%s RETURNING title;",
+        (args.id, args.user_id)
+    )
     if not result: print("❌ 목표를 찾을 수 없습니다."); return
     print(f"🗑️ 목표 삭제됨: {result.strip()}")
 

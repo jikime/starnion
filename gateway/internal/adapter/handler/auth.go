@@ -273,6 +273,10 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
 	}
 
+	// Reject empty password_hash (e.g., Telegram-only accounts)
+	if passwordHash == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
+	}
 	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
 		recordFailedLogin(req.Email)
 		h.logger.Warn("failed login attempt", zap.String("email", req.Email), zap.String("ip", c.RealIP()))

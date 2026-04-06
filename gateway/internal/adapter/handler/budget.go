@@ -221,19 +221,23 @@ func (h *BudgetHandler) UpdateBudget(c echo.Context) error {
 			continue
 		}
 		if amount > 0 {
-			_, _ = h.db.ExecContext(ctx,
+			if _, err := h.db.ExecContext(ctx,
 				`INSERT INTO budgets (user_id, category, amount, period)
 				 VALUES ($1, $2, $3, 'monthly')
 				 ON CONFLICT (user_id, category, period) DO UPDATE
 				   SET amount = EXCLUDED.amount, updated_at = NOW()`,
 				userID, cat, amount,
-			)
+			); err != nil {
+				h.logger.Warn("budget upsert failed", zap.String("category", cat), zap.Error(err))
+			}
 		} else {
 			// amount == 0 means the user cleared the budget for this category
-			_, _ = h.db.ExecContext(ctx,
+			if _, err := h.db.ExecContext(ctx,
 				`DELETE FROM budgets WHERE user_id = $1 AND category = $2 AND period = 'monthly'`,
 				userID, cat,
-			)
+			); err != nil {
+				h.logger.Warn("budget delete failed", zap.String("category", cat), zap.Error(err))
+			}
 		}
 	}
 
@@ -248,13 +252,15 @@ func (h *BudgetHandler) UpdateBudget(c echo.Context) error {
 		"warning_threshold": req.WarningThreshold,
 		"danger_threshold":  req.DangerThreshold,
 	})
-	_, _ = h.db.ExecContext(ctx,
+	if _, err := h.db.ExecContext(ctx,
 		`UPDATE users
 		 SET preferences = jsonb_set(COALESCE(preferences, '{}'), '{budget}', $1::jsonb),
 		     updated_at  = NOW()
 		 WHERE id = $2`,
 		string(budgetPrefsJSON), userID,
-	)
+	); err != nil {
+		h.logger.Warn("budget preferences update failed", zap.Error(err))
+	}
 
 	return c.JSON(http.StatusOK, map[string]string{"status": "updated"})
 }

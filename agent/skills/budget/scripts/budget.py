@@ -10,15 +10,13 @@ if not DB_URL:
     print("❌ DATABASE_URL is not set.", file=sys.stderr)
     sys.exit(1)
 
-def psql(sql): return _shared_psql(sql, DB_URL)
-
-def esc(s):
-    return (s or "").replace("'", "''")
+def psql(sql, params=None): return _shared_psql(sql, DB_URL, params)
 
 def get_budget(user_id):
     rows = psql(
-        f"SELECT category, amount FROM budgets "
-        f"WHERE user_id = '{esc(user_id)}' AND period = 'monthly';"
+        "SELECT category, amount FROM budgets "
+        "WHERE user_id = %s AND period = 'monthly';",
+        (user_id,)
     )
     budget = {}
     if rows:
@@ -33,10 +31,11 @@ def cmd_set(args):
         print("Error: --category and --amount are required", file=sys.stderr)
         sys.exit(1)
     psql(
-        f"INSERT INTO budgets (user_id, category, amount, period) "
-        f"VALUES ('{esc(args.user_id)}', '{esc(args.category)}', {args.amount}, 'monthly') "
-        f"ON CONFLICT (user_id, category, period) DO UPDATE "
-        f"SET amount = EXCLUDED.amount, updated_at = NOW();"
+        "INSERT INTO budgets (user_id, category, amount, period) "
+        "VALUES (%s, %s, %s, 'monthly') "
+        "ON CONFLICT (user_id, category, period) DO UPDATE "
+        "SET amount = EXCLUDED.amount, updated_at = NOW();",
+        (args.user_id, args.category, args.amount)
     )
     print(f"✅ Monthly budget for '{args.category}' set to {args.amount:,}.")
 
@@ -55,9 +54,10 @@ def cmd_status(args):
             print(f"No budget set for category '{args.category}'.")
             return
         row = psql(
-            f"SELECT COALESCE(ABS(SUM(amount)), 0) FROM finances "
-            f"WHERE user_id = '{esc(args.user_id)}' AND category = '{esc(args.category)}' "
-            f"AND TO_CHAR(created_at, 'YYYY-MM') = '{month}' AND amount < 0;"
+            "SELECT COALESCE(ABS(SUM(amount)), 0) FROM finances "
+            "WHERE user_id = %s AND category = %s "
+            "AND TO_CHAR(created_at, 'YYYY-MM') = %s AND amount < 0;",
+            (args.user_id, args.category, month)
         )
         spent = int(float(row or "0"))
         pct = (spent / budget_amount * 100) if budget_amount > 0 else 0
@@ -67,9 +67,10 @@ def cmd_status(args):
         print("This month's budget status:")
         for cat, budget_amount in budget.items():
             row = psql(
-                f"SELECT COALESCE(ABS(SUM(amount)), 0) FROM finances "
-                f"WHERE user_id = '{esc(args.user_id)}' AND category = '{esc(cat)}' "
-                f"AND TO_CHAR(created_at, 'YYYY-MM') = '{month}' AND amount < 0;"
+                "SELECT COALESCE(ABS(SUM(amount)), 0) FROM finances "
+                "WHERE user_id = %s AND category = %s "
+                "AND TO_CHAR(created_at, 'YYYY-MM') = %s AND amount < 0;",
+                (args.user_id, cat, month)
             )
             spent = int(float(row or "0"))
             pct = (spent / budget_amount * 100) if budget_amount > 0 else 0

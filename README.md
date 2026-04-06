@@ -318,19 +318,6 @@ Key proxy routes:
 
 ---
 
-## Planner Database Tables
-
-| Table | Description |
-|-------|-------------|
-| `planner_roles` | Life roles with color, mission, Key Goal |
-| `planner_tasks` | Daily tasks with ABC priority + inbox items + `weekly_goal_id` FK |
-| `planner_weekly_goals` | Weekly key plans per role (1:N → daily tasks) |
-| `planner_goals` | D-Day goals with due dates |
-| `planner_diary` | Daily diary with mood tracking |
-| `planner_reflection_notes` | Reflection notes (JSONB) |
-
----
-
 ## Documentation
 
 Full documentation is hosted at **[jikime.github.io/starnion](https://jikime.github.io/starnion/)**.
