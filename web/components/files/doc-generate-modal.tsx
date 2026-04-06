@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -53,6 +53,7 @@ export default function DocGenerateModal({ open, onClose, onDone }: { open: bool
           <DialogTitle className="flex items-center gap-2">
             <FileOutput className="size-5 text-blue-500" /> {t("docGenerateTitle")}
           </DialogTitle>
+          <DialogDescription className="sr-only">{t("docGenerateTitle")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-3">

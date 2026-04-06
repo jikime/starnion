@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Check, ClipboardCopy } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { LogEntry } from "./types"
@@ -36,6 +36,7 @@ export function LogDetailDialog({ entry, open, onOpenChange }: {
             <span className={cn("text-xs", SOURCE_COLOR[src] ?? "text-zinc-400")}>[{src}]</span>
             <span className="ml-auto text-xs text-zinc-500 font-normal">{fullTs(entry.time)}</span>
           </DialogTitle>
+          <DialogDescription className="sr-only">Log entry details</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className={cn(

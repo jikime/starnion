@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -842,6 +843,7 @@ export function BudgetView() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("settingsTitle")}</DialogTitle>
+            <DialogDescription className="sr-only">{t("settingsTitle")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2 max-h-[70vh] overflow-y-auto pr-1">
             {/* ⑤ 총합계 실시간 표시 */}

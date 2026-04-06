@@ -8,7 +8,7 @@ import {
   X, Play, Pause, FileAudio, MapPin, ExternalLink, Trash2,
   Info, BookOpenText, AlertCircle, ChevronDown,
 } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -654,6 +654,7 @@ export default function FilesPage() {
             <DialogTitle className="text-sm font-medium text-white truncate pr-8">
               {previewImage?.name}
             </DialogTitle>
+            <DialogDescription className="sr-only">Image preview</DialogDescription>
             <button onClick={() => setPreviewImage(null)}
               className="absolute top-3 right-3 p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors">
               <X className="size-4 text-white" />

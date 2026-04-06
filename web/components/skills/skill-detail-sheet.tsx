@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { Info, Loader2, Zap, MessageSquare, ToggleLeft, ToggleRight, Key, AlertTriangle } from "lucide-react"
 import type { Skill } from "./types"
@@ -37,6 +37,7 @@ export function SkillDetailSheet({
             <div className="flex-shrink-0 size-14 rounded-2xl bg-background border border-border/60 flex items-center justify-center text-3xl">{skill.emoji}</div>
             <div className="flex-1 min-w-0 pt-1">
               <SheetTitle className="text-xl font-bold leading-tight mb-1">{skill.display_name}</SheetTitle>
+              <SheetDescription className="sr-only">{skill.description}</SheetDescription>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {(skill.requires_api_key || !!skill.api_key_provider) && (
                   <span className={cn(

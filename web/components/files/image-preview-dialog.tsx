@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 
 export default function ImagePreviewDialog({ open, onClose, imageUrl, fileName }: {
@@ -18,6 +18,7 @@ export default function ImagePreviewDialog({ open, onClose, imageUrl, fileName }
           <DialogTitle className="text-sm font-medium text-white truncate pr-8">
             {fileName}
           </DialogTitle>
+          <DialogDescription className="sr-only">Image preview</DialogDescription>
           <button
             onClick={onClose}
             className="absolute top-3 right-3 p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"

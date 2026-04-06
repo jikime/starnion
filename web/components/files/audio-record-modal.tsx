@@ -6,7 +6,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -113,6 +113,7 @@ export default function AudioRecordModal({ open, onClose, onDone }: { open: bool
           <DialogTitle className="flex items-center gap-2">
             <Mic className="size-5 text-rose-500" /> {t("audioRecordTitle")}
           </DialogTitle>
+          <DialogDescription className="sr-only">{t("audioRecordTitle")}</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center gap-4 py-4">
           <div className={cn(

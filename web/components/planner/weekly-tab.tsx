@@ -11,6 +11,7 @@ import { ChevronLeft, ChevronRight, Plus, Check, ArrowRight, X, Circle, Compass 
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
@@ -410,6 +411,7 @@ export function WeeklyTab({ onNavigateToDaily }: { onNavigateToDaily: () => void
         <SheetContent side="right" className="w-80 sm:w-96 overflow-y-auto p-0">
           <SheetHeader className="px-4 pt-4 pb-2">
             <SheetTitle className="text-lg font-bold">{t("weeklyCompassTitle")}</SheetTitle>
+            <SheetDescription className="sr-only">{t("weeklyCompassSubtitle")}</SheetDescription>
             <p className="text-xs text-muted-foreground">{t("weeklyCompassSubtitle")}</p>
           </SheetHeader>
           <WeeklyCompass />

@@ -18,6 +18,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -584,6 +585,7 @@ export default function CronPage() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>{cronEditTarget ? t("dialogEditTitle") : t("dialogAddTitle")}</DialogTitle>
+              <DialogDescription className="sr-only">{cronEditTarget ? t("dialogEditTitle") : t("dialogAddTitle")}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div className="space-y-1.5">

@@ -7,7 +7,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { useTranslations } from "next-intl"
@@ -70,6 +70,7 @@ export default function AudioTranscribeModal({ open, onClose, onDone }: { open: 
           <DialogTitle className="flex items-center gap-2">
             <FileAudio className="size-5 text-yellow-500" /> {t("audioTranscribeTitle")}
           </DialogTitle>
+          <DialogDescription className="sr-only">{t("audioTranscribeTitle")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">

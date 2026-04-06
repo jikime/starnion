@@ -19,6 +19,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -792,6 +793,9 @@ export function FinanceView() {
             <DialogTitle>
               {editTarget ? t("editTransaction") : t("addTransaction")}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              {editTarget ? t("editTransaction") : t("addTransaction")}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
