@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useTranslations } from "next-intl"
 import { usePlannerStore } from "@/lib/planner-store"
+import { useShallow } from "zustand/react/shallow"
 import { cn } from "@/lib/utils"
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"

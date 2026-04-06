@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useTranslations } from "next-intl"
 import { usePlannerStore } from "@/lib/planner-store"
+import { useShallow } from "zustand/react/shallow"
 import { cn } from "@/lib/utils"
 import { Plus, Trash2, Flag, ChevronDown, ChevronUp } from "lucide-react"
 import { Input } from "@/components/ui/input"

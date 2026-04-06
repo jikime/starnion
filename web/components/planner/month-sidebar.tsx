@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl"
 import { usePlannerStore } from "@/lib/planner-store"
+import { useShallow } from "zustand/react/shallow"
 import { format, parse } from "date-fns"
 import { ko } from "date-fns/locale"
 import { ChevronLeft, ChevronRight } from "lucide-react"

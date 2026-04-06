@@ -109,6 +109,7 @@ func (r *Router) Register(e *echo.Echo) {
 	auth.POST("/register", r.auth.Register)
 	auth.POST("/login", r.auth.Login)
 	auth.POST("/refresh", r.auth.RefreshToken)
+	auth.POST("/logout", r.auth.Logout)
 
 	// Protected routes
 	protected := api.Group("")

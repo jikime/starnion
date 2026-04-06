@@ -102,8 +102,9 @@ func New(logger *zap.Logger) (*Server, error) {
 	})
 
 	// ── Rate Limiting ──────────────────────────────────────────────────────────
+	// In-memory rate limiter — suitable for single-instance deployments.
+	// For multi-instance: replace with Redis-backed store.
 	// Keyed by "user:<user_id>" for authenticated requests, "ip:<ip>" otherwise.
-	// This prevents shared-IP users (office, cloud) from blocking each other.
 	e.Use(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
 		Store: middleware.NewRateLimiterMemoryStoreWithConfig(
 			middleware.RateLimiterMemoryStoreConfig{

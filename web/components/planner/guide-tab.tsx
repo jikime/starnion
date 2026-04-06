@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useTranslations } from "next-intl"
 import { usePlannerStore } from "@/lib/planner-store"
+import { useShallow } from "zustand/react/shallow"
 import { cn } from "@/lib/utils"
 import { Pencil, Check, Plus, Trash2 } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"

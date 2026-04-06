@@ -3,6 +3,7 @@
 import { useState, memo } from "react"
 import { useTranslations } from "next-intl"
 import { usePlannerStore, type Task, type TaskStatus } from "@/lib/planner-store"
+import { useShallow } from "zustand/react/shallow"
 import { cn } from "@/lib/utils"
 import {
   Check, ArrowRight, X, Circle, User, GripVertical,

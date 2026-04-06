@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useTranslations } from "next-intl"
 import { usePlannerStore, type Priority, type Task } from "@/lib/planner-store"
+import { useShallow } from "zustand/react/shallow"
 import { cn } from "@/lib/utils"
 import {
   Plus, Trash2, ArrowRight, Inbox, MessageSquare, BarChart2, X,

@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo, memo } from "react"
 import { useTranslations } from "next-intl"
 import { usePlannerStore, type Priority, type Task } from "@/lib/planner-store"
+import { useShallow } from "zustand/react/shallow"
 import { WeeklyCompass } from "./weekly-compass"
 import { cn } from "@/lib/utils"
 import { format, addDays, parseISO, isToday, startOfWeek } from "date-fns"

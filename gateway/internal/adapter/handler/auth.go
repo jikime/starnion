@@ -35,16 +35,17 @@ type loginAttempt struct {
 }
 
 var (
-	loginAttempts = sync.Map{} // key: email → *loginAttempt
+	loginAttempts  = sync.Map{} // key: email → *loginAttempt
+	tokenBlacklist = sync.Map{} // key: token string → expiry time.Time
 )
 
-// init starts a background goroutine that sweeps stale loginAttempt entries every
-// 15 minutes to prevent unbounded memory growth for emails that never reach lockout.
+// init starts background goroutines for cleanup.
 func init() {
 	go func() {
 		ticker := time.NewTicker(15 * time.Minute)
 		defer ticker.Stop()
 		for range ticker.C {
+			// Clean stale login attempts
 			loginAttempts.Range(func(k, v any) bool {
 				a := v.(*loginAttempt)
 				a.mu.Lock()
@@ -55,8 +56,27 @@ func init() {
 				}
 				return true
 			})
+			// Clean expired blacklisted tokens
+			now := time.Now()
+			tokenBlacklist.Range(func(k, v any) bool {
+				if expiry, ok := v.(time.Time); ok && now.After(expiry) {
+					tokenBlacklist.Delete(k)
+				}
+				return true
+			})
 		}
 	}()
+}
+
+// blacklistToken adds a token to the blacklist until its expiry.
+func blacklistToken(tokenStr string, expiry time.Time) {
+	tokenBlacklist.Store(tokenStr, expiry)
+}
+
+// isTokenBlacklisted checks if a token has been revoked.
+func isTokenBlacklisted(tokenStr string) bool {
+	_, ok := tokenBlacklist.Load(tokenStr)
+	return ok
 }
 
 func isLockedOut(email string) bool {
@@ -149,6 +169,11 @@ func (h *AuthHandler) JWTMiddleware() echo.MiddlewareFunc {
 				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "missing token"})
 			}
 			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+			// Check blacklist before parsing
+			if isTokenBlacklisted(tokenStr) {
+				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "token revoked"})
+			}
 
 			token, err := jwt.ParseWithClaims(tokenStr, &JWTClaims{}, func(t *jwt.Token) (any, error) {
 				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -342,5 +367,28 @@ func (h *AuthHandler) RefreshToken(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to generate token"})
 	}
 
+	// Blacklist the old token so it can't be reused
+	blacklistToken(strings.TrimPrefix(authHeader, "Bearer "), claims.ExpiresAt.Time)
+
 	return c.JSON(http.StatusOK, map[string]any{"token": token})
+}
+
+// Logout invalidates the current JWT token.
+func (h *AuthHandler) Logout(c echo.Context) error {
+	authHeader := c.Request().Header.Get("Authorization")
+	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+	}
+	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+	parsed, err := jwt.ParseWithClaims(tokenStr, &JWTClaims{}, func(t *jwt.Token) (any, error) {
+		return []byte(h.config.JWTSecret), nil
+	})
+	if err == nil && parsed.Valid {
+		if claims, ok := parsed.Claims.(*JWTClaims); ok && claims.ExpiresAt != nil {
+			blacklistToken(tokenStr, claims.ExpiresAt.Time)
+		}
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }

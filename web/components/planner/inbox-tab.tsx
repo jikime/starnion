@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useTranslations } from "next-intl"
 import { usePlannerStore, type Priority } from "@/lib/planner-store"
+import { useShallow } from "zustand/react/shallow"
 import { Inbox, Plus, Trash2, ArrowRight } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"

@@ -3,6 +3,7 @@
 import { useState, useMemo, memo } from "react"
 import { useTranslations } from "next-intl"
 import { usePlannerStore, type Priority, type Task } from "@/lib/planner-store"
+import { useShallow } from "zustand/react/shallow"
 import { TaskItem } from "./task-item"
 import { MagicBar } from "./magic-bar"
 import { cn } from "@/lib/utils"
