@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -383,6 +384,7 @@ func (h *WSHandler) handleChatSend(userID uuid.UUID, msg wsIncoming, runID strin
 				wsConfiguredProviders = append(wsConfiguredProviders, p)
 			}
 		}
+		_ = rows.Err()
 		rows.Close()
 	}
 
@@ -531,6 +533,9 @@ func (h *WSHandler) handleChatHistory(userID uuid.UUID, msg wsIncoming, send fun
 			messages = append(messages, m)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		h.logger.Warn("loadHistory: rows iteration error", zap.Error(err))
+	}
 	if messages == nil {
 		messages = []histMsg{}
 	}
@@ -567,6 +572,9 @@ func (h *WSHandler) resolveConversation(ctx context.Context, userID uuid.UUID, t
 
 // validateToken verifies a JWT and returns the user ID.
 func (h *WSHandler) validateToken(tokenStr string) (uuid.UUID, error) {
+	if isTokenBlacklisted(tokenStr) {
+		return uuid.Nil, fmt.Errorf("token revoked")
+	}
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid

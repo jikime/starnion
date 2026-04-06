@@ -63,6 +63,9 @@ func (h *PersonaHandler) List(c echo.Context) error {
 			"updatedAt":    updatedAt,
 		})
 	}
+	if err := rows.Err(); err != nil {
+		h.logger.Warn("ListPersonas: rows iteration error", zap.Error(err))
+	}
 	if personas == nil {
 		personas = []map[string]any{}
 	}

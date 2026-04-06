@@ -43,7 +43,7 @@ function popupResponse(success: boolean) {
 <body>
 <script>
   if (window.opener) {
-    window.opener.postMessage({ type: "${messageType}" }, "*");
+    window.opener.postMessage({ type: "${messageType}" }, window.location.origin);
   }
   window.close();
 </script>

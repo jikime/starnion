@@ -26,22 +26,24 @@ import (
 // A 15-second timeout prevents hanging goroutines if the Google endpoint is slow.
 var googleHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
-// googleOAuthSuccessHTML is returned to the popup window after a successful OAuth flow.
-// It sends a postMessage to the opener so the parent page can react, then closes itself.
-const googleOAuthSuccessHTML = `<!DOCTYPE html>
+// googleOAuthSuccessHTML returns the popup HTML for a successful Google OAuth flow.
+// targetOrigin is set to the configured web origin to prevent postMessage leakage to other windows.
+func googleOAuthSuccessHTML(targetOrigin string) string {
+	return fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>Google 연결 완료</title></head>
 <body>
 <script>
   if (window.opener) {
-    window.opener.postMessage({ type: 'google-oauth-success' }, '*');
+    window.opener.postMessage({ type: 'google-oauth-success' }, %q);
     window.close();
   } else {
     document.body.innerText = 'Google 계정이 연결되었습니다. 이 창을 닫아 주세요.';
   }
 </script>
 </body>
-</html>`
+</html>`, targetOrigin)
+}
 
 // IntegrationsHandler manages third-party API key storage in the integration_keys table.
 // Supported providers: tavily, naver_search, gemini, github, notion (and any future additions).
@@ -422,7 +424,12 @@ func (h *IntegrationsHandler) GoogleCallback(c echo.Context) error {
 		return c.Redirect(http.StatusFound, redirectUI+"?google=connected")
 	}
 	// When called from a popup window, post a message to the opener and close.
-	return c.HTML(http.StatusOK, googleOAuthSuccessHTML)
+	// Use the first allowed origin as postMessage target to prevent leakage to other windows.
+	webOrigin := "*"
+	if len(h.config.AllowedOrigins) > 0 {
+		webOrigin = h.config.AllowedOrigins[0]
+	}
+	return c.HTML(http.StatusOK, googleOAuthSuccessHTML(webOrigin))
 }
 
 // GET /api/v1/integrations/google/status

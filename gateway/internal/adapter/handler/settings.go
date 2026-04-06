@@ -78,6 +78,9 @@ func (h *SettingsHandler) ListProviders(c echo.Context) error {
 			"updated_at":    updatedAt,
 		})
 	}
+	if err := rows.Err(); err != nil {
+		h.logger.Warn("ListProviders: rows iteration error", zap.Error(err))
+	}
 	if providers == nil {
 		providers = []map[string]any{}
 	}
@@ -253,6 +256,9 @@ func (h *SettingsHandler) ListModelPricing(c echo.Context) error {
 			"updated_at":     updatedAt,
 		})
 	}
+	if err := rows.Err(); err != nil {
+		h.logger.Warn("ListModelPricing: rows iteration error", zap.Error(err))
+	}
 	if pricing == nil {
 		pricing = []map[string]any{}
 	}
@@ -349,6 +355,9 @@ func (h *SettingsHandler) ListModelAssignments(c echo.Context) error {
 			"model":      model,
 			"updated_at": updatedAt,
 		})
+	}
+	if err := rows.Err(); err != nil {
+		h.logger.Warn("ListModelAssignments: rows iteration error", zap.Error(err))
 	}
 	if assignments == nil {
 		assignments = []map[string]any{}

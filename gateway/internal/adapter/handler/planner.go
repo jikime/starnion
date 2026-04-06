@@ -67,6 +67,9 @@ func (h *PlannerHandler) Snapshot(c echo.Context) error {
 			}
 			roles = append(roles, map[string]any{"id": id, "name": name, "color": color, "bigRock": bigRock, "mission": m, "sortOrder": sortOrder})
 		}
+		if err := rows.Err(); err != nil {
+			h.logger.Warn("snapshot: roles iteration error", zap.Error(err))
+		}
 		return nil
 	})
 
@@ -97,6 +100,9 @@ func (h *PlannerHandler) Snapshot(c echo.Context) error {
 			}
 			tasks = append(tasks, t)
 		}
+		if err := rows.Err(); err != nil {
+			h.logger.Warn("snapshot: tasks iteration error", zap.Error(err))
+		}
 		return nil
 	})
 
@@ -117,6 +123,9 @@ func (h *PlannerHandler) Snapshot(c echo.Context) error {
 			}
 			inbox = append(inbox, map[string]any{"id": id, "title": title, "priority": priority, "order": sortOrder})
 		}
+		if err := rows.Err(); err != nil {
+			h.logger.Warn("snapshot: inbox iteration error", zap.Error(err))
+		}
 		return nil
 	})
 
@@ -136,6 +145,9 @@ func (h *PlannerHandler) Snapshot(c echo.Context) error {
 				continue
 			}
 			wgoals = append(wgoals, map[string]any{"id": id, "roleId": roleID, "title": title, "done": done, "weekStart": weekStart})
+		}
+		if err := rows.Err(); err != nil {
+			h.logger.Warn("snapshot: weekly goals iteration error", zap.Error(err))
 		}
 		return nil
 	})
@@ -160,6 +172,9 @@ func (h *PlannerHandler) Snapshot(c echo.Context) error {
 			}
 			goals = append(goals, gl)
 		}
+		if err := rows.Err(); err != nil {
+			h.logger.Warn("snapshot: goals iteration error", zap.Error(err))
+		}
 		return nil
 	})
 
@@ -177,6 +192,9 @@ func (h *PlannerHandler) Snapshot(c echo.Context) error {
 				continue
 			}
 			diary = append(diary, map[string]any{"date": date, "oneLiner": oneLiner, "mood": mood, "fullNote": fullNote})
+		}
+		if err := rows.Err(); err != nil {
+			h.logger.Warn("snapshot: diary iteration error", zap.Error(err))
 		}
 		return nil
 	})
@@ -198,6 +216,9 @@ func (h *PlannerHandler) Snapshot(c echo.Context) error {
 			var notes any
 			json.Unmarshal(notesJSON, &notes)
 			reflections = append(reflections, map[string]any{"date": date, "notes": notes})
+		}
+		if err := rows.Err(); err != nil {
+			h.logger.Warn("snapshot: reflections iteration error", zap.Error(err))
 		}
 		return nil
 	})
@@ -235,6 +256,9 @@ func (h *PlannerHandler) Snapshot(c echo.Context) error {
 				if err := rows.Scan(&wgID, &total, &done); err == nil {
 					counts[wgID] = [2]int{total, done}
 				}
+			}
+			if err := rows.Err(); err != nil {
+				h.logger.Warn("snapshot: wgoal counts iteration error", zap.Error(err))
 			}
 			for i, wg := range wgoals {
 				if id, ok := wg["id"].(int64); ok {
@@ -302,6 +326,9 @@ func (h *PlannerHandler) ListRoles(c echo.Context) error {
 		var sortOrder int
 		rows.Scan(&id, &name, &color, &bigRock, &mission, &sortOrder)
 		roles = append(roles, map[string]any{"id": id, "name": name, "color": color, "bigRock": bigRock, "mission": mission, "sortOrder": sortOrder})
+	}
+	if err := rows.Err(); err != nil {
+		h.logger.Warn("ListRoles: rows iteration error", zap.Error(err))
 	}
 	return c.JSON(http.StatusOK, roles)
 }
@@ -393,6 +420,9 @@ func (h *PlannerHandler) ListTasks(c echo.Context) error {
 		if fwdID != 0 { t["forwardedFromId"] = fwdID }
 		if weeklyGoalID != 0 { t["weeklyGoalId"] = weeklyGoalID }
 		tasks = append(tasks, t)
+	}
+	if err := rows.Err(); err != nil {
+		h.logger.Warn("ListTasks: rows iteration error", zap.Error(err))
 	}
 	return c.JSON(http.StatusOK, tasks)
 }
@@ -527,8 +557,18 @@ func (h *PlannerHandler) ReorderTasks(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid body"})
 	}
+	tx, err := h.db.BeginTx(ctx, nil)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to begin transaction"})
+	}
 	for _, item := range req.Items {
-		h.db.ExecContext(ctx, `UPDATE planner_tasks SET sort_order=$1, updated_at=NOW() WHERE id=$2 AND user_id=$3`, item.Order, item.ID, uid.String())
+		if _, err := tx.ExecContext(ctx, `UPDATE planner_tasks SET sort_order=$1, updated_at=NOW() WHERE id=$2 AND user_id=$3`, item.Order, item.ID, uid.String()); err != nil {
+			tx.Rollback() //nolint:errcheck
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "reorder failed"})
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "reorder failed"})
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "reordered"})
 }
@@ -551,6 +591,9 @@ func (h *PlannerHandler) ListInbox(c echo.Context) error {
 		var id int64; var title, priority string; var so int
 		rows.Scan(&id, &title, &priority, &so)
 		items = append(items, map[string]any{"id": id, "title": title, "priority": priority, "order": so})
+	}
+	if err := rows.Err(); err != nil {
+		h.logger.Warn("ListInbox: rows iteration error", zap.Error(err))
 	}
 	return c.JSON(http.StatusOK, items)
 }
@@ -616,6 +659,9 @@ func (h *PlannerHandler) ListWeeklyGoals(c echo.Context) error {
 		rows.Scan(&id, &roleID, &title, &done, &ws)
 		goals = append(goals, map[string]any{"id": id, "roleId": roleID, "title": title, "done": done, "weekStart": ws})
 	}
+	if err := rows.Err(); err != nil {
+		h.logger.Warn("ListWeeklyGoals: rows iteration error", zap.Error(err))
+	}
 	return c.JSON(http.StatusOK, goals)
 }
 
@@ -677,6 +723,9 @@ func (h *PlannerHandler) GetWeeklyGoalTasks(c echo.Context) error {
 		if weeklyGoalID != 0 { t["weeklyGoalId"] = weeklyGoalID }
 		tasks = append(tasks, t)
 	}
+	if err := rows.Err(); err != nil {
+		h.logger.Warn("GetWeeklyGoalTasks: rows iteration error", zap.Error(err))
+	}
 	return c.JSON(http.StatusOK, tasks)
 }
 
@@ -697,6 +746,9 @@ func (h *PlannerHandler) ListGoals(c echo.Context) error {
 		g := map[string]any{"id": id, "title": title, "dueDate": due, "description": desc, "status": status}
 		if roleID != 0 { g["roleId"] = roleID }
 		goals = append(goals, g)
+	}
+	if err := rows.Err(); err != nil {
+		h.logger.Warn("ListGoals: rows iteration error", zap.Error(err))
 	}
 	return c.JSON(http.StatusOK, goals)
 }

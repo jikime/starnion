@@ -650,7 +650,7 @@ func (h *MediaHandler) Transcribe(c echo.Context) error {
 		mw.WriteField("language", req.Language) //nolint:errcheck
 	}()
 
-	whisperReq, _ := http.NewRequestWithContext(context.Background(), http.MethodPost,
+	whisperReq, _ := http.NewRequestWithContext(c.Request().Context(), http.MethodPost,
 		stt.endpoint, pr)
 	whisperReq.Header.Set("Authorization", "Bearer "+stt.apiKey)
 	whisperReq.Header.Set("Content-Type", mw.FormDataContentType())
