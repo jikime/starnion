@@ -24,3 +24,6 @@ gateway/*.test
 .env
 # pi-coding-agent auto-generated directories
 agent/skills/.pi/
+__pycache__/
+_workspace/
+*.swp
