@@ -128,10 +128,6 @@ func (h *TelegramHandler) HandleUpdate(
 	pollerBotToken ...string,
 ) {
 	info, err := h.findOrCreateUserByTelegram(ctx, telegramUserID, chatID, firstName, username)
-	if err != nil && len(pollerBotToken) > 0 && pollerBotToken[0] != "" {
-		// User lookup failed but we have the poller's token — try creating user with it
-		info, err = h.findOrCreateUserByTelegram(ctx, telegramUserID, chatID, firstName, username)
-	}
 	if err != nil {
 		h.logger.Error("findOrCreateUserByTelegram failed", zap.Error(err))
 		return
@@ -767,7 +763,7 @@ func (h *TelegramHandler) Webhook(c echo.Context) error {
 			un := entry.username
 			ct := entry.chatType
 			entry.mu.Unlock()
-			go h.HandleUpdate(context.Background(), tUID, cID, mID, fn, un, txt, ct, pFileIDs, "", dFileID)
+			go h.HandleUpdate(context.Background(), tUID, cID, mID, fn, un, txt, ct, pFileIDs, "", dFileID) // TODO: use server shutdown context for graceful shutdown
 		})
 		entry.mu.Unlock()
 

@@ -126,7 +126,11 @@ def psql(sql: str, db_url: str, params: tuple | list | None = None) -> str:
     try:
         import psycopg2
     except ImportError:
-        # Fallback to psql CLI if psycopg2 is not installed (no params support)
+        # Fallback to psql CLI if psycopg2 is not installed
+        if params:
+            import sys
+            print("ERROR: psycopg2 not installed — parameterized queries require psycopg2. Install with: pip install psycopg2-binary", file=sys.stderr)
+            return ""
         result = subprocess.run(
             ["psql", db_url, "-t", "-A", "-q", "-c", sql],
             capture_output=True, text=True,

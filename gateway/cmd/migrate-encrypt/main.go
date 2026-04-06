@@ -18,7 +18,7 @@ import (
 	"strings"
 
 	"github.com/joho/godotenv"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"github.com/newstarnion/gateway/config"
 	"github.com/newstarnion/gateway/internal/crypto"
 )
@@ -131,7 +131,7 @@ func migrateColumnWhere(
 	db *sql.DB,
 	key, table, pkCol, col, where string,
 ) (total, skipped, encrypted, failed int) {
-	query := fmt.Sprintf(`SELECT %s, %s FROM %s WHERE %s`, pkCol, col, table, where)
+	query := fmt.Sprintf(`SELECT %s, %s FROM %s WHERE %s`, pq.QuoteIdentifier(pkCol), pq.QuoteIdentifier(col), pq.QuoteIdentifier(table), where)
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		log.Printf("ERROR querying %s.%s: %v", table, col, err)
@@ -171,7 +171,7 @@ func migrateColumnWhere(
 			failed++
 			continue
 		}
-		upd := fmt.Sprintf(`UPDATE %s SET %s = $1 WHERE %s = $2`, table, col, pkCol)
+		upd := fmt.Sprintf(`UPDATE %s SET %s = $1 WHERE %s = $2`, pq.QuoteIdentifier(table), pq.QuoteIdentifier(col), pq.QuoteIdentifier(pkCol))
 		if _, err := db.ExecContext(ctx, upd, enc, r.pk); err != nil {
 			log.Printf("ERROR update %s pk=%s: %v", table, r.pk, err)
 			failed++
@@ -189,8 +189,12 @@ func migrateColumnCompositePK(
 	db *sql.DB,
 	key, table string, pkCols []string, col, where string,
 ) (total, skipped, encrypted, failed int) {
-	selectCols := strings.Join(pkCols, ", ") + ", " + col
-	query := fmt.Sprintf(`SELECT %s FROM %s WHERE %s`, selectCols, table, where)
+	quotedPKs := make([]string, len(pkCols))
+	for i, pk := range pkCols {
+		quotedPKs[i] = pq.QuoteIdentifier(pk)
+	}
+	selectCols := strings.Join(quotedPKs, ", ") + ", " + pq.QuoteIdentifier(col)
+	query := fmt.Sprintf(`SELECT %s FROM %s WHERE %s`, selectCols, pq.QuoteIdentifier(table), where)
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		log.Printf("ERROR querying %s.%s: %v", table, col, err)
@@ -241,11 +245,11 @@ func migrateColumnCompositePK(
 		args := make([]interface{}, len(pkCols)+1)
 		args[0] = enc
 		for i, c := range pkCols {
-			whereParts[i] = fmt.Sprintf("%s = $%d", c, i+2)
+			whereParts[i] = fmt.Sprintf("%s = $%d", pq.QuoteIdentifier(c), i+2)
 			args[i+1] = r.pkVals[i]
 		}
 		upd := fmt.Sprintf(`UPDATE %s SET %s = $1 WHERE %s`,
-			table, col, strings.Join(whereParts, " AND "))
+			pq.QuoteIdentifier(table), pq.QuoteIdentifier(col), strings.Join(whereParts, " AND "))
 		if _, err := db.ExecContext(ctx, upd, args...); err != nil {
 			log.Printf("ERROR update %s pk=%v: %v", table, r.pkVals, err)
 			failed++

@@ -74,11 +74,6 @@ function getToday() {
 // Computed dynamically on each access to avoid stale value after midnight
 const TODAY = getToday() // initial value; store.selectedDate resets on hydrate
 
-function _addDaysStr(dateStr: string, n: number): string {
-  const d = new Date(dateStr)
-  d.setDate(d.getDate() + n)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-}
 
 function getWeekStart(dateStr?: string): string {
   const d = dateStr ? new Date(dateStr) : new Date()

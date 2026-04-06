@@ -306,7 +306,7 @@ function RoleCard({
       <div className="space-y-1">
         {goals.length === 0 && !adding && (
           <p className="text-xs text-muted-foreground italic text-center py-1">
-            {/* TODO: i18n */}
+            {t("addBigRockPlaceholder")}
           </p>
         )}
         {goals.map((g) => {

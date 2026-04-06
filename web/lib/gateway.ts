@@ -31,8 +31,9 @@ export async function gatewayFetch(
   const headers: Record<string, string> = {
     ...(init?.headers as Record<string, string> | undefined),
   }
-  if (session?.gatewayToken) {
-    headers["Authorization"] = `Bearer ${session.gatewayToken}`
+  const gwToken = (session as typeof session & { gatewayToken?: string })?.gatewayToken
+  if (gwToken) {
+    headers["Authorization"] = `Bearer ${gwToken}`
   }
 
   // When the caller supplies its own AbortSignal (e.g. SSE streaming routes),

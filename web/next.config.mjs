@@ -6,7 +6,7 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts")
 const nextConfig = {
   output: (process.env.DOCKER_BUILD || process.env.NEXT_STANDALONE) ? "standalone" : undefined,
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     unoptimized: true,

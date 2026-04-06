@@ -6,7 +6,7 @@ const TOOL_BADGE_COLOR: Record<string, string> = {
   get_weather: "bg-sky-500/20 text-sky-300 ring-sky-500/30",
 }
 const TOOL_DEFAULT_COLOR = "bg-violet-500/20 text-violet-300 ring-violet-500/30"
-const TOOL_CALL_RE = /^(tool_call:\s*)(\S+)(.*)/s
+const TOOL_CALL_RE = /^(tool_call:\s*)(\S+)([\s\S]*)/
 
 export function Highlight({ text, q }: { text: string; q: string }) {
   if (!q) return <>{text}</>
