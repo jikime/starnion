@@ -1,7 +1,7 @@
 ---
 name: python3 planner-mission/scripts/planner_mission.py
 display_name: 사명문
-description: "Set and view personal mission statement in Planner."
+description: "Set and view personal mission statement in Planner. Use for: 사명문, 개인 미션, mission statement, 나의 미션, 삶의 목적"
 version: 1.0.0
 emoji: "🧭"
 category: personal

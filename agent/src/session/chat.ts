@@ -122,14 +122,12 @@ export async function handleChat(options: ChatOptions): Promise<void> {
     }
 
     // ── Session creation via harness components ───────────────────────────────
-    const skillOpts: SkillVisibilityOptions | undefined =
-      (options.configuredProviders?.length || options.platform || options.disabledSkillIds?.length)
-        ? {
-            configuredProviders: options.configuredProviders,
-            platform: options.platform,
-            disabledSkillIds: options.disabledSkillIds,
-          }
-        : undefined;
+    const skillOpts: SkillVisibilityOptions = {
+      configuredProviders: options.configuredProviders,
+      platform: options.platform,
+      disabledSkillIds: options.disabledSkillIds,
+      userMessage: options.message,  // Dynamic scoping: filter skills by message keywords
+    };
     const resourceLoader = await promptComposer.getResourceLoader(
       systemPrompt,
       ctx.appendHistory,

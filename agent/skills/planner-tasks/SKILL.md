@@ -1,7 +1,7 @@
 ---
 name: python3 planner-tasks/scripts/planner_tasks.py
 display_name: 업무 관리
-description: "Manage daily planner tasks with ABC priorities. Add, search, update status, delete, forward to tomorrow, and manage task memos. Use when the user mentions tasks, to-dos, or daily planning."
+description: "Manage daily planner tasks with ABC priorities. Add, search, update status, delete, forward to tomorrow, and manage task memos. Use for: 할일, 태스크, 업무 추가, 오늘 할일, 플래너 업무, task, todo, daily planning"
 version: 1.0.0
 emoji: "📋"
 category: productivity

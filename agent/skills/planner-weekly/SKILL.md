@@ -1,7 +1,7 @@
 ---
 name: python3 planner-weekly/scripts/planner_weekly.py
 display_name: 주간 목표
-description: "Manage weekly key goals in Planner. Add, toggle, delete weekly goals per role."
+description: "Manage weekly key goals in Planner. Add, toggle, delete weekly goals per role. Use for: 주간 목표, 이번 주 목표, weekly goal, 주간 핵심목표, 주간 계획"
 version: 1.0.0
 emoji: "🎯"
 category: productivity

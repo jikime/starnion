@@ -1,7 +1,7 @@
 ---
 name: python3 planner-diary/scripts/planner_diary.py
 display_name: 오늘의 한마디
-description: "Record the daily one-liner summary (오늘의 한마디) and mood shown in the Planner. NOT for general note-taking."
+description: "Record the daily one-liner summary (오늘의 한마디) and mood shown in the Planner. NOT for general note-taking. Use for: 오늘의 한마디, 한마디 기록, 기분 기록, 컨디션 기록, mood"
 version: 1.0.0
 emoji: "📔"
 category: personal

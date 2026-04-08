@@ -103,3 +103,28 @@ export function buildSkillIndex(metas: SkillMeta[]): string {
   }
   return lines.join("\n");
 }
+
+/**
+ * Build a compact skill index filtered by the user's message.
+ *
+ * Filtering rules:
+ *  - Skills with NO keywords → always included (general-purpose)
+ *  - Skills WITH keywords → included only if at least one keyword appears in the message
+ *  - If ZERO keyword-bearing skills match → fall back to full index (no false negatives)
+ */
+export function buildFilteredSkillIndex(metas: SkillMeta[], message: string): string {
+  const lower = message.toLowerCase();
+  const filtered = metas.filter((m) => {
+    if (m.keywords.length === 0) return true;  // no keywords = always show
+    return m.keywords.some((kw) => lower.includes(kw.toLowerCase()));
+  });
+
+  // Fallback: if filtering removed all keyword-bearing skills, show everything
+  const keywordSkills = metas.filter((m) => m.keywords.length > 0);
+  const anyMatched = keywordSkills.some((m) =>
+    m.keywords.some((kw) => lower.includes(kw.toLowerCase())),
+  );
+  if (!anyMatched) return buildSkillIndex(metas);
+
+  return buildSkillIndex(filtered);
+}

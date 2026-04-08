@@ -107,6 +107,9 @@ const SKILLS_DIR = path.resolve(
 );
 
 // Cache the resource loader — scans disk once and reuses across calls.
+// We use a minimal loader: no skills, no AGENTS.md context.
+// Analysis jobs are pure text-generation tasks — loading 30+ skills and routing
+// guidelines into context wastes tokens without any benefit.
 let _resourceLoader: DefaultResourceLoader | null = null;
 
 async function getResourceLoader(): Promise<DefaultResourceLoader> {
@@ -114,7 +117,14 @@ async function getResourceLoader(): Promise<DefaultResourceLoader> {
   const loader = new DefaultResourceLoader({
     cwd: SKILLS_DIR,
     agentDir: AGENT_DIR,
-  });
+    // noSkills: exclude <available_skills> XML (unneeded for JSON-only output)
+    noSkills: true,
+    // Override system prompt to a minimal analyst identity — prevents AGENTS.md
+    // and SOUL.md persona from being injected into every analysis call.
+    systemPromptOverride: () =>
+      "You are a concise data analyst. " +
+      "Output only valid JSON with no additional text or explanation.",
+  } as ConstructorParameters<typeof DefaultResourceLoader>[0]);
   await loader.reload();
   _resourceLoader = loader;
   return loader;
@@ -320,9 +330,20 @@ async function analyzeConversation(userId: string): Promise<void> {
 
 async function analyzePatterns(userId: string): Promise<void> {
   const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
   const days30 = new Date(today.getTime() - 30 * 86400000).toISOString().slice(0, 10);
   const days60 = new Date(today.getTime() - 60 * 86400000).toISOString().slice(0, 10);
   const thisMonth = today.toISOString().slice(0, 7);
+
+  // Skip if today's pattern analysis already ran
+  const existingPattern = await query<{ id: string }>(
+    `SELECT id FROM knowledge_base WHERE user_id = $1 AND key = $2 LIMIT 1`,
+    [userId, `pattern:analysis:${todayStr}`],
+  );
+  if (existingPattern.length > 0) {
+    log(`pattern_analysis: already ran today (user=${userId.slice(0, 8)}…)`);
+    return;
+  }
 
   const [{ cnt }] = await query<{ cnt: string }>(
     `SELECT COUNT(DISTINCT DATE(created_at))::text AS cnt FROM finances
@@ -406,7 +427,7 @@ async function analyzePatterns(userId: string): Promise<void> {
   const result = extractJson(response);
   if (!result) { log(`pattern_analysis: JSON parse failed (user=${userId.slice(0, 8)}…)`); return; }
 
-  await kbUpsert(userId, "pattern:analysis_result", JSON.stringify(result), "pattern_analyzer");
+  await kbUpsert(userId, `pattern:analysis:${todayStr}`, JSON.stringify(result), "pattern_analyzer");
   log(`pattern_analysis: ${(result.patterns as unknown[])?.length ?? 0} patterns (user=${userId.slice(0, 8)}…)`);
 }
 

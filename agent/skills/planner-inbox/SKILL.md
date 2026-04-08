@@ -1,7 +1,7 @@
 ---
 name: python3 planner-inbox/scripts/planner_inbox.py
 display_name: 임시보관
-description: "Manage planner inbox items. Capture quick ideas, promote to daily tasks with priority. Use when user mentions inbox, temporary items, or quick capture."
+description: "Manage planner inbox items. Capture quick ideas, promote to daily tasks with priority. Use for: 임시보관, 인박스, inbox, 아이디어 저장, 나중에 처리, quick capture"
 version: 1.0.0
 emoji: "📥"
 category: productivity

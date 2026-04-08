@@ -1,7 +1,7 @@
 ---
 name: python3 planner-roles/scripts/planner_roles.py
 display_name: 역할 관리
-description: "Manage life roles in Planner. Add, update, delete roles with colors, key goals, and missions."
+description: "Manage life roles in Planner. Add, update, delete roles with colors, key goals, and missions. Use for: 역할, 내 역할, 역할 추가, 역할 관리, life role, 플래너 역할"
 version: 1.0.0
 emoji: "🎭"
 category: personal

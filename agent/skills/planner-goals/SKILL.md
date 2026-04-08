@@ -1,7 +1,7 @@
 ---
 name: python3 planner-goals/scripts/planner_goals.py
 display_name: 목표 관리
-description: "Manage D-Day goals in Planner. Track long-term goals with due dates and role assignments."
+description: "Manage D-Day goals in Planner. Track long-term goals with due dates and role assignments. Use for: 목표, 디데이, D-Day, 장기목표, goal, 달성, 기한"
 version: 1.0.0
 emoji: "🎯"
 category: personal

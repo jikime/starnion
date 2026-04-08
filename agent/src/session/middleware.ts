@@ -227,29 +227,33 @@ export class SkillTrackingMiddleware extends ChatMiddleware {
 
     if (event.type === "tool_execution_end") {
       const skillName = ctx.pendingSkillCalls.get(event.toolCallId);
-      if (skillName) {
-        ctx.pendingSkillCalls.delete(event.toolCallId);
-        const status = event.isError ? "ERROR" : "OK";
-        console.log(
-          `[Skill] ${status === "OK" ? "✅" : "❌"} Skill done: ${skillName} | status=${status} | user=${ctx.userId}`,
-        );
-        // Always log skill output so Python print/stderr is visible in server console
-        const resultText = typeof event.result === "string"
+      const resultText =
+        typeof event.result === "string"
           ? event.result
           : JSON.stringify(event.result);
-        if (resultText && resultText.trim() !== "(no output)") {
-          // Skill output omitted from logs (may contain sensitive content).
-        }
+
+      // Verification: treat as error if exit code non-zero OR if output starts with ❌
+      // (some Python skills print ❌ and exit 0 on soft errors).
+      const outputIsError =
+        !event.isError &&
+        typeof resultText === "string" &&
+        resultText.trimStart().startsWith("❌");
+      const effectiveIsError = event.isError || outputIsError;
+
+      if (skillName) {
+        ctx.pendingSkillCalls.delete(event.toolCallId);
+        const status = effectiveIsError ? "ERROR" : "OK";
+        const marker = outputIsError ? "❌(soft)" : effectiveIsError ? "❌" : "✅";
+        console.log(
+          `[Skill] ${marker} Skill done: ${skillName} | status=${status} | user=${ctx.userId}`,
+        );
       }
       return [
         {
           tool_result: {
             tool_name: event.toolName,
-            result:
-              typeof event.result === "string"
-                ? event.result
-                : JSON.stringify(event.result),
-            is_error: event.isError,
+            result: resultText,
+            is_error: effectiveIsError,
           },
         },
       ];
