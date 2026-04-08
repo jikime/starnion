@@ -135,14 +135,15 @@ export async function handleChat(options: ChatOptions): Promise<void> {
       skillOpts,
     );
 
-    // Inject skill API keys into process.env so both custom exec tool AND
-    // pi-coding-agent's built-in bash tool can access them.
+    // Register skill API keys in the per-task env store (exec.ts).
+    // The custom exec tool reads keys from this store at call time, so each
+    // concurrent request sees only its own user's keys.
+    // We deliberately do NOT write to process.env — that is a global mutable
+    // object shared across all concurrent requests, which would cause API keys
+    // from one user to be visible to another user's skill subprocess.
     const skillEnvKeys = ctx.skillEnv ? Object.keys(ctx.skillEnv) : [];
     if (skillEnvKeys.length > 0) {
       setTaskSkillEnv(ctx.taskId, ctx.skillEnv!);
-      for (const [k, v] of Object.entries(ctx.skillEnv!)) {
-        process.env[k] = v;
-      }
     }
     console.log(`[handleChat] skillEnv keys=[${skillEnvKeys.join(",")}] taskId=${ctx.taskId}`);
 

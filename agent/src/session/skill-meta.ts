@@ -105,6 +105,21 @@ export function buildSkillIndex(metas: SkillMeta[]): string {
 }
 
 /**
+ * Returns true if at least one keyword-bearing skill has a keyword that appears
+ * in the lowercased message. Used as a gate before filtering: if nothing matches,
+ * we fall back to the full index so no skill is silently dropped.
+ *
+ * Exported so prompt-composer.ts can use the same logic for skillsOverride,
+ * keeping both filtering paths consistent.
+ */
+export function anyKeywordSkillMatches(metas: SkillMeta[], lowerMessage: string): boolean {
+  return metas.some(
+    (m) => m.keywords.length > 0 &&
+      m.keywords.some((kw) => lowerMessage.includes(kw.toLowerCase())),
+  );
+}
+
+/**
  * Build a compact skill index filtered by the user's message.
  *
  * Filtering rules:
@@ -114,17 +129,13 @@ export function buildSkillIndex(metas: SkillMeta[]): string {
  */
 export function buildFilteredSkillIndex(metas: SkillMeta[], message: string): string {
   const lower = message.toLowerCase();
+
+  // Same gate used by skillsOverride in prompt-composer — must stay in sync.
+  if (!anyKeywordSkillMatches(metas, lower)) return buildSkillIndex(metas);
+
   const filtered = metas.filter((m) => {
     if (m.keywords.length === 0) return true;  // no keywords = always show
     return m.keywords.some((kw) => lower.includes(kw.toLowerCase()));
   });
-
-  // Fallback: if filtering removed all keyword-bearing skills, show everything
-  const keywordSkills = metas.filter((m) => m.keywords.length > 0);
-  const anyMatched = keywordSkills.some((m) =>
-    m.keywords.some((kw) => lower.includes(kw.toLowerCase())),
-  );
-  if (!anyMatched) return buildSkillIndex(metas);
-
   return buildSkillIndex(filtered);
 }

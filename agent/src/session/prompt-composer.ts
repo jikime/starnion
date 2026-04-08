@@ -6,6 +6,7 @@ import {
   loadAllSkillMeta,
   buildSkillIndex,
   buildFilteredSkillIndex,
+  anyKeywordSkillMatches,
 } from "./skill-meta.js";
 import { PromptInjectionMiddleware } from "./middleware.js";
 
@@ -249,12 +250,10 @@ export class PromptComposer {
     const skillsOverrideFn = needsFilter
       ? (base: { skills: any[]; diagnostics: any }) => {
           // Pre-compute whether any keyword-bearing skill matches the message.
-          // If none match, we skip message filtering to avoid false negatives.
+          // Uses the same helper as buildFilteredSkillIndex to keep both
+          // filtering paths consistent (no false-negative divergence).
           const anyKeywordMatch = lowerMessage
-            ? metas.some(
-                (m) => m.keywords.length > 0 &&
-                  m.keywords.some((kw) => lowerMessage.includes(kw.toLowerCase())),
-              )
+            ? anyKeywordSkillMatches(metas, lowerMessage)
             : false;
 
           const filtered = base.skills.filter((skill: any) => {

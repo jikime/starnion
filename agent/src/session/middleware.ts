@@ -873,10 +873,54 @@ function contextRefAllowUrls(): boolean {
   return process.env.CONTEXT_REF_ALLOW_URLS !== "false";
 }
 
+/**
+ * SSRF guard: block requests to private/link-local/loopback IP ranges and
+ * reserved hostnames before any network connection is made.
+ *
+ * Blocked ranges (RFC 1918 / RFC 3927 / loopback):
+ *   10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16,
+ *   127.0.0.0/8, 169.254.0.0/16 (link-local / AWS metadata),
+ *   ::1, fc00::/7 (IPv6 ULA), fe80::/10 (IPv6 link-local)
+ */
+function isSsrfBlocked(urlStr: string): boolean {
+  let hostname: string;
+  try {
+    hostname = new URL(urlStr).hostname.toLowerCase();
+  } catch {
+    return true; // malformed URL → block
+  }
+
+  // Reserved / loopback hostnames
+  const blockedHosts = ["localhost", "metadata.google.internal"];
+  if (blockedHosts.includes(hostname)) return true;
+
+  // Numeric IPv4 check
+  const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [, a, b] = ipv4.map(Number);
+    if (a === 10) return true;                                  // 10.0.0.0/8
+    if (a === 127) return true;                                 // 127.0.0.0/8
+    if (a === 169 && b === 254) return true;                    // 169.254.0.0/16 (link-local / IMDS)
+    if (a === 172 && b >= 16 && b <= 31) return true;          // 172.16.0.0/12
+    if (a === 192 && b === 168) return true;                    // 192.168.0.0/16
+    if (a === 0) return true;                                   // 0.0.0.0/8
+    if (a === 100 && b >= 64 && b <= 127) return true;         // 100.64.0.0/10 (CGNAT)
+  }
+
+  // IPv6 loopback and ULA/link-local
+  const bareHost = hostname.replace(/^\[|\]$/g, ""); // strip [] from [::1]
+  if (bareHost === "::1") return true;
+  if (/^fe80:/i.test(bareHost)) return true;          // link-local
+  if (/^fc[0-9a-f]{2}:/i.test(bareHost) || /^fd[0-9a-f]{2}:/i.test(bareHost)) return true; // ULA
+
+  return false;
+}
+
 async function resolveRef(ref: string): Promise<string> {
   // URL reference
   if (ref.startsWith("http://") || ref.startsWith("https://")) {
     if (!contextRefAllowUrls()) return `[URL references disabled: ${ref}]`;
+    if (isSsrfBlocked(ref)) return `[Blocked: ${ref} resolves to a private/internal address]`;
     try {
       const res = await fetch(ref, {
         headers: { Accept: "text/*, application/json" },

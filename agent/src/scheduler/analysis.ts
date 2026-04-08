@@ -117,14 +117,15 @@ async function getResourceLoader(): Promise<DefaultResourceLoader> {
   const loader = new DefaultResourceLoader({
     cwd: SKILLS_DIR,
     agentDir: AGENT_DIR,
-    // noSkills: exclude <available_skills> XML (unneeded for JSON-only output)
+    // noSkills: exclude <available_skills> XML (unneeded for JSON-only output).
+    // Confirmed as an official API in resource-loader.d.ts line 61.
     noSkills: true,
     // Override system prompt to a minimal analyst identity — prevents AGENTS.md
     // and SOUL.md persona from being injected into every analysis call.
     systemPromptOverride: () =>
       "You are a concise data analyst. " +
       "Output only valid JSON with no additional text or explanation.",
-  } as ConstructorParameters<typeof DefaultResourceLoader>[0]);
+  });
   await loader.reload();
   _resourceLoader = loader;
   return loader;
@@ -289,7 +290,8 @@ async function analyzeConversation(userId: string): Promise<void> {
     entry_date: string; title: string; content: string; mood: string;
   }>(
     `SELECT entry_date::text, one_liner AS title, COALESCE(full_note, '') AS content, mood
-     FROM planner_diary WHERE user_id = $1 AND entry_date = $2 ORDER BY created_at`,
+     FROM planner_diary WHERE user_id = $1 AND entry_date = $2 AND archived_at IS NULL
+     ORDER BY created_at`,
     [userId, today],
   );
   if (entries.length === 0) return; // no diary today — skip silently
@@ -443,6 +445,7 @@ async function compactMemory(userId: string): Promise<void> {
   }>(
     `SELECT id::text, entry_date::text, one_liner AS title, COALESCE(full_note, '') AS content, mood
      FROM planner_diary WHERE user_id = $1 AND entry_date < $2 AND entry_date >= $3
+     AND archived_at IS NULL
      ORDER BY entry_date`,
     [userId, cutoff, veryOld],
   );
@@ -485,9 +488,17 @@ async function compactMemory(userId: string): Promise<void> {
 
   for (const s of summaries) await kbUpsert(userId, s.key, s.value, "memory_compactor");
 
+  // Soft-delete: stamp archived_at instead of hard-deleting.
+  // Originals are preserved for recovery if an LLM summary contains hallucinations.
+  // The partial index on (user_id, entry_date WHERE archived_at IS NULL) keeps
+  // active-record queries fast even as the archive grows.
   const allIds = summaries.flatMap((s) => s.ids);
-  await query(`DELETE FROM planner_diary WHERE user_id = $1 AND id = ANY($2::bigint[])`, [userId, allIds]);
-  log(`memory_compaction: ${summaries.length} weeks, ${allIds.length} entries removed (user=${userId.slice(0, 8)}…)`);
+  await query(
+    `UPDATE planner_diary SET archived_at = NOW()
+     WHERE user_id = $1 AND id = ANY($2::bigint[]) AND archived_at IS NULL`,
+    [userId, allIds],
+  );
+  log(`memory_compaction: ${summaries.length} weeks, ${allIds.length} entries archived (user=${userId.slice(0, 8)}…)`);
 }
 
 // ── Job 4: User Schedules ──────────────────────────────────────────────────────
