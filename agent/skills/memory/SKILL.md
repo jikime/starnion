@@ -26,7 +26,7 @@ triggers:
     - 기억나
     - 찾아줘
     - 대화 기록
-    - 일기 찾아줘
+    - 오늘의 한마디 찾아줘
     - recall
     - remember
     - past conversation
@@ -37,10 +37,10 @@ triggers:
   when_to_use:
     - User asks about something they mentioned in a previous conversation
     - User says "예전에 말했던 거 기억나?" or "저번에 어떻게 했더라"
-    - User wants to retrieve a past diary entry or log
+    - User wants to retrieve a past record or log
     - User asks "내가 언제 X 했더라?" referring to past records
   not_for:
-    - Saving new memories (use memo or diary skill)
+    - Saving new memories (use planner-reflection for notes, planner-diary for 오늘의 한마디)
     - Real-time search of external information (use websearch skill)
 ---
 

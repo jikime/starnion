@@ -30,7 +30,7 @@ def cmd_write(args):
     )
     psql(sql, (args.user_id, d, one_liner, mood, full_note,
                one_liner, mood, full_note, full_note))
-    print(f"📔 일기 저장됨 ({d})")
+    print(f"📔 오늘의 한마디 저장됨 ({d})")
     print(f"  {MOOD_EMOJI.get(mood, '★')} {args.text}")
 
 def cmd_read(args):
@@ -40,11 +40,11 @@ def cmd_read(args):
         "FROM planner_diary WHERE user_id=%s AND entry_date=%s;",
         (args.user_id, d)
     )
-    if not row: print(f"📔 {d} 일기가 없습니다."); return
+    if not row: print(f"📔 {d} 오늘의 한마디가 없습니다."); return
     p = row.strip().split("|")
     if len(p) < 4: return
     ed, ol, mood, fn = [x.strip() for x in p]
-    print(f"📔 {ed} 일기\n")
+    print(f"📔 {ed} 오늘의 한마디\n")
     print(f"  {MOOD_EMOJI.get(mood, '★')} {ol}")
     if fn: print(f"\n  {fn}")
 

@@ -296,8 +296,8 @@ async function analyzeConversation(userId: string): Promise<void> {
     .join("\n");
 
   const prompt =
-    "당신은 사용자 일기 분석 전문가입니다. " +
-    "아래 오늘의 일기 기록을 분석하여 핵심 인사이트를 추출하세요.\n\n" +
+    "당신은 사용자 기록 분석 전문가입니다. " +
+    "아래 오늘의 기록을 분석하여 핵심 인사이트를 추출하세요.\n\n" +
     "반드시 아래 JSON 형식으로만 응답하세요 (다른 텍스트 없이):\n" +
     "```json\n{\n" +
     '  "insights": [{"type": "spending_intent|emotional_state|key_decision|life_event|financial_concern", ' +
@@ -305,7 +305,7 @@ async function analyzeConversation(userId: string): Promise<void> {
     '  "overall_mood": "positive|neutral|negative|mixed",\n' +
     '  "topics": ["주제1", "주제2"]\n}\n```\n\n' +
     "규칙: confidence 0.5 미만 제외, 최대 5개, topics 최대 3개\n\n" +
-    `데이터:\n[${today} 일기 기록]\n${logsText}`;
+    `데이터:\n[${today} 기록]\n${logsText}`;
 
   const response = await callClaude(prompt, 1024);
   const result = extractJson(response);
@@ -383,7 +383,7 @@ async function analyzePatterns(userId: string): Promise<void> {
   );
   lines.push("\n[최근 거래 20건]");
   recent.forEach((r) => lines.push(`  ${r.d} ${r.category} ${parseInt(r.amount).toLocaleString()}원 ${r.description}`));
-  lines.push("\n[최근 일기/감정 (10건)]");
+  lines.push("\n[최근 한마디/감정 (10건)]");
   diaryMoods.forEach((r) => lines.push(`  ${r.entry_date} [${r.mood}]: ${r.content}`));
   if (insights.length > 0) {
     lines.push("\n[최근 대화 분석 인사이트]");

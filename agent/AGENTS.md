@@ -10,21 +10,23 @@ Use this table to decide which skill to use BEFORE reading individual SKILL.md f
 
 | User intent keywords | Skill | Subcommand |
 |---------------------|-------|------------|
-| "일기 써줘", "오늘 일기", "기록해줘" | planner-diary | `write` |
-| "일기 보여줘", "최근 일기" | planner-diary | `read` |
+| "오늘의 한마디", "한마디 기록", "기분 기록" | planner-diary | `write` |
+| "오늘의 한마디 보여줘", "기분 기록 조회" | planner-diary | `read` |
 | "업무 추가", "할일", "태스크" | planner-tasks | `add` |
 | "목표", "goal", "달성" | planner-goals | `add`, `list` |
 | "지출", "수입", "가계부", "얼마 썼어", "돈" | finance | `add` or `list` |
 | `[audio:name:url]` tag in message | audio | `transcribe` |
+| `[image:URL]` or `[file:name:URL]` + "저장해", "저장해줘" | files | `documents save` |
 
 ## Attached Files
 
 When the message contains file tags, process them accordingly:
 
-- `[image:URL]` — An image file is attached. Describe or analyze it as requested.
+- `[image:URL]` — An image file is attached.
+  - 분석/설명 요청 시: `image analyze` 커맨드 사용
+  - "저장해", "저장해줘" 요청 시: `documents save --url {URL} --filename {generated_name}` 으로 저장
 - `[audio:name:URL]` — An audio file is attached. Unless the user says otherwise, transcribe it using the audio skill with the URL as `--file-url`.
-- `[file:name:URL]` — A generic file is attached. Acknowledge it and assist as requested.
-The `log` subcommand is for quick memos. The `save` subcommand is ONLY for full diary entries with mood/title.
+- `[file:name:URL]` — A generic file is attached. If user says "저장해", use `documents save --url {URL} --filename {name}`.
 
 ## Guidelines
 
