@@ -20,6 +20,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/newstarnion/gateway/internal/infrastructure/database"
@@ -33,12 +34,21 @@ type ReportFunc func(ctx context.Context, userID string, reportType string) erro
 // NotifyFunc inserts a notification row for the given user.
 type NotifyFunc func(ctx context.Context, userID string, notifType string, message string) error
 
+// userTZEntry is a cached timezone string for a user.
+type userTZEntry struct {
+	timezone  string
+	fetchedAt time.Time
+}
+
+const userTZCacheTTL = 5 * time.Minute
+
 // Scheduler polls scheduled jobs once per minute and dispatches due actions.
 type Scheduler struct {
-	db       *database.DB
-	logger   *zap.Logger
-	reportFn ReportFunc
-	notifyFn NotifyFunc
+	db         *database.DB
+	logger     *zap.Logger
+	reportFn   ReportFunc
+	notifyFn   NotifyFunc
+	userTZCache sync.Map // string(userID) → userTZEntry
 }
 
 // New creates a Scheduler. Call Start to begin execution.
@@ -200,6 +210,24 @@ func (s *Scheduler) runSystemJobs(ctx context.Context, now time.Time) {
 
 // ── User Schedules ────────────────────────────────────────────────────────────
 
+// getUserTimezone returns the user's IANA timezone from their profile, with a
+// 5-minute in-process cache. Falls back to "Asia/Seoul" on DB error.
+func (s *Scheduler) getUserTimezone(ctx context.Context, userID string) string {
+	if v, ok := s.userTZCache.Load(userID); ok {
+		e := v.(userTZEntry)
+		if time.Since(e.fetchedAt) < userTZCacheTTL {
+			return e.timezone
+		}
+	}
+	tz := "Asia/Seoul"
+	_ = s.db.QueryRowContext(ctx,
+		`SELECT COALESCE(preferences->>'timezone', 'Asia/Seoul') FROM users WHERE id = $1::uuid`,
+		userID,
+	).Scan(&tz)
+	s.userTZCache.Store(userID, userTZEntry{timezone: tz, fetchedAt: time.Now()})
+	return tz
+}
+
 // schedTime mirrors the struct in cron.go for JSON unmarshalling.
 type schedTime struct {
 	Hour      int    `json:"hour"`
@@ -259,13 +287,21 @@ func (s *Scheduler) runUserSchedules(ctx context.Context, now time.Time) {
 			continue
 		}
 
-		// Convert now to the schedule's timezone for accurate local-time comparison.
-		// Falls back to server time when timezone is empty or invalid (backward compat).
+		// Resolve timezone from user's profile (updated when user changes profile).
+		// Falls back to the timezone stored in the schedule entry for backward compat,
+		// then to "Asia/Seoul" as a last resort.
+		profileTZ := s.getUserTimezone(ctx, userID)
+		tz := profileTZ
+		if tz == "" {
+			tz = entry.Schedule.Timezone
+		}
+		if tz == "" {
+			tz = "Asia/Seoul"
+		}
+
 		localNow := now
-		if tz := entry.Schedule.Timezone; tz != "" {
-			if loc, err := time.LoadLocation(tz); err == nil {
-				localNow = now.In(loc)
-			}
+		if loc, err := time.LoadLocation(tz); err == nil {
+			localNow = now.In(loc)
 		}
 		today := localNow.Format("2006-01-02")
 
