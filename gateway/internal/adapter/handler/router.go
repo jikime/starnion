@@ -90,6 +90,12 @@ func (r *Router) SetBotManager(bm *tginfra.BotManager) {
 	r.stub.SetBotManager(bm)
 }
 
+// SetScheduler wires the event-driven scheduler into the cron handler so that
+// schedule mutations immediately re-arm the user schedule timer.
+func (r *Router) SetScheduler(w ScheduleWaker) {
+	r.cron.SetScheduler(w)
+}
+
 func (r *Router) Register(e *echo.Echo) {
 	// Health check
 	e.GET("/health", r.health.Check)

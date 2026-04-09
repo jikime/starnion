@@ -162,6 +162,7 @@ func New(logger *zap.Logger) (*Server, error) {
 	}
 
 	sched := scheduler.New(db, logger, reportFn, notifyFn)
+	h.SetScheduler(sched) // wire scheduler → cron handler for immediate timer re-arm
 
 	return &Server{
 		echo:        e,

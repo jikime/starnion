@@ -14,14 +14,33 @@ import (
 	"go.uber.org/zap"
 )
 
+// ScheduleWaker signals the scheduler to re-arm its event-driven timer.
+// Implemented by *scheduler.Scheduler; may be nil before the scheduler starts.
+type ScheduleWaker interface {
+	Wake()
+}
+
 type CronHandler struct {
 	db     *database.DB
 	config *config.Config
 	logger *zap.Logger
+	sched  ScheduleWaker // optional; nil-safe
 }
 
 func NewCronHandler(db *database.DB, cfg *config.Config, logger *zap.Logger) *CronHandler {
 	return &CronHandler{db: db, config: cfg, logger: logger}
+}
+
+// SetScheduler wires the event-driven scheduler into the cron handler so that
+// create/update/delete operations immediately re-arm the user schedule timer.
+func (h *CronHandler) SetScheduler(w ScheduleWaker) {
+	h.sched = w
+}
+
+func (h *CronHandler) wake() {
+	if h.sched != nil {
+		h.sched.Wake()
+	}
 }
 
 // ── System Jobs ────────────────────────────────────────────────────────────────
@@ -351,6 +370,7 @@ func (h *CronHandler) CreateUserSchedule(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "create failed"})
 	}
 
+	h.wake()
 	return c.JSON(http.StatusOK, scheduleResponse{
 		ID: schedID, KBRowID: rowID,
 		Title: data.Title, Type: data.Type, ReportType: data.ReportType,
@@ -406,6 +426,7 @@ func (h *CronHandler) InternalCreateSchedule(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "create failed"})
 	}
 
+	h.wake()
 	return c.JSON(http.StatusCreated, map[string]any{
 		"id": schedID, "kb_row_id": rowID,
 		"title": data.Title, "created_at": data.CreatedAt,
@@ -493,6 +514,7 @@ func (h *CronHandler) UpdateUserSchedule(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "update failed"})
 	}
 
+	h.wake()
 	return c.JSON(http.StatusOK, map[string]any{"id": schedID, "status": existing.Status})
 }
 
@@ -519,6 +541,7 @@ func (h *CronHandler) DeleteUserSchedule(c echo.Context) error {
 	if n == 0 {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "schedule not found"})
 	}
+	h.wake()
 	return c.JSON(http.StatusOK, map[string]string{"id": schedID})
 }
 
@@ -566,5 +589,6 @@ func (h *CronHandler) ToggleUserSchedule(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "toggle failed"})
 	}
 
+	h.wake()
 	return c.JSON(http.StatusOK, map[string]string{"id": schedID, "status": data.Status})
 }

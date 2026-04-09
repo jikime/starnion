@@ -33,17 +33,38 @@ type ReportFunc func(ctx context.Context, userID string, reportType string) erro
 // NotifyFunc inserts a notification row for the given user.
 type NotifyFunc func(ctx context.Context, userID string, notifType string, message string) error
 
-// Scheduler polls scheduled jobs once per minute and dispatches due actions.
+// Scheduler dispatches timed jobs for all users.
+//
+// System jobs run on a fixed 1-minute ticker.
+// User schedules are event-driven: each entry stores a pre-computed UTC
+// next_fire_at timestamp; the scheduler sleeps until the earliest one and
+// wakes only when work is due or the schedule list changes.
 type Scheduler struct {
 	db       *database.DB
 	logger   *zap.Logger
 	reportFn ReportFunc
 	notifyFn NotifyFunc
+	wakeC    chan struct{} // buffered(1): signals schedule list changed
 }
 
 // New creates a Scheduler. Call Start to begin execution.
 func New(db *database.DB, logger *zap.Logger, rf ReportFunc, nf NotifyFunc) *Scheduler {
-	return &Scheduler{db: db, logger: logger, reportFn: rf, notifyFn: nf}
+	return &Scheduler{
+		db:       db,
+		logger:   logger,
+		reportFn: rf,
+		notifyFn: nf,
+		wakeC:    make(chan struct{}, 1),
+	}
+}
+
+// Wake signals the scheduler to reload schedules and re-arm the user timer.
+// Safe to call from any goroutine; drops the signal if one is already queued.
+func (s *Scheduler) Wake() {
+	select {
+	case s.wakeC <- struct{}{}:
+	default:
+	}
 }
 
 // Start launches the background goroutine. It returns immediately.
@@ -54,27 +75,50 @@ func (s *Scheduler) Start(ctx context.Context) {
 func (s *Scheduler) run(ctx context.Context) {
 	s.logger.Info("scheduler: started")
 
-	// Run once at startup to catch any missed schedules.
-	s.tick(ctx)
+	// System jobs: fixed 1-minute ticker (cron expressions evaluated server-side in UTC).
+	s.runSystemJobs(ctx, time.Now())
+	sysTicker := time.NewTicker(time.Minute)
+	defer sysTicker.Stop()
 
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
+	// User schedules: event-driven — fire immediately to initialise next_fire_at values.
+	userTimer := time.NewTimer(0)
+	defer userTimer.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			s.logger.Info("scheduler: stopped")
 			return
-		case <-ticker.C:
-			s.tick(ctx)
+
+		case <-sysTicker.C:
+			s.runSystemJobs(ctx, time.Now())
+
+		case <-userTimer.C:
+			next := s.runAndArmUserSchedules(ctx)
+			userTimer.Reset(s.nextUserTimerDelay(next))
+
+		case <-s.wakeC:
+			// Schedule list changed (created/updated/deleted) — re-arm immediately.
+			if !userTimer.Stop() {
+				select { case <-userTimer.C: default: }
+			}
+			userTimer.Reset(0)
 		}
 	}
 }
 
-func (s *Scheduler) tick(ctx context.Context) {
-	now := time.Now()
-	s.runSystemJobs(ctx, now)
-	s.runUserSchedules(ctx, now)
+// nextUserTimerDelay returns how long to sleep before the next user-schedule check.
+// Uses a 5-minute safety-net when no schedules are pending.
+func (s *Scheduler) nextUserTimerDelay(nextFireAt time.Time) time.Duration {
+	const maxDelay = 5 * time.Minute
+	if nextFireAt.IsZero() {
+		return maxDelay
+	}
+	d := time.Until(nextFireAt)
+	if d < 0 {
+		d = 0
+	}
+	return d
 }
 
 // ── System Jobs ───────────────────────────────────────────────────────────────
@@ -200,38 +244,54 @@ func (s *Scheduler) runSystemJobs(ctx context.Context, now time.Time) {
 
 // ── User Schedules ────────────────────────────────────────────────────────────
 
-// schedTime mirrors the struct in cron.go for JSON unmarshalling.
-type schedTime struct {
-	Hour      int    `json:"hour"`
-	Minute    int    `json:"minute"`
-	DayOfWeek string `json:"day_of_week,omitempty"`
-	Date      string `json:"date,omitempty"`
-	Timezone  string `json:"timezone,omitempty"` // IANA timezone, e.g. "Asia/Seoul"
+// computeNextFireAt returns the next UTC time at which entry should fire, after `after`.
+// Returns zero time if the schedule is expired, paused, or otherwise unschedulable.
+func computeNextFireAt(entry scheduleEntry, userTZ string, after time.Time) time.Time {
+	loc, err := time.LoadLocation(userTZ)
+	if err != nil {
+		loc = time.UTC
+	}
+
+	localAfter := after.In(loc)
+
+	// One-time: specific date + hour + minute
+	if entry.Schedule.Date != "" {
+		s := fmt.Sprintf("%s %02d:%02d", entry.Schedule.Date, entry.Schedule.Hour, entry.Schedule.Minute)
+		t, err := time.ParseInLocation("2006-01-02 15:04", s, loc)
+		if err != nil || !t.After(after) {
+			return time.Time{} // already past or invalid
+		}
+		return t.UTC()
+	}
+
+	// Recurring: next occurrence of Hour:Minute (+ optional day_of_week)
+	candidate := time.Date(
+		localAfter.Year(), localAfter.Month(), localAfter.Day(),
+		entry.Schedule.Hour, entry.Schedule.Minute, 0, 0, loc,
+	)
+	// If this minute has already passed today, start from tomorrow
+	if !candidate.After(after) {
+		candidate = candidate.AddDate(0, 0, 1)
+	}
+	// Advance day until day_of_week matches (at most 7 days)
+	if entry.Schedule.DayOfWeek != "" {
+		for i := 0; i < 7; i++ {
+			if matchDayOfWeek(entry.Schedule.DayOfWeek, candidate) {
+				break
+			}
+			candidate = candidate.AddDate(0, 0, 1)
+		}
+	}
+	return candidate.UTC()
 }
 
-type scheduleEntry struct {
-	Title      string    `json:"title"`
-	Type       string    `json:"type"`        // "recurring" | "once" | "one_time"
-	ReportType string    `json:"report_type"` // action discriminator
-	Schedule   schedTime `json:"schedule"`
-	Status     string    `json:"status"`      // "active" | "paused"
-	Message    string    `json:"message"`
-	LastSent   string    `json:"last_sent"`
-	TaskPrompt string    `json:"task_prompt,omitempty"` // NL task for AI agent execution
-	DeliverTo  string    `json:"deliver_to,omitempty"`  // "telegram" or ""
-	LastOutput string    `json:"last_output,omitempty"` // last execution output snippet
-}
+// runAndArmUserSchedules executes all due user schedules and returns the next UTC
+// fire time across all active schedules (used to arm the event-driven timer).
+func (s *Scheduler) runAndArmUserSchedules(ctx context.Context) time.Time {
+	now := time.Now().UTC()
+	queryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 
-// reportTypeSet contains the report_type values that should trigger report generation.
-var reportTypeSet = map[string]bool{
-	"summary": true, "weekly": true, "monthly": true,
-	"diary": true, "goals": true, "finance": true,
-}
-
-func (s *Scheduler) runUserSchedules(ctx context.Context, now time.Time) {
-	queryCtx, queryCancel := context.WithTimeout(ctx, 10*time.Second)
-	defer queryCancel()
-	// JOIN with users to fetch profile timezone in a single query — eliminates N+1.
 	rows, err := s.db.QueryContext(queryCtx,
 		`SELECT kb.user_id::text, kb.id, kb.key, kb.value,
 		        COALESCE(u.preferences->>'timezone', 'Asia/Seoul') AS user_timezone
@@ -242,9 +302,11 @@ func (s *Scheduler) runUserSchedules(ctx context.Context, now time.Time) {
 	)
 	if err != nil {
 		s.logger.Error("scheduler: user schedule query failed", zap.Error(err))
-		return
+		return time.Time{}
 	}
 	defer rows.Close()
+
+	var nextFireAt time.Time
 
 	for rows.Next() {
 		var userID, key, value, userTimezone string
@@ -262,37 +324,82 @@ func (s *Scheduler) runUserSchedules(ctx context.Context, now time.Time) {
 			continue
 		}
 
-		// Use the user's profile timezone (fetched via JOIN above).
-		localNow := now
-		if loc, err := time.LoadLocation(userTimezone); err == nil {
-			localNow = now.In(loc)
+		// Compute and persist next_fire_at if missing (first run or migrated from old format)
+		if entry.NextFireAt == 0 {
+			nfa := computeNextFireAt(entry, userTimezone, now)
+			if nfa.IsZero() {
+				// One-time schedule already expired — pause it
+				if entry.Type == "once" || entry.Type == "one_time" {
+					entry.Status = "paused"
+					s.updateEntry(ctx, kbID, entry)
+				}
+				continue
+			}
+			entry.NextFireAt = nfa.Unix()
+			s.updateEntry(ctx, kbID, entry)
 		}
-		today := localNow.Format("2006-01-02")
 
-		// Time match (in local timezone)
-		if entry.Schedule.Hour != localNow.Hour() || entry.Schedule.Minute != localNow.Minute() {
+		fireAt := time.Unix(entry.NextFireAt, 0).UTC()
+
+		if !fireAt.After(now) {
+			// Due — execute in background; it will recompute next_fire_at and call Wake()
+			schedID := strings.TrimPrefix(key, "schedule:")
+			cUserID, cEntry, cKBID, cTZ := userID, entry, kbID, userTimezone
+			go s.executeUserSchedule(ctx, cUserID, schedID, cKBID, cEntry, cTZ, now)
 			continue
 		}
 
-		// Day-of-week match (optional, in local timezone)
-		if entry.Schedule.DayOfWeek != "" && !matchDayOfWeek(entry.Schedule.DayOfWeek, localNow) {
-			continue
+		// Track earliest upcoming fire time for timer arm
+		if nextFireAt.IsZero() || fireAt.Before(nextFireAt) {
+			nextFireAt = fireAt
 		}
-
-		// Specific date match (optional, local date)
-		if entry.Schedule.Date != "" && entry.Schedule.Date != today {
-			continue
-		}
-
-		// Prevent duplicate execution within the same day (local date).
-		if entry.LastSent == today {
-			continue
-		}
-
-		schedID := strings.TrimPrefix(key, "schedule:")
-		capturedUserID, capturedEntry, capturedKBID, capturedToday := userID, entry, kbID, today
-		go s.executeUserSchedule(ctx, capturedUserID, schedID, capturedKBID, capturedEntry, capturedToday)
 	}
+
+	return nextFireAt
+}
+
+// updateEntry persists a modified scheduleEntry back to knowledge_base.
+func (s *Scheduler) updateEntry(ctx context.Context, kbID int64, entry scheduleEntry) {
+	newValue, err := json.Marshal(entry)
+	if err != nil {
+		return
+	}
+	if _, err := s.db.ExecContext(ctx,
+		`UPDATE knowledge_base SET value = $1 WHERE id = $2`,
+		string(newValue), kbID,
+	); err != nil {
+		s.logger.Warn("scheduler: failed to update schedule entry",
+			zap.Int64("kb_id", kbID), zap.Error(err))
+	}
+}
+
+// schedTime mirrors the struct in cron.go for JSON unmarshalling.
+type schedTime struct {
+	Hour      int    `json:"hour"`
+	Minute    int    `json:"minute"`
+	DayOfWeek string `json:"day_of_week,omitempty"`
+	Date      string `json:"date,omitempty"`
+	Timezone  string `json:"timezone,omitempty"` // IANA timezone, e.g. "Asia/Seoul"
+}
+
+type scheduleEntry struct {
+	Title      string    `json:"title"`
+	Type       string    `json:"type"`        // "recurring" | "once" | "one_time"
+	ReportType string    `json:"report_type"` // action discriminator
+	Schedule   schedTime `json:"schedule"`
+	Status     string    `json:"status"`      // "active" | "paused"
+	Message    string    `json:"message"`
+	LastSent   string    `json:"last_sent"`
+	NextFireAt int64     `json:"next_fire_at,omitempty"` // UTC Unix seconds; 0 = not yet computed
+	TaskPrompt string    `json:"task_prompt,omitempty"`  // NL task for AI agent execution
+	DeliverTo  string    `json:"deliver_to,omitempty"`   // "telegram" or ""
+	LastOutput string    `json:"last_output,omitempty"`  // last execution output snippet
+}
+
+// reportTypeSet contains the report_type values that should trigger report generation.
+var reportTypeSet = map[string]bool{
+	"summary": true, "weekly": true, "monthly": true,
+	"diary": true, "goals": true, "finance": true,
 }
 
 func (s *Scheduler) executeUserSchedule(
@@ -300,7 +407,8 @@ func (s *Scheduler) executeUserSchedule(
 	userID, schedID string,
 	kbID int64,
 	entry scheduleEntry,
-	today string,
+	userTZ string,
+	executedAt time.Time,
 ) {
 	s.logger.Info("scheduler: executing user schedule",
 		zap.String("sched_id", schedID),
@@ -330,20 +438,28 @@ func (s *Scheduler) executeUserSchedule(
 		return
 	}
 
-	// Mark executed: update last_sent; pause one-time schedules.
-	entry.LastSent = today
+	// Record local date of execution
+	loc, err := time.LoadLocation(userTZ)
+	if err != nil {
+		loc = time.UTC
+	}
+	entry.LastSent = executedAt.In(loc).Format("2006-01-02")
+
+	// Pause one-time schedules; advance next_fire_at for recurring ones
 	if entry.Type == "once" || entry.Type == "one_time" {
 		entry.Status = "paused"
+		entry.NextFireAt = 0
+	} else {
+		nfa := computeNextFireAt(entry, userTZ, executedAt)
+		if nfa.IsZero() {
+			entry.NextFireAt = 0
+		} else {
+			entry.NextFireAt = nfa.Unix()
+		}
 	}
 
-	newValue, _ := json.Marshal(entry)
-	if _, err := s.db.ExecContext(ctx,
-		`UPDATE knowledge_base SET value = $1 WHERE id = $2`,
-		string(newValue), kbID,
-	); err != nil {
-		s.logger.Warn("scheduler: failed to update last_sent",
-			zap.String("sched_id", schedID), zap.Error(err))
-	}
+	s.updateEntry(ctx, kbID, entry)
+	s.Wake() // Re-arm the event-driven timer with the updated next_fire_at
 }
 
 // ── Smart Notify ──────────────────────────────────────────────────────────────
