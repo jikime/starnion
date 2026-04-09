@@ -271,6 +271,7 @@ export default function CronPage() {
           hour: cronForm.hour, minute: cronForm.minute,
           day_of_week: cronForm.type === "recurring" ? (cronForm.day_of_week || undefined) : undefined,
           date: cronForm.type === "one_time" ? (cronForm.date || undefined) : undefined,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
       }
       if (cronEditTarget) {

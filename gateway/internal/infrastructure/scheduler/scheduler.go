@@ -206,6 +206,7 @@ type schedTime struct {
 	Minute    int    `json:"minute"`
 	DayOfWeek string `json:"day_of_week,omitempty"`
 	Date      string `json:"date,omitempty"`
+	Timezone  string `json:"timezone,omitempty"` // IANA timezone, e.g. "Asia/Seoul"
 }
 
 type scheduleEntry struct {
@@ -238,8 +239,6 @@ func (s *Scheduler) runUserSchedules(ctx context.Context, now time.Time) {
 	}
 	defer rows.Close()
 
-	today := now.Format("2006-01-02")
-
 	for rows.Next() {
 		var userID string
 		var kbID int64
@@ -257,29 +256,39 @@ func (s *Scheduler) runUserSchedules(ctx context.Context, now time.Time) {
 			continue
 		}
 
-		// Time match
-		if entry.Schedule.Hour != now.Hour() || entry.Schedule.Minute != now.Minute() {
+		// Convert now to the schedule's timezone for accurate local-time comparison.
+		// Falls back to server time when timezone is empty or invalid (backward compat).
+		localNow := now
+		if tz := entry.Schedule.Timezone; tz != "" {
+			if loc, err := time.LoadLocation(tz); err == nil {
+				localNow = now.In(loc)
+			}
+		}
+		today := localNow.Format("2006-01-02")
+
+		// Time match (in local timezone)
+		if entry.Schedule.Hour != localNow.Hour() || entry.Schedule.Minute != localNow.Minute() {
 			continue
 		}
 
-		// Day-of-week match (optional)
-		if entry.Schedule.DayOfWeek != "" && !matchDayOfWeek(entry.Schedule.DayOfWeek, now) {
+		// Day-of-week match (optional, in local timezone)
+		if entry.Schedule.DayOfWeek != "" && !matchDayOfWeek(entry.Schedule.DayOfWeek, localNow) {
 			continue
 		}
 
-		// Specific date match (optional)
+		// Specific date match (optional, local date)
 		if entry.Schedule.Date != "" && entry.Schedule.Date != today {
 			continue
 		}
 
-		// Prevent duplicate execution within the same day.
+		// Prevent duplicate execution within the same day (local date).
 		if entry.LastSent == today {
 			continue
 		}
 
 		schedID := strings.TrimPrefix(key, "schedule:")
-		userID, entry, kbID, today := userID, entry, kbID, today // capture
-		go s.executeUserSchedule(ctx, userID, schedID, kbID, entry, today)
+		capturedUserID, capturedEntry, capturedKBID, capturedToday := userID, entry, kbID, today
+		go s.executeUserSchedule(ctx, capturedUserID, schedID, capturedKBID, capturedEntry, capturedToday)
 	}
 }
 

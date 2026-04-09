@@ -202,6 +202,7 @@ type schedTime struct {
 	Minute    int    `json:"minute"`
 	DayOfWeek string `json:"day_of_week,omitempty"`
 	Date      string `json:"date,omitempty"`
+	Timezone  string `json:"timezone,omitempty"` // IANA timezone, e.g. "Asia/Seoul"
 }
 
 type scheduleData struct {
@@ -313,6 +314,11 @@ func (h *CronHandler) CreateUserSchedule(c echo.Context) error {
 	}
 	if req.DeliverTo != "" && req.DeliverTo != "telegram" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "deliver_to must be 'telegram' or empty"})
+	}
+	if req.Schedule.Timezone != "" {
+		if _, err := time.LoadLocation(req.Schedule.Timezone); err != nil {
+			req.Schedule.Timezone = "UTC"
+		}
 	}
 	if req.Type == "" {
 		req.Type = "recurring"
