@@ -57,16 +57,6 @@ func (s *Scheduler) run(ctx context.Context) {
 	// Run once at startup to catch any missed schedules.
 	s.tick(ctx)
 
-	// Align to the next clock-minute boundary so ticks fire at :00 seconds,
-	// regardless of when the server started.
-	now := time.Now()
-	nextMinute := now.Truncate(time.Minute).Add(time.Minute)
-	select {
-	case <-time.After(nextMinute.Sub(now)):
-	case <-ctx.Done():
-		return
-	}
-
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
