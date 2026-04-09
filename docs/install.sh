@@ -15,7 +15,7 @@ cd "${HOME:-/tmp}"
 # ── Pinned version (updated automatically on release) ─────────────────────────
 # _STARNION_PINNED is the auto-bumped default; STARNION_VERSION env var overrides it.
 # Using a separate variable prevents the assignment from clobbering an env override.
-_STARNION_PINNED="0.1.23"
+_STARNION_PINNED="0.1.24"
 STARNION_VERSION="${STARNION_VERSION:-$_STARNION_PINNED}"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
