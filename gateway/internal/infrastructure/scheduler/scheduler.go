@@ -211,12 +211,15 @@ type schedTime struct {
 
 type scheduleEntry struct {
 	Title      string    `json:"title"`
-	Type       string    `json:"type"`       // "recurring" | "once"
+	Type       string    `json:"type"`        // "recurring" | "once" | "one_time"
 	ReportType string    `json:"report_type"` // action discriminator
 	Schedule   schedTime `json:"schedule"`
-	Status     string    `json:"status"` // "active" | "paused"
+	Status     string    `json:"status"`      // "active" | "paused"
 	Message    string    `json:"message"`
 	LastSent   string    `json:"last_sent"`
+	TaskPrompt string    `json:"task_prompt,omitempty"` // NL task for AI agent execution
+	DeliverTo  string    `json:"deliver_to,omitempty"`  // "telegram" or ""
+	LastOutput string    `json:"last_output,omitempty"` // last execution output snippet
 }
 
 // reportTypeSet contains the report_type values that should trigger report generation.
@@ -329,7 +332,7 @@ func (s *Scheduler) executeUserSchedule(
 
 	// Mark executed: update last_sent; pause one-time schedules.
 	entry.LastSent = today
-	if entry.Type == "once" {
+	if entry.Type == "once" || entry.Type == "one_time" {
 		entry.Status = "paused"
 	}
 
@@ -940,15 +943,30 @@ func (s *Scheduler) runMaintenance(ctx context.Context, jobID, userID string) {
 }
 
 func matchDayOfWeek(dayName string, t time.Time) bool {
-	dayMap := map[string]time.Weekday{
-		"sunday": time.Sunday, "monday": time.Monday, "tuesday": time.Tuesday,
-		"wednesday": time.Wednesday, "thursday": time.Thursday,
-		"friday": time.Friday, "saturday": time.Saturday,
+	switch strings.ToLower(dayName) {
+	case "sunday":
+		return t.Weekday() == time.Sunday
+	case "monday":
+		return t.Weekday() == time.Monday
+	case "tuesday":
+		return t.Weekday() == time.Tuesday
+	case "wednesday":
+		return t.Weekday() == time.Wednesday
+	case "thursday":
+		return t.Weekday() == time.Thursday
+	case "friday":
+		return t.Weekday() == time.Friday
+	case "saturday":
+		return t.Weekday() == time.Saturday
+	case "weekday":
+		wd := t.Weekday()
+		return wd >= time.Monday && wd <= time.Friday
+	case "weekend":
+		wd := t.Weekday()
+		return wd == time.Saturday || wd == time.Sunday
+	default:
+		return true // unknown value: always match (backward compat)
 	}
-	if wd, ok := dayMap[strings.ToLower(dayName)]; ok {
-		return t.Weekday() == wd
-	}
-	return true // unknown value: always match
 }
 
 // ── Cron Expression Parser ────────────────────────────────────────────────────
