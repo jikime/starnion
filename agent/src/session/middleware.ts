@@ -319,7 +319,10 @@ async function generateCompressionSummary(
 export class ContextCompressionMiddleware extends ChatMiddleware {
   readonly name = "ContextCompression";
 
-  private _compress = false;
+  // Per-session flag — keyed by sessionId to prevent concurrent-request interference.
+  // Using a singleton-level instance variable would cause request A to clear the flag
+  // before request B's afterComplete runs (Node.js single-thread but async gaps).
+  private _compressSessions = new Set<string>();
 
   override async onEvent(
     ctx: ChatContext,
@@ -330,7 +333,7 @@ export class ContextCompressionMiddleware extends ChatMiddleware {
       if (usage && usage.contextWindow > 0 && usage.tokens != null) {
         const ratio = usage.tokens / usage.contextWindow;
         if (ratio >= COMPRESSION_THRESHOLD) {
-          this._compress = true;
+          this._compressSessions.add(ctx.sessionId);
           console.log(
             `[ContextCompression] Context at ${(ratio * 100).toFixed(1)}% — ` +
             `will reset session=${ctx.sessionId} after completion`,
@@ -343,8 +346,8 @@ export class ContextCompressionMiddleware extends ChatMiddleware {
   }
 
   override async afterComplete(ctx: ChatContext): Promise<void> {
-    if (!this._compress) return;
-    this._compress = false;
+    if (!this._compressSessions.has(ctx.sessionId)) return;
+    this._compressSessions.delete(ctx.sessionId);
 
     try {
       // 1. Read all conversation exchanges before clearing

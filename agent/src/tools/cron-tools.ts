@@ -188,7 +188,7 @@ function httpPost(url: string, body: unknown, headers: Record<string, string>): 
 
 // ── Tool factory ──────────────────────────────────────────────────────────────
 
-function makeCronCreateTool(userId: string): ToolDefinition<typeof cronCreateSchema, null> {
+function makeCronCreateTool(userId: string, timezone: string): ToolDefinition<typeof cronCreateSchema, null> {
   return {
     name: "cron_create",
     label: "Create Scheduled Task",
@@ -224,6 +224,7 @@ function makeCronCreateTool(userId: string): ToolDefinition<typeof cronCreateSch
           hour: sched.hour,
           minute: sched.minute,
           day_of_week: sched.day_of_week ?? "",
+          timezone,
         },
         deliver_to: deliver_to ?? "",
       };
@@ -275,8 +276,8 @@ function makeCronCreateTool(userId: string): ToolDefinition<typeof cronCreateSch
  * @param taskId - Unique session identifier: "{userId}:{sessionId}"
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function createCronTools(taskId: string): ToolDefinition<any, any>[] {
+export function createCronTools(taskId: string, timezone = "UTC"): ToolDefinition<any, any>[] {
   const colonIdx = taskId.indexOf(":");
   const userId = taskId.slice(0, colonIdx);
-  return [makeCronCreateTool(userId)];
+  return [makeCronCreateTool(userId, timezone)];
 }

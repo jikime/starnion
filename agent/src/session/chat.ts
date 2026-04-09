@@ -160,7 +160,7 @@ export async function handleChat(options: ChatOptions): Promise<void> {
       tools: [
         ...createExecTools(ctx.taskId, ctx.skillEnv ?? {}),
         ...createCheckpointTools(ctx.taskId),
-        ...createCronTools(ctx.taskId),
+        ...createCronTools(ctx.taskId, options.timezone),
         ...createSkillTools(options.disabledSkillIds),
         ...createSessionTools(userId),
         ...createDelegateTools(provider || "anthropic", apiKey, options.model),

@@ -442,6 +442,11 @@ func (h *CronHandler) UpdateUserSchedule(c echo.Context) error {
 	if req.DeliverTo != "" && req.DeliverTo != "telegram" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "deliver_to must be 'telegram' or empty"})
 	}
+	if req.Schedule.Timezone != "" {
+		if _, err := time.LoadLocation(req.Schedule.Timezone); err != nil {
+			req.Schedule.Timezone = "UTC"
+		}
+	}
 	if req.Status != "" && req.Status != "active" && req.Status != "paused" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "status must be 'active' or 'paused'"})
 	}
