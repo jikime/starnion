@@ -68,7 +68,7 @@ func (p *Poller) Run(ctx context.Context) {
 		default:
 		}
 
-		updates, err := p.client.GetUpdates(offset, 30)
+		updates, err := p.client.GetUpdates(offset, 25)
 		if err != nil {
 			if IsPermanentError(err) {
 				p.logger.Error("getUpdates permanent error — stopping poller", zap.Error(err))

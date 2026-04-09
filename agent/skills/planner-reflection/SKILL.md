@@ -1,7 +1,7 @@
 ---
 name: python3 planner-reflection/scripts/planner_reflection.py
 display_name: 노트
-description: "Record notes in the Planner's '노트' section. Use for: 노트에 기록, 메모해줘, 노트 추가, 메모 저장, note, memo, reflection"
+description: "Record notes in the Planner's '노트' section. Use for: 노트, 노트에 기록, 메모, 메모해줘, 노트 저장, 노트 추가, note, memo"
 version: 1.0.0
 emoji: "💭"
 category: personal

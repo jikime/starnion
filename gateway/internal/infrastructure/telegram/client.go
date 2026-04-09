@@ -98,16 +98,24 @@ type Client struct {
 }
 
 func NewClient(token string) *Client {
-	// Shared transport enables TCP connection reuse across all Telegram API calls.
-	transport := &http.Transport{
+	// Short-lived requests (sendMessage, getMe, etc.) — 30 s hard timeout.
+	shortTransport := &http.Transport{
 		MaxIdleConns:        10,
 		MaxIdleConnsPerHost: 10,
 		IdleConnTimeout:     90 * time.Second,
 	}
+	// Long-poll transport is intentionally separate so that timed-out or
+	// reset connections from short-lived requests never contaminate the
+	// getUpdates connection pool (which must sustain ~30 s open connections).
+	longPollTransport := &http.Transport{
+		MaxIdleConns:        2,
+		MaxIdleConnsPerHost: 2,
+		IdleConnTimeout:     90 * time.Second,
+	}
 	return &Client{
 		token:          token,
-		httpClient:     &http.Client{Timeout: 30 * time.Second, Transport: transport},
-		longPollClient: &http.Client{Timeout: 60 * time.Second, Transport: transport},
+		httpClient:     &http.Client{Timeout: 30 * time.Second, Transport: shortTransport},
+		longPollClient: &http.Client{Timeout: 60 * time.Second, Transport: longPollTransport},
 	}
 }
 

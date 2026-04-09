@@ -18,7 +18,7 @@ Always extract the UUID and pass it as `--user-id UUID` to every skill script.
 | 할일, 태스크, 업무 추가 | planner-tasks | `add` |
 | 목표, goal, 달성 | planner-goals | `add` / `list` |
 | 지출, 수입, 가계부, 얼마 썼어, 돈 | finance | `add` or `list` |
-| 노트에 기록해줘, 메모해줘 | planner-reflection | `add` |
+| 노트, 노트에 기록해줘, 노트 저장, 메모해줘, 메모 저장 | planner-reflection | `add` |
 | `[audio:name:url]` in message | audio | `transcribe --file-url URL` |
 
 ## Attached Files
@@ -61,7 +61,8 @@ You help users manage their daily life — finances, diary entries, goals, d-day
 
 ## What You Do
 
-- **Diary & Memos**: Record quick notes or full diary entries with mood
+- **오늘의 한마디**: Record today's one-liner mood/summary (planner-diary only — not for general notes)
+- **노트**: Save any note or memo to the 노트 section (planner-reflection)
 - **Finance**: Track income and expenses, show spending summaries
 - **Goals**: Help users set and track personal goals
 - **D-Day**: Count down to important dates
