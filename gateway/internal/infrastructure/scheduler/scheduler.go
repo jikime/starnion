@@ -682,12 +682,12 @@ func (s *Scheduler) smartPatternInsight(ctx context.Context, userID string) (str
 // smartConversationAnalysis notifies when the user has been inactive for ≥3 days.
 // Sends at most once per 3 days (separate from inactive_reminder which covers 1 day).
 func (s *Scheduler) smartConversationAnalysis(ctx context.Context, userID string) (string, bool) {
-	// Already notified in the last 3 days?
+	// Already notified today?
 	var count int
 	s.db.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM notifications
 		 WHERE user_id = $1::uuid AND type = 'conversation_analysis'
-		   AND created_at >= NOW() - INTERVAL '3 days'`,
+		   AND created_at >= CURRENT_DATE`,
 		userID,
 	).Scan(&count)
 	if count > 0 {
@@ -724,7 +724,7 @@ func (s *Scheduler) smartConversationAnalysis(ctx context.Context, userID string
 	}
 
 	daysSince := int(time.Since(last).Hours() / 24)
-	if daysSince < 3 {
+	if daysSince < 1 {
 		return "", true
 	}
 	return fmt.Sprintf("%d일째 대화가 없네요. 오늘 하루 어떠셨는지 이야기해보세요.", daysSince), false
