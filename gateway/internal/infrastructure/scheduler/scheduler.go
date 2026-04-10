@@ -193,6 +193,9 @@ var builtinJobs = []systemJob{
 		notifType: "local_events"},
 	{id: "it_blog_digest", cronExpr: "0 18 * * *", actionType: "smart_notify",
 		notifType: "it_blog_digest"},
+	// Level 3c: Tavily Search API
+	{id: "tavily_it_news", cronExpr: "30 8 * * *", actionType: "smart_notify",
+		notifType: "tavily_it_news"},
 	// Level 5: Maintenance
 	{id: "memory_compaction", cronExpr: "0 5 * * 1", actionType: "maintenance"},
 }
@@ -565,6 +568,8 @@ func (s *Scheduler) computeSmartNotify(ctx context.Context, userID, jobID string
 		return s.smartLocalEvents(ctx, userID)
 	case "it_blog_digest":
 		return s.smartItBlogDigest(ctx, userID)
+	case "tavily_it_news":
+		return s.smartTavilyItNews(ctx, userID)
 	default:
 		return "", true
 	}
@@ -1656,6 +1661,128 @@ func (s *Scheduler) smartItBlogDigest(ctx context.Context, userID string) (strin
 			break
 		}
 		lines = append(lines, fmt.Sprintf("%d. %s", i+1, stripHTML(item.Title)))
+	}
+	return strings.Join(lines, "\n"), false
+}
+
+// ── Tavily IT News Job ────────────────────────────────────────────────────────
+
+// tavilyAPIKey returns the user's Tavily API key from integration_keys (decrypted).
+// Returns "" when not configured.
+func (s *Scheduler) tavilyAPIKey(ctx context.Context, userID string) string {
+	var raw string
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT api_key FROM integration_keys WHERE user_id = $1::uuid AND provider = 'tavily' LIMIT 1`,
+		userID,
+	).Scan(&raw); err != nil || raw == "" {
+		return ""
+	}
+	if s.encryptionKey != "" {
+		if dec, err := crypto.Decrypt(raw, s.encryptionKey); err == nil && dec != "" {
+			return dec
+		}
+	}
+	return raw
+}
+
+// itNewsQueryForTimezone returns a localised "latest IT news" query string and
+// a human-readable header based on the user's IANA timezone.
+func itNewsQueryForTimezone(tz string) (query, header string) {
+	region := strings.SplitN(tz, "/", 2)[0]
+	city := ""
+	if parts := strings.SplitN(tz, "/", 2); len(parts) == 2 {
+		city = strings.ToLower(parts[1])
+	}
+	switch {
+	case region == "Asia" && (strings.Contains(city, "seoul") || strings.Contains(city, "pyongyang")):
+		return "최신 IT 기술 뉴스", "[오늘의 IT 뉴스]"
+	case region == "Asia" && strings.Contains(city, "tokyo"):
+		return "最新IT技術ニュース", "[今日のITニュース]"
+	case region == "Asia" && (strings.Contains(city, "shanghai") || strings.Contains(city, "hong_kong") || strings.Contains(city, "taipei") || strings.Contains(city, "chongqing")):
+		return "最新IT技术新闻", "[今日IT新闻]"
+	default:
+		return "latest IT technology news today", "[Today's IT News]"
+	}
+}
+
+// smartTavilyItNews fetches today's top IT news via Tavily Search API (매일 오전 8시 30분).
+// Skips if the user has no Tavily API key configured. Sends at most once per day.
+func (s *Scheduler) smartTavilyItNews(ctx context.Context, userID string) (string, bool) {
+	apiKey := s.tavilyAPIKey(ctx, userID)
+	if apiKey == "" {
+		return "", true // no key configured → skip silently
+	}
+
+	// Dedup: at most once per day
+	var count int
+	s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM notifications
+		 WHERE user_id = $1::uuid AND type = 'tavily_it_news'
+		   AND created_at >= CURRENT_DATE`,
+		userID,
+	).Scan(&count)
+	if count > 0 {
+		return "", true
+	}
+
+	// Determine query language from user's timezone
+	var tz string
+	s.db.QueryRowContext(ctx,
+		`SELECT COALESCE(preferences->>'timezone', 'Asia/Seoul') FROM users WHERE id = $1::uuid`,
+		userID,
+	).Scan(&tz)
+	query, header := itNewsQueryForTimezone(tz)
+
+	// Call Tavily
+	payload := map[string]any{
+		"query":          query,
+		"max_results":    5,
+		"search_depth":   "basic",
+		"topic":          "news",
+		"time_range":     "day",
+		"include_answer": false,
+	}
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.tavily.com/search", strings.NewReader(string(body)))
+	if err != nil {
+		s.logger.Warn("scheduler: tavily it news request failed", zap.Error(err))
+		return "", true
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		s.logger.Warn("scheduler: tavily it news request failed", zap.Error(err))
+		return "", true
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		s.logger.Warn("scheduler: tavily it news HTTP error", zap.Int("status", resp.StatusCode))
+		return "", true
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", true
+	}
+	var result struct {
+		Results []struct {
+			Title   string `json:"title"`
+			URL     string `json:"url"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil || len(result.Results) == 0 {
+		return "", true
+	}
+
+	lines := []string{header}
+	for i, r := range result.Results {
+		if i >= 5 {
+			break
+		}
+		lines = append(lines, fmt.Sprintf("%d. %s", i+1, r.Title))
 	}
 	return strings.Join(lines, "\n"), false
 }

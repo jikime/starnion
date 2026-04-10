@@ -1,7 +1,7 @@
 ---
 name: websearch
-display_name: 웹 검색
-description: "Search the internet for up-to-date information and fetch web page content. Use for: 검색해줘, 찾아줘, 최신 정보, 인터넷 검색, 뉴스, 요즘, web search, latest news, current information"
+display_name: Tavily 검색
+description: "Search the internet for up-to-date information and fetch web page content via Tavily. Use for: 검색해줘, 찾아줘, 최신 정보, 인터넷 검색, 뉴스, 요즘, web search, latest news, current information"
 version: 1.0.0
 emoji: "🔍"
 category: search
@@ -42,7 +42,7 @@ triggers:
     - Korea-specific searches where Naver would be better (use naver-search skill)
 ---
 
-# 웹 검색 (websearch)
+# Tavily 검색 (websearch)
 
 Always pass `--user-id {user_id}`.
 

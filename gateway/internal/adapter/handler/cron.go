@@ -104,6 +104,14 @@ func humanizeCron(expr string) string {
 			return "매일 " + cronHourKR(h)
 		}
 	}
+	// M H * * * — daily at H:M
+	if domF == "*" && dowF == "*" {
+		if h, errH := strconv.Atoi(hourF); errH == nil {
+			if m, errM := strconv.Atoi(minF); errM == nil {
+				return fmt.Sprintf("매일 %s %d분", cronHourKR(h), m)
+			}
+		}
+	}
 	return expr
 }
 
@@ -162,6 +170,8 @@ var builtinSystemJobs = []systemJobResponse{
 	{ID: "daily_news", Name: "오늘의 뉴스", Description: "네이버 검색으로 오늘의 주요 뉴스를 전송합니다", Schedule: "0 7 * * *", Level: "external", Enabled: true, CanDisable: true},
 	{ID: "local_events", Name: "오늘의 지역 이벤트", Description: "네이버 지역 검색으로 오늘의 이벤트/행사를 전송합니다", Schedule: "0 12 * * *", Level: "external", Enabled: true, CanDisable: true},
 	{ID: "it_blog_digest", Name: "IT 블로그 다이제스트", Description: "네이버 블로그 검색으로 오늘의 IT 관련 글을 전송합니다", Schedule: "0 18 * * *", Level: "external", Enabled: true, CanDisable: true},
+	// Level 3c: Tavily Search API
+	{ID: "tavily_it_news", Name: "Tavily IT 뉴스", Description: "Tavily 검색으로 오늘의 최신 IT 뉴스를 타임존 언어에 맞춰 전송합니다", Schedule: "30 8 * * *", Level: "external", Enabled: true, CanDisable: true},
 	// Level 4: Runner
 	{ID: "user_schedules", Name: "사용자 일정 실행기", Description: "15분마다 사용자 생성 일정을 확인하고 실행합니다", Schedule: "*/15 * * * *", Level: "runner", Enabled: true},
 	// Level 5: Maintenance
