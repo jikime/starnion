@@ -34,14 +34,20 @@ func NewTelegramNotifier(db *database.DB, encryptionKey string, logger *zap.Logg
 func (n *TelegramNotifier) Platform() string { return "telegram" }
 
 func (n *TelegramNotifier) Send(ctx context.Context, userID, _ /*notifType*/, message string) error {
-	// 1. Resolve Telegram chat_id from platform_identities.
+	// 1. Resolve Telegram chat_id.
+	// Primary source: platform_identities (populated by ApprovePairing flow).
+	// Fallback: users.telegram_id (populated by LinkTelegram / LinkTelegramByCode flows).
 	var platformID string
-	if err := n.db.QueryRowContext(ctx,
-		`SELECT platform_id FROM platform_identities
-		 WHERE user_id = $1::uuid AND platform = 'telegram'
-		 LIMIT 1`,
+	n.db.QueryRowContext(ctx,
+		`SELECT COALESCE(
+		     (SELECT platform_id FROM platform_identities
+		      WHERE user_id = $1::uuid AND platform = 'telegram' LIMIT 1),
+		     (SELECT telegram_id::text FROM users
+		      WHERE id = $1::uuid AND telegram_id IS NOT NULL LIMIT 1)
+		 )`,
 		userID,
-	).Scan(&platformID); err != nil {
+	).Scan(&platformID)
+	if platformID == "" {
 		// User has not linked Telegram — skip silently.
 		return nil
 	}

@@ -158,6 +158,12 @@ func New(logger *zap.Logger) (*Server, error) {
 		notification.NewTelegramNotifier(db, cfg.EncryptionKey, logger),
 	)
 	notifyFn := func(ctx context.Context, userID, notifType, message string) error {
+		// Persist to notifications table so dedup checks in smart_notify jobs work.
+		db.ExecContext(ctx,
+			`INSERT INTO notifications (user_id, type, message)
+			 VALUES ($1::uuid, $2, $3)`,
+			userID, notifType, message,
+		)
 		return dispatcher.Dispatch(ctx, userID, notifType, message)
 	}
 
