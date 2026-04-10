@@ -17,7 +17,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +48,9 @@ type Scheduler struct {
 	reportFn ReportFunc
 	notifyFn NotifyFunc
 	wakeC    chan struct{} // buffered(1): signals schedule list changed
+
+	naverClientID     string
+	naverClientSecret string
 }
 
 // New creates a Scheduler. Call Start to begin execution.
@@ -56,6 +62,13 @@ func New(db *database.DB, logger *zap.Logger, rf ReportFunc, nf NotifyFunc) *Sch
 		notifyFn: nf,
 		wakeC:    make(chan struct{}, 1),
 	}
+}
+
+// SetNaverCredentials configures the Naver Search API credentials used by
+// daily_news, local_events, and it_blog_digest jobs.
+func (s *Scheduler) SetNaverCredentials(clientID, clientSecret string) {
+	s.naverClientID = clientID
+	s.naverClientSecret = clientSecret
 }
 
 // Wake signals the scheduler to reload schedules and re-arm the user timer.
@@ -163,6 +176,13 @@ var builtinJobs = []systemJob{
 		notifType: "pattern_insight"},
 	{id: "conversation_analysis", cronExpr: "0 10 * * *", actionType: "smart_notify",
 		notifType: "conversation_analysis"},
+	// Level 3: External Content (Naver Search API)
+	{id: "daily_news", cronExpr: "0 7 * * *", actionType: "smart_notify",
+		notifType: "daily_news"},
+	{id: "local_events", cronExpr: "0 12 * * *", actionType: "smart_notify",
+		notifType: "local_events"},
+	{id: "it_blog_digest", cronExpr: "0 18 * * *", actionType: "smart_notify",
+		notifType: "it_blog_digest"},
 	// Level 5: Maintenance
 	{id: "memory_compaction", cronExpr: "0 5 * * 1", actionType: "maintenance"},
 }
@@ -491,6 +511,12 @@ func (s *Scheduler) computeSmartNotify(ctx context.Context, userID, jobID string
 		return s.smartConversationAnalysis(ctx, userID)
 	case "anomaly_insights":
 		return s.smartAnomalyInsights(ctx, userID)
+	case "daily_news":
+		return s.smartDailyNews(ctx, userID)
+	case "local_events":
+		return s.smartLocalEvents(ctx, userID)
+	case "it_blog_digest":
+		return s.smartItBlogDigest(ctx, userID)
 	default:
 		return "", true
 	}
@@ -1217,6 +1243,173 @@ func (s *Scheduler) smartAnomalyInsights(ctx context.Context, userID string) (st
 		sb.WriteByte('\n')
 	}
 	return strings.TrimRight(sb.String(), "\n"), false
+}
+
+// ── Naver Search Jobs ─────────────────────────────────────────────────────────
+
+// naverSearchItem mirrors the Naver Search API response item.
+type naverSearchItem struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Link        string `json:"link"`
+}
+
+// naverSearch calls the Naver Search API (news, blog, local, …) and returns up to
+// `display` items. Returns an error when credentials are not configured.
+func (s *Scheduler) naverSearch(ctx context.Context, apiType, query string, display int) ([]naverSearchItem, error) {
+	if s.naverClientID == "" || s.naverClientSecret == "" {
+		return nil, fmt.Errorf("naver search credentials not configured")
+	}
+	apiURL := fmt.Sprintf(
+		"https://openapi.naver.com/v1/search/%s.json?query=%s&display=%d&sort=date",
+		apiType, url.QueryEscape(query), display,
+	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-Naver-Client-Id", s.naverClientID)
+	req.Header.Set("X-Naver-Client-Secret", s.naverClientSecret)
+
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("naver search: HTTP %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var result struct {
+		Items []naverSearchItem `json:"items"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+	return result.Items, nil
+}
+
+// stripHTML removes HTML tags from Naver Search API title/description strings.
+func stripHTML(s string) string {
+	var b strings.Builder
+	inTag := false
+	for _, r := range s {
+		switch {
+		case r == '<':
+			inTag = true
+		case r == '>':
+			inTag = false
+		case !inTag:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// smartDailyNews fetches today's top news via Naver Search API (매일 오전 7시).
+// Sends at most once per day.
+func (s *Scheduler) smartDailyNews(ctx context.Context, userID string) (string, bool) {
+	var count int
+	s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM notifications
+		 WHERE user_id = $1::uuid AND type = 'daily_news'
+		   AND created_at >= CURRENT_DATE`,
+		userID,
+	).Scan(&count)
+	if count > 0 {
+		return "", true
+	}
+
+	items, err := s.naverSearch(ctx, "news", "오늘 주요 뉴스", 5)
+	if err != nil {
+		s.logger.Warn("scheduler: naver news search failed", zap.Error(err))
+		return "", true
+	}
+	if len(items) == 0 {
+		return "", true
+	}
+
+	var lines []string
+	lines = append(lines, "[오늘의 뉴스]")
+	for i, item := range items {
+		if i >= 5 {
+			break
+		}
+		lines = append(lines, fmt.Sprintf("%d. %s", i+1, stripHTML(item.Title)))
+	}
+	return strings.Join(lines, "\n"), false
+}
+
+// smartLocalEvents fetches today's local events/activities via Naver local search (매일 오후 12시).
+// Sends at most once per day.
+func (s *Scheduler) smartLocalEvents(ctx context.Context, userID string) (string, bool) {
+	var count int
+	s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM notifications
+		 WHERE user_id = $1::uuid AND type = 'local_events'
+		   AND created_at >= CURRENT_DATE`,
+		userID,
+	).Scan(&count)
+	if count > 0 {
+		return "", true
+	}
+
+	items, err := s.naverSearch(ctx, "local", "오늘 이벤트 행사", 5)
+	if err != nil {
+		s.logger.Warn("scheduler: naver local search failed", zap.Error(err))
+		return "", true
+	}
+	if len(items) == 0 {
+		return "", true
+	}
+
+	var lines []string
+	lines = append(lines, "[오늘의 지역 이벤트]")
+	for i, item := range items {
+		if i >= 5 {
+			break
+		}
+		lines = append(lines, fmt.Sprintf("%d. %s", i+1, stripHTML(item.Title)))
+	}
+	return strings.Join(lines, "\n"), false
+}
+
+// smartItBlogDigest fetches today's IT blog posts via Naver blog search (매일 오후 6시).
+// Sends at most once per day.
+func (s *Scheduler) smartItBlogDigest(ctx context.Context, userID string) (string, bool) {
+	var count int
+	s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM notifications
+		 WHERE user_id = $1::uuid AND type = 'it_blog_digest'
+		   AND created_at >= CURRENT_DATE`,
+		userID,
+	).Scan(&count)
+	if count > 0 {
+		return "", true
+	}
+
+	items, err := s.naverSearch(ctx, "blog", "IT 기술 트렌드", 5)
+	if err != nil {
+		s.logger.Warn("scheduler: naver blog search failed", zap.Error(err))
+		return "", true
+	}
+	if len(items) == 0 {
+		return "", true
+	}
+
+	var lines []string
+	lines = append(lines, "[오늘의 IT 블로그]")
+	for i, item := range items {
+		if i >= 5 {
+			break
+		}
+		lines = append(lines, fmt.Sprintf("%d. %s", i+1, stripHTML(item.Title)))
+	}
+	return strings.Join(lines, "\n"), false
 }
 
 // formatKRW formats an integer as a comma-separated Korean Won amount (e.g. 1,234,567).

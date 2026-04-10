@@ -3,7 +3,9 @@ package handler
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,13 +48,97 @@ func (h *CronHandler) wake() {
 // ── System Jobs ────────────────────────────────────────────────────────────────
 
 type systemJobResponse struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Schedule    string `json:"schedule"`
-	Level       string `json:"level"`
-	Enabled     bool   `json:"enabled"`
-	CanDisable  bool   `json:"can_disable"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	Schedule      string `json:"schedule"`
+	HumanSchedule string `json:"human_schedule"`
+	Level         string `json:"level"`
+	Enabled       bool   `json:"enabled"`
+	CanDisable    bool   `json:"can_disable"`
+}
+
+// humanizeCron converts a 5-field cron expression to a Korean human-readable string.
+// Examples:
+//
+//	"0 7 * * *"   → "매일 오전 7시"
+//	"0 21 * * *"  → "매일 오후 9시"
+//	"0 20 * * 0"  → "매주 일요일 오후 8시"
+//	"0 21 1 * *"  → "매월 1일 오후 9시"
+//	"0 */3 * * *" → "3시간마다"
+//	"*/15 * * * *"→ "15분마다"
+func humanizeCron(expr string) string {
+	parts := strings.Fields(expr)
+	if len(parts) != 5 {
+		return expr
+	}
+	minF, hourF, domF, _, dowF := parts[0], parts[1], parts[2], parts[3], parts[4]
+
+	// */N * * * * — every N minutes
+	if strings.HasPrefix(minF, "*/") && hourF == "*" && domF == "*" && dowF == "*" {
+		return strings.TrimPrefix(minF, "*/") + "분마다"
+	}
+	// 0 */N * * * — every N hours
+	if minF == "0" && strings.HasPrefix(hourF, "*/") && domF == "*" && dowF == "*" {
+		return strings.TrimPrefix(hourF, "*/") + "시간마다"
+	}
+	// 0 H * * DOW — weekly on specific day
+	if minF == "0" && domF == "*" && dowF != "*" {
+		if h, errH := strconv.Atoi(hourF); errH == nil {
+			if d, errD := strconv.Atoi(dowF); errD == nil {
+				return "매주 " + cronWeekdayKR(d) + " " + cronHourKR(h)
+			}
+		}
+	}
+	// 0 H D * * — monthly on day D
+	if minF == "0" && dowF == "*" && domF != "*" {
+		if h, errH := strconv.Atoi(hourF); errH == nil {
+			if d, errD := strconv.Atoi(domF); errD == nil {
+				return fmt.Sprintf("매월 %d일 %s", d, cronHourKR(h))
+			}
+		}
+	}
+	// 0 H * * * — daily at H
+	if minF == "0" && domF == "*" && dowF == "*" {
+		if h, errH := strconv.Atoi(hourF); errH == nil {
+			return "매일 " + cronHourKR(h)
+		}
+	}
+	return expr
+}
+
+func cronHourKR(h int) string {
+	switch {
+	case h == 0:
+		return "오전 12시"
+	case h < 12:
+		return fmt.Sprintf("오전 %d시", h)
+	case h == 12:
+		return "오후 12시"
+	default:
+		return fmt.Sprintf("오후 %d시", h-12)
+	}
+}
+
+func cronWeekdayKR(d int) string {
+	switch d {
+	case 0:
+		return "일요일"
+	case 1:
+		return "월요일"
+	case 2:
+		return "화요일"
+	case 3:
+		return "수요일"
+	case 4:
+		return "목요일"
+	case 5:
+		return "금요일"
+	case 6:
+		return "토요일"
+	default:
+		return strconv.Itoa(d) + "요일"
+	}
 }
 
 var builtinSystemJobs = []systemJobResponse{
@@ -70,6 +156,10 @@ var builtinSystemJobs = []systemJobResponse{
 	{ID: "pattern_analysis", Name: "소비 패턴 분석", Description: "카테고리 지출 증가 패턴을 분석합니다", Schedule: "0 6 * * *", Level: "pattern", Enabled: true, CanDisable: true},
 	{ID: "pattern_insight", Name: "주간 인사이트", Description: "지출·노트·목표를 종합한 주간 인사이트를 전송합니다", Schedule: "0 14 * * *", Level: "pattern", Enabled: true, CanDisable: true},
 	{ID: "conversation_analysis", Name: "재방문 유도", Description: "3일 이상 대화가 없을 때 텔레그램으로 알림을 보냅니다", Schedule: "0 10 * * *", Level: "pattern", Enabled: true, CanDisable: true},
+	// Level 3: External Content (Naver Search API)
+	{ID: "daily_news", Name: "오늘의 뉴스", Description: "네이버 검색으로 오늘의 주요 뉴스를 전송합니다", Schedule: "0 7 * * *", Level: "external", Enabled: true, CanDisable: true},
+	{ID: "local_events", Name: "오늘의 지역 이벤트", Description: "네이버 지역 검색으로 오늘의 이벤트/행사를 전송합니다", Schedule: "0 12 * * *", Level: "external", Enabled: true, CanDisable: true},
+	{ID: "it_blog_digest", Name: "IT 블로그 다이제스트", Description: "네이버 블로그 검색으로 오늘의 IT 관련 글을 전송합니다", Schedule: "0 18 * * *", Level: "external", Enabled: true, CanDisable: true},
 	// Level 4: Runner
 	{ID: "user_schedules", Name: "사용자 일정 실행기", Description: "15분마다 사용자 생성 일정을 확인하고 실행합니다", Schedule: "*/15 * * * *", Level: "runner", Enabled: true},
 	// Level 5: Maintenance
@@ -96,6 +186,7 @@ func (h *CronHandler) ListSystemJobs(c echo.Context) error {
 	result := make([]systemJobResponse, len(builtinSystemJobs))
 	for i, job := range builtinSystemJobs {
 		result[i] = job
+		result[i].HumanSchedule = humanizeCron(job.Schedule)
 		if job.CanDisable {
 			result[i].Enabled = !isJobDisabled(prefs, job.ID)
 		}

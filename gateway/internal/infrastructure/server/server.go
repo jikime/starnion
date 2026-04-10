@@ -168,6 +168,7 @@ func New(logger *zap.Logger) (*Server, error) {
 	}
 
 	sched := scheduler.New(db, logger, reportFn, notifyFn)
+	sched.SetNaverCredentials(cfg.NaverSearchClientID, cfg.NaverSearchClientSecret)
 	h.SetScheduler(sched) // wire scheduler → cron handler for immediate timer re-arm
 
 	return &Server{

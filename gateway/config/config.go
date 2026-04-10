@@ -67,6 +67,10 @@ type Config struct {
 	GoogleClientSecret string
 	GoogleRedirectURL  string
 
+	// Naver Search API
+	NaverSearchClientID     string
+	NaverSearchClientSecret string
+
 	// Model defaults — per-use-case fallback when user has no model_assignment.
 	ModelDefaults ModelDefaults
 }
@@ -114,6 +118,10 @@ type starnionYAML struct {
 		ClientSecret string `yaml:"client_secret"`
 		RedirectURI  string `yaml:"redirect_uri"`
 	} `yaml:"google"`
+	Naver struct {
+		SearchClientID     string `yaml:"search_client_id"`
+		SearchClientSecret string `yaml:"search_client_secret"`
+	} `yaml:"naver"`
 	Cors struct {
 		AllowedOrigins []string `yaml:"allowed_origins"`
 	} `yaml:"cors"`
@@ -175,9 +183,11 @@ func Load() *Config {
 		MinioBucket:        getEnv("MINIO_BUCKET", "starnion-files"),
 		MinioPublicURL:     getEnv("MINIO_PUBLIC_URL", ""),
 		MinioUseSSL:        getEnv("MINIO_USE_SSL", "false") == "true",
-		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
-		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
-		GoogleRedirectURL:  getEnv("GOOGLE_REDIRECT_URL", ""),
+		GoogleClientID:          getEnv("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret:      getEnv("GOOGLE_CLIENT_SECRET", ""),
+		GoogleRedirectURL:       getEnv("GOOGLE_REDIRECT_URL", ""),
+		NaverSearchClientID:     getEnv("NAVER_SEARCH_CLIENT_ID", ""),
+		NaverSearchClientSecret: getEnv("NAVER_SEARCH_CLIENT_SECRET", ""),
 		// Model defaults — built-in fallbacks (can be overridden by starnion.yaml).
 		ModelDefaults: ModelDefaults{
 			Chat:    "claude-sonnet-4-5",
@@ -286,6 +296,12 @@ func Load() *Config {
 		}
 		if cfg.GoogleRedirectURL == "" && y.Google.RedirectURI != "" {
 			cfg.GoogleRedirectURL = y.Google.RedirectURI
+		}
+		if cfg.NaverSearchClientID == "" && y.Naver.SearchClientID != "" {
+			cfg.NaverSearchClientID = y.Naver.SearchClientID
+		}
+		if cfg.NaverSearchClientSecret == "" && y.Naver.SearchClientSecret != "" {
+			cfg.NaverSearchClientSecret = y.Naver.SearchClientSecret
 		}
 		if len(cfg.AllowedOrigins) == 0 && len(y.Cors.AllowedOrigins) > 0 {
 			cfg.AllowedOrigins = y.Cors.AllowedOrigins
