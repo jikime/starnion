@@ -1695,18 +1695,59 @@ func (s *Scheduler) tavilyAPIKey(ctx context.Context, userID string) string {
 // itNewsQueryForTimezone returns a localised "latest IT news" query string and
 // a human-readable header based on the user's IANA timezone.
 func itNewsQueryForTimezone(tz string) (query, header string) {
-	region := strings.SplitN(tz, "/", 2)[0]
-	city := ""
-	if parts := strings.SplitN(tz, "/", 2); len(parts) == 2 {
-		city = strings.ToLower(parts[1])
-	}
-	switch {
-	case region == "Asia" && (strings.Contains(city, "seoul") || strings.Contains(city, "pyongyang")):
+	switch tz {
+	// Korean
+	case "Asia/Seoul", "Asia/Pyongyang":
 		return "최신 IT 기술 뉴스", "[오늘의 IT 뉴스]"
-	case region == "Asia" && strings.Contains(city, "tokyo"):
+	// Japanese
+	case "Asia/Tokyo":
 		return "最新IT技術ニュース", "[今日のITニュース]"
-	case region == "Asia" && (strings.Contains(city, "shanghai") || strings.Contains(city, "hong_kong") || strings.Contains(city, "taipei") || strings.Contains(city, "chongqing")):
+	// Chinese
+	case "Asia/Shanghai", "Asia/Hong_Kong", "Asia/Taipei",
+		"Asia/Macau", "Asia/Urumqi", "Asia/Chongqing",
+		"Asia/Harbin", "Asia/Kashgar":
 		return "最新IT技术新闻", "[今日IT新闻]"
+	// Vietnamese
+	case "Asia/Ho_Chi_Minh", "Asia/Hanoi":
+		return "tin tức IT mới nhất hôm nay", "[Tin tức IT hôm nay]"
+	// Thai
+	case "Asia/Bangkok":
+		return "ข่าวไอทีล่าสุดวันนี้", "[ข่าวไอทีวันนี้]"
+	// Indonesian
+	case "Asia/Jakarta", "Asia/Makassar", "Asia/Jayapura":
+		return "berita IT terbaru hari ini", "[Berita IT Hari Ini]"
+	// Malay
+	case "Asia/Kuala_Lumpur", "Asia/Singapore", "Asia/Brunei":
+		return "berita IT terkini hari ini", "[Berita IT Hari Ini]"
+	// Filipino
+	case "Asia/Manila":
+		return "pinakabagong balita sa IT ngayon", "[IT News Ngayon]"
+	// German
+	case "Europe/Berlin", "Europe/Vienna", "Europe/Zurich":
+		return "neueste IT-Nachrichten heute", "[IT-Nachrichten heute]"
+	// French
+	case "Europe/Paris", "Europe/Brussels", "Europe/Luxembourg":
+		return "dernières actualités IT aujourd'hui", "[Actualités IT du jour]"
+	// Spanish
+	case "Europe/Madrid", "America/Mexico_City", "America/Bogota",
+		"America/Lima", "America/Santiago", "America/Argentina/Buenos_Aires":
+		return "últimas noticias de tecnología hoy", "[Noticias IT de hoy]"
+	// Portuguese
+	case "Europe/Lisbon", "America/Sao_Paulo":
+		return "últimas notícias de tecnologia hoje", "[Notícias de TI hoje]"
+	// Russian
+	case "Europe/Moscow", "Asia/Yekaterinburg", "Asia/Novosibirsk",
+		"Asia/Krasnoyarsk", "Asia/Irkutsk", "Asia/Yakutsk",
+		"Asia/Vladivostok", "Asia/Kamchatka":
+		return "последние новости IT сегодня", "[IT-новости сегодня]"
+	// Arabic
+	case "Asia/Riyadh", "Asia/Kuwait", "Asia/Dubai", "Asia/Muscat",
+		"Asia/Qatar", "Asia/Bahrain", "Asia/Aden", "Africa/Cairo":
+		return "أحدث أخبار تكنولوجيا المعلومات اليوم", "[أخبار تقنية اليوم]"
+	// Turkish
+	case "Europe/Istanbul":
+		return "bugünün güncel BT haberleri", "[Bugünün BT Haberleri]"
+	// Default: English
 	default:
 		return "latest IT technology news today", "[Today's IT News]"
 	}
