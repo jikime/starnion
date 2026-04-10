@@ -145,7 +145,7 @@ var builtinJobs = []systemJob{
 	{id: "monthly_closing", cronExpr: "0 21 1 * *", actionType: "smart_notify",
 		notifType: "monthly_closing"},
 	{id: "inactive_reminder", cronExpr: "0 20 * * *", actionType: "notify",
-		notifType: "inactive_reminder", message: "오늘 하루 어떠셨나요? 일기를 작성해보세요."},
+		notifType: "inactive_reminder", message: "오늘 하루 어떠셨나요? 오늘의 한마디나 노트를 작성해보세요."},
 	{id: "budget_warning", cronExpr: "0 21 * * *", actionType: "notify",
 		notifType: "budget_warning", message: "오늘 예산 현황을 확인해보세요."},
 	// Level 2: Pattern-Learning
@@ -645,7 +645,7 @@ func (s *Scheduler) smartPatternInsight(ctx context.Context, userID string) (str
 		parts = append(parts, fmt.Sprintf("이번 주 지출 ₩%s", formatKRW(int64(weekSpend))))
 	}
 	if diaryCount > 0 {
-		parts = append(parts, fmt.Sprintf("일기 %d회 작성", diaryCount))
+		parts = append(parts, fmt.Sprintf("노트 %d회 작성", diaryCount))
 	}
 	if activeGoals > 0 {
 		parts = append(parts, fmt.Sprintf("진행 중인 목표 %d개", activeGoals))

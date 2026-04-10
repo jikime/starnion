@@ -60,7 +60,7 @@ var builtinSystemJobs = []systemJobResponse{
 	{ID: "daily_summary", Name: "오늘의 재정 요약", Description: "오늘 지출 내역을 카테고리별로 요약합니다", Schedule: "0 21 * * *", Level: "rule", Enabled: true, CanDisable: true},
 	{ID: "weekly_report", Name: "주간 플래너 리뷰", Description: "이번 주 목표 달성률과 지출 현황을 요약합니다", Schedule: "0 20 * * 0", Level: "rule", Enabled: true, CanDisable: true},
 	{ID: "monthly_closing", Name: "월간 재정 정산", Description: "전월 수입/지출 총정리 및 저축률을 알려드립니다", Schedule: "0 21 1 * *", Level: "rule", Enabled: true, CanDisable: true},
-	{ID: "inactive_reminder", Name: "일기 리마인더", Description: "오늘 하루를 기록해보세요. 일기 작성을 유도합니다", Schedule: "0 20 * * *", Level: "rule", Enabled: true, CanDisable: true},
+	{ID: "inactive_reminder", Name: "노트 리마인더", Description: "오늘 하루를 기록해보세요. 노트 작성을 유도합니다", Schedule: "0 20 * * *", Level: "rule", Enabled: true, CanDisable: true},
 	{ID: "budget_warning", Name: "예산 경고", Description: "예산 초과 임박 시 경고 알림을 전송합니다", Schedule: "0 21 * * *", Level: "rule", Enabled: true, CanDisable: true},
 	// Level 2: Pattern-Learning
 	{ID: "planner_task_reminder", Name: "오늘의 할 일", Description: "오늘 마감인 작업과 우선순위 A 태스크를 알려드립니다", Schedule: "0 9 * * *", Level: "pattern", Enabled: true, CanDisable: true},
@@ -68,7 +68,7 @@ var builtinSystemJobs = []systemJobResponse{
 	{ID: "spending_anomaly", Name: "이상 소비 감지", Description: "비정상적인 소비 패턴을 감지합니다", Schedule: "0 */3 * * *", Level: "pattern", Enabled: true, CanDisable: true},
 	{ID: "anomaly_insights", Name: "이상 지출 인사이트", Description: "다차원 지출 이상 신호를 종합 분석합니다", Schedule: "0 9 * * *", Level: "pattern", Enabled: true, CanDisable: true},
 	{ID: "pattern_analysis", Name: "소비 패턴 분석", Description: "카테고리 지출 증가 패턴을 분석합니다", Schedule: "0 6 * * *", Level: "pattern", Enabled: true, CanDisable: true},
-	{ID: "pattern_insight", Name: "주간 인사이트", Description: "지출·일기·목표를 종합한 주간 인사이트를 전송합니다", Schedule: "0 14 * * *", Level: "pattern", Enabled: true, CanDisable: true},
+	{ID: "pattern_insight", Name: "주간 인사이트", Description: "지출·노트·목표를 종합한 주간 인사이트를 전송합니다", Schedule: "0 14 * * *", Level: "pattern", Enabled: true, CanDisable: true},
 	{ID: "conversation_analysis", Name: "재방문 유도", Description: "3일 이상 대화가 없을 때 텔레그램으로 알림을 보냅니다", Schedule: "0 10 * * *", Level: "pattern", Enabled: true, CanDisable: true},
 	// Level 4: Runner
 	{ID: "user_schedules", Name: "사용자 일정 실행기", Description: "15분마다 사용자 생성 일정을 확인하고 실행합니다", Schedule: "*/15 * * * *", Level: "runner", Enabled: true},
