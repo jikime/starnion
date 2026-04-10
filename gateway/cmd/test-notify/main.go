@@ -173,6 +173,7 @@ func main() {
 	// ── Scheduler ─────────────────────────────────────────────────────────────
 	sched := scheduler.New(db, logger, reportFn, notifyFn)
 	sched.SetNaverCredentials(cfg.NaverSearchClientID, cfg.NaverSearchClientSecret)
+	sched.SetEncryptionKey(cfg.EncryptionKey)
 
 	// ── Job list ──────────────────────────────────────────────────────────────
 	jobs := allJobIDs

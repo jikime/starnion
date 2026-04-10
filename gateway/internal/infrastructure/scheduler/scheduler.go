@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/newstarnion/gateway/internal/crypto"
 	"github.com/newstarnion/gateway/internal/infrastructure/database"
 	"go.uber.org/zap"
 )
@@ -51,6 +52,7 @@ type Scheduler struct {
 
 	naverClientID     string
 	naverClientSecret string
+	encryptionKey     string
 }
 
 // New creates a Scheduler. Call Start to begin execution.
@@ -64,11 +66,16 @@ func New(db *database.DB, logger *zap.Logger, rf ReportFunc, nf NotifyFunc) *Sch
 	}
 }
 
-// SetNaverCredentials configures the Naver Search API credentials used by
-// daily_news, local_events, and it_blog_digest jobs.
+// SetNaverCredentials configures the global (server-level) Naver Search API credentials
+// used as fallback when a user has not set their own credentials in integration_keys.
 func (s *Scheduler) SetNaverCredentials(clientID, clientSecret string) {
 	s.naverClientID = clientID
 	s.naverClientSecret = clientSecret
+}
+
+// SetEncryptionKey sets the key used to decrypt API keys stored in integration_keys.
+func (s *Scheduler) SetEncryptionKey(key string) {
+	s.encryptionKey = key
 }
 
 // Wake signals the scheduler to reload schedules and re-arm the user timer.
@@ -1467,10 +1474,34 @@ type naverSearchItem struct {
 	Link        string `json:"link"`
 }
 
+// naverCredsForUser returns (clientID, clientSecret) for the given user.
+// Priority: per-user integration_keys (decrypted) → global server config.
+// Returns ("", "") when neither is configured.
+func (s *Scheduler) naverCredsForUser(ctx context.Context, userID string) (string, string) {
+	var raw string
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT api_key FROM integration_keys WHERE user_id = $1::uuid AND provider = 'naver_search' LIMIT 1`,
+		userID,
+	).Scan(&raw); err == nil && raw != "" {
+		plain := raw
+		if s.encryptionKey != "" {
+			if dec, err := crypto.Decrypt(raw, s.encryptionKey); err == nil && dec != "" {
+				plain = dec
+			}
+		}
+		if idx := strings.Index(plain, ":"); idx > 0 {
+			return plain[:idx], plain[idx+1:]
+		}
+		return plain, ""
+	}
+	// Fall back to global credentials (server-level config)
+	return s.naverClientID, s.naverClientSecret
+}
+
 // naverSearch calls the Naver Search API (news, blog, local, …) and returns up to
-// `display` items. Returns an error when credentials are not configured.
-func (s *Scheduler) naverSearch(ctx context.Context, apiType, query string, display int) ([]naverSearchItem, error) {
-	if s.naverClientID == "" || s.naverClientSecret == "" {
+// `display` items. clientID and clientSecret must be non-empty.
+func (s *Scheduler) naverSearch(ctx context.Context, clientID, clientSecret, apiType, query string, display int) ([]naverSearchItem, error) {
+	if clientID == "" || clientSecret == "" {
 		return nil, fmt.Errorf("naver search credentials not configured")
 	}
 	apiURL := fmt.Sprintf(
@@ -1481,8 +1512,8 @@ func (s *Scheduler) naverSearch(ctx context.Context, apiType, query string, disp
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-Naver-Client-Id", s.naverClientID)
-	req.Header.Set("X-Naver-Client-Secret", s.naverClientSecret)
+	req.Header.Set("X-Naver-Client-Id", clientID)
+	req.Header.Set("X-Naver-Client-Secret", clientSecret)
 
 	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 	if err != nil {
@@ -1537,7 +1568,8 @@ func (s *Scheduler) smartDailyNews(ctx context.Context, userID string) (string, 
 		return "", true
 	}
 
-	items, err := s.naverSearch(ctx, "news", "오늘 주요 뉴스", 5)
+	clientID, clientSecret := s.naverCredsForUser(ctx, userID)
+	items, err := s.naverSearch(ctx, clientID, clientSecret, "news", "오늘 주요 뉴스", 5)
 	if err != nil {
 		s.logger.Warn("scheduler: naver news search failed", zap.Error(err))
 		return "", true
@@ -1571,9 +1603,11 @@ func (s *Scheduler) smartLocalEvents(ctx context.Context, userID string) (string
 		return "", true
 	}
 
-	items, err := s.naverSearch(ctx, "local", "오늘 이벤트 행사", 5)
+	clientID, clientSecret := s.naverCredsForUser(ctx, userID)
+	// Naver local API searches businesses/places; use news API for event listings.
+	items, err := s.naverSearch(ctx, clientID, clientSecret, "news", "지역 이벤트 행사 축제", 5)
 	if err != nil {
-		s.logger.Warn("scheduler: naver local search failed", zap.Error(err))
+		s.logger.Warn("scheduler: naver local events search failed", zap.Error(err))
 		return "", true
 	}
 	if len(items) == 0 {
@@ -1605,7 +1639,8 @@ func (s *Scheduler) smartItBlogDigest(ctx context.Context, userID string) (strin
 		return "", true
 	}
 
-	items, err := s.naverSearch(ctx, "blog", "IT 기술 트렌드", 5)
+	clientID, clientSecret := s.naverCredsForUser(ctx, userID)
+	items, err := s.naverSearch(ctx, clientID, clientSecret, "blog", "IT 기술 트렌드", 5)
 	if err != nil {
 		s.logger.Warn("scheduler: naver blog search failed", zap.Error(err))
 		return "", true
