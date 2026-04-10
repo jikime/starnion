@@ -1084,6 +1084,7 @@
     "lastSent": "最終送信: {date}",
     "statusActive": "アクティブ",
     "statusInactive": "非アクティブ",
+    "triggerNow": "今すぐ実行",
     "backgroundOnly": "バックグラウンド",
     "statusPaused": "一時停止",
     "statusCompleted": "完了",
@@ -1159,6 +1160,9 @@
       "systemToggleActive": "システムジョブを有効にしました。",
       "systemToggleInactive": "システムジョブを無効にしました。",
       "systemToggleFailed": "システムジョブのステータス変更に失敗しました。",
+      "triggerSent": "送信完了: {name}",
+      "triggerSkipped": "送信するデータがありません（スキップ）。",
+      "triggerFailed": "即時実行に失敗しました。",
       "deleteSuccess": "\"{title}\"の通知が削除されました。",
       "deleteFailed": "通知の削除に失敗しました。"
     },
@@ -1739,7 +1743,29 @@
     },
     "defaultPersona": "デフォルトペルソナ",
     "toolsUnavailable": "ツール不可",
-    "charCount": "文字"
+    "charCount": "文字",
+    "systemPersonas": {
+      "default_assistant": {
+        "name": "デフォルトアシスタント",
+        "description": "すべての機能をサポートする汎用AIアシスタント"
+      },
+      "empathy_friend": {
+        "name": "こころの友",
+        "description": "感情を打ち明けられる温かい共感パートナー"
+      },
+      "life_coach": {
+        "name": "ライフコーチ",
+        "description": "目標達成と成長をサポートするモチベーションコーチ"
+      },
+      "finance_expert": {
+        "name": "金融専門家",
+        "description": "予算・支出・貯蓄戦略をサポートする財務アドバイザー"
+      },
+      "data_analyst": {
+        "name": "データアナリスト",
+        "description": "レポート・統計・パターンからインサイトを導き出す分析専門家"
+      }
+    }
   },
   "files": {
     "title": "マイファイル",

@@ -1108,11 +1108,111 @@ func listSkillPaths(skillsDir string) []string {
 	return paths
 }
 
+// skillI18n holds a translated display_name and short description for a skill.
+type skillI18n struct{ DisplayName, Description string }
+
+// skillTranslations[lang][skillID] — non-Korean translations for built-in skills.
+var skillTranslations = map[string]map[string]skillI18n{
+	"en": {
+		"analysis":          {DisplayName: "AI Analysis", Description: "Trigger AI insights: conversation analysis, spending patterns, memory compaction"},
+		"audio":             {DisplayName: "Audio / TTS", Description: "Speech-to-text transcription and text-to-speech generation"},
+		"browser":           {DisplayName: "Browser Control", Description: "Control Chrome browser — navigate, read content, click, screenshot"},
+		"budget":            {DisplayName: "Budget Manager", Description: "Set and check monthly spending budgets per category"},
+		"currency":          {DisplayName: "Currency Exchange", Description: "Get exchange rates and convert currency amounts"},
+		"documents":         {DisplayName: "Document Search & Creation", Description: "Search, read, save, and generate documents in the knowledge base"},
+		"files":             {DisplayName: "My Files", Description: "Manage, search, upload, and analyze all files — documents, images, audio"},
+		"finance":           {DisplayName: "Finance Ledger", Description: "Record and query income/expense transactions"},
+		"github":            {DisplayName: "GitHub Integration", Description: "Browse repositories, issues, PRs, and search code"},
+		"google-workspace":  {DisplayName: "Google Workspace", Description: "Calendar, Drive, Docs, Tasks, and Gmail integration"},
+		"image":             {DisplayName: "Image Analysis & Generation", Description: "Analyze images with AI or generate/edit images"},
+		"memory":            {DisplayName: "Memory Search", Description: "Search past conversations and personal records semantically"},
+		"naver-map":         {DisplayName: "Naver Maps", Description: "Geocode addresses and generate static map images (Korea)"},
+		"naver-search":      {DisplayName: "Naver Search", Description: "Search Korean web content — news, blogs, shopping, and more"},
+		"notion":            {DisplayName: "Notion Integration", Description: "Search, read, create, and update Notion pages and databases"},
+		"planner-diary":     {DisplayName: "Daily One-Liner", Description: "Record today's one-line summary and mood in Planner"},
+		"planner-goals":     {DisplayName: "Goal Management", Description: "Track long-term D-Day goals with due dates and roles"},
+		"planner-inbox":     {DisplayName: "Inbox", Description: "Capture quick ideas and promote them to daily tasks"},
+		"planner-mission":   {DisplayName: "Mission Statement", Description: "Set and view your personal mission statement"},
+		"planner-reflection":{DisplayName: "Notes", Description: "Record notes in the Planner's notes section"},
+		"planner-roles":     {DisplayName: "Role Management", Description: "Manage life roles with colors, key goals, and missions"},
+		"planner-tasks":     {DisplayName: "Task Management", Description: "Manage daily tasks with ABC priority levels"},
+		"planner-weekly":    {DisplayName: "Weekly Goals", Description: "Set and track weekly key goals per role"},
+		"weather":           {DisplayName: "Weather", Description: "Get current weather forecasts (no API key required)"},
+		"websearch":         {DisplayName: "Tavily Search", Description: "Search the internet for up-to-date information"},
+	},
+	"ja": {
+		"analysis":          {DisplayName: "AI分析", Description: "会話インサイト・支出パターン・メモリ最適化のAI分析"},
+		"audio":             {DisplayName: "音声変換 / TTS", Description: "音声ファイルのテキスト変換とテキスト読み上げ"},
+		"browser":           {DisplayName: "ブラウザ制御", Description: "Chromeブラウザを操作 — ナビゲート・コンテンツ読取・スクリーンショット"},
+		"budget":            {DisplayName: "予算管理", Description: "カテゴリ別の月次予算を設定・確認"},
+		"currency":          {DisplayName: "為替レート", Description: "為替レートの取得と通貨換算"},
+		"documents":         {DisplayName: "文書検索・生成", Description: "ナレッジベースの文書を検索・読込・保存・生成"},
+		"files":             {DisplayName: "マイファイル", Description: "文書・画像・音声ファイルを管理・検索・分析"},
+		"finance":           {DisplayName: "家計簿", Description: "収支取引を記録・照会"},
+		"github":            {DisplayName: "GitHub連携", Description: "リポジトリ・イシュー・PR・コード検索"},
+		"google-workspace":  {DisplayName: "Google Workspace", Description: "カレンダー・ドライブ・ドキュメント・タスク・Gmail連携"},
+		"image":             {DisplayName: "画像分析・生成", Description: "AIで画像を分析または生成・編集"},
+		"memory":            {DisplayName: "記憶検索", Description: "過去の会話や個人記録をセマンティック検索"},
+		"naver-map":         {DisplayName: "Naverマップ", Description: "住所の座標変換と静的地図画像生成（韓国）"},
+		"naver-search":      {DisplayName: "Naver検索", Description: "Naverで韓国語Webコンテンツを検索"},
+		"notion":            {DisplayName: "Notion連携", Description: "Notionページとデータベースの検索・作成・更新"},
+		"planner-diary":     {DisplayName: "今日のひとこと", Description: "今日のひとこと要約と気分を記録"},
+		"planner-goals":     {DisplayName: "目標管理", Description: "締め切り付きの長期D-Day目標を管理"},
+		"planner-inbox":     {DisplayName: "インボックス", Description: "アイデアをすばやくキャプチャして日次タスクに昇格"},
+		"planner-mission":   {DisplayName: "ミッションステートメント", Description: "個人のミッションステートメントを設定・閲覧"},
+		"planner-reflection":{DisplayName: "ノート", Description: "プランナーのノートセクションに記録"},
+		"planner-roles":     {DisplayName: "役割管理", Description: "色・目標・ミッションで人生の役割を管理"},
+		"planner-tasks":     {DisplayName: "タスク管理", Description: "ABC優先度で日次タスクを管理"},
+		"planner-weekly":    {DisplayName: "週次目標", Description: "役割ごとの週次重要目標を設定・追跡"},
+		"weather":           {DisplayName: "天気", Description: "現在の天気予報を取得（APIキー不要）"},
+		"websearch":         {DisplayName: "Tavily検索", Description: "最新情報のインターネット検索"},
+	},
+	"zh": {
+		"analysis":          {DisplayName: "AI分析", Description: "触发AI洞察：会话分析、消费模式、记忆压缩"},
+		"audio":             {DisplayName: "语音转换 / TTS", Description: "音频转文字和文字转语音"},
+		"browser":           {DisplayName: "浏览器控制", Description: "控制Chrome浏览器 — 导航、读取内容、截图"},
+		"budget":            {DisplayName: "预算管理", Description: "按类别设置和检查月度支出预算"},
+		"currency":          {DisplayName: "汇率换算", Description: "获取汇率并换算货币"},
+		"documents":         {DisplayName: "文档搜索与生成", Description: "搜索、读取、保存和生成知识库文档"},
+		"files":             {DisplayName: "我的文件", Description: "管理、搜索、上传和分析所有文件"},
+		"finance":           {DisplayName: "账本", Description: "记录和查询收支交易"},
+		"github":            {DisplayName: "GitHub集成", Description: "浏览仓库、问题、PR和搜索代码"},
+		"google-workspace":  {DisplayName: "Google Workspace", Description: "日历、云端硬盘、文档、任务和Gmail集成"},
+		"image":             {DisplayName: "图像分析与生成", Description: "用AI分析图像或生成/编辑图像"},
+		"memory":            {DisplayName: "记忆搜索", Description: "通过语义搜索查找过去的对话和个人记录"},
+		"naver-map":         {DisplayName: "Naver地图", Description: "地址坐标转换和生成静态地图图像（韩国）"},
+		"naver-search":      {DisplayName: "Naver搜索", Description: "搜索韩文网络内容"},
+		"notion":            {DisplayName: "Notion集成", Description: "搜索、读取、创建和更新Notion页面和数据库"},
+		"planner-diary":     {DisplayName: "今日一言", Description: "记录今日总结和心情"},
+		"planner-goals":     {DisplayName: "目标管理", Description: "管理带截止日期的长期D-Day目标"},
+		"planner-inbox":     {DisplayName: "收件箱", Description: "快速记录想法并转化为日常任务"},
+		"planner-mission":   {DisplayName: "使命宣言", Description: "设置和查看个人使命宣言"},
+		"planner-reflection":{DisplayName: "笔记", Description: "在计划员的笔记区域记录"},
+		"planner-roles":     {DisplayName: "角色管理", Description: "用颜色、目标和使命管理人生角色"},
+		"planner-tasks":     {DisplayName: "任务管理", Description: "用ABC优先级管理日常任务"},
+		"planner-weekly":    {DisplayName: "每周目标", Description: "按角色设置和追踪每周重要目标"},
+		"weather":           {DisplayName: "天气", Description: "获取当前天气预报（无需API密钥）"},
+		"websearch":         {DisplayName: "Tavily搜索", Description: "搜索最新信息"},
+	},
+}
+
 func (h *StubHandler) ListSkills(c echo.Context) error {
 	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
+
+	// Resolve display language: ?lang= param > user DB preference > "ko"
+	lang := c.QueryParam("lang")
+	if lang == "" {
+		h.db.QueryRowContext(c.Request().Context(),
+			`SELECT COALESCE(preferences->>'language', 'ko') FROM users WHERE id = $1`, userID,
+		).Scan(&lang) //nolint:errcheck
+	}
+	if lang == "" {
+		lang = "ko"
+	}
+	i18nMap := skillTranslations[lang] // nil for "ko" — use SKILL.md values as-is
 
 	skillsDir := h.config.SkillsDir
 	h.logger.Info("ListSkills called", zap.String("skillsDir", skillsDir))
@@ -1202,10 +1302,17 @@ func (h *StubHandler) ListSkills(c echo.Context) error {
 			enabled = sd.meta.EnabledByDefault
 		}
 
+		displayName := sd.meta.DisplayName
+		description := sd.meta.Description
+		if t, ok := i18nMap[sd.id]; ok {
+			displayName = t.DisplayName
+			description = t.Description
+		}
+
 		entry := map[string]any{
 			"id":               sd.id,
-			"display_name":     sd.meta.DisplayName,
-			"description":      sd.meta.Description,
+			"display_name":     displayName,
+			"description":      description,
 			"category":         sd.meta.Category,
 			"emoji":            sd.meta.Emoji,
 			"enabled":          enabled,

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, useMemo } from "react"
-import { useTranslations } from "next-intl"
+import { useTranslations, useLocale } from "next-intl"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -140,6 +140,7 @@ interface Persona {
   botName: string
   userName: string
   isDefault: boolean
+  systemKey?: string
 }
 
 interface ProviderData {
@@ -171,6 +172,7 @@ const CUSTOM_MODEL_VALUE = "__custom__"
 
 export function PersonasView() {
   const t = useTranslations("personas")
+  const locale = useLocale()
   const [personas, setPersonas] = useState<Persona[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -190,7 +192,7 @@ export function PersonasView() {
   const fetchPersonas = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/settings/personas", { cache: "no-store" })
+      const res = await fetch(`/api/settings/personas?lang=${locale}`, { cache: "no-store" })
       if (res.ok) {
         const data = await res.json()
         setPersonas(data.personas ?? [])
@@ -198,7 +200,7 @@ export function PersonasView() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [locale])
 
   const fetchProviders = useCallback(async () => {
     const res = await fetch("/api/settings/providers", { cache: "no-store" })
@@ -490,6 +492,12 @@ export function PersonasView() {
           {personas.map(p => {
             const provMeta = PROVIDER_META[p.provider]
             const toolsSupport = personaToolsSupportMap[p.id]
+            // System personas (seed data) are translated via i18n; user-created ones use DB values.
+            const sysT = p.systemKey
+              ? (t.raw(`systemPersonas.${p.systemKey}`) as { name: string; description: string } | undefined)
+              : undefined
+            const displayName = sysT?.name ?? p.name
+            const displayDesc = sysT?.description ?? p.description
             return (
               <div key={p.id} className={cn(
                 "rounded-xl border bg-card overflow-hidden",
@@ -509,11 +517,11 @@ export function PersonasView() {
                         {p.isDefault && (
                           <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400 shrink-0" />
                         )}
-                        <span className="truncate">{p.name}</span>
+                        <span className="truncate">{displayName}</span>
                       </p>
-                      {p.description && (
+                      {displayDesc && (
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                          {p.description}
+                          {displayDesc}
                         </p>
                       )}
                     </div>

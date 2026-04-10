@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -22,11 +23,18 @@ type ScheduleWaker interface {
 	Wake()
 }
 
+// JobTriggerer forces a single builtin job to fire immediately for a given user.
+// Implemented by *scheduler.Scheduler.
+type JobTriggerer interface {
+	TriggerJob(ctx context.Context, jobID, userID string) (msg string, sent bool, err error)
+}
+
 type CronHandler struct {
-	db     *database.DB
-	config *config.Config
-	logger *zap.Logger
-	sched  ScheduleWaker // optional; nil-safe
+	db        *database.DB
+	config    *config.Config
+	logger    *zap.Logger
+	sched     ScheduleWaker // optional; nil-safe
+	triggerer JobTriggerer  // optional; nil-safe
 }
 
 func NewCronHandler(db *database.DB, cfg *config.Config, logger *zap.Logger) *CronHandler {
@@ -37,6 +45,9 @@ func NewCronHandler(db *database.DB, cfg *config.Config, logger *zap.Logger) *Cr
 // create/update/delete operations immediately re-arm the user schedule timer.
 func (h *CronHandler) SetScheduler(w ScheduleWaker) {
 	h.sched = w
+	if jt, ok := w.(JobTriggerer); ok {
+		h.triggerer = jt
+	}
 }
 
 func (h *CronHandler) wake() {
@@ -58,16 +69,8 @@ type systemJobResponse struct {
 	CanDisable    bool   `json:"can_disable"`
 }
 
-// humanizeCron converts a 5-field cron expression to a Korean human-readable string.
-// Examples:
-//
-//	"0 7 * * *"   → "매일 오전 7시"
-//	"0 21 * * *"  → "매일 오후 9시"
-//	"0 20 * * 0"  → "매주 일요일 오후 8시"
-//	"0 21 1 * *"  → "매월 1일 오후 9시"
-//	"0 */3 * * *" → "3시간마다"
-//	"*/15 * * * *"→ "15분마다"
-func humanizeCron(expr string) string {
+// humanizeCronLang converts a cron expression to a human-readable string in the given language (ko/en/ja/zh).
+func humanizeCronLang(expr, lang string) string {
 	parts := strings.Fields(expr)
 	if len(parts) != 5 {
 		return expr
@@ -76,17 +79,46 @@ func humanizeCron(expr string) string {
 
 	// */N * * * * — every N minutes
 	if strings.HasPrefix(minF, "*/") && hourF == "*" && domF == "*" && dowF == "*" {
-		return strings.TrimPrefix(minF, "*/") + "분마다"
+		n := strings.TrimPrefix(minF, "*/")
+		switch lang {
+		case "en":
+			return "every " + n + " minutes"
+		case "ja":
+			return n + "分ごと"
+		case "zh":
+			return "每" + n + "分钟"
+		default:
+			return n + "분마다"
+		}
 	}
 	// 0 */N * * * — every N hours
 	if minF == "0" && strings.HasPrefix(hourF, "*/") && domF == "*" && dowF == "*" {
-		return strings.TrimPrefix(hourF, "*/") + "시간마다"
+		n := strings.TrimPrefix(hourF, "*/")
+		switch lang {
+		case "en":
+			return "every " + n + " hours"
+		case "ja":
+			return n + "時間ごと"
+		case "zh":
+			return "每" + n + "小时"
+		default:
+			return n + "시간마다"
+		}
 	}
 	// 0 H * * DOW — weekly on specific day
 	if minF == "0" && domF == "*" && dowF != "*" {
 		if h, errH := strconv.Atoi(hourF); errH == nil {
 			if d, errD := strconv.Atoi(dowF); errD == nil {
-				return "매주 " + cronWeekdayKR(d) + " " + cronHourKR(h)
+				switch lang {
+				case "en":
+					return "every " + cronWeekdayEN(d) + " at " + cronHourEN(h)
+				case "ja":
+					return "毎週" + cronWeekdayJA(d) + " " + cronHourJA(h)
+				case "zh":
+					return "每周" + cronWeekdayZH(d) + cronHourZH(h)
+				default:
+					return "매주 " + cronWeekdayKR(d) + " " + cronHourKR(h)
+				}
 			}
 		}
 	}
@@ -94,21 +126,48 @@ func humanizeCron(expr string) string {
 	if minF == "0" && dowF == "*" && domF != "*" {
 		if h, errH := strconv.Atoi(hourF); errH == nil {
 			if d, errD := strconv.Atoi(domF); errD == nil {
-				return fmt.Sprintf("매월 %d일 %s", d, cronHourKR(h))
+				switch lang {
+				case "en":
+					return fmt.Sprintf("monthly on the %d at %s", d, cronHourEN(h))
+				case "ja":
+					return fmt.Sprintf("毎月%d日 %s", d, cronHourJA(h))
+				case "zh":
+					return fmt.Sprintf("每月%d日%s", d, cronHourZH(h))
+				default:
+					return fmt.Sprintf("매월 %d일 %s", d, cronHourKR(h))
+				}
 			}
 		}
 	}
 	// 0 H * * * — daily at H
 	if minF == "0" && domF == "*" && dowF == "*" {
 		if h, errH := strconv.Atoi(hourF); errH == nil {
-			return "매일 " + cronHourKR(h)
+			switch lang {
+			case "en":
+				return "daily at " + cronHourEN(h)
+			case "ja":
+				return "毎日 " + cronHourJA(h)
+			case "zh":
+				return "每天" + cronHourZH(h)
+			default:
+				return "매일 " + cronHourKR(h)
+			}
 		}
 	}
 	// M H * * * — daily at H:M
 	if domF == "*" && dowF == "*" {
 		if h, errH := strconv.Atoi(hourF); errH == nil {
 			if m, errM := strconv.Atoi(minF); errM == nil {
-				return fmt.Sprintf("매일 %s %d분", cronHourKR(h), m)
+				switch lang {
+				case "en":
+					return fmt.Sprintf("daily at %s %d min", cronHourEN(h), m)
+				case "ja":
+					return fmt.Sprintf("毎日 %s%d分", cronHourJA(h), m)
+				case "zh":
+					return fmt.Sprintf("每天%s%d分", cronHourZH(h), m)
+				default:
+					return fmt.Sprintf("매일 %s %d분", cronHourKR(h), m)
+				}
 			}
 		}
 	}
@@ -128,25 +187,147 @@ func cronHourKR(h int) string {
 	}
 }
 
-func cronWeekdayKR(d int) string {
-	switch d {
-	case 0:
-		return "일요일"
-	case 1:
-		return "월요일"
-	case 2:
-		return "화요일"
-	case 3:
-		return "수요일"
-	case 4:
-		return "목요일"
-	case 5:
-		return "금요일"
-	case 6:
-		return "토요일"
+func cronHourEN(h int) string {
+	switch {
+	case h == 0:
+		return "12:00 AM"
+	case h < 12:
+		return fmt.Sprintf("%d:00 AM", h)
+	case h == 12:
+		return "12:00 PM"
 	default:
-		return strconv.Itoa(d) + "요일"
+		return fmt.Sprintf("%d:00 PM", h-12)
 	}
+}
+
+func cronHourJA(h int) string {
+	switch {
+	case h < 12:
+		return fmt.Sprintf("午前%d時", h)
+	case h == 12:
+		return "午後12時"
+	default:
+		return fmt.Sprintf("午後%d時", h-12)
+	}
+}
+
+func cronHourZH(h int) string {
+	switch {
+	case h < 12:
+		return fmt.Sprintf("上午%d点", h)
+	case h == 12:
+		return "下午12点"
+	default:
+		return fmt.Sprintf("下午%d点", h-12)
+	}
+}
+
+func cronWeekdayKR(d int) string {
+	days := []string{"일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"}
+	if d >= 0 && d < len(days) {
+		return days[d]
+	}
+	return strconv.Itoa(d) + "요일"
+}
+
+func cronWeekdayEN(d int) string {
+	days := []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+	if d >= 0 && d < len(days) {
+		return days[d]
+	}
+	return strconv.Itoa(d)
+}
+
+func cronWeekdayJA(d int) string {
+	days := []string{"日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"}
+	if d >= 0 && d < len(days) {
+		return days[d]
+	}
+	return strconv.Itoa(d) + "曜日"
+}
+
+func cronWeekdayZH(d int) string {
+	days := []string{"周日", "周一", "周二", "周三", "周四", "周五", "周六"}
+	if d >= 0 && d < len(days) {
+		return days[d]
+	}
+	return "周" + strconv.Itoa(d)
+}
+
+// jobI18n holds translated name and description for a single job.
+type jobI18n struct{ Name, Description string }
+
+// jobTranslations[lang][jobID] — non-Korean translations for system jobs.
+var jobTranslations = map[string]map[string]jobI18n{
+	"en": {
+		"daily_summary":         {Name: "Daily Finance Summary", Description: "Summarizes today's expenses by category"},
+		"weekly_report":         {Name: "Weekly Planner Review", Description: "Summarizes this week's goal completion and spending"},
+		"monthly_closing":       {Name: "Monthly Finance Report", Description: "Reviews last month's income/expenses and savings rate"},
+		"inactive_reminder":     {Name: "Note Reminder", Description: "Encourages you to write a note about your day"},
+		"budget_warning":        {Name: "Budget Warning", Description: "Alerts you when you're close to exceeding your budget"},
+		"planner_task_reminder": {Name: "Today's Tasks", Description: "Shows today's due tasks and priority-A items"},
+		"planner_goal_dday":     {Name: "Goal D-Day Alert", Description: "Shows goals due within 7 days"},
+		"spending_anomaly":      {Name: "Spending Anomaly", Description: "Detects unusual spending patterns"},
+		"anomaly_insights":      {Name: "Anomaly Insights", Description: "Comprehensive multi-dimensional spending anomaly analysis"},
+		"pattern_analysis":      {Name: "Spending Pattern Analysis", Description: "Analyzes category spending increase patterns"},
+		"pattern_insight":       {Name: "Weekly Insights", Description: "Sends weekly insights combining spending, notes, and goals"},
+		"conversation_analysis": {Name: "Re-engagement Alert", Description: "Sends a Telegram alert after 3+ days of inactivity"},
+		"daily_weather":         {Name: "Daily Weather", Description: "Morning weather forecast and precipitation via wttr.in"},
+		"daily_news":            {Name: "Today's News (Naver)", Description: "Sends today's top news via Naver Search"},
+		"local_events":          {Name: "Local Events (Naver)", Description: "Sends local events and festivals via Naver Search"},
+		"it_blog_digest":        {Name: "IT Blog Digest (Naver)", Description: "Sends today's IT blog posts via Naver Search"},
+		"tavily_news":              {Name: "Today's Top News (Tavily)", Description: "Sends today's top news in your language via Tavily Search"},
+		"google_calendar_digest":   {Name: "This Week's Google Calendar", Description: "Sends this week's Google Calendar events every morning"},
+		"google_gmail_digest":      {Name: "Recent Emails (Top 5)", Description: "Sends the 5 most recent Gmail inbox messages every morning"},
+		"user_schedules":           {Name: "User Schedule Runner", Description: "Checks and runs user-created schedules every 15 minutes"},
+		"memory_compaction":     {Name: "Memory Compaction", Description: "Cleans up old knowledge base entries"},
+	},
+	"ja": {
+		"daily_summary":         {Name: "今日の財務サマリー", Description: "今日の支出をカテゴリ別にまとめます"},
+		"weekly_report":         {Name: "週次プランナーレビュー", Description: "今週の目標達成率と支出状況をまとめます"},
+		"monthly_closing":       {Name: "月次財務精算", Description: "先月の収支と貯蓄率をまとめます"},
+		"inactive_reminder":     {Name: "ノートリマインダー", Description: "今日の出来事をノートに記録しましょう"},
+		"budget_warning":        {Name: "予算警告", Description: "予算超過が近づいたときに警告します"},
+		"planner_task_reminder": {Name: "今日のタスク", Description: "今日締め切りのタスクと優先度Aの項目をお知らせします"},
+		"planner_goal_dday":     {Name: "目標D-Dayアラート", Description: "7日以内に締め切りの目標をお知らせします"},
+		"spending_anomaly":      {Name: "異常支出検知", Description: "異常な支出パターンを検知します"},
+		"anomaly_insights":      {Name: "異常支出インサイト", Description: "多次元的な支出異常を総合分析します"},
+		"pattern_analysis":      {Name: "支出パターン分析", Description: "カテゴリ別支出の増加傾向を分析します"},
+		"pattern_insight":       {Name: "週次インサイト", Description: "支出・ノート・目標を総合した週次インサイトを送信します"},
+		"conversation_analysis": {Name: "再訪問促進", Description: "3日以上会話がない場合にTelegramで通知します"},
+		"daily_weather":         {Name: "今日の天気", Description: "wttr.inによる朝の天気予報と降水確率"},
+		"daily_news":            {Name: "今日のニュース (Naver)", Description: "Naver検索で今日の主要ニュースをお届けします"},
+		"local_events":          {Name: "地域イベント (Naver)", Description: "Naver検索で地域のイベントや祭りをお届けします"},
+		"it_blog_digest":        {Name: "ITブログダイジェスト (Naver)", Description: "Naver検索で今日のIT関連ブログ記事をお届けします"},
+		"tavily_news":              {Name: "今日のトップニュース (Tavily)", Description: "Tavily検索でお使いの言語に合ったニュースをお届けします"},
+		"google_calendar_digest":   {Name: "今週のGoogleカレンダー", Description: "Googleカレンダーの今週の予定を毎朝お届けします"},
+		"google_gmail_digest":      {Name: "最近のメール (最新5件)", Description: "Gmailの受信トレイの最新5件を毎朝お届けします"},
+		"user_schedules":           {Name: "ユーザースケジュール実行", Description: "15分ごとにユーザー作成のスケジュールを確認・実行します"},
+		"memory_compaction":     {Name: "メモリ圧縮", Description: "古いナレッジベースのエントリを整理します"},
+	},
+	"zh": {
+		"daily_summary":         {Name: "今日财务摘要", Description: "按类别汇总今日支出"},
+		"weekly_report":         {Name: "每周计划回顾", Description: "汇总本周目标完成率和支出情况"},
+		"monthly_closing":       {Name: "月度财务结算", Description: "回顾上月收支和储蓄率"},
+		"inactive_reminder":     {Name: "记事提醒", Description: "提醒您记录今天的日记"},
+		"budget_warning":        {Name: "预算警告", Description: "接近超出预算时发出警告"},
+		"planner_task_reminder": {Name: "今日任务", Description: "提示今日到期任务和优先级A的事项"},
+		"planner_goal_dday":     {Name: "目标倒计时", Description: "提示7天内到期的目标"},
+		"spending_anomaly":      {Name: "异常消费检测", Description: "检测异常消费模式"},
+		"anomaly_insights":      {Name: "异常支出洞察", Description: "综合分析多维支出异常信号"},
+		"pattern_analysis":      {Name: "消费模式分析", Description: "分析各类别支出增长趋势"},
+		"pattern_insight":       {Name: "每周洞察", Description: "综合支出、记事和目标发送每周洞察"},
+		"conversation_analysis": {Name: "重访提醒", Description: "3天以上未对话时通过Telegram发送提醒"},
+		"daily_weather":         {Name: "今日天气", Description: "通过wttr.in在早上发送天气预报和降水概率"},
+		"daily_news":            {Name: "今日新闻 (Naver)", Description: "通过Naver搜索发送今日主要新闻"},
+		"local_events":          {Name: "本地活动 (Naver)", Description: "通过Naver搜索发送本地活动和节庆信息"},
+		"it_blog_digest":        {Name: "IT博客摘要 (Naver)", Description: "通过Naver搜索发送今日IT相关博客文章"},
+		"tavily_news":              {Name: "今日头条 (Tavily)", Description: "通过Tavily搜索以您的语言发送今日头条"},
+		"google_calendar_digest":   {Name: "本周Google日历", Description: "每天早上发送Google日历本周日程"},
+		"google_gmail_digest":      {Name: "最近邮件 (最新5封)", Description: "每天早上发送Gmail收件箱最新5封邮件"},
+		"user_schedules":           {Name: "用户日程运行器", Description: "每15分钟检查并运行用户创建的日程"},
+		"memory_compaction":     {Name: "内存压缩", Description: "清理过期的知识库条目"},
+	},
 }
 
 var builtinSystemJobs = []systemJobResponse{
@@ -171,7 +352,10 @@ var builtinSystemJobs = []systemJobResponse{
 	{ID: "local_events", Name: "오늘의 지역 이벤트", Description: "네이버 지역 검색으로 오늘의 이벤트/행사를 전송합니다", Schedule: "0 12 * * *", Level: "external", Enabled: false, CanDisable: true},
 	{ID: "it_blog_digest", Name: "IT 블로그 다이제스트", Description: "네이버 블로그 검색으로 오늘의 IT 관련 글을 전송합니다", Schedule: "0 18 * * *", Level: "external", Enabled: false, CanDisable: true},
 	// Level 3c: Tavily Search API
-	{ID: "tavily_it_news", Name: "Tavily IT 뉴스", Description: "Tavily 검색으로 오늘의 최신 IT 뉴스를 타임존 언어에 맞춰 전송합니다", Schedule: "30 8 * * *", Level: "external", Enabled: true, CanDisable: true},
+	{ID: "tavily_news", Name: "오늘의 주요 뉴스 (Tavily)", Description: "Tavily 검색으로 오늘의 주요 뉴스를 타임존 언어에 맞춰 전송합니다", Schedule: "30 8 * * *", Level: "external", Enabled: false, CanDisable: true},
+	// Level 3d: Google Workspace
+	{ID: "google_calendar_digest", Name: "이번 주 Google 일정", Description: "Google 캘린더에서 이번 주 일정을 매일 아침 전송합니다", Schedule: "0 8 * * *", Level: "external", Enabled: false, CanDisable: true},
+	{ID: "google_gmail_digest", Name: "최근 메일 5개", Description: "Gmail 받은편지함의 최근 메일 5개를 매일 아침 전송합니다", Schedule: "0 8 * * *", Level: "external", Enabled: false, CanDisable: true},
 	// Level 4: Runner
 	{ID: "user_schedules", Name: "사용자 일정 실행기", Description: "15분마다 사용자 생성 일정을 확인하고 실행합니다", Schedule: "*/15 * * * *", Level: "runner", Enabled: true},
 	// Level 5: Maintenance
@@ -195,10 +379,23 @@ func (h *CronHandler) ListSystemJobs(c echo.Context) error {
 		_ = json.Unmarshal([]byte(prefsJSON.String), &prefs)
 	}
 
+	lang := c.QueryParam("lang")
+	if lang == "" {
+		lang = "ko"
+		if l, ok := prefs["language"].(string); ok && l != "" {
+			lang = l
+		}
+	}
+	translations := jobTranslations[lang] // nil for "ko" — fall back to builtin names
+
 	result := make([]systemJobResponse, len(builtinSystemJobs))
 	for i, job := range builtinSystemJobs {
 		result[i] = job
-		result[i].HumanSchedule = humanizeCron(job.Schedule)
+		result[i].HumanSchedule = humanizeCronLang(job.Schedule, lang)
+		if t, ok := translations[job.ID]; ok {
+			result[i].Name = t.Name
+			result[i].Description = t.Description
+		}
 		if job.CanDisable {
 			if job.Enabled {
 				// Default ON: disabled only if user opted out
@@ -308,6 +505,43 @@ func (h *CronHandler) ToggleSystemJob(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, map[string]any{"id": jobID, "enabled": enabled})
+}
+
+// POST /api/v1/cron/system/:id/trigger
+// Forces a single builtin job to fire immediately for the current user.
+// Intended for testing and debugging only.
+func (h *CronHandler) TriggerSystemJob(c echo.Context) error {
+	userID, err := getUserIDFromContext(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	}
+	jobID := c.Param("id")
+
+	// Validate job exists
+	found := false
+	for _, j := range builtinSystemJobs {
+		if j.ID == jobID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "job not found"})
+	}
+	if h.triggerer == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "scheduler not available"})
+	}
+
+	msg, sent, err := h.triggerer.TriggerJob(c.Request().Context(), jobID, userID.String())
+	if err != nil {
+		h.logger.Warn("TriggerSystemJob: execution error", zap.String("job", jobID), zap.Error(err))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, map[string]any{
+		"id":      jobID,
+		"sent":    sent,
+		"message": msg,
+	})
 }
 
 // isJobEnabled checks whether jobID is present in preferences.scheduler.enabled_jobs.

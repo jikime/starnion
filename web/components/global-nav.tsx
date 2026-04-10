@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useLocale, useTranslations } from "next-intl"
@@ -72,15 +72,30 @@ export function GlobalNav() {
   const { theme, setTheme } = useTheme()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [langOpen, setLangOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const settingsRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
+  const langRef = useRef<HTMLDivElement>(null)
 
-  const toggleLocale = () => {
-    const next = currentLocale === "ko" ? "en" : currentLocale === "en" ? "ja" : currentLocale === "ja" ? "zh" : "ko"
+  const LOCALES = [
+    { code: "ko", label: "한국어" },
+    { code: "en", label: "English" },
+    { code: "ja", label: "日本語" },
+    { code: "zh", label: "中文" },
+  ]
+
+  const changeLocale = useCallback(async (next: string) => {
+    setLangOpen(false)
+    if (next === currentLocale) return
     document.cookie = `NEXT_LOCALE=${next}; path=/; max-age=${365 * 24 * 60 * 60}; SameSite=Lax`
+    await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language: next }),
+    }).catch(() => {})
     window.location.href = window.location.pathname + window.location.search
-  }
+  }, [currentLocale])
 
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark")
 
@@ -88,10 +103,11 @@ export function GlobalNav() {
     function handleClick(e: MouseEvent) {
       if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) setSettingsOpen(false)
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false)
+      if (langRef.current && !langRef.current.contains(e.target as Node)) setLangOpen(false)
     }
-    if (settingsOpen || profileOpen) document.addEventListener("mousedown", handleClick)
+    if (settingsOpen || profileOpen || langOpen) document.addEventListener("mousedown", handleClick)
     return () => document.removeEventListener("mousedown", handleClick)
-  }, [settingsOpen, profileOpen])
+  }, [settingsOpen, profileOpen, langOpen])
 
   // Close mobile menu on route change
   useEffect(() => { setMobileMenuOpen(false) }, [pathname])
@@ -157,14 +173,44 @@ export function GlobalNav() {
 
         {/* Right controls */}
         <div className="flex items-center gap-0.5 sm:gap-1 sm:w-44 justify-end shrink-0">
-          <button
-            onClick={toggleLocale}
-            className="hidden sm:flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-header-foreground hover:text-white hover:bg-white/10 transition-colors"
-            title={t("changeLanguage")}
-          >
-            <Globe className="w-3.5 h-3.5" />
-            {currentLocale.toUpperCase()}
-          </button>
+          {/* Language dropdown */}
+          <div ref={langRef} className="relative hidden sm:block">
+            <button
+              onClick={() => setLangOpen(v => !v)}
+              className={cn(
+                "flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium transition-colors",
+                langOpen
+                  ? "bg-accent text-foreground"
+                  : "text-header-foreground hover:text-white hover:bg-white/10"
+              )}
+              title={t("changeLanguage")}
+              aria-expanded={langOpen}
+              aria-haspopup="true"
+            >
+              <Globe className="w-3.5 h-3.5" />
+              {currentLocale.toUpperCase()}
+            </button>
+            {langOpen && (
+              <div className="absolute right-0 top-full mt-2 w-32 rounded-xl border border-border bg-card shadow-xl z-50 overflow-hidden py-1" role="menu">
+                {LOCALES.map(({ code, label }) => (
+                  <button
+                    key={code}
+                    role="menuitem"
+                    onClick={() => changeLocale(code)}
+                    className={cn(
+                      "w-full flex items-center justify-between px-4 py-2 text-sm transition-colors",
+                      code === currentLocale
+                        ? "text-foreground font-medium bg-accent/50"
+                        : "text-foreground hover:bg-accent/50"
+                    )}
+                  >
+                    <span>{label}</span>
+                    {code === currentLocale && <span className="size-1.5 rounded-full bg-emerald-400 shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             onClick={toggleTheme}
             className="w-7 h-7 flex items-center justify-center rounded-md text-header-foreground hover:text-white hover:bg-white/10 transition-colors"
@@ -286,10 +332,30 @@ export function GlobalNav() {
               )
             })}
             <div className="border-t border-white/10 my-2" />
+            {/* Mobile language selector */}
+            <div className="px-3 pb-1">
+              <div className="flex items-center gap-1 mb-1.5">
+                <Globe className="w-3.5 h-3.5 text-header-foreground/60" />
+                <span className="text-xs text-header-foreground/60 font-medium uppercase tracking-wider">Language</span>
+              </div>
+              <div className="flex gap-1 flex-wrap">
+                {LOCALES.map(({ code, label }) => (
+                  <button
+                    key={code}
+                    onClick={() => { setMobileMenuOpen(false); changeLocale(code) }}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+                      code === currentLocale
+                        ? "bg-white/20 text-white"
+                        : "text-header-foreground hover:bg-white/10 hover:text-white"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex items-center gap-2 px-3 py-1">
-              <button onClick={toggleLocale} className="flex items-center gap-1.5 text-xs text-header-foreground hover:text-white">
-                <Globe className="w-3.5 h-3.5" />{currentLocale.toUpperCase()}
-              </button>
               <Link href="/profile" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-1.5 text-xs text-header-foreground hover:text-white">
                 <UserCircle2 className="w-3.5 h-3.5" />{t("profile")}
               </Link>

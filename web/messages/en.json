@@ -1084,6 +1084,7 @@
     "lastSent": "Last sent: {date}",
     "statusActive": "Active",
     "statusInactive": "Inactive",
+    "triggerNow": "Run now",
     "backgroundOnly": "Background",
     "statusPaused": "Paused",
     "statusCompleted": "Completed",
@@ -1159,6 +1160,9 @@
       "systemToggleActive": "System job activated.",
       "systemToggleInactive": "System job deactivated.",
       "systemToggleFailed": "Failed to change system job status.",
+      "triggerSent": "Sent: {name}",
+      "triggerSkipped": "No data to send (skipped).",
+      "triggerFailed": "Failed to run immediately.",
       "deleteSuccess": "\"{title}\" has been deleted.",
       "deleteFailed": "Failed to delete notification."
     },
@@ -1739,7 +1743,29 @@
     },
     "defaultPersona": "Default Persona",
     "toolsUnavailable": "No tools",
-    "charCount": "chars"
+    "charCount": "chars",
+    "systemPersonas": {
+      "default_assistant": {
+        "name": "Default Assistant",
+        "description": "A general-purpose AI assistant supporting all features"
+      },
+      "empathy_friend": {
+        "name": "Empathy Friend",
+        "description": "A warm companion you can open up to emotionally"
+      },
+      "life_coach": {
+        "name": "Life Coach",
+        "description": "A motivational coach for goal achievement and growth"
+      },
+      "finance_expert": {
+        "name": "Finance Expert",
+        "description": "A financial advisor for budgeting, spending and savings"
+      },
+      "data_analyst": {
+        "name": "Data Analyst",
+        "description": "An analysis expert who extracts insights from reports and statistics"
+      }
+    }
   },
   "files": {
     "title": "My Files",

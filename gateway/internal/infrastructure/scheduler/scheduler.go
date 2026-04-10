@@ -53,6 +53,9 @@ type Scheduler struct {
 	naverClientID     string
 	naverClientSecret string
 	encryptionKey     string
+
+	googleClientID     string
+	googleClientSecret string
 }
 
 // New creates a Scheduler. Call Start to begin execution.
@@ -76,6 +79,13 @@ func (s *Scheduler) SetNaverCredentials(clientID, clientSecret string) {
 // SetEncryptionKey sets the key used to decrypt API keys stored in integration_keys.
 func (s *Scheduler) SetEncryptionKey(key string) {
 	s.encryptionKey = key
+}
+
+// SetGoogleCredentials configures the Google OAuth client ID/secret used for
+// token refresh when a stored access_token has expired.
+func (s *Scheduler) SetGoogleCredentials(clientID, clientSecret string) {
+	s.googleClientID = clientID
+	s.googleClientSecret = clientSecret
 }
 
 // Wake signals the scheduler to reload schedules and re-arm the user timer.
@@ -195,8 +205,13 @@ var builtinJobs = []systemJob{
 	{id: "it_blog_digest", cronExpr: "0 18 * * *", actionType: "smart_notify", defaultEnabled: false,
 		notifType: "it_blog_digest"},
 	// Level 3c: Tavily Search API — default OFF (requires Tavily API key)
-	{id: "tavily_it_news", cronExpr: "30 8 * * *", actionType: "smart_notify", defaultEnabled: false,
-		notifType: "tavily_it_news"},
+	{id: "tavily_news", cronExpr: "30 8 * * *", actionType: "smart_notify", defaultEnabled: false,
+		notifType: "tavily_news"},
+	// Level 3d: Google Workspace — default OFF (requires Google OAuth)
+	{id: "google_calendar_digest", cronExpr: "0 8 * * *", actionType: "smart_notify", defaultEnabled: false,
+		notifType: "google_calendar_digest"},
+	{id: "google_gmail_digest", cronExpr: "0 8 * * *", actionType: "smart_notify", defaultEnabled: false,
+		notifType: "google_gmail_digest"},
 	// Level 5: Maintenance
 	{id: "memory_compaction", cronExpr: "0 5 * * 1", actionType: "maintenance", defaultEnabled: true},
 }
@@ -575,8 +590,12 @@ func (s *Scheduler) computeSmartNotify(ctx context.Context, userID, jobID string
 		return s.smartLocalEvents(ctx, userID)
 	case "it_blog_digest":
 		return s.smartItBlogDigest(ctx, userID)
-	case "tavily_it_news":
-		return s.smartTavilyItNews(ctx, userID)
+	case "tavily_news":
+		return s.smartTavilyNews(ctx, userID)
+	case "google_calendar_digest":
+		return s.smartGoogleCalendarDigest(ctx, userID)
+	case "google_gmail_digest":
+		return s.smartGoogleGmailDigest(ctx, userID)
 	default:
 		return "", true
 	}
@@ -1692,70 +1711,24 @@ func (s *Scheduler) tavilyAPIKey(ctx context.Context, userID string) string {
 	return raw
 }
 
-// itNewsQueryForTimezone returns a localised "latest IT news" query string and
-// a human-readable header based on the user's IANA timezone.
-func itNewsQueryForTimezone(tz string) (query, header string) {
-	switch tz {
-	// Korean
-	case "Asia/Seoul", "Asia/Pyongyang":
-		return "최신 IT 기술 뉴스", "[오늘의 IT 뉴스]"
-	// Japanese
-	case "Asia/Tokyo":
-		return "最新IT技術ニュース", "[今日のITニュース]"
-	// Chinese
-	case "Asia/Shanghai", "Asia/Hong_Kong", "Asia/Taipei",
-		"Asia/Macau", "Asia/Urumqi", "Asia/Chongqing",
-		"Asia/Harbin", "Asia/Kashgar":
-		return "最新IT技术新闻", "[今日IT新闻]"
-	// Vietnamese
-	case "Asia/Ho_Chi_Minh", "Asia/Hanoi":
-		return "tin tức IT mới nhất hôm nay", "[Tin tức IT hôm nay]"
-	// Thai
-	case "Asia/Bangkok":
-		return "ข่าวไอทีล่าสุดวันนี้", "[ข่าวไอทีวันนี้]"
-	// Indonesian
-	case "Asia/Jakarta", "Asia/Makassar", "Asia/Jayapura":
-		return "berita IT terbaru hari ini", "[Berita IT Hari Ini]"
-	// Malay
-	case "Asia/Kuala_Lumpur", "Asia/Singapore", "Asia/Brunei":
-		return "berita IT terkini hari ini", "[Berita IT Hari Ini]"
-	// Filipino
-	case "Asia/Manila":
-		return "pinakabagong balita sa IT ngayon", "[IT News Ngayon]"
-	// German
-	case "Europe/Berlin", "Europe/Vienna", "Europe/Zurich":
-		return "neueste IT-Nachrichten heute", "[IT-Nachrichten heute]"
-	// French
-	case "Europe/Paris", "Europe/Brussels", "Europe/Luxembourg":
-		return "dernières actualités IT aujourd'hui", "[Actualités IT du jour]"
-	// Spanish
-	case "Europe/Madrid", "America/Mexico_City", "America/Bogota",
-		"America/Lima", "America/Santiago", "America/Argentina/Buenos_Aires":
-		return "últimas noticias de tecnología hoy", "[Noticias IT de hoy]"
-	// Portuguese
-	case "Europe/Lisbon", "America/Sao_Paulo":
-		return "últimas notícias de tecnologia hoje", "[Notícias de TI hoje]"
-	// Russian
-	case "Europe/Moscow", "Asia/Yekaterinburg", "Asia/Novosibirsk",
-		"Asia/Krasnoyarsk", "Asia/Irkutsk", "Asia/Yakutsk",
-		"Asia/Vladivostok", "Asia/Kamchatka":
-		return "последние новости IT сегодня", "[IT-новости сегодня]"
-	// Arabic
-	case "Asia/Riyadh", "Asia/Kuwait", "Asia/Dubai", "Asia/Muscat",
-		"Asia/Qatar", "Asia/Bahrain", "Asia/Aden", "Africa/Cairo":
-		return "أحدث أخبار تكنولوجيا المعلومات اليوم", "[أخبار تقنية اليوم]"
-	// Turkish
-	case "Europe/Istanbul":
-		return "bugünün güncel BT haberleri", "[Bugünün BT Haberleri]"
-	// Default: English
-	default:
-		return "latest IT technology news today", "[Today's IT News]"
+// tavilyNewsQueryForLang returns a localised "today's major news" query string and
+// a human-readable header based on the user's language preference code (ko/en/ja/zh).
+func tavilyNewsQueryForLang(lang string) (query, header string) {
+	switch lang {
+	case "ko":
+		return "오늘의 주요 뉴스", "[오늘의 주요 뉴스]"
+	case "ja":
+		return "今日の主要ニュース", "[今日の主要ニュース]"
+	case "zh":
+		return "今日重要新闻", "[今日重要新闻]"
+	default: // "en" and any future codes
+		return "today's top news", "[Today's Top News]"
 	}
 }
 
-// smartTavilyItNews fetches today's top IT news via Tavily Search API (매일 오전 8시 30분).
+// smartTavilyNews fetches today's major news via Tavily Search API (매일 오전 8시 30분).
 // Skips if the user has no Tavily API key configured. Sends at most once per day.
-func (s *Scheduler) smartTavilyItNews(ctx context.Context, userID string) (string, bool) {
+func (s *Scheduler) smartTavilyNews(ctx context.Context, userID string) (string, bool) {
 	apiKey := s.tavilyAPIKey(ctx, userID)
 	if apiKey == "" {
 		return "", true // no key configured → skip silently
@@ -1765,7 +1738,7 @@ func (s *Scheduler) smartTavilyItNews(ctx context.Context, userID string) (strin
 	var count int
 	s.db.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM notifications
-		 WHERE user_id = $1::uuid AND type = 'tavily_it_news'
+		 WHERE user_id = $1::uuid AND type = 'tavily_news'
 		   AND created_at >= CURRENT_DATE`,
 		userID,
 	).Scan(&count)
@@ -1773,13 +1746,13 @@ func (s *Scheduler) smartTavilyItNews(ctx context.Context, userID string) (strin
 		return "", true
 	}
 
-	// Determine query language from user's timezone
-	var tz string
+	// Determine query language from user's language preference
+	var lang string
 	s.db.QueryRowContext(ctx,
-		`SELECT COALESCE(preferences->>'timezone', 'Asia/Seoul') FROM users WHERE id = $1::uuid`,
+		`SELECT COALESCE(preferences->>'language', 'ko') FROM users WHERE id = $1::uuid`,
 		userID,
-	).Scan(&tz)
-	query, header := itNewsQueryForTimezone(tz)
+	).Scan(&lang)
+	query, header := tavilyNewsQueryForLang(lang)
 
 	// Call Tavily
 	payload := map[string]any{
@@ -1831,6 +1804,323 @@ func (s *Scheduler) smartTavilyItNews(ctx context.Context, userID string) (strin
 			break
 		}
 		lines = append(lines, fmt.Sprintf("%d. %s", i+1, r.Title))
+	}
+	return strings.Join(lines, "\n"), false
+}
+
+// ── Google Workspace ──────────────────────────────────────────────────────────
+
+// getGoogleAccessToken retrieves a valid (non-expired) Google access token for
+// the given user. It decrypts the stored token and refreshes it if expired.
+// Returns "" when no Google token exists for the user.
+func (s *Scheduler) getGoogleAccessToken(ctx context.Context, userID string) string {
+	var encAccess, encRefresh, tokenURI string
+	var expiresAt time.Time
+	err := s.db.QueryRowContext(ctx,
+		`SELECT access_token, refresh_token, token_uri, expires_at
+		   FROM google_tokens WHERE user_id = $1::uuid`,
+		userID,
+	).Scan(&encAccess, &encRefresh, &tokenURI, &expiresAt)
+	if err != nil {
+		return "" // no token stored
+	}
+
+	// Decrypt access token
+	accessToken := encAccess
+	if s.encryptionKey != "" {
+		if dec, err := crypto.Decrypt(encAccess, s.encryptionKey); err == nil && dec != "" {
+			accessToken = dec
+		}
+	}
+
+	// Still valid? Return immediately.
+	if time.Now().Add(30 * time.Second).Before(expiresAt) {
+		return accessToken
+	}
+
+	// Token expired — refresh using refresh_token
+	if s.googleClientID == "" || s.googleClientSecret == "" {
+		return accessToken // can't refresh without client creds, try anyway
+	}
+	refreshToken := encRefresh
+	if s.encryptionKey != "" {
+		if dec, err := crypto.Decrypt(encRefresh, s.encryptionKey); err == nil && dec != "" {
+			refreshToken = dec
+		}
+	}
+	if tokenURI == "" {
+		tokenURI = "https://oauth2.googleapis.com/token"
+	}
+
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).PostForm(tokenURI, url.Values{
+		"client_id":     {s.googleClientID},
+		"client_secret": {s.googleClientSecret},
+		"refresh_token": {refreshToken},
+		"grant_type":    {"refresh_token"},
+	})
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return accessToken // return old token, let Google API handle the error
+	}
+	defer resp.Body.Close()
+
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
+		ExpiresIn   int    `json:"expires_in"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil || tokenResp.AccessToken == "" {
+		return accessToken
+	}
+
+	// Persist refreshed token (best-effort, encrypted)
+	newAccess := tokenResp.AccessToken
+	newExpiry := time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
+	encNew := newAccess
+	if s.encryptionKey != "" {
+		if enc, err := crypto.Encrypt(newAccess, s.encryptionKey); err == nil {
+			encNew = enc
+		}
+	}
+	_, _ = s.db.ExecContext(ctx,
+		`UPDATE google_tokens SET access_token = $1, expires_at = $2, updated_at = NOW()
+		   WHERE user_id = $3::uuid`,
+		encNew, newExpiry, userID,
+	)
+	return newAccess
+}
+
+// getUserLang returns the user's preferred UI language (ko/en/ja/zh).
+func (s *Scheduler) getUserLang(ctx context.Context, userID string) string {
+	var lang string
+	_ = s.db.QueryRowContext(ctx,
+		`SELECT COALESCE(preferences->>'language', 'ko') FROM users WHERE id = $1::uuid`,
+		userID,
+	).Scan(&lang)
+	if lang == "" {
+		lang = "ko"
+	}
+	return lang
+}
+
+// smartGoogleCalendarDigest sends this week's Google Calendar events.
+func (s *Scheduler) smartGoogleCalendarDigest(ctx context.Context, userID string) (string, bool) {
+	token := s.getGoogleAccessToken(ctx, userID)
+	if token == "" {
+		return "", true // Google not connected
+	}
+
+	// Dedup: at most once per day
+	var count int
+	s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM notifications
+		 WHERE user_id = $1::uuid AND type = 'google_calendar_digest'
+		   AND created_at >= CURRENT_DATE`,
+		userID,
+	).Scan(&count)
+	if count > 0 {
+		return "", true
+	}
+
+	lang := s.getUserLang(ctx, userID)
+
+	// This week: Monday 00:00 → Sunday 23:59 (UTC)
+	now := time.Now().UTC()
+	weekday := int(now.Weekday()) // 0=Sun
+	if weekday == 0 {
+		weekday = 7
+	}
+	monday := now.AddDate(0, 0, -(weekday - 1))
+	monday = time.Date(monday.Year(), monday.Month(), monday.Day(), 0, 0, 0, 0, time.UTC)
+	sunday := monday.AddDate(0, 0, 6)
+	sunday = time.Date(sunday.Year(), sunday.Month(), sunday.Day(), 23, 59, 59, 0, time.UTC)
+
+	calURL := "https://www.googleapis.com/calendar/v3/calendars/primary/events" +
+		"?timeMin=" + url.QueryEscape(monday.Format(time.RFC3339)) +
+		"&timeMax=" + url.QueryEscape(sunday.Format(time.RFC3339)) +
+		"&singleEvents=true&orderBy=startTime&maxResults=20"
+
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, calURL, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		s.logger.Warn("scheduler: google calendar request failed", zap.Error(err))
+		return "", true
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		s.logger.Warn("scheduler: google calendar HTTP error", zap.Int("status", resp.StatusCode))
+		return "", true
+	}
+
+	var calResp struct {
+		Items []struct {
+			Summary string `json:"summary"`
+			Start   struct {
+				DateTime string `json:"dateTime"`
+				Date     string `json:"date"`
+			} `json:"start"`
+		} `json:"items"`
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if err := json.Unmarshal(body, &calResp); err != nil {
+		return "", true
+	}
+	if len(calResp.Items) == 0 {
+		return "", true // no events this week → skip
+	}
+
+	var header string
+	switch lang {
+	case "en":
+		header = "📅 This Week's Schedule"
+	case "ja":
+		header = "📅 今週のスケジュール"
+	case "zh":
+		header = "📅 本周日程"
+	default:
+		header = "📅 이번 주 일정"
+	}
+
+	lines := []string{header}
+	for _, ev := range calResp.Items {
+		when := ev.Start.DateTime
+		if when == "" {
+			when = ev.Start.Date
+		}
+		// Format datetime nicely: 2006-01-02T15:04:05Z07:00 → "1/2 15:04"
+		t, err := time.Parse(time.RFC3339, when)
+		if err == nil {
+			switch lang {
+			case "en":
+				when = t.Format("1/2 3:04 PM")
+			case "ja", "zh":
+				when = fmt.Sprintf("%d/%d %02d:%02d", t.Month(), t.Day(), t.Hour(), t.Minute())
+			default:
+				when = fmt.Sprintf("%d/%d %02d:%02d", t.Month(), t.Day(), t.Hour(), t.Minute())
+			}
+		} else if len(when) == 10 { // date-only: "2006-01-02"
+			dt, err2 := time.Parse("2006-01-02", when)
+			if err2 == nil {
+				when = fmt.Sprintf("%d/%d", dt.Month(), dt.Day())
+			}
+		}
+		lines = append(lines, fmt.Sprintf("• %s %s", when, ev.Summary))
+	}
+	return strings.Join(lines, "\n"), false
+}
+
+// smartGoogleGmailDigest sends the 5 most recent Gmail messages.
+func (s *Scheduler) smartGoogleGmailDigest(ctx context.Context, userID string) (string, bool) {
+	token := s.getGoogleAccessToken(ctx, userID)
+	if token == "" {
+		return "", true
+	}
+
+	// Dedup: at most once per day
+	var count int
+	s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM notifications
+		 WHERE user_id = $1::uuid AND type = 'google_gmail_digest'
+		   AND created_at >= CURRENT_DATE`,
+		userID,
+	).Scan(&count)
+	if count > 0 {
+		return "", true
+	}
+
+	lang := s.getUserLang(ctx, userID)
+
+	// 1. Fetch message list
+	listURL := "https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=5&labelIds=INBOX"
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		s.logger.Warn("scheduler: gmail list request failed", zap.Error(err))
+		return "", true
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		s.logger.Warn("scheduler: gmail list HTTP error", zap.Int("status", resp.StatusCode))
+		return "", true
+	}
+
+	var listResp struct {
+		Messages []struct{ ID string `json:"id"` } `json:"messages"`
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if err := json.Unmarshal(body, &listResp); err != nil || len(listResp.Messages) == 0 {
+		return "", true
+	}
+
+	// 2. Fetch subject + sender for each message
+	type mailItem struct{ from, subject string }
+	var items []mailItem
+	for _, msg := range listResp.Messages {
+		msgURL := "https://www.googleapis.com/gmail/v1/users/me/messages/" + msg.ID +
+			"?format=metadata&metadataHeaders=From&metadataHeaders=Subject"
+		mReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, msgURL, nil)
+		mReq.Header.Set("Authorization", "Bearer "+token)
+		mResp, err := client.Do(mReq)
+		if err != nil || mResp.StatusCode != http.StatusOK {
+			if mResp != nil {
+				mResp.Body.Close()
+			}
+			continue
+		}
+		var msgDetail struct {
+			Payload struct {
+				Headers []struct {
+					Name  string `json:"name"`
+					Value string `json:"value"`
+				} `json:"headers"`
+			} `json:"payload"`
+		}
+		mBody, _ := io.ReadAll(mResp.Body)
+		mResp.Body.Close()
+		if err := json.Unmarshal(mBody, &msgDetail); err != nil {
+			continue
+		}
+		var from, subject string
+		for _, h := range msgDetail.Payload.Headers {
+			switch h.Name {
+			case "From":
+				from = h.Value
+			case "Subject":
+				subject = h.Value
+			}
+		}
+		// Trim long sender display names: "John Doe <john@example.com>" → "John Doe"
+		if idx := strings.Index(from, " <"); idx > 0 {
+			from = from[:idx]
+		}
+		if subject == "" {
+			subject = "(no subject)"
+		}
+		items = append(items, mailItem{from: from, subject: subject})
+	}
+
+	if len(items) == 0 {
+		return "", true
+	}
+
+	var header string
+	switch lang {
+	case "en":
+		header = "📬 Recent Emails (Top 5)"
+	case "ja":
+		header = "📬 最近のメール (最新5件)"
+	case "zh":
+		header = "📬 最近邮件 (最新5封)"
+	default:
+		header = "📬 최근 메일 5개"
+	}
+
+	lines := []string{header}
+	for i, item := range items {
+		lines = append(lines, fmt.Sprintf("%d. [%s] %s", i+1, item.from, item.subject))
 	}
 	return strings.Join(lines, "\n"), false
 }

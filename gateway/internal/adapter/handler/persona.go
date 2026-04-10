@@ -30,7 +30,7 @@ func (h *PersonaHandler) List(c echo.Context) error {
 
 	rows, err := h.db.QueryContext(c.Request().Context(),
 		`SELECT id, name, description, provider, model, system_prompt,
-		        bot_name, user_name, is_default, created_at, updated_at
+		        bot_name, user_name, is_default, COALESCE(system_key, ''), created_at, updated_at
 		 FROM personas WHERE user_id = $1
 		 ORDER BY is_default DESC, created_at ASC`,
 		userID,
@@ -42,14 +42,14 @@ func (h *PersonaHandler) List(c echo.Context) error {
 
 	var personas []map[string]any
 	for rows.Next() {
-		var id, name, description, provider, model, systemPrompt, botName, userName string
+		var id, name, description, provider, model, systemPrompt, botName, userName, systemKey string
 		var isDefault bool
 		var createdAt, updatedAt time.Time
 		if err := rows.Scan(&id, &name, &description, &provider, &model, &systemPrompt,
-			&botName, &userName, &isDefault, &createdAt, &updatedAt); err != nil {
+			&botName, &userName, &isDefault, &systemKey, &createdAt, &updatedAt); err != nil {
 			continue
 		}
-		personas = append(personas, map[string]any{
+		p := map[string]any{
 			"id":           id,
 			"name":         name,
 			"description":  description,
@@ -61,7 +61,11 @@ func (h *PersonaHandler) List(c echo.Context) error {
 			"isDefault":    isDefault,
 			"createdAt":    createdAt,
 			"updatedAt":    updatedAt,
-		})
+		}
+		if systemKey != "" {
+			p["systemKey"] = systemKey
+		}
+		personas = append(personas, p)
 	}
 	if err := rows.Err(); err != nil {
 		h.logger.Warn("ListPersonas: rows iteration error", zap.Error(err))

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, useMemo } from "react"
-import { useTranslations } from "next-intl"
+import { useTranslations, useLocale } from "next-intl"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -50,6 +50,7 @@ import {
   CalendarClock,
   HelpCircle,
   BanIcon,
+  Play,
 } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -121,6 +122,7 @@ const emptyCronForm = () => ({
 
 export default function CronPage() {
   const t = useTranslations("cron")
+  const locale = useLocale()
 
   const HOUR_OPTIONS = useMemo(() => Array.from({ length: 24 }, (_, i) => ({
     value: String(i),
@@ -212,8 +214,9 @@ export default function CronPage() {
   const [cronDialogOpen, setCronDialogOpen] = useState(false)
   const [cronEditTarget, setCronEditTarget] = useState<UserSchedule | null>(null)
   const [cronSaving, setCronSaving]         = useState(false)
-  const [togglingId, setTogglingId]         = useState<string | null>(null)
+  const [togglingId, setTogglingId]             = useState<string | null>(null)
   const [togglingSystemId, setTogglingSystemId] = useState<string | null>(null)
+  const [triggeringId, setTriggeringId]         = useState<string | null>(null)
   // #1 AlertDialog용 삭제 대상 state
   const [deleteTarget, setDeleteTarget]     = useState<UserSchedule | null>(null)
   const [cronDeletingId, setCronDeletingId] = useState<string | null>(null)
@@ -221,12 +224,12 @@ export default function CronPage() {
 
   // ── Fetch: system jobs ───────────────────────────────────────────────────────
   useEffect(() => {
-    fetch("/api/cron/system")
+    fetch(`/api/cron/system?lang=${locale}`)
       .then((r) => r.json())
       .then((d) => setSystemJobs(Array.isArray(d) ? d : []))
       .catch(() => toast.error(t("toast.loadSystemJobsFailed")))
       .finally(() => setLoadingSystem(false))
-  }, [])
+  }, [locale])
 
   // ── Fetch: user schedules ───────────────────────────────────────────────────
   const fetchSchedules = useCallback(() => {
@@ -318,6 +321,24 @@ export default function CronPage() {
       toast.error(t("toast.toggleFailed"))
     } finally {
       setTogglingId(null)
+    }
+  }
+
+  const handleTriggerSystem = async (id: string) => {
+    setTriggeringId(id)
+    try {
+      const res = await fetch(`/api/cron/system/${id}/trigger`, { method: "POST" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error ?? "trigger failed")
+      if (data.sent) {
+        toast.success(t("toast.triggerSent", { name: data.message?.split("\n")[0] ?? id }))
+      } else {
+        toast.info(t("toast.triggerSkipped"))
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("toast.triggerFailed"))
+    } finally {
+      setTriggeringId(null)
     }
   }
 
@@ -533,6 +554,21 @@ export default function CronPage() {
                           <code className="text-xs bg-muted px-2 py-1 rounded">{job.schedule}</code>
                           <span className="text-xs text-muted-foreground">{job.human_schedule ?? cronHuman(job.schedule)}</span>
                         </div>
+                        {/* Trigger button */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => handleTriggerSystem(job.id)}
+                              disabled={triggeringId === job.id}
+                              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors disabled:opacity-50"
+                            >
+                              {triggeringId === job.id
+                                ? <Loader2 className="size-3.5 animate-spin" />
+                                : <Play className="size-3.5" />}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">{t("triggerNow")}</TooltipContent>
+                        </Tooltip>
                         {job.can_disable ? (
                           togglingSystemId === job.id ? (
                             <Loader2 className="size-4 animate-spin text-muted-foreground shrink-0" />

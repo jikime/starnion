@@ -1084,6 +1084,7 @@
     "lastSent": "最后发送: {date}",
     "statusActive": "活跃",
     "statusInactive": "非活跃",
+    "triggerNow": "立即运行",
     "backgroundOnly": "后台",
     "statusPaused": "已暂停",
     "statusCompleted": "已完成",
@@ -1159,6 +1160,9 @@
       "systemToggleActive": "已启用系统任务。",
       "systemToggleInactive": "已停用系统任务。",
       "systemToggleFailed": "系统任务状态变更失败。",
+      "triggerSent": "发送完成：{name}",
+      "triggerSkipped": "没有可发送的数据（已跳过）。",
+      "triggerFailed": "立即执行失败。",
       "deleteSuccess": "已删除\"{title}\"通知。",
       "deleteFailed": "删除通知失败。"
     },
@@ -1739,7 +1743,29 @@
     },
     "defaultPersona": "默认角色",
     "toolsUnavailable": "不支持工具",
-    "charCount": "字"
+    "charCount": "字",
+    "systemPersonas": {
+      "default_assistant": {
+        "name": "默认助手",
+        "description": "支持所有功能的通用AI助手"
+      },
+      "empathy_friend": {
+        "name": "心灵伙伴",
+        "description": "可以倾诉情感的温暖共情伙伴"
+      },
+      "life_coach": {
+        "name": "人生教练",
+        "description": "陪伴目标实现和成长的激励教练"
+      },
+      "finance_expert": {
+        "name": "金融专家",
+        "description": "协助预算·支出·储蓄策略的财务顾问"
+      },
+      "data_analyst": {
+        "name": "数据分析师",
+        "description": "从报告·统计·模式中提炼洞察的分析专家"
+      }
+    }
   },
   "files": {
     "title": "我的文件",

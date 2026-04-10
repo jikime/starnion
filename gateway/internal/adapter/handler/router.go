@@ -293,6 +293,7 @@ func (r *Router) Register(e *echo.Echo) {
 	protected.POST("/cron/schedules/:id/toggle", r.cron.ToggleUserSchedule)
 	protected.GET("/cron/system", r.cron.ListSystemJobs)
 	protected.POST("/cron/system/:id/toggle", r.cron.ToggleSystemJob)
+	protected.POST("/cron/system/:id/trigger", r.cron.TriggerSystemJob)
 
 	// ── Channels ──────────────────────────────────────────────────────────────
 	protected.GET("/channels/telegram", r.stub.GetChannelsTelegram)

@@ -1081,6 +1081,7 @@
     "lastSent": "마지막 전송: {date}",
     "statusActive": "활성",
     "statusInactive": "비활성",
+    "triggerNow": "지금 즉시 실행",
     "backgroundOnly": "백그라운드",
     "statusPaused": "일시정지",
     "statusCompleted": "완료",
@@ -1156,6 +1157,9 @@
       "systemToggleActive": "시스템 잡을 활성화했습니다.",
       "systemToggleInactive": "시스템 잡을 비활성화했습니다.",
       "systemToggleFailed": "시스템 잡 상태 변경에 실패했습니다.",
+      "triggerSent": "전송 완료: {name}",
+      "triggerSkipped": "전송할 데이터가 없습니다 (건너뜀).",
+      "triggerFailed": "즉시 실행에 실패했습니다.",
       "deleteSuccess": "\"{title}\" 알림이 삭제되었습니다.",
       "deleteFailed": "알림 삭제에 실패했습니다."
     },
@@ -1736,7 +1740,29 @@
     },
     "defaultPersona": "기본 페르소나",
     "toolsUnavailable": "tools 불가",
-    "charCount": "자"
+    "charCount": "자",
+    "systemPersonas": {
+      "default_assistant": {
+        "name": "기본 비서",
+        "description": "모든 기능을 지원하는 범용 AI 비서"
+      },
+      "empathy_friend": {
+        "name": "마음 친구",
+        "description": "감정을 터놓고 대화할 수 있는 따뜻한 공감 파트너"
+      },
+      "life_coach": {
+        "name": "라이프 코치",
+        "description": "목표 달성과 성장을 함께하는 동기 부여 코치"
+      },
+      "finance_expert": {
+        "name": "금융 전문가",
+        "description": "예산·지출·저축 전략을 도와주는 재정 어드바이저"
+      },
+      "data_analyst": {
+        "name": "데이터 분석가",
+        "description": "리포트·통계·패턴에서 인사이트를 도출하는 분석 전문가"
+      }
+    }
   },
   "files": {
     "title": "내 파일",

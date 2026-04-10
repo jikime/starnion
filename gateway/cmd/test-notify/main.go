@@ -35,7 +35,7 @@ var allJobIDs = []string{
 	"local_events",
 	"it_blog_digest",
 	// Level 3c: Tavily Search
-	"tavily_it_news",
+	"tavily_news",
 	// Level 1: Rule-Based
 	"daily_summary",
 	"weekly_report",

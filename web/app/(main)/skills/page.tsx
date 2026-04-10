@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
-import { useTranslations } from "next-intl"
+import { useTranslations, useLocale } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -15,6 +15,7 @@ import { SkillDetailSheet } from "@/components/skills/skill-detail-sheet"
 
 export default function SkillsPage() {
   const t = useTranslations("skills")
+  const locale = useLocale()
   const [skills, setSkills] = useState<Skill[]>([])
   const [loading, setLoading] = useState(true)
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -39,7 +40,7 @@ export default function SkillsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/skills")
+        const res = await fetch(`/api/skills?lang=${locale}`)
         if (res.ok) {
           const data = await res.json()
           setSkills(Array.isArray(data) ? data : (data.skills ?? []))
@@ -47,7 +48,7 @@ export default function SkillsPage() {
       } catch { /* ignore */ }
       finally { setLoading(false) }
     })()
-  }, [])
+  }, [locale])
 
   const toggleSkill = async (skillId: string) => {
     const target = skills.find(s => s.id === skillId)
