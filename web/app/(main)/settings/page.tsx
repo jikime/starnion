@@ -32,28 +32,125 @@ import {
   Info,
 } from "lucide-react"
 
-// Common IANA timezones with UTC offset labels
+// IANA timezones — each city/region listed individually
 const TIMEZONES = [
-  { value: "Pacific/Honolulu",    label: "UTC-10  Hawaii" },
-  { value: "America/Anchorage",   label: "UTC-9   Alaska" },
-  { value: "America/Los_Angeles", label: "UTC-8   Los Angeles / Seattle" },
-  { value: "America/Denver",      label: "UTC-7   Denver / Phoenix" },
-  { value: "America/Chicago",     label: "UTC-6   Chicago / Mexico City" },
-  { value: "America/New_York",    label: "UTC-5   New York / Toronto" },
-  { value: "America/Sao_Paulo",   label: "UTC-3   São Paulo / Buenos Aires" },
-  { value: "Europe/London",       label: "UTC+0   London / Lisbon" },
-  { value: "Europe/Paris",        label: "UTC+1   Paris / Berlin / Rome" },
-  { value: "Europe/Helsinki",     label: "UTC+2   Helsinki / Athens / Cairo" },
-  { value: "Europe/Moscow",       label: "UTC+3   Moscow / Istanbul" },
-  { value: "Asia/Dubai",          label: "UTC+4   Dubai / Abu Dhabi" },
-  { value: "Asia/Karachi",        label: "UTC+5   Karachi / Islamabad" },
-  { value: "Asia/Kolkata",        label: "UTC+5:30 Mumbai / Delhi" },
-  { value: "Asia/Dhaka",          label: "UTC+6   Dhaka / Almaty" },
-  { value: "Asia/Bangkok",        label: "UTC+7   Bangkok / Jakarta / Hanoi" },
-  { value: "Asia/Shanghai",       label: "UTC+8   Beijing / Shanghai / Singapore" },
-  { value: "Asia/Seoul",          label: "UTC+9   Seoul / Tokyo / Pyongyang" },
-  { value: "Australia/Sydney",    label: "UTC+10  Sydney / Melbourne" },
-  { value: "Pacific/Auckland",    label: "UTC+12  Auckland / Fiji" },
+  // UTC-11
+  { value: "Pacific/Pago_Pago",               label: "UTC-11  Pago Pago" },
+  // UTC-10
+  { value: "Pacific/Honolulu",                 label: "UTC-10  Honolulu (Hawaii)" },
+  // UTC-9
+  { value: "America/Anchorage",                label: "UTC-9   Anchorage (Alaska)" },
+  // UTC-8
+  { value: "America/Los_Angeles",              label: "UTC-8   Los Angeles" },
+  { value: "America/Vancouver",                label: "UTC-8   Vancouver / Seattle" },
+  { value: "America/Tijuana",                  label: "UTC-8   Tijuana" },
+  // UTC-7
+  { value: "America/Denver",                   label: "UTC-7   Denver" },
+  { value: "America/Phoenix",                  label: "UTC-7   Phoenix (no DST)" },
+  { value: "America/Edmonton",                 label: "UTC-7   Edmonton / Calgary" },
+  // UTC-6
+  { value: "America/Chicago",                  label: "UTC-6   Chicago" },
+  { value: "America/Mexico_City",              label: "UTC-6   Mexico City" },
+  { value: "America/Winnipeg",                 label: "UTC-6   Winnipeg" },
+  // UTC-5
+  { value: "America/New_York",                 label: "UTC-5   New York" },
+  { value: "America/Toronto",                  label: "UTC-5   Toronto" },
+  { value: "America/Bogota",                   label: "UTC-5   Bogotá" },
+  { value: "America/Lima",                     label: "UTC-5   Lima" },
+  // UTC-4
+  { value: "America/Halifax",                  label: "UTC-4   Halifax (Atlantic)" },
+  { value: "America/Caracas",                  label: "UTC-4   Caracas" },
+  // UTC-3
+  { value: "America/Sao_Paulo",                label: "UTC-3   São Paulo" },
+  { value: "America/Argentina/Buenos_Aires",   label: "UTC-3   Buenos Aires" },
+  { value: "America/Santiago",                 label: "UTC-3   Santiago" },
+  // UTC-2:30
+  { value: "America/St_Johns",                 label: "UTC-2:30 St. John's (Newfoundland)" },
+  // UTC+0
+  { value: "Europe/London",                    label: "UTC+0   London" },
+  { value: "Europe/Lisbon",                    label: "UTC+0   Lisbon" },
+  { value: "Africa/Casablanca",                label: "UTC+0   Casablanca" },
+  // UTC+1
+  { value: "Europe/Paris",                     label: "UTC+1   Paris" },
+  { value: "Europe/Berlin",                    label: "UTC+1   Berlin" },
+  { value: "Europe/Rome",                      label: "UTC+1   Rome" },
+  { value: "Europe/Madrid",                    label: "UTC+1   Madrid" },
+  { value: "Europe/Amsterdam",                 label: "UTC+1   Amsterdam" },
+  { value: "Europe/Brussels",                  label: "UTC+1   Brussels" },
+  { value: "Africa/Lagos",                     label: "UTC+1   Lagos" },
+  // UTC+2
+  { value: "Europe/Helsinki",                  label: "UTC+2   Helsinki" },
+  { value: "Europe/Tallinn",                   label: "UTC+2   Tallinn" },
+  { value: "Europe/Riga",                      label: "UTC+2   Riga" },
+  { value: "Europe/Athens",                    label: "UTC+2   Athens" },
+  { value: "Europe/Bucharest",                 label: "UTC+2   Bucharest" },
+  { value: "Europe/Kiev",                      label: "UTC+2   Kyiv" },
+  { value: "Africa/Cairo",                     label: "UTC+2   Cairo" },
+  { value: "Africa/Johannesburg",              label: "UTC+2   Johannesburg" },
+  // UTC+3
+  { value: "Europe/Moscow",                    label: "UTC+3   Moscow" },
+  { value: "Europe/Istanbul",                  label: "UTC+3   Istanbul" },
+  { value: "Asia/Riyadh",                      label: "UTC+3   Riyadh" },
+  { value: "Asia/Kuwait",                      label: "UTC+3   Kuwait" },
+  { value: "Africa/Nairobi",                   label: "UTC+3   Nairobi" },
+  // UTC+3:30
+  { value: "Asia/Tehran",                      label: "UTC+3:30 Tehran" },
+  // UTC+4
+  { value: "Asia/Dubai",                       label: "UTC+4   Dubai" },
+  { value: "Asia/Muscat",                      label: "UTC+4   Muscat (Abu Dhabi)" },
+  { value: "Asia/Baku",                        label: "UTC+4   Baku" },
+  { value: "Asia/Tbilisi",                     label: "UTC+4   Tbilisi" },
+  { value: "Asia/Yerevan",                     label: "UTC+4   Yerevan" },
+  // UTC+4:30
+  { value: "Asia/Kabul",                       label: "UTC+4:30 Kabul" },
+  // UTC+5
+  { value: "Asia/Karachi",                     label: "UTC+5   Karachi" },
+  { value: "Asia/Tashkent",                    label: "UTC+5   Tashkent / Islamabad" },
+  // UTC+5:30
+  { value: "Asia/Kolkata",                     label: "UTC+5:30 Mumbai / Delhi / Kolkata" },
+  { value: "Asia/Colombo",                     label: "UTC+5:30 Colombo" },
+  // UTC+5:45
+  { value: "Asia/Kathmandu",                   label: "UTC+5:45 Kathmandu" },
+  // UTC+6
+  { value: "Asia/Dhaka",                       label: "UTC+6   Dhaka" },
+  { value: "Asia/Almaty",                      label: "UTC+6   Almaty" },
+  // UTC+6:30
+  { value: "Asia/Yangon",                      label: "UTC+6:30 Yangon (Rangoon)" },
+  // UTC+7
+  { value: "Asia/Bangkok",                     label: "UTC+7   Bangkok" },
+  { value: "Asia/Ho_Chi_Minh",                 label: "UTC+7   Ho Chi Minh City" },
+  { value: "Asia/Hanoi",                       label: "UTC+7   Hanoi" },
+  { value: "Asia/Jakarta",                     label: "UTC+7   Jakarta" },
+  { value: "Asia/Phnom_Penh",                  label: "UTC+7   Phnom Penh" },
+  { value: "Asia/Vientiane",                   label: "UTC+7   Vientiane" },
+  // UTC+8
+  { value: "Asia/Shanghai",                    label: "UTC+8   Shanghai / Beijing" },
+  { value: "Asia/Hong_Kong",                   label: "UTC+8   Hong Kong" },
+  { value: "Asia/Taipei",                      label: "UTC+8   Taipei" },
+  { value: "Asia/Singapore",                   label: "UTC+8   Singapore" },
+  { value: "Asia/Kuala_Lumpur",                label: "UTC+8   Kuala Lumpur" },
+  { value: "Asia/Brunei",                      label: "UTC+8   Bandar Seri Begawan" },
+  { value: "Asia/Makassar",                    label: "UTC+8   Makassar" },
+  { value: "Asia/Manila",                      label: "UTC+8   Manila" },
+  { value: "Australia/Perth",                  label: "UTC+8   Perth" },
+  // UTC+9
+  { value: "Asia/Seoul",                       label: "UTC+9   Seoul" },
+  { value: "Asia/Tokyo",                       label: "UTC+9   Tokyo" },
+  { value: "Asia/Pyongyang",                   label: "UTC+9   Pyongyang" },
+  // UTC+9:30
+  { value: "Australia/Adelaide",               label: "UTC+9:30 Adelaide" },
+  { value: "Australia/Darwin",                 label: "UTC+9:30 Darwin (no DST)" },
+  // UTC+10
+  { value: "Australia/Sydney",                 label: "UTC+10  Sydney" },
+  { value: "Australia/Melbourne",              label: "UTC+10  Melbourne" },
+  { value: "Australia/Brisbane",               label: "UTC+10  Brisbane (no DST)" },
+  { value: "Pacific/Port_Moresby",             label: "UTC+10  Port Moresby" },
+  // UTC+11
+  { value: "Pacific/Noumea",                   label: "UTC+11  Noumea" },
+  { value: "Pacific/Guadalcanal",              label: "UTC+11  Honiara" },
+  // UTC+12
+  { value: "Pacific/Auckland",                 label: "UTC+12  Auckland" },
+  { value: "Pacific/Fiji",                     label: "UTC+12  Suva (Fiji)" },
 ] as const
 
 interface Profile {
