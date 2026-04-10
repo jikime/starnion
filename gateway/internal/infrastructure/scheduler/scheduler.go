@@ -490,6 +490,42 @@ func (s *Scheduler) executeUserSchedule(
 
 // ── Smart Notify ──────────────────────────────────────────────────────────────
 
+// TriggerJob forces a single builtin job to fire for the given user regardless
+// of its cron schedule. Intended for local testing and debugging only.
+//
+// Returns:
+//   - msg: the message that was (or would have been) sent
+//   - sent: true if notifyFn was called, false if the job was skipped (no data)
+//   - err: non-nil if notifyFn failed or the job was not found
+func (s *Scheduler) TriggerJob(ctx context.Context, jobID, userID string) (msg string, sent bool, err error) {
+	for _, job := range builtinJobs {
+		if job.id != jobID {
+			continue
+		}
+		switch job.actionType {
+		case "notify":
+			if err = s.notifyFn(ctx, userID, job.notifType, job.message); err != nil {
+				return "", false, err
+			}
+			return job.message, true, nil
+		case "smart_notify":
+			m, skip := s.computeSmartNotify(ctx, userID, job.id)
+			if skip {
+				return "", false, nil
+			}
+			if err = s.notifyFn(ctx, userID, job.notifType, m); err != nil {
+				return "", false, err
+			}
+			return m, true, nil
+		case "maintenance":
+			s.runMaintenance(ctx, job.id, userID)
+			return "(maintenance — no message)", false, nil
+		}
+		return "", false, fmt.Errorf("unknown action type %q for job %q", job.actionType, jobID)
+	}
+	return "", false, fmt.Errorf("job %q not found", jobID)
+}
+
 // computeSmartNotify runs job-specific logic and returns a dynamic notification
 // message. Returns ("", true) when the notification should be skipped.
 func (s *Scheduler) computeSmartNotify(ctx context.Context, userID, jobID string) (string, bool) {
@@ -1306,9 +1342,22 @@ func wttrWeatherDesc(code int) string {
 	}
 }
 
+// cityFromTimezone derives a city name from an IANA timezone string.
+// "Asia/Seoul"         → "Seoul"
+// "America/New_York"   → "New York"
+// "America/Los_Angeles"→ "Los Angeles"
+func cityFromTimezone(tz string) string {
+	parts := strings.SplitN(tz, "/", 2)
+	if len(parts) == 2 && parts[1] != "" {
+		return strings.ReplaceAll(parts[1], "_", " ")
+	}
+	return "Seoul"
+}
+
 // smartDailyWeather fetches today's weather via wttr.in and sends a morning
-// summary (매일 오전 6시). The user's preferred location is read from
-// preferences->>'location'; falls back to "Seoul". Sends at most once per day.
+// summary (매일 오전 6시).
+// Location priority: preferences->>'location' > timezone-derived city > Seoul.
+// Sends at most once per day.
 func (s *Scheduler) smartDailyWeather(ctx context.Context, userID string) (string, bool) {
 	// Dedup: already sent today?
 	var count int
@@ -1322,15 +1371,22 @@ func (s *Scheduler) smartDailyWeather(ctx context.Context, userID string) (strin
 		return "", true
 	}
 
-	// User's preferred location (defaults to Seoul).
-	var locationRaw sql.NullString
+	// Resolve location:
+	//  1. preferences->>'location'  (explicit city set by user)
+	//  2. city derived from preferences->>'timezone'
+	//  3. fallback "Seoul"
+	var locationPref, timezone sql.NullString
 	s.db.QueryRowContext(ctx,
-		`SELECT preferences->>'location' FROM users WHERE id = $1::uuid`,
+		`SELECT preferences->>'location', COALESCE(preferences->>'timezone', 'Asia/Seoul')
+		 FROM users WHERE id = $1::uuid`,
 		userID,
-	).Scan(&locationRaw)
+	).Scan(&locationPref, &timezone)
+
 	location := "Seoul"
-	if locationRaw.Valid && strings.TrimSpace(locationRaw.String) != "" {
-		location = strings.TrimSpace(locationRaw.String)
+	if locationPref.Valid && strings.TrimSpace(locationPref.String) != "" {
+		location = strings.TrimSpace(locationPref.String)
+	} else if timezone.Valid && timezone.String != "" {
+		location = cityFromTimezone(timezone.String)
 	}
 
 	// Call wttr.in JSON API (no key required).
