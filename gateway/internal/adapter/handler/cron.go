@@ -156,7 +156,9 @@ var builtinSystemJobs = []systemJobResponse{
 	{ID: "pattern_analysis", Name: "소비 패턴 분석", Description: "카테고리 지출 증가 패턴을 분석합니다", Schedule: "0 6 * * *", Level: "pattern", Enabled: true, CanDisable: true},
 	{ID: "pattern_insight", Name: "주간 인사이트", Description: "지출·노트·목표를 종합한 주간 인사이트를 전송합니다", Schedule: "0 14 * * *", Level: "pattern", Enabled: true, CanDisable: true},
 	{ID: "conversation_analysis", Name: "재방문 유도", Description: "3일 이상 대화가 없을 때 텔레그램으로 알림을 보냅니다", Schedule: "0 10 * * *", Level: "pattern", Enabled: true, CanDisable: true},
-	// Level 3: External Content (Naver Search API)
+	// Level 3: External Content
+	{ID: "daily_weather", Name: "오늘의 날씨", Description: "wttr.in 으로 오늘 날씨와 강수확률을 아침에 알려드립니다", Schedule: "0 6 * * *", Level: "external", Enabled: true, CanDisable: true},
+	// Level 3b: Naver Search API
 	{ID: "daily_news", Name: "오늘의 뉴스", Description: "네이버 검색으로 오늘의 주요 뉴스를 전송합니다", Schedule: "0 7 * * *", Level: "external", Enabled: true, CanDisable: true},
 	{ID: "local_events", Name: "오늘의 지역 이벤트", Description: "네이버 지역 검색으로 오늘의 이벤트/행사를 전송합니다", Schedule: "0 12 * * *", Level: "external", Enabled: true, CanDisable: true},
 	{ID: "it_blog_digest", Name: "IT 블로그 다이제스트", Description: "네이버 블로그 검색으로 오늘의 IT 관련 글을 전송합니다", Schedule: "0 18 * * *", Level: "external", Enabled: true, CanDisable: true},

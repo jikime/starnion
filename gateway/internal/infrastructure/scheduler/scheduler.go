@@ -176,7 +176,10 @@ var builtinJobs = []systemJob{
 		notifType: "pattern_insight"},
 	{id: "conversation_analysis", cronExpr: "0 10 * * *", actionType: "smart_notify",
 		notifType: "conversation_analysis"},
-	// Level 3: External Content (Naver Search API)
+	// Level 3: External Content
+	{id: "daily_weather", cronExpr: "0 6 * * *", actionType: "smart_notify",
+		notifType: "daily_weather"},
+	// Level 3b: Naver Search API
 	{id: "daily_news", cronExpr: "0 7 * * *", actionType: "smart_notify",
 		notifType: "daily_news"},
 	{id: "local_events", cronExpr: "0 12 * * *", actionType: "smart_notify",
@@ -511,6 +514,8 @@ func (s *Scheduler) computeSmartNotify(ctx context.Context, userID, jobID string
 		return s.smartConversationAnalysis(ctx, userID)
 	case "anomaly_insights":
 		return s.smartAnomalyInsights(ctx, userID)
+	case "daily_weather":
+		return s.smartDailyWeather(ctx, userID)
 	case "daily_news":
 		return s.smartDailyNews(ctx, userID)
 	case "local_events":
@@ -1243,6 +1248,158 @@ func (s *Scheduler) smartAnomalyInsights(ctx context.Context, userID string) (st
 		sb.WriteByte('\n')
 	}
 	return strings.TrimRight(sb.String(), "\n"), false
+}
+
+// ── Weather Job ───────────────────────────────────────────────────────────────
+
+// wttr.in JSON response (subset used by smartDailyWeather).
+type wttrResponse struct {
+	CurrentCondition []struct {
+		WeatherCode   string `json:"weatherCode"`
+		TempC         string `json:"temp_C"`
+		FeelsLikeC    string `json:"FeelsLikeC"`
+		Humidity      string `json:"humidity"`
+		WindspeedKmph string `json:"windspeedKmph"`
+	} `json:"current_condition"`
+	NearestArea []struct {
+		AreaName []struct{ Value string `json:"value"` } `json:"areaName"`
+	} `json:"nearest_area"`
+	Weather []struct {
+		MaxTempC string `json:"maxtempC"`
+		MinTempC string `json:"mintempC"`
+		Hourly   []struct {
+			WeatherCode  string `json:"weatherCode"`
+			ChanceOfRain string `json:"chanceofrain"`
+		} `json:"hourly"`
+	} `json:"weather"`
+}
+
+// wttrWeatherDesc maps wttr.in weather codes to Korean descriptions + emoji.
+func wttrWeatherDesc(code int) string {
+	switch {
+	case code == 113:
+		return "맑음 ☀️"
+	case code == 116:
+		return "구름 조금 ⛅"
+	case code == 119, code == 122:
+		return "흐림 ☁️"
+	case code == 143, code == 248, code == 260:
+		return "안개 🌫️"
+	case code == 200, code == 386, code == 389, code == 392, code == 395:
+		return "천둥번개 ⛈️"
+	case code >= 227 && code <= 230:
+		return "눈보라 ❄️"
+	case code >= 293 && code <= 308:
+		return "비 🌧️"
+	case code == 176, code == 353, code == 356, code == 359:
+		return "소나기 🌦️"
+	case code >= 179 && code <= 185, code >= 311 && code <= 320, code >= 362 && code <= 377:
+		return "진눈깨비 🌨️"
+	case code >= 323 && code <= 338, code >= 368 && code <= 371:
+		return "눈 🌨️"
+	case code == 350:
+		return "우박 ❄️"
+	case code >= 263 && code <= 284:
+		return "이슬비 🌦️"
+	default:
+		return "알 수 없음 🌈"
+	}
+}
+
+// smartDailyWeather fetches today's weather via wttr.in and sends a morning
+// summary (매일 오전 6시). The user's preferred location is read from
+// preferences->>'location'; falls back to "Seoul". Sends at most once per day.
+func (s *Scheduler) smartDailyWeather(ctx context.Context, userID string) (string, bool) {
+	// Dedup: already sent today?
+	var count int
+	s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM notifications
+		 WHERE user_id = $1::uuid AND type = 'daily_weather'
+		   AND created_at >= CURRENT_DATE`,
+		userID,
+	).Scan(&count)
+	if count > 0 {
+		return "", true
+	}
+
+	// User's preferred location (defaults to Seoul).
+	var locationRaw sql.NullString
+	s.db.QueryRowContext(ctx,
+		`SELECT preferences->>'location' FROM users WHERE id = $1::uuid`,
+		userID,
+	).Scan(&locationRaw)
+	location := "Seoul"
+	if locationRaw.Valid && strings.TrimSpace(locationRaw.String) != "" {
+		location = strings.TrimSpace(locationRaw.String)
+	}
+
+	// Call wttr.in JSON API (no key required).
+	apiURL := fmt.Sprintf("https://wttr.in/%s?format=j1", url.QueryEscape(location))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		s.logger.Warn("scheduler: weather request build failed", zap.Error(err))
+		return "", true
+	}
+	req.Header.Set("User-Agent", "starnion-weather/1.0")
+
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	if err != nil {
+		s.logger.Warn("scheduler: weather fetch failed", zap.Error(err))
+		return "", true
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", true
+	}
+
+	// wttr.in sometimes wraps data under "data" key.
+	var outer map[string]json.RawMessage
+	var wttr wttrResponse
+	if json.Unmarshal(body, &outer) == nil {
+		if raw, ok := outer["data"]; ok {
+			json.Unmarshal(raw, &wttr) //nolint:errcheck
+		} else {
+			json.Unmarshal(body, &wttr) //nolint:errcheck
+		}
+	}
+
+	if len(wttr.CurrentCondition) == 0 {
+		s.logger.Warn("scheduler: weather response empty", zap.String("location", location))
+		return "", true
+	}
+
+	cur := wttr.CurrentCondition[0]
+	code, _ := strconv.Atoi(cur.WeatherCode)
+	desc := wttrWeatherDesc(code)
+
+	// Display name from nearest_area if available.
+	displayName := location
+	if len(wttr.NearestArea) > 0 && len(wttr.NearestArea[0].AreaName) > 0 {
+		displayName = wttr.NearestArea[0].AreaName[0].Value
+	}
+
+	msg := fmt.Sprintf("[오늘 날씨] %s - %s\n기온: %s°C (체감 %s°C), 습도: %s%%",
+		displayName, desc, cur.TempC, cur.FeelsLikeC, cur.Humidity)
+
+	// Today's forecast if available.
+	if len(wttr.Weather) > 0 {
+		today := wttr.Weather[0]
+		maxRain := 0
+		for _, h := range today.Hourly {
+			if r, err := strconv.Atoi(h.ChanceOfRain); err == nil && r > maxRain {
+				maxRain = r
+			}
+		}
+		msg += fmt.Sprintf("\n예보: 최저 %s°C ~ 최고 %s°C, 강수확률 %d%%",
+			today.MinTempC, today.MaxTempC, maxRain)
+		if maxRain >= 40 {
+			msg += "\n우산을 챙기세요! ☂️"
+		}
+	}
+
+	return msg, false
 }
 
 // ── Naver Search Jobs ─────────────────────────────────────────────────────────
