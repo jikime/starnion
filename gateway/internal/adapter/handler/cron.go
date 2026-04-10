@@ -167,9 +167,9 @@ var builtinSystemJobs = []systemJobResponse{
 	// Level 3: External Content
 	{ID: "daily_weather", Name: "오늘의 날씨", Description: "wttr.in 으로 오늘 날씨와 강수확률을 아침에 알려드립니다", Schedule: "0 6 * * *", Level: "external", Enabled: true, CanDisable: true},
 	// Level 3b: Naver Search API
-	{ID: "daily_news", Name: "오늘의 뉴스", Description: "네이버 검색으로 오늘의 주요 뉴스를 전송합니다", Schedule: "0 7 * * *", Level: "external", Enabled: true, CanDisable: true},
-	{ID: "local_events", Name: "오늘의 지역 이벤트", Description: "네이버 지역 검색으로 오늘의 이벤트/행사를 전송합니다", Schedule: "0 12 * * *", Level: "external", Enabled: true, CanDisable: true},
-	{ID: "it_blog_digest", Name: "IT 블로그 다이제스트", Description: "네이버 블로그 검색으로 오늘의 IT 관련 글을 전송합니다", Schedule: "0 18 * * *", Level: "external", Enabled: true, CanDisable: true},
+	{ID: "daily_news", Name: "오늘의 뉴스", Description: "네이버 검색으로 오늘의 주요 뉴스를 전송합니다", Schedule: "0 7 * * *", Level: "external", Enabled: false, CanDisable: true},
+	{ID: "local_events", Name: "오늘의 지역 이벤트", Description: "네이버 지역 검색으로 오늘의 이벤트/행사를 전송합니다", Schedule: "0 12 * * *", Level: "external", Enabled: false, CanDisable: true},
+	{ID: "it_blog_digest", Name: "IT 블로그 다이제스트", Description: "네이버 블로그 검색으로 오늘의 IT 관련 글을 전송합니다", Schedule: "0 18 * * *", Level: "external", Enabled: false, CanDisable: true},
 	// Level 3c: Tavily Search API
 	{ID: "tavily_it_news", Name: "Tavily IT 뉴스", Description: "Tavily 검색으로 오늘의 최신 IT 뉴스를 타임존 언어에 맞춰 전송합니다", Schedule: "30 8 * * *", Level: "external", Enabled: true, CanDisable: true},
 	// Level 4: Runner
@@ -200,7 +200,13 @@ func (h *CronHandler) ListSystemJobs(c echo.Context) error {
 		result[i] = job
 		result[i].HumanSchedule = humanizeCron(job.Schedule)
 		if job.CanDisable {
-			result[i].Enabled = !isJobDisabled(prefs, job.ID)
+			if job.Enabled {
+				// Default ON: disabled only if user opted out
+				result[i].Enabled = !isJobDisabled(prefs, job.ID)
+			} else {
+				// Default OFF: enabled only if user opted in
+				result[i].Enabled = isJobEnabled(prefs, job.ID)
+			}
 		}
 	}
 	return c.JSON(http.StatusOK, result)
@@ -250,9 +256,15 @@ func (h *CronHandler) ToggleSystemJob(c echo.Context) error {
 		scheduler = make(map[string]any)
 	}
 
-	disabledRaw, _ := scheduler["disabled_jobs"]
+	// Default-ON jobs use disabled_jobs (opt-out); default-OFF jobs use enabled_jobs (opt-in).
+	listKey := "disabled_jobs"
+	if !target.Enabled {
+		listKey = "enabled_jobs"
+	}
+
+	listRaw, _ := scheduler[listKey]
 	var current []string
-	if arr, ok := disabledRaw.([]any); ok {
+	if arr, ok := listRaw.([]any); ok {
 		for _, d := range arr {
 			if s, ok := d.(string); ok {
 				current = append(current, s)
@@ -260,7 +272,6 @@ func (h *CronHandler) ToggleSystemJob(c echo.Context) error {
 		}
 	}
 
-	enabled := true
 	found := false
 	next := make([]string, 0, len(current))
 	for _, d := range current {
@@ -270,12 +281,23 @@ func (h *CronHandler) ToggleSystemJob(c echo.Context) error {
 			next = append(next, d)
 		}
 	}
-	if !found {
-		next = append(next, jobID)
-		enabled = false
+	// enabled result: for disabled_jobs — not found means enabled; for enabled_jobs — found means enabled
+	enabled := true
+	if listKey == "disabled_jobs" {
+		if !found {
+			next = append(next, jobID)
+			enabled = false
+		}
+	} else {
+		if !found {
+			next = append(next, jobID)
+			enabled = true
+		} else {
+			enabled = false
+		}
 	}
 
-	scheduler["disabled_jobs"] = next
+	scheduler[listKey] = next
 	prefs["scheduler"] = scheduler
 
 	newPrefsJSON, _ := json.Marshal(prefs)
@@ -286,6 +308,36 @@ func (h *CronHandler) ToggleSystemJob(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, map[string]any{"id": jobID, "enabled": enabled})
+}
+
+// isJobEnabled checks whether jobID is present in preferences.scheduler.enabled_jobs.
+// Used for default-OFF jobs that require explicit opt-in.
+func isJobEnabled(prefs map[string]any, jobID string) bool {
+	if prefs == nil {
+		return false
+	}
+	schedulerRaw, ok := prefs["scheduler"]
+	if !ok {
+		return false
+	}
+	scheduler, ok := schedulerRaw.(map[string]any)
+	if !ok {
+		return false
+	}
+	enabledRaw, ok := scheduler["enabled_jobs"]
+	if !ok {
+		return false
+	}
+	enabled, ok := enabledRaw.([]any)
+	if !ok {
+		return false
+	}
+	for _, d := range enabled {
+		if s, ok := d.(string); ok && s == jobID {
+			return true
+		}
+	}
+	return false
 }
 
 func isJobDisabled(prefs map[string]any, jobID string) bool {

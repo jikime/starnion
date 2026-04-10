@@ -144,9 +144,10 @@ func (s *Scheduler) nextUserTimerDelay(nextFireAt time.Time) time.Duration {
 // ── System Jobs ───────────────────────────────────────────────────────────────
 
 type systemJob struct {
-	id         string
-	cronExpr   string
-	actionType string // "report" or "notify"
+	id             string
+	cronExpr       string
+	actionType     string // "report" or "notify"
+	defaultEnabled bool   // false = opt-in (user must explicitly enable)
 	// report params
 	reportType string
 	// notify params
@@ -158,46 +159,46 @@ type systemJob struct {
 // Only jobs that have an executable action are included here.
 var builtinJobs = []systemJob{
 	// Level 1: Rule-Based
-	{id: "daily_summary", cronExpr: "0 21 * * *", actionType: "smart_notify",
+	{id: "daily_summary", cronExpr: "0 21 * * *", actionType: "smart_notify", defaultEnabled: true,
 		notifType: "daily_summary"},
-	{id: "weekly_report", cronExpr: "0 20 * * 0", actionType: "smart_notify",
+	{id: "weekly_report", cronExpr: "0 20 * * 0", actionType: "smart_notify", defaultEnabled: true,
 		notifType: "weekly_report"},
-	{id: "monthly_closing", cronExpr: "0 21 1 * *", actionType: "smart_notify",
+	{id: "monthly_closing", cronExpr: "0 21 1 * *", actionType: "smart_notify", defaultEnabled: true,
 		notifType: "monthly_closing"},
-	{id: "inactive_reminder", cronExpr: "0 20 * * *", actionType: "notify",
+	{id: "inactive_reminder", cronExpr: "0 20 * * *", actionType: "notify", defaultEnabled: true,
 		notifType: "inactive_reminder", message: "오늘 하루 어떠셨나요? 오늘의 한마디나 노트를 작성해보세요."},
-	{id: "budget_warning", cronExpr: "0 21 * * *", actionType: "notify",
+	{id: "budget_warning", cronExpr: "0 21 * * *", actionType: "notify", defaultEnabled: true,
 		notifType: "budget_warning", message: "오늘 예산 현황을 확인해보세요."},
 	// Level 2: Pattern-Learning
-	{id: "planner_task_reminder", cronExpr: "0 9 * * *", actionType: "smart_notify",
+	{id: "planner_task_reminder", cronExpr: "0 9 * * *", actionType: "smart_notify", defaultEnabled: true,
 		notifType: "planner_task_reminder"},
-	{id: "planner_goal_dday", cronExpr: "0 8 * * *", actionType: "smart_notify",
+	{id: "planner_goal_dday", cronExpr: "0 8 * * *", actionType: "smart_notify", defaultEnabled: true,
 		notifType: "planner_goal_dday"},
-	{id: "spending_anomaly", cronExpr: "0 */3 * * *", actionType: "smart_notify",
+	{id: "spending_anomaly", cronExpr: "0 */3 * * *", actionType: "smart_notify", defaultEnabled: true,
 		notifType: "spending_anomaly"},
-	{id: "anomaly_insights", cronExpr: "0 9 * * *", actionType: "smart_notify",
+	{id: "anomaly_insights", cronExpr: "0 9 * * *", actionType: "smart_notify", defaultEnabled: true,
 		notifType: "anomaly_insights"},
-	{id: "pattern_analysis", cronExpr: "0 6 * * *", actionType: "smart_notify",
+	{id: "pattern_analysis", cronExpr: "0 6 * * *", actionType: "smart_notify", defaultEnabled: true,
 		notifType: "pattern_analysis"},
-	{id: "pattern_insight", cronExpr: "0 14 * * *", actionType: "smart_notify",
+	{id: "pattern_insight", cronExpr: "0 14 * * *", actionType: "smart_notify", defaultEnabled: true,
 		notifType: "pattern_insight"},
-	{id: "conversation_analysis", cronExpr: "0 10 * * *", actionType: "smart_notify",
+	{id: "conversation_analysis", cronExpr: "0 10 * * *", actionType: "smart_notify", defaultEnabled: true,
 		notifType: "conversation_analysis"},
 	// Level 3: External Content
-	{id: "daily_weather", cronExpr: "0 6 * * *", actionType: "smart_notify",
+	{id: "daily_weather", cronExpr: "0 6 * * *", actionType: "smart_notify", defaultEnabled: true,
 		notifType: "daily_weather"},
-	// Level 3b: Naver Search API
-	{id: "daily_news", cronExpr: "0 7 * * *", actionType: "smart_notify",
+	// Level 3b: Naver Search API — default OFF (requires Naver API key)
+	{id: "daily_news", cronExpr: "0 7 * * *", actionType: "smart_notify", defaultEnabled: false,
 		notifType: "daily_news"},
-	{id: "local_events", cronExpr: "0 12 * * *", actionType: "smart_notify",
+	{id: "local_events", cronExpr: "0 12 * * *", actionType: "smart_notify", defaultEnabled: false,
 		notifType: "local_events"},
-	{id: "it_blog_digest", cronExpr: "0 18 * * *", actionType: "smart_notify",
+	{id: "it_blog_digest", cronExpr: "0 18 * * *", actionType: "smart_notify", defaultEnabled: false,
 		notifType: "it_blog_digest"},
-	// Level 3c: Tavily Search API
-	{id: "tavily_it_news", cronExpr: "30 8 * * *", actionType: "smart_notify",
+	// Level 3c: Tavily Search API — default OFF (requires Tavily API key)
+	{id: "tavily_it_news", cronExpr: "30 8 * * *", actionType: "smart_notify", defaultEnabled: false,
 		notifType: "tavily_it_news"},
 	// Level 5: Maintenance
-	{id: "memory_compaction", cronExpr: "0 5 * * 1", actionType: "maintenance"},
+	{id: "memory_compaction", cronExpr: "0 5 * * 1", actionType: "maintenance", defaultEnabled: true},
 }
 
 func (s *Scheduler) runSystemJobs(ctx context.Context, now time.Time) {
@@ -208,17 +209,23 @@ func (s *Scheduler) runSystemJobs(ctx context.Context, now time.Time) {
 		job := job // capture for goroutine
 		s.logger.Info("scheduler: system job triggered", zap.String("id", job.id))
 
-		// Fetch all users who have NOT disabled this job.
-		// Preference path: preferences -> scheduler -> disabled_jobs (jsonb array of strings).
+		// Fetch target users based on job's default state:
+		//   defaultEnabled=true  → all users NOT in disabled_jobs
+		//   defaultEnabled=false → only users IN enabled_jobs (opt-in)
 		queryCtx, queryCancel := context.WithTimeout(ctx, 10*time.Second)
-		rows, err := s.db.QueryContext(queryCtx,
-			`SELECT id::text FROM users
+		var userQuery string
+		if job.defaultEnabled {
+			userQuery = `SELECT id::text FROM users
 			 WHERE NOT (
 			     COALESCE(preferences->'scheduler'->'disabled_jobs', '[]'::jsonb)
 			     @> to_jsonb($1::text)
-			 )`,
-			job.id,
-		)
+			 )`
+		} else {
+			userQuery = `SELECT id::text FROM users
+			 WHERE COALESCE(preferences->'scheduler'->'enabled_jobs', '[]'::jsonb)
+			       @> to_jsonb($1::text)`
+		}
+		rows, err := s.db.QueryContext(queryCtx, userQuery, job.id)
 		if err != nil {
 			queryCancel()
 			s.logger.Error("scheduler: query users for system job failed",
