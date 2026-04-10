@@ -59,6 +59,7 @@ interface SystemJob {
   name: string
   description: string
   schedule: string
+  human_schedule?: string
   level: string
   enabled: boolean
   can_disable: boolean
@@ -156,11 +157,17 @@ export default function CronPage() {
       "0 20 * * *":     t("cronHuman.daily20"),
       "0 21 28-31 * *": t("cronHuman.monthEnd21"),
       "0 6 * * *":      t("cronHuman.daily06"),
+      "0 9 * * *":      t("cronHuman.daily09"),
+      "0 10 * * *":     t("cronHuman.daily10"),
+      "0 12 * * *":     t("cronHuman.daily12"),
+      "0 18 * * *":     t("cronHuman.daily18"),
       "0 */3 * * *":    t("cronHuman.every3h"),
       "0 14 * * *":     t("cronHuman.daily14"),
       "*/10 * * * *":   t("cronHuman.every10m"),
       "0 7 * * *":      t("cronHuman.daily07"),
       "0 8 * * *":      t("cronHuman.daily08"),
+      "0 20 * * 0":     t("cronHuman.weeklySun20"),
+      "0 21 1 * *":     t("cronHuman.monthly1st21"),
       "0 12 * * 3":     t("cronHuman.weeklyWed12"),
       "*/15 * * * *":   t("cronHuman.every15m"),
       "0 5 * * 1":      t("cronHuman.weeklyMon05"),
@@ -522,8 +529,10 @@ export default function CronPage() {
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">{job.description}</p>
                         </div>
-                        <code className="text-xs bg-muted px-2 py-1 rounded shrink-0 hidden sm:block">{job.schedule}</code>
-                        <span className="text-xs text-muted-foreground shrink-0 hidden md:block">{cronHuman(job.schedule)}</span>
+                        <div className="flex flex-col items-center gap-0.5 shrink-0 hidden sm:flex">
+                          <code className="text-xs bg-muted px-2 py-1 rounded">{job.schedule}</code>
+                          <span className="text-xs text-muted-foreground">{job.human_schedule ?? cronHuman(job.schedule)}</span>
+                        </div>
                         {job.can_disable ? (
                           togglingSystemId === job.id ? (
                             <Loader2 className="size-4 animate-spin text-muted-foreground shrink-0" />
