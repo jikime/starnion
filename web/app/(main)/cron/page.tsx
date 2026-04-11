@@ -332,6 +332,9 @@ export default function CronPage() {
       if (!res.ok) throw new Error(data?.error ?? "trigger failed")
       if (data.sent) {
         toast.success(t("toast.triggerSent", { name: data.message?.split("\n")[0] ?? id }))
+        if (data.scheduled === false) {
+          setTimeout(() => toast.info(t("toast.triggerNotScheduled")), 800)
+        }
       } else {
         toast.info(t("toast.triggerSkipped"))
       }

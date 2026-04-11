@@ -216,29 +216,38 @@ var builtinJobs = []systemJob{
 	{id: "memory_compaction", cronExpr: "0 5 * * 1", actionType: "maintenance", defaultEnabled: true},
 }
 
+// runSystemJobs evaluates all builtin jobs for the current minute.
+//
+// Cron expressions are interpreted in each user's local timezone
+// (preferences->>'timezone', defaulting to "Asia/Seoul").  This means
+// "0 8 * * *" fires at 08:00 the user's local time, regardless of the
+// server's system timezone.
+//
+// To keep DB load predictable the function always fetches the full user list
+// for each job (14 queries/minute) and then filters by per-user local-time
+// cron match.  For typical deployments with O(hundreds) of users this is
+// fast; the timezone-aware filter replaces the previous single global check.
 func (s *Scheduler) runSystemJobs(ctx context.Context, now time.Time) {
 	for _, job := range builtinJobs {
-		if !matchCron(job.cronExpr, now) {
-			continue
-		}
-		job := job // capture for goroutine
-		s.logger.Info("scheduler: system job triggered", zap.String("id", job.id))
-
-		// Fetch target users based on job's default state:
-		//   defaultEnabled=true  → all users NOT in disabled_jobs
-		//   defaultEnabled=false → only users IN enabled_jobs (opt-in)
+		// Query all candidate users together with their stored timezone.
+		// defaultEnabled=true  → everyone NOT in disabled_jobs
+		// defaultEnabled=false → only users explicitly in enabled_jobs
 		queryCtx, queryCancel := context.WithTimeout(ctx, 10*time.Second)
 		var userQuery string
 		if job.defaultEnabled {
-			userQuery = `SELECT id::text FROM users
-			 WHERE NOT (
-			     COALESCE(preferences->'scheduler'->'disabled_jobs', '[]'::jsonb)
-			     @> to_jsonb($1::text)
-			 )`
+			userQuery = `SELECT id::text,
+			              COALESCE(preferences->>'timezone', 'Asia/Seoul') AS tz
+			             FROM users
+			             WHERE NOT (
+			                 COALESCE(preferences->'scheduler'->'disabled_jobs', '[]'::jsonb)
+			                 @> to_jsonb($1::text)
+			             )`
 		} else {
-			userQuery = `SELECT id::text FROM users
-			 WHERE COALESCE(preferences->'scheduler'->'enabled_jobs', '[]'::jsonb)
-			       @> to_jsonb($1::text)`
+			userQuery = `SELECT id::text,
+			              COALESCE(preferences->>'timezone', 'Asia/Seoul') AS tz
+			             FROM users
+			             WHERE COALESCE(preferences->'scheduler'->'enabled_jobs', '[]'::jsonb)
+			                   @> to_jsonb($1::text)`
 		}
 		rows, err := s.db.QueryContext(queryCtx, userQuery, job.id)
 		if err != nil {
@@ -248,15 +257,36 @@ func (s *Scheduler) runSystemJobs(ctx context.Context, now time.Time) {
 			continue
 		}
 
-		var userIDs []string
+		type userEntry struct{ id, tz string }
+		var candidates []userEntry
 		for rows.Next() {
-			var uid string
-			if rows.Scan(&uid) == nil {
-				userIDs = append(userIDs, uid)
+			var e userEntry
+			if rows.Scan(&e.id, &e.tz) == nil {
+				candidates = append(candidates, e)
 			}
 		}
 		rows.Close()
 		queryCancel()
+
+		// Filter: only fire for users whose local time matches the cron expression.
+		var userIDs []string
+		for _, e := range candidates {
+			loc, err := time.LoadLocation(e.tz)
+			if err != nil {
+				loc, _ = time.LoadLocation("Asia/Seoul")
+			}
+			if matchCron(job.cronExpr, now.In(loc)) {
+				userIDs = append(userIDs, e.id)
+			}
+		}
+
+		if len(userIDs) == 0 {
+			continue
+		}
+		s.logger.Info("scheduler: system job triggered",
+			zap.String("id", job.id),
+			zap.Int("users", len(userIDs)),
+		)
 
 		for _, uid := range userIDs {
 			switch job.actionType {
@@ -541,11 +571,12 @@ func (s *Scheduler) TriggerJob(ctx context.Context, jobID, userID string) (msg s
 			}
 			return job.message, true, nil
 		case "smart_notify":
-			m, skip := s.computeSmartNotify(ctx, userID, job.id)
+			triggerCtx := context.WithValue(ctx, bypassDedupCtxKey{}, true)
+			m, skip := s.computeSmartNotify(triggerCtx, userID, job.id)
 			if skip {
 				return "", false, nil
 			}
-			if err = s.notifyFn(ctx, userID, job.notifType, m); err != nil {
+			if err = s.notifyFn(triggerCtx, userID, job.notifType, m); err != nil {
 				return "", false, err
 			}
 			return m, true, nil
@@ -556,6 +587,26 @@ func (s *Scheduler) TriggerJob(ctx context.Context, jobID, userID string) (msg s
 		return "", false, fmt.Errorf("unknown action type %q for job %q", job.actionType, jobID)
 	}
 	return "", false, fmt.Errorf("job %q not found", jobID)
+}
+
+// bypassDedupCtxKey is the context key used to skip dedup checks.
+// Set by TriggerJob so that a manual Play-button run never blocks same-day scheduled runs.
+type bypassDedupCtxKey struct{}
+
+// alreadySentToday returns true if a notification of notifType was already sent to userID today
+// (UTC calendar date). Always returns false when the bypassDedup context value is set.
+func (s *Scheduler) alreadySentToday(ctx context.Context, userID, notifType string) bool {
+	if ctx.Value(bypassDedupCtxKey{}) != nil {
+		return false
+	}
+	var count int
+	s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM notifications
+		 WHERE user_id = $1::uuid AND type = $2
+		   AND created_at >= CURRENT_DATE`,
+		userID, notifType,
+	).Scan(&count)
+	return count > 0
 }
 
 // computeSmartNotify runs job-specific logic and returns a dynamic notification
@@ -604,15 +655,7 @@ func (s *Scheduler) computeSmartNotify(ctx context.Context, userID, jobID string
 // smartSpendingAnomaly fires when today's spending is ≥2× the 30-day daily average.
 // Sends at most once per day.
 func (s *Scheduler) smartSpendingAnomaly(ctx context.Context, userID string) (string, bool) {
-	// Already notified today?
-	var count int
-	s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM notifications
-		 WHERE user_id = $1::uuid AND type = 'spending_anomaly'
-		   AND created_at >= CURRENT_DATE`,
-		userID,
-	).Scan(&count)
-	if count > 0 {
+	if s.alreadySentToday(ctx, userID, "spending_anomaly") {
 		return "", true
 	}
 
@@ -762,14 +805,7 @@ func (s *Scheduler) smartPatternInsight(ctx context.Context, userID string) (str
 // Sends at most once per 3 days (separate from inactive_reminder which covers 1 day).
 func (s *Scheduler) smartConversationAnalysis(ctx context.Context, userID string) (string, bool) {
 	// Already notified today?
-	var count int
-	s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM notifications
-		 WHERE user_id = $1::uuid AND type = 'conversation_analysis'
-		   AND created_at >= CURRENT_DATE`,
-		userID,
-	).Scan(&count)
-	if count > 0 {
+	if s.alreadySentToday(ctx, userID, "conversation_analysis") {
 		return "", true
 	}
 
@@ -1054,15 +1090,7 @@ type schedAnomalySignal struct {
 // smartAnomalyInsights runs all 4 anomaly signals once per day at 09:00 and
 // sends a consolidated notification when ≥1 HIGH or MODERATE signal is found.
 func (s *Scheduler) smartAnomalyInsights(ctx context.Context, userID string) (string, bool) {
-	// Dedup: already sent today?
-	var count int
-	s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM notifications
-		 WHERE user_id = $1::uuid AND type = 'anomaly_insights'
-		   AND created_at >= CURRENT_DATE`,
-		userID,
-	).Scan(&count)
-	if count > 0 {
+	if s.alreadySentToday(ctx, userID, "anomaly_insights") {
 		return "", true
 	}
 
@@ -1397,15 +1425,7 @@ func cityFromTimezone(tz string) string {
 // Location priority: preferences->>'location' > timezone-derived city > Seoul.
 // Sends at most once per day.
 func (s *Scheduler) smartDailyWeather(ctx context.Context, userID string) (string, bool) {
-	// Dedup: already sent today?
-	var count int
-	s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM notifications
-		 WHERE user_id = $1::uuid AND type = 'daily_weather'
-		   AND created_at >= CURRENT_DATE`,
-		userID,
-	).Scan(&count)
-	if count > 0 {
+	if s.alreadySentToday(ctx, userID, "daily_weather") {
 		return "", true
 	}
 
@@ -1588,14 +1608,7 @@ func stripHTML(s string) string {
 // smartDailyNews fetches today's top news via Naver Search API (매일 오전 7시).
 // Sends at most once per day.
 func (s *Scheduler) smartDailyNews(ctx context.Context, userID string) (string, bool) {
-	var count int
-	s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM notifications
-		 WHERE user_id = $1::uuid AND type = 'daily_news'
-		   AND created_at >= CURRENT_DATE`,
-		userID,
-	).Scan(&count)
-	if count > 0 {
+	if s.alreadySentToday(ctx, userID, "daily_news") {
 		return "", true
 	}
 
@@ -1623,14 +1636,7 @@ func (s *Scheduler) smartDailyNews(ctx context.Context, userID string) (string, 
 // smartLocalEvents fetches today's local events/activities via Naver local search (매일 오후 12시).
 // Sends at most once per day.
 func (s *Scheduler) smartLocalEvents(ctx context.Context, userID string) (string, bool) {
-	var count int
-	s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM notifications
-		 WHERE user_id = $1::uuid AND type = 'local_events'
-		   AND created_at >= CURRENT_DATE`,
-		userID,
-	).Scan(&count)
-	if count > 0 {
+	if s.alreadySentToday(ctx, userID, "local_events") {
 		return "", true
 	}
 
@@ -1659,14 +1665,7 @@ func (s *Scheduler) smartLocalEvents(ctx context.Context, userID string) (string
 // smartItBlogDigest fetches today's IT blog posts via Naver blog search (매일 오후 6시).
 // Sends at most once per day.
 func (s *Scheduler) smartItBlogDigest(ctx context.Context, userID string) (string, bool) {
-	var count int
-	s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM notifications
-		 WHERE user_id = $1::uuid AND type = 'it_blog_digest'
-		   AND created_at >= CURRENT_DATE`,
-		userID,
-	).Scan(&count)
-	if count > 0 {
+	if s.alreadySentToday(ctx, userID, "it_blog_digest") {
 		return "", true
 	}
 
@@ -1734,15 +1733,7 @@ func (s *Scheduler) smartTavilyNews(ctx context.Context, userID string) (string,
 		return "", true // no key configured → skip silently
 	}
 
-	// Dedup: at most once per day
-	var count int
-	s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM notifications
-		 WHERE user_id = $1::uuid AND type = 'tavily_news'
-		   AND created_at >= CURRENT_DATE`,
-		userID,
-	).Scan(&count)
-	if count > 0 {
+	if s.alreadySentToday(ctx, userID, "tavily_news") {
 		return "", true
 	}
 
@@ -1908,15 +1899,7 @@ func (s *Scheduler) smartGoogleCalendarDigest(ctx context.Context, userID string
 		return "", true // Google not connected
 	}
 
-	// Dedup: at most once per day
-	var count int
-	s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM notifications
-		 WHERE user_id = $1::uuid AND type = 'google_calendar_digest'
-		   AND created_at >= CURRENT_DATE`,
-		userID,
-	).Scan(&count)
-	if count > 0 {
+	if s.alreadySentToday(ctx, userID, "google_calendar_digest") {
 		return "", true
 	}
 
@@ -2016,15 +1999,7 @@ func (s *Scheduler) smartGoogleGmailDigest(ctx context.Context, userID string) (
 		return "", true
 	}
 
-	// Dedup: at most once per day
-	var count int
-	s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM notifications
-		 WHERE user_id = $1::uuid AND type = 'google_gmail_digest'
-		   AND created_at >= CURRENT_DATE`,
-		userID,
-	).Scan(&count)
-	if count > 0 {
+	if s.alreadySentToday(ctx, userID, "google_gmail_digest") {
 		return "", true
 	}
 

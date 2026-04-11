@@ -1163,6 +1163,7 @@
       "triggerSent": "发送完成：{name}",
       "triggerSkipped": "没有可发送的数据（已跳过）。",
       "triggerFailed": "立即执行失败。",
+      "triggerNotScheduled": "此通知处于未激活状态。开启开关后将每天自动发送。",
       "deleteSuccess": "已删除\"{title}\"通知。",
       "deleteFailed": "删除通知失败。"
     },

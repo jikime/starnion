@@ -1163,6 +1163,7 @@
       "triggerSent": "送信完了: {name}",
       "triggerSkipped": "送信するデータがありません（スキップ）。",
       "triggerFailed": "即時実行に失敗しました。",
+      "triggerNotScheduled": "この通知は無効です。トグルをオンにすると毎日自動で送信されます。",
       "deleteSuccess": "\"{title}\"の通知が削除されました。",
       "deleteFailed": "通知の削除に失敗しました。"
     },

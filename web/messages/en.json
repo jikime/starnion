@@ -1163,6 +1163,7 @@
       "triggerSent": "Sent: {name}",
       "triggerSkipped": "No data to send (skipped).",
       "triggerFailed": "Failed to run immediately.",
+      "triggerNotScheduled": "This notification is inactive. Enable the toggle to receive it automatically every day.",
       "deleteSuccess": "\"{title}\" has been deleted.",
       "deleteFailed": "Failed to delete notification."
     },

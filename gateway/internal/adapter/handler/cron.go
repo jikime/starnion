@@ -537,10 +537,30 @@ func (h *CronHandler) TriggerSystemJob(c echo.Context) error {
 		h.logger.Warn("TriggerSystemJob: execution error", zap.String("job", jobID), zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
+
+	// Determine whether the job is also enabled for automatic scheduled runs.
+	// For defaultEnabled=false jobs, the user must have toggled it ON via enabled_jobs.
+	var prefsJSON sql.NullString
+	_ = h.db.QueryRowContext(c.Request().Context(),
+		`SELECT preferences FROM users WHERE id = $1`, userID,
+	).Scan(&prefsJSON)
+	var prefs map[string]any
+	if prefsJSON.Valid {
+		_ = json.Unmarshal([]byte(prefsJSON.String), &prefs)
+	}
+	scheduled := true
+	for _, j := range builtinSystemJobs {
+		if j.ID == jobID && !j.Enabled {
+			scheduled = isJobEnabled(prefs, jobID)
+			break
+		}
+	}
+
 	return c.JSON(http.StatusOK, map[string]any{
-		"id":      jobID,
-		"sent":    sent,
-		"message": msg,
+		"id":        jobID,
+		"sent":      sent,
+		"message":   msg,
+		"scheduled": scheduled,
 	})
 }
 
