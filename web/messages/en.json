@@ -2100,6 +2100,7 @@
       "addPlaceholder": "Enter task title...",
       "add": "Add",
       "priority": "Priority",
+      "order": "Order",
       "role": "Role",
       "roleNone": "None",
       "timeStart": "Start",
@@ -2266,7 +2267,8 @@
       "yesterday": "Yesterday",
       "goToday": "Today",
       "prevDay": "Previous day",
-      "nextDay": "Next day"
+      "nextDay": "Next day",
+      "refresh": "Refresh"
     },
     "timeBlock": {
       "title": "Time Blocking",

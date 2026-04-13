@@ -163,6 +163,36 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Lock the viewport when the MainLayout shell is mounted.
+   *
+   * MainLayout (app/(main)/layout.tsx) adds `.main-shell-active` to
+   * <body> on mount and removes it on unmount. While active, the
+   * browser can NEVER scroll the body — every scrollable area lives
+   * inside the app shell (`<div class="flex flex-col h-dvh ...">`).
+   *
+   * Why this matters on mobile Chrome: without it, 100vh in the shell
+   * computes as the URL-bar-hidden size. At load time the URL bar IS
+   * visible, so the shell overflows the visible area, the body
+   * becomes the scroll container, and the sticky top header creeps
+   * upward as the user scrolls — even though `sticky top-0` is set
+   * on the header — because the real scroll root is <body>.
+   *
+   * Pinning html/body to 100% + overflow:hidden guarantees the shell
+   * is always flush with the visible viewport regardless of URL-bar
+   * state. Auth pages (`app/(auth)/layout.tsx`) are unaffected
+   * because `.main-shell-active` is NOT applied there, so their long
+   * forms keep the normal body-scroll behaviour.
+   */
+  html:has(body.main-shell-active),
+  body.main-shell-active {
+    height: 100%;
+    overflow: hidden;
+    /* Disable iOS rubber-band and Android pull-to-refresh so the
+     * shell feels like a native app shell. Individual scroll areas
+     * inside the shell keep their own overscroll behaviour.
+     */
+    overscroll-behavior: none;
+  }
   /* Number input spinner */
   input[type="number"]::-webkit-inner-spin-button,
   input[type="number"]::-webkit-outer-spin-button {

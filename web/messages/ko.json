@@ -2097,6 +2097,7 @@
       "addPlaceholder": "업무 제목 입력...",
       "add": "추가",
       "priority": "우선순위",
+      "order": "순서",
       "role": "역할",
       "roleNone": "선택 안함",
       "timeStart": "시작",
@@ -2263,7 +2264,8 @@
       "yesterday": "어제",
       "goToday": "오늘로",
       "prevDay": "이전 날",
-      "nextDay": "다음 날"
+      "nextDay": "다음 날",
+      "refresh": "새로고침"
     },
     "timeBlock": {
       "title": "타임 블로킹",

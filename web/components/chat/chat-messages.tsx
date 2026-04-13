@@ -202,19 +202,26 @@ export function ChatMessages({
             <ChatEmptyState onSuggest={onSuggest ?? (() => {})} />
           )}
 
-          {messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              conversationId={conversationId}
-              speakingId={speakingId}
-              voiceState={voiceState}
-              onSpeak={handleSpeak}
-              onDelete={handleDelete}
-              deletingId={deletingId}
-              onRetry={onRetry}
-            />
-          ))}
+          {messages.map((message) => {
+            // Per-bubble booleans keep React.memo effective: when `voiceState`
+            // or `speakingId` changes, only the single affected bubble re-renders.
+            const isSpeaking = speakingId === message.id
+            const isSpeakingLoading = isSpeaking && voiceState === "loading"
+            const isDeleting = deletingId === message.id
+            return (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                canDelete={Boolean(conversationId)}
+                isSpeaking={isSpeaking}
+                isSpeakingLoading={isSpeakingLoading}
+                isDeleting={isDeleting}
+                onSpeak={handleSpeak}
+                onDelete={handleDelete}
+                onRetry={onRetry}
+              />
+            )
+          })}
 
           {isThinking && <ThinkingBubble />}
         </div>

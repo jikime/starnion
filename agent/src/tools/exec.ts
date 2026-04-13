@@ -63,6 +63,48 @@ function resolveWorkdir(workdir: string | undefined, cwd: string): string {
 // Cap foreground stdout+stderr at 256 KB each (same limit as background processes).
 const MAX_FOREGROUND_OUTPUT_BYTES = 256 * 1024;
 
+// Denylist of obviously destructive patterns. The exec tool is LLM-driven,
+// so a strict allowlist is infeasible — but there is no legitimate agentic
+// use case that needs to destroy the host system. These patterns exist to
+// catch prompt-injection attacks that try to slip a "rm -rf /" through.
+// Defense in depth: the gRPC interceptor (GRPC_SHARED_SECRET) is still the
+// primary authentication boundary.
+const DANGEROUS_COMMAND_PATTERNS: RegExp[] = [
+  // Recursive removal of root or home directories
+  /\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r|-rf|-fr)\s+(\/|~|\$HOME)(\s|$|\/\*)/,
+  /\brm\s+-[a-zA-Z]*r[a-zA-Z]*\s+\/\*/,
+  // Wipe filesystems
+  /\b(dd|shred|wipefs)\s+.*\/dev\//,
+  /\bmkfs(\.\w+)?\s+\/dev\//,
+  // Format / mkfs
+  /\bformat\s+[a-z]:/i,
+  // Fork bomb
+  /:\s*\(\s*\)\s*\{.*\|.*&.*\}\s*;\s*:/,
+  // Curl-pipe-shell onto an unknown endpoint
+  /(curl|wget)\s+[^|]+\|\s*(sh|bash|zsh)\b/,
+  // History / log wipe
+  /\b(history\s+-c|>\s*\/dev\/null\s*2>&1\s*<<.*EOF.*rm\s+-rf)/,
+];
+
+// validateCommand inspects a shell command string and returns an error
+// message when it matches a destructive pattern. Return value is a tuple
+// so callers can surface the reason to the LLM via the tool result.
+function validateCommand(cmd: string): string | null {
+  const trimmed = cmd.trim();
+  if (trimmed.length === 0) {
+    return "empty command";
+  }
+  if (trimmed.length > 16 * 1024) {
+    return "command exceeds 16 KiB";
+  }
+  for (const pat of DANGEROUS_COMMAND_PATTERNS) {
+    if (pat.test(trimmed)) {
+      return `refused: command matches dangerous pattern (${pat.source})`;
+    }
+  }
+  return null;
+}
+
 function capOutput(current: string, chunk: string): string {
   const combined = current + chunk;
   if (combined.length > MAX_FOREGROUND_OUTPUT_BYTES) {
@@ -255,6 +297,19 @@ export const execTool: ToolDefinition<typeof execSchema, ExecDetails> = {
 
   async execute(_toolCallId, params, signal, _onUpdate, ctx) {
     let { command, workdir, env: extraEnv, timeout = 30_000, background = false, yieldMs = 0 } = params;
+
+    // Destructive-pattern guard. The exec tool is LLM-driven and prompt
+    // injection could trick the agent into running "rm -rf /" or piping
+    // a remote script into a shell. validateCommand rejects the most
+    // obvious variants before we hand anything to spawn().
+    const refuseReason = validateCommand(command);
+    if (refuseReason) {
+      return {
+        output: `exec refused: ${refuseReason}`,
+        details: { command, exitCode: 126, background },
+      };
+    }
+
     const cwd = resolveWorkdir(workdir, ctx.cwd);
     const filteredEnv = extraEnv
       ? Object.fromEntries(

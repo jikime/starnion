@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package agent;
 
-option go_package = "github.com/newstarnion/gateway/internal/infrastructure/grpc/proto;proto";
+option go_package = "github.com/newstarnion/gateway/proto/agent;agent";
 
 service AgentService {
   rpc Chat(ChatRequest) returns (stream ChatResponse);
@@ -12,12 +12,107 @@ service AgentService {
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }
 
+// ChatRequest carries everything the agent needs for one chat turn.
+// All context (persona, LLM credentials, history, vision inputs, skills)
+// is expressed as typed sub-messages; the previous design stuffed these
+// into a `map<string,string> metadata` field, which forced both sides to
+// JSON-marshal/unmarshal and broke schema versioning.
 message ChatRequest {
   string user_id = 1;
   string session_id = 2;
   string message = 3;
   string model = 4;
-  map<string, string> metadata = 5;
+  // Field 5 is intentionally reserved — it used to be `map<string,string>
+  // metadata` and must not be recycled so that mixed-version rollouts do
+  // not mis-decode the new typed fields.
+  reserved 5;
+  reserved "metadata";
+
+  ProviderConfig provider = 6;
+  UserContext user_context = 7;
+  PersonaConfig persona = 8;
+  ChatHistory history = 9;
+  VisionInputs vision = 10;
+  SkillConfig skills = 11;
+  ClientInfo client = 12;
+}
+
+// ProviderConfig bundles the primary-provider credentials plus the list
+// of other configured providers so the agent can both make the primary
+// call and construct a fallback chain without extra database work.
+message ProviderConfig {
+  string name = 1;            // e.g. "anthropic", "openai", "groq"
+  string api_key = 2;         // decrypted at the gateway edge
+  string secondary_model = 3; // utility model for titles/insights/compression
+  repeated string configured_providers = 4;
+  repeated FallbackProvider fallback_chain = 5;
+}
+
+// FallbackProvider is one entry in the ordered LLM fallback chain.
+message FallbackProvider {
+  string provider = 1;
+  string api_key = 2;
+  string model = 3;
+  string base_url = 4; // optional, for OpenAI-compatible endpoints
+}
+
+// UserContext exposes user-scoped knobs the agent needs without touching
+// the database. Add fields here when a new per-user preference must flow
+// through the chat path.
+message UserContext {
+  string timezone = 1;
+}
+
+// PersonaConfig is the conversation-specific persona copy. Empty fields
+// mean "fall back to the agent-side default persona".
+message PersonaConfig {
+  string system_prompt = 1;
+}
+
+// ChatHistory is the short window of previous turns the agent needs for
+// short-term context reconstruction. Long-term memory retrieval is a
+// separate skill-side concern and is not shipped on this channel.
+message ChatHistory {
+  repeated PreviousMessage messages = 1;
+}
+
+message PreviousMessage {
+  string role = 1;    // "user" | "assistant" | "system"
+  string content = 2;
+}
+
+// VisionInputs carries either raw bytes (preferred for small images from
+// Telegram) or URLs (preferred for files already uploaded to MinIO on
+// the web path — the agent fetches+caches them before calling the LLM).
+message VisionInputs {
+  repeated ImageContent images = 1;
+  repeated ImageURL image_urls = 2;
+}
+
+message ImageContent {
+  bytes data = 1;       // raw bytes (proto3 handles binary natively)
+  string mime_type = 2; // e.g. "image/jpeg"
+}
+
+message ImageURL {
+  string url = 1;
+  string mime_type = 2;
+}
+
+// SkillConfig parameterises the skill runtime:
+//  * env — extra environment variables (typically provider API keys)
+//          that individual skills can read from process.env
+//  * disabled — skill IDs the user has toggled off in settings
+message SkillConfig {
+  map<string, string> env = 1;
+  repeated string disabled = 2;
+}
+
+// ClientInfo identifies which UI surface this turn originated from so
+// the agent can tune its output format (markdown for web, plain for
+// Telegram, etc.).
+message ClientInfo {
+  string platform = 1; // "web" | "telegram" | "cli"
 }
 
 message ChatResponse {

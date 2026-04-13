@@ -247,8 +247,14 @@ export class PromptComposer {
     const disabledSet = disabledSkillIds?.length ? new Set(disabledSkillIds) : undefined;
     const lowerMessage = userMessage?.toLowerCase();
     const needsFilter = !!(configuredProviders?.length || platform || disabledSet || lowerMessage);
+    // Minimal shape of a skill entry — we only read `filePath` so a full
+    // pi-coding-agent Skill typing isn't needed here. Using `unknown` for
+    // diagnostics keeps the override contract surface small without
+    // falling back to `any`.
+    type SkillLike = { filePath?: string } & Record<string, unknown>;
+    type SkillsOverrideInput = { skills: SkillLike[]; diagnostics: unknown };
     const skillsOverrideFn = needsFilter
-      ? (base: { skills: any[]; diagnostics: any }) => {
+      ? (base: SkillsOverrideInput) => {
           // Pre-compute whether any keyword-bearing skill matches the message.
           // Uses the same helper as buildFilteredSkillIndex to keep both
           // filtering paths consistent (no false-negative divergence).
@@ -256,7 +262,7 @@ export class PromptComposer {
             ? anyKeywordSkillMatches(metas, lowerMessage)
             : false;
 
-          const filtered = base.skills.filter((skill: any) => {
+          const filtered = base.skills.filter((skill) => {
             const dirName = path.basename(path.dirname(skill.filePath ?? ""));
             const meta = metas.find((m) => m.dirName === dirName);
 

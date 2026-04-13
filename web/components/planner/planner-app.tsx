@@ -4,16 +4,23 @@
 import { useEffect, useRef, useState } from "react"
 import { useTranslations } from "next-intl"
 import NextImage from "next/image"
+import dynamic from "next/dynamic"
 import { cn } from "@/lib/utils"
 import { TabBar, type PlannerTab } from "./tab-bar"
-import { DailyTab } from "./daily-tab"
-import { WeeklyTab } from "./weekly-tab"
-import { MonthlyTab } from "./monthly-tab"
-import { GoalsTab } from "./goals-tab"
-import { GuideTab } from "./guide-tab"
+// Planner sub-tabs are loaded lazily so the initial planner bundle only
+// has to ship the tab bar + month sidebar + currently-visible tab. Each
+// sub-tab is 500-800 LOC of React with its own form logic and charts,
+// and only one is visible at a time.
+const DailyTab = dynamic(() => import("./daily-tab").then((m) => ({ default: m.DailyTab })), { ssr: false })
+const WeeklyTab = dynamic(() => import("./weekly-tab").then((m) => ({ default: m.WeeklyTab })), { ssr: false })
+const MonthlyTab = dynamic(() => import("./monthly-tab").then((m) => ({ default: m.MonthlyTab })), { ssr: false })
+const GoalsTab = dynamic(() => import("./goals-tab").then((m) => ({ default: m.GoalsTab })), { ssr: false })
+const GuideTab = dynamic(() => import("./guide-tab").then((m) => ({ default: m.GuideTab })), { ssr: false })
 import { MonthSidebar } from "./month-sidebar"
-import { ChatSection, FilesSection, AnalyticsSection } from "./journal-tab"
-import { AssetsSection } from "./stats-tab"
+const ChatSection = dynamic(() => import("./journal-tab").then((m) => ({ default: m.ChatSection })), { ssr: false })
+const FilesSection = dynamic(() => import("./journal-tab").then((m) => ({ default: m.FilesSection })), { ssr: false })
+const AnalyticsSection = dynamic(() => import("./journal-tab").then((m) => ({ default: m.AnalyticsSection })), { ssr: false })
+const AssetsSection = dynamic(() => import("./stats-tab").then((m) => ({ default: m.AssetsSection })), { ssr: false })
 import {
   MessageSquare,
   FolderOpen,
@@ -221,7 +228,7 @@ export function PlannerApp() {
 
   if (!mounted) {
     return (
-      <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
+      <div className="flex flex-col h-dvh bg-background text-foreground overflow-hidden">
         <div className="h-11 border-b border-border bg-card/80 shrink-0" />
         <div className="flex flex-1 overflow-hidden">
           <div className="w-20 shrink-0 border-r border-border bg-card/50" />
@@ -234,7 +241,7 @@ export function PlannerApp() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
+    <div className="flex flex-col h-dvh bg-background text-foreground overflow-hidden">
       <GlobalNav activeSection={activeSection} onSectionChange={setActiveSection} />
 
       <div className="flex flex-1 overflow-hidden min-h-0">

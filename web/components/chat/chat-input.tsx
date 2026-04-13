@@ -323,13 +323,31 @@ export function ChatInput({
             </div>
           )}
 
-          {/* Textarea — hidden while recorder is open */}
+          {/* Textarea — hidden while recorder is open.
+              `style={{ fieldSizing: "fixed" }}` kills the browser-
+              native auto-resize that the base `<Textarea>` enables
+              via `field-sizing-content`. Auto-resize is nice on
+              low-traffic forms (planner notes, persona editor, …)
+              but it forces a layout recalc on every keystroke
+              because the intrinsic size depends on text content.
+              In a fast chat input — especially under a Korean IME
+              that fires several compositionupdate events per
+              character — that per-keystroke layout pass stacks up
+              and drops input frames on mobile Chrome. Pinning the
+              field size to `fixed` lets the textarea keep its
+              explicit min/max (64px–160px via
+              `min-h-[64px] max-h-40`) and scroll internally when
+              the content exceeds the max, matching the behaviour
+              of every major chat app. Inline style is used instead
+              of a class override so the fix is immune to tailwind-
+              merge conflict-group quirks. */}
           {!showRecorder && (
             <Textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={placeholder ?? t("inputPlaceholder")}
-              className="min-h-[64px] max-h-40 resize-none border-0 bg-transparent px-4 pt-4 pb-2 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 text-base"
+              className="min-h-[64px] max-h-40 resize-none border-0 bg-transparent px-4 pt-4 pb-2 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 text-base overflow-y-auto"
+              style={{ fieldSizing: "fixed" } as React.CSSProperties}
               rows={2}
               maxLength={32000}
               disabled={disabled}

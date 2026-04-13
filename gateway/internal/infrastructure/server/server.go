@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -10,16 +9,14 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/newstarnion/gateway/config"
-	"github.com/newstarnion/gateway/internal/adapter/handler"
+	"github.com/newstarnion/gateway/internal/adapter/http/httpauth"
+	"github.com/newstarnion/gateway/internal/adapter/router"
 	"github.com/newstarnion/gateway/internal/crypto"
-	"github.com/newstarnion/gateway/internal/infrastructure/database"
+	"github.com/newstarnion/gateway/internal/infrastructure/bootstrap"
 	agentgrpc "github.com/newstarnion/gateway/internal/infrastructure/grpc"
-	"github.com/newstarnion/gateway/internal/infrastructure/logbuffer"
 	"github.com/newstarnion/gateway/internal/infrastructure/scheduler"
 	tginfra "github.com/newstarnion/gateway/internal/infrastructure/telegram"
-	"github.com/newstarnion/gateway/internal/notification"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 type Server struct {
@@ -27,51 +24,46 @@ type Server struct {
 	config      *config.Config
 	logger      *zap.Logger
 	agentClient *agentgrpc.AgentClient
-	router      *handler.Router
+	router      *router.Router
 	scheduler   *scheduler.Scheduler
+	container   *bootstrap.Container
 }
 
-func New(logger *zap.Logger) (*Server, error) {
+func New(rootLogger *zap.Logger) (*Server, error) {
 	cfg := config.Load()
 
-	// Initialize database
+	// Build the non-HTTP dependency graph via the bootstrap container.
+	// This replaces the 150-line `New()` body that used to construct the
+	// DB, gRPC client, log hub, repositories, usecases, scheduler and
+	// notification dispatcher inline — all of those now live in
+	// internal/infrastructure/bootstrap/wire.go.
 	ctx := context.Background()
-	db, err := database.NewPostgres(ctx, cfg.DatabaseURL)
+	container, err := bootstrap.New(ctx, cfg, rootLogger)
 	if err != nil {
 		return nil, err
 	}
-
-	// Run pending database migrations.
-	if err := database.RunMigrations(ctx, db, logger); err != nil {
-		return nil, fmt.Errorf("run migrations: %w", err)
-	}
-
-	// Initialize agent gRPC client
-	agentClient, err := agentgrpc.NewAgentClient(cfg.AgentGRPCAddr, cfg.GRPCSharedSecret, logger)
-	if err != nil {
-		// Non-fatal: agent may not be running in all environments
-		logger.Warn("Failed to connect to agent service", zap.String("addr", cfg.AgentGRPCAddr), zap.Error(err))
-		agentClient = nil
-	}
-
-	// Create in-memory log hub and tee gateway logs into it.
-	hub := logbuffer.NewHub()
-	logger = zap.New(zapcore.NewTee(logger.Core(), logbuffer.NewZapCore(hub)),
-		zap.WithCaller(false))
+	logger := container.Logger
 
 	// Initialize Echo
 	e := echo.New()
 	e.HideBanner = true
+
+	// Register a request-body validator so handlers can call
+	// c.Validate(&req) after c.Bind(&req). Without this, the
+	// `validate:` struct tags scattered through the handler
+	// packages are dead code and any zero-value input slips past
+	// the Bind step straight into downstream logic.
+	e.Validator = httpauth.NewRequestValidator()
 
 	// Middleware
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestID())
 
 	// ── CORS ──────────────────────────────────────────────────────────────────
+	// config.Load() fail-fasts when AllowedOrigins is empty on a non-loopback
+	// bind and populates sensible localhost defaults in dev, so by the time
+	// we reach this line the list is guaranteed non-empty.
 	allowedOrigins := cfg.AllowedOrigins
-	if len(allowedOrigins) == 0 {
-		allowedOrigins = []string{"*"}
-	}
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: allowedOrigins,
 		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
@@ -108,7 +100,7 @@ func New(logger *zap.Logger) (*Server, error) {
 	e.Use(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
 		Store: middleware.NewRateLimiterMemoryStoreWithConfig(
 			middleware.RateLimiterMemoryStoreConfig{
-				Rate:      100,          // requests per minute per identity
+				Rate:      100, // requests per minute per identity
 				Burst:     30,
 				ExpiresIn: 1 * time.Minute,
 			},
@@ -140,50 +132,58 @@ func New(logger *zap.Logger) (*Server, error) {
 	// ── Request Body Size Limit ───────────────────────────────────────────────
 	e.Use(middleware.BodyLimit("10M"))
 
-	// Register routes
-	h := handler.NewRouter(db, cfg, agentClient, hub, logger)
+	// Register routes using dependencies from the bootstrap container.
+	h := router.NewRouter(container.DB, cfg, container.AgentClient, container.LogHub, router.RouterDeps{
+		UserUseCase:         container.UseCases.User,
+		AnomalyUseCase:      container.UseCases.Anomaly,
+		BudgetUseCase:       container.UseCases.Budget,
+		ChannelsUseCase:     container.UseCases.Channels,
+		ConversationUseCase: container.UseCases.Conversation,
+		CronUseCase:         container.UseCases.Cron,
+		FilesUseCase:        container.UseCases.Files,
+		FinanceUseCase:      container.UseCases.Finance,
+		IntegrationsUseCase: container.UseCases.Integrations,
+		MediaUseCase:        container.UseCases.Media,
+		MediaStore:          container.MediaStore,
+		NotificationUseCase: container.UseCases.Notification,
+		Dispatcher:          container.Dispatcher,
+		PersonaUseCase:      container.UseCases.Persona,
+		PlannerUseCase:      container.UseCases.Planner,
+		SearchUseCase:       container.UseCases.Search,
+		SettingsUseCase:     container.UseCases.Settings,
+		SkillsUseCase:       container.UseCases.Skills,
+		StatisticsUseCase:   container.UseCases.Statistics,
+	}, logger)
 	h.Register(e)
 
-	// Wire scheduler with notification callbacks.
-	// Report generation removed — reports handler was deleted.
-	reportFn := func(ctx context.Context, userID, reportType string) error {
-		_ = userID
-		_ = reportType
-		return nil // reports handler removed
-	}
-
-	// Build the notification dispatcher.
-	// To add a new platform (Discord, Slack, …) register a new Notifier here.
-	dispatcher := notification.NewDispatcher(db, logger,
-		notification.NewTelegramNotifier(db, cfg.EncryptionKey, logger),
-	)
-	notifyFn := func(ctx context.Context, userID, notifType, message string) error {
-		// Persist to notifications table so dedup checks in smart_notify jobs work.
-		db.ExecContext(ctx,
-			`INSERT INTO notifications (user_id, type, message)
-			 VALUES ($1::uuid, $2, $3)`,
-			userID, notifType, message,
-		)
-		return dispatcher.Dispatch(ctx, userID, notifType, message)
-	}
-
-	sched := scheduler.New(db, logger, reportFn, notifyFn)
-	sched.SetNaverCredentials(cfg.NaverSearchClientID, cfg.NaverSearchClientSecret)
-	sched.SetEncryptionKey(cfg.EncryptionKey)
-	sched.SetGoogleCredentials(cfg.GoogleClientID, cfg.GoogleClientSecret)
-	h.SetScheduler(sched) // wire scheduler → cron handler for immediate timer re-arm
+	// Wire scheduler → cron handler for immediate timer re-arm.
+	h.SetScheduler(container.Scheduler)
 
 	return &Server{
 		echo:        e,
 		config:      cfg,
 		logger:      logger,
-		agentClient: agentClient,
+		agentClient: container.AgentClient,
 		router:      h,
-		scheduler:   sched,
+		scheduler:   container.Scheduler,
+		container:   container,
 	}, nil
 }
 
 func (s *Server) Run(ctx context.Context) error {
+	// Thread the server lifetime context into the telegram webhook
+	// handler so its detached goroutines (HandleUpdate + album-buffer
+	// timers) get cancelled during graceful shutdown. Without this
+	// the webhook goroutines use context.Background() and outlive
+	// the Echo shutdown window, holding DB connections past SIGTERM.
+	s.router.SetBaseContext(ctx)
+
+	// Wire the token blacklist to the DB so revoked tokens survive
+	// process restarts. Without this, logout was effectively erased
+	// on every redeploy and the previously-logged-out token became
+	// valid again until its 24-hour TTL elapsed.
+	httpauth.InitBlacklist(s.router.DB().Pool())
+
 	telegramHandler := s.router.TelegramHandler()
 
 	// Build the MessageHandler used by all pollers.
@@ -257,7 +257,7 @@ func (s *Server) Run(ctx context.Context) error {
 	botManager.EnsurePoller(s.config.TelegramBotToken)
 
 	// 2. Per-user bot tokens from channel_settings (set via web UI Channels page)
-	if rows, err := s.router.DB().QueryContext(ctx,
+	if rows, err := s.router.DB().Pool().Query(ctx,
 		`SELECT DISTINCT bot_token FROM channel_settings WHERE channel = 'telegram' AND bot_token <> '' AND bot_token IS NOT NULL`,
 	); err == nil {
 		for rows.Next() {

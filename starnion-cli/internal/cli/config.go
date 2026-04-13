@@ -26,6 +26,23 @@ type StarNionConfig struct {
 	Embedding EmbeddingConfig `yaml:"embedding,omitempty"`
 	Admin     AdminConfig     `yaml:"admin,omitempty"`
 	UI        UIConfig        `yaml:"ui,omitempty"`
+	Browser   BrowserConfig   `yaml:"browser,omitempty"`
+}
+
+// BrowserConfig holds settings for the agent's browser-control bridge.
+//
+// AuthToken used to live here under `browser.auth_token`, but it is a
+// shared secret — structurally the same as jwt_secret / encryption_key
+// / grpc_shared_secret — so it now lives alongside them under
+// `auth.browser_auth_token`. The LegacyAuthToken field below exists
+// only to transparently migrate pre-existing yamls; LoadConfig copies
+// it to AuthConfig.BrowserAuthToken and zeroes it on read, so the next
+// SaveConfig emits the new field and drops the legacy one.
+type BrowserConfig struct {
+	Enabled bool `yaml:"enabled,omitempty"`
+	// Deprecated: tokens are now stored in auth.browser_auth_token.
+	// Kept here so LoadConfig can migrate old yamls in place.
+	LegacyAuthToken string `yaml:"auth_token,omitempty"`
 }
 
 type DatabaseConfig struct {
@@ -38,10 +55,16 @@ type DatabaseConfig struct {
 }
 
 type AuthConfig struct {
-	JWTSecret        string `yaml:"jwt_secret"`
-	AuthSecret       string `yaml:"auth_secret"`
-	EncryptionKey    string `yaml:"encryption_key"`
+	JWTSecret         string `yaml:"jwt_secret"`
+	AuthSecret        string `yaml:"auth_secret"`
+	EncryptionKey     string `yaml:"encryption_key"`
+	GRPCSharedSecret  string `yaml:"grpc_shared_secret,omitempty"`
 	InternalLogSecret string `yaml:"internal_log_secret,omitempty"`
+	// BrowserAuthToken is the shared bearer for the agent's browser-
+	// control HTTP bridge. Without it the agent disables the bridge
+	// at startup with a loud warning, so EnsureSecrets auto-fills it
+	// alongside the other shared secrets.
+	BrowserAuthToken string `yaml:"browser_auth_token,omitempty"`
 }
 
 type MinIOConfig struct {
@@ -92,8 +115,9 @@ type ModelsDefaults struct {
 }
 
 type TelegramConfig struct {
-	BotToken   string `yaml:"bot_token,omitempty"`
-	WebhookURL string `yaml:"webhook_url,omitempty"`
+	BotToken      string `yaml:"bot_token,omitempty"`
+	WebhookURL    string `yaml:"webhook_url,omitempty"`
+	WebhookSecret string `yaml:"webhook_secret,omitempty"`
 }
 
 type EmbeddingConfig struct {
@@ -184,6 +208,13 @@ func LoadConfig() (StarNionConfig, error) {
 		return cfg, fmt.Errorf("parse config: %w", err)
 	}
 	cfg.Minio.DeriveEndpoint()
+	// Migrate legacy browser.auth_token → auth.browser_auth_token so
+	// older yamls (pre-reshuffle) upgrade transparently on the next
+	// SaveConfig. The legacy field is zeroed so it isn't re-emitted.
+	if cfg.Browser.LegacyAuthToken != "" && cfg.Auth.BrowserAuthToken == "" {
+		cfg.Auth.BrowserAuthToken = cfg.Browser.LegacyAuthToken
+	}
+	cfg.Browser.LegacyAuthToken = ""
 	return cfg, nil
 }
 
@@ -241,19 +272,32 @@ func randomSecret(nbytes int) string {
 	return hex.EncodeToString(b)
 }
 
-// EnsureSecrets auto-generates JWT, Auth, and Encryption secrets if they are empty.
-func EnsureSecrets(cfg *StarNionConfig) {
-	if cfg.Auth.JWTSecret == "" {
-		cfg.Auth.JWTSecret = randomSecret(32)
+// EnsureSecrets auto-generates JWT, Auth, Encryption, gRPC, Internal-log, and
+// Telegram webhook secrets if they are empty. The generated secrets are safe
+// to persist to ~/.starnion/starnion.yaml and are consumed by both the
+// gateway and the agent.
+//
+// Returns true when at least one field was filled so callers can decide
+// whether the config needs to be re-saved. This avoids drift where a new
+// secret is added to EnsureSecrets but a caller's dirty-check forgets it.
+func EnsureSecrets(cfg *StarNionConfig) (changed bool) {
+	fill := func(dst *string, size int) {
+		if *dst == "" {
+			*dst = randomSecret(size)
+			changed = true
+		}
 	}
-	if cfg.Auth.AuthSecret == "" {
-		cfg.Auth.AuthSecret = randomSecret(32)
-	}
-	if cfg.Auth.EncryptionKey == "" {
-		cfg.Auth.EncryptionKey = randomSecret(32) // 32 bytes → 64-char hex → AES-256
-	}
-	if cfg.Auth.InternalLogSecret == "" {
-		cfg.Auth.InternalLogSecret = randomSecret(16)
-	}
+	fill(&cfg.Auth.JWTSecret, 32)
+	fill(&cfg.Auth.AuthSecret, 32)
+	fill(&cfg.Auth.EncryptionKey, 32) // 32 bytes → 64-char hex → AES-256
+	fill(&cfg.Auth.GRPCSharedSecret, 32)
+	fill(&cfg.Auth.InternalLogSecret, 16)
+	fill(&cfg.Telegram.WebhookSecret, 16)
+	// Browser control bridge — the agent's index.ts fail-fasts when
+	// BROWSER_AUTH_TOKEN is unset (unless BROWSER_ENABLED=false). Populate
+	// a secure random token under auth.browser_auth_token so a fresh
+	// `starnion start` / `starnion dev` / `starnion setup` run works out
+	// of the box without the user having to hand-craft a config field.
+	fill(&cfg.Auth.BrowserAuthToken, 32)
+	return changed
 }
-

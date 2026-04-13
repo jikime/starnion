@@ -485,8 +485,16 @@ func (c *Client) SetReaction(chatID int64, messageID int, emoji string) error {
 }
 
 // SetWebhook registers a webhook URL with Telegram.
-func (c *Client) SetWebhook(webhookURL string) error {
+// secretToken is the `secret_token` parameter that Telegram will send
+// back in the `X-Telegram-Bot-Api-Secret-Token` header on every
+// webhook delivery. When non-empty, the gateway can verify the
+// header to authenticate that the request genuinely came from
+// Telegram.
+func (c *Client) SetWebhook(webhookURL, secretToken string) error {
 	payload := map[string]string{"url": webhookURL}
+	if secretToken != "" {
+		payload["secret_token"] = secretToken
+	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return err

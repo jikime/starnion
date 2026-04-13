@@ -29,12 +29,21 @@ type Config struct {
 	DatabaseURL string
 
 	// Telegram
-	TelegramBotToken   string
-	TelegramWebhookURL string
+	TelegramBotToken      string
+	TelegramWebhookURL    string
+	TelegramWebhookSecret string // X-Telegram-Bot-Api-Secret-Token verification (set via setWebhook)
 
 	// Agent gRPC
-	AgentGRPCAddr     string
-	GRPCSharedSecret  string // shared secret sent in gRPC metadata for auth
+	AgentGRPCAddr    string
+	GRPCSharedSecret string // shared secret sent in gRPC metadata for auth
+
+	// Agent gRPC TLS — optional. When AgentGRPCTLSCAPath is set, transport credentials
+	// are loaded from the CA (and optionally client cert/key for mTLS). When unset,
+	// the client only connects to loopback addresses to avoid plaintext over the network.
+	AgentGRPCTLSCAPath     string
+	AgentGRPCTLSCertPath   string
+	AgentGRPCTLSKeyPath    string
+	AgentGRPCTLSServerName string // SNI / hostname override for server cert verification
 
 	// JWT
 	JWTSecret string
@@ -110,8 +119,9 @@ type starnionYAML struct {
 		SessionDir     string `yaml:"session_dir"`
 	} `yaml:"gateway"`
 	Telegram struct {
-		BotToken   string `yaml:"bot_token"`
-		WebhookURL string `yaml:"webhook_url"`
+		BotToken      string `yaml:"bot_token"`
+		WebhookURL    string `yaml:"webhook_url"`
+		WebhookSecret string `yaml:"webhook_secret"`
 	} `yaml:"telegram"`
 	Google struct {
 		ClientID     string `yaml:"client_id"`
@@ -165,24 +175,29 @@ func loadStarnionYAML() (*starnionYAML, error) {
 func Load() *Config {
 	// 1. Start with env-var defaults.
 	cfg := &Config{
-		HTTPAddr:           getEnv("GATEWAY_HTTP_ADDR", ":8080"),
-		PublicURL:          getEnv("GATEWAY_PUBLIC_URL", ""),
-		DatabaseURL:        getEnv("DATABASE_URL", ""),
-		TelegramBotToken:   getEnv("TELEGRAM_BOT_TOKEN", ""),
-		TelegramWebhookURL: getEnv("TELEGRAM_WEBHOOK_URL", ""),
-		AgentGRPCAddr:      getEnv("AGENT_GRPC_ADDR", "localhost:50051"),
-		GRPCSharedSecret:   getEnv("GRPC_SHARED_SECRET", ""),
-		JWTSecret:          getEnv("JWT_SECRET", ""),
-		EncryptionKey:      getEnv("ENCRYPTION_KEY", ""),
-		InternalLogSecret:  getEnv("INTERNAL_LOG_SECRET", ""),
-		SessionDir:         getEnv("SESSION_DIR", "/tmp/starnion-sessions"),
-		SkillsDir:          getEnv("SKILLS_DIR", "../agent/skills"),
-		MinioEndpoint:      getEnv("MINIO_ENDPOINT", ""),
-		MinioAccessKey:     getEnv("MINIO_ACCESS_KEY", ""),
-		MinioSecretKey:     getEnv("MINIO_SECRET_KEY", ""),
-		MinioBucket:        getEnv("MINIO_BUCKET", "starnion-files"),
-		MinioPublicURL:     getEnv("MINIO_PUBLIC_URL", ""),
-		MinioUseSSL:        getEnv("MINIO_USE_SSL", "false") == "true",
+		HTTPAddr:                getEnv("GATEWAY_HTTP_ADDR", ":8080"),
+		PublicURL:               getEnv("GATEWAY_PUBLIC_URL", ""),
+		DatabaseURL:             getEnv("DATABASE_URL", ""),
+		TelegramBotToken:        getEnv("TELEGRAM_BOT_TOKEN", ""),
+		TelegramWebhookURL:      getEnv("TELEGRAM_WEBHOOK_URL", ""),
+		TelegramWebhookSecret:   getEnv("TELEGRAM_WEBHOOK_SECRET", ""),
+		AgentGRPCAddr:           getEnv("AGENT_GRPC_ADDR", "127.0.0.1:50051"),
+		GRPCSharedSecret:        getEnv("GRPC_SHARED_SECRET", ""),
+		AgentGRPCTLSCAPath:      getEnv("AGENT_GRPC_TLS_CA", ""),
+		AgentGRPCTLSCertPath:    getEnv("AGENT_GRPC_TLS_CERT", ""),
+		AgentGRPCTLSKeyPath:     getEnv("AGENT_GRPC_TLS_KEY", ""),
+		AgentGRPCTLSServerName:  getEnv("AGENT_GRPC_TLS_SERVER_NAME", ""),
+		JWTSecret:               getEnv("JWT_SECRET", ""),
+		EncryptionKey:           getEnv("ENCRYPTION_KEY", ""),
+		InternalLogSecret:       getEnv("INTERNAL_LOG_SECRET", ""),
+		SessionDir:              getEnv("SESSION_DIR", "/tmp/starnion-sessions"),
+		SkillsDir:               getEnv("SKILLS_DIR", "../agent/skills"),
+		MinioEndpoint:           getEnv("MINIO_ENDPOINT", ""),
+		MinioAccessKey:          getEnv("MINIO_ACCESS_KEY", ""),
+		MinioSecretKey:          getEnv("MINIO_SECRET_KEY", ""),
+		MinioBucket:             getEnv("MINIO_BUCKET", "starnion-files"),
+		MinioPublicURL:          getEnv("MINIO_PUBLIC_URL", ""),
+		MinioUseSSL:             getEnv("MINIO_USE_SSL", "false") == "true",
 		GoogleClientID:          getEnv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret:      getEnv("GOOGLE_CLIENT_SECRET", ""),
 		GoogleRedirectURL:       getEnv("GOOGLE_REDIRECT_URL", ""),
@@ -266,10 +281,10 @@ func Load() *Config {
 				y.Database.Host, port, y.Database.Name, sslMode,
 			)
 		}
-		if cfg.AgentGRPCAddr == "localhost:50051" && y.Gateway.GRPCPort > 0 {
+		if cfg.AgentGRPCAddr == "127.0.0.1:50051" && y.Gateway.GRPCPort > 0 {
 			agentHost := y.Gateway.AgentHost
 			if agentHost == "" {
-				agentHost = "localhost"
+				agentHost = "127.0.0.1"
 			}
 			cfg.AgentGRPCAddr = fmt.Sprintf("%s:%d", agentHost, y.Gateway.GRPCPort)
 		}
@@ -287,6 +302,9 @@ func Load() *Config {
 		}
 		if cfg.TelegramWebhookURL == "" && y.Telegram.WebhookURL != "" {
 			cfg.TelegramWebhookURL = y.Telegram.WebhookURL
+		}
+		if cfg.TelegramWebhookSecret == "" && y.Telegram.WebhookSecret != "" {
+			cfg.TelegramWebhookSecret = y.Telegram.WebhookSecret
 		}
 		if cfg.GoogleClientID == "" && y.Google.ClientID != "" {
 			cfg.GoogleClientID = y.Google.ClientID
@@ -364,11 +382,30 @@ func Load() *Config {
 	if cfg.EncryptionKey == "" {
 		log.Fatal("FATAL: ENCRYPTION_KEY is not set. Set it via environment variable or starnion.yaml auth.encryption_key")
 	}
+	// CORS fail-fast — a wildcard `*` fallback on a service that stores
+	// user JWTs + OAuth refresh tokens is effectively an open data-exfil
+	// vector for any authenticated browser context. We still tolerate an
+	// empty list in local dev (detected by a ":"-prefixed HTTP bind, i.e.
+	// `:8080`) because `starnion setup` may run before the user picks a
+	// UI origin. Anything else is a hard stop.
 	if len(cfg.AllowedOrigins) == 0 {
-		fmt.Fprintln(os.Stderr, "WARNING: ALLOWED_ORIGINS is not set. CORS will allow all origins (*).")
+		if strings.HasPrefix(cfg.HTTPAddr, ":") {
+			fmt.Fprintln(os.Stderr, "WARNING: ALLOWED_ORIGINS is not set. Allowing localhost origins in dev mode. Set this before exposing the gateway.")
+			cfg.AllowedOrigins = []string{
+				"http://localhost:3000",
+				"http://localhost:3893",
+				"http://127.0.0.1:3000",
+				"http://127.0.0.1:3893",
+			}
+		} else {
+			log.Fatal("FATAL: ALLOWED_ORIGINS is not set. Refusing to default to `*` on a non-loopback bind. Set ALLOWED_ORIGINS to the comma-separated web origin(s) that may reach the gateway.")
+		}
 	}
 	if cfg.InternalLogSecret == "" {
-		fmt.Fprintln(os.Stderr, "WARNING: INTERNAL_LOG_SECRET is not set. /internal/logs endpoint is unprotected.")
+		log.Fatal("FATAL: INTERNAL_LOG_SECRET is not set. Set it via environment variable or starnion.yaml auth.internal_log_secret so /api/v1/internal/* routes can authenticate agent callers.")
+	}
+	if cfg.GRPCSharedSecret == "" {
+		log.Fatal("FATAL: GRPC_SHARED_SECRET is not set. Set it via environment variable or starnion.yaml auth.grpc_shared_secret so the gateway can authenticate to the agent.")
 	}
 
 	return cfg

@@ -53,6 +53,7 @@
     "embla-carousel-react": "8.6.0",
     "hast-util-to-html": "^9.0.5",
     "input-otp": "1.4.2",
+    "js-yaml": "^4.1.0",
     "lowlight": "^3.3.0",
     "lucide-react": "^0.564.0",
     "minio": "^8.0.7",
@@ -79,6 +80,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.0",
     "@types/dompurify": "^3.2.0",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",

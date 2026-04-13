@@ -1,12 +1,19 @@
-// migrate-encrypt encrypts all plaintext sensitive values already stored in the
-// database. It is safe to run multiple times — already-encrypted values (those
-// starting with "enc:") are skipped.
+//go:build devtools
+
+// migrate-encrypt encrypts all plaintext sensitive values already stored
+// in the database. It is safe to run multiple times — already-encrypted
+// values (those starting with "enc:") are skipped.
+//
+// Hidden behind the `devtools` build tag so `go build ./...` does not
+// pull this one-off migration into production binaries. Run with:
+//
+//	go run -tags devtools ./cmd/migrate-encrypt
 //
 // Usage:
 //
-//	ENCRYPTION_KEY=<your-key> DATABASE_URL=<postgres-url> go run ./gateway/cmd/migrate-encrypt/
+//	ENCRYPTION_KEY=<your-key> DATABASE_URL=<postgres-url> go run -tags devtools ./cmd/migrate-encrypt
 //
-// Or, if you use .env / starnion.yaml, the config.Load() call picks those up.
+// Or, if you use starnion.yaml, the config.Load() call picks those up.
 package main
 
 import (
@@ -17,15 +24,27 @@ import (
 	"os"
 	"strings"
 
-	"github.com/joho/godotenv"
-	"github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
 	"github.com/newstarnion/gateway/config"
 	"github.com/newstarnion/gateway/internal/crypto"
 )
 
+// quoteIdent mirrors lib/pq's QuoteIdentifier: wrap in double quotes and
+// double any existing quote characters. Adequate for the fixed allowlist
+// of table/column names below (all are hardcoded identifiers, not user
+// input), and saves us from carrying lib/pq just for this helper.
+func quoteIdent(name string) string {
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
 func main() {
-	// Load .env if present (same as the main server binary).
-	_ = godotenv.Load("../.env")
+	// Intentionally do NOT call godotenv.Load with a relative path.
+	// The previous `godotenv.Load("../.env")` would read whatever .env
+	// happened to sit in the parent of the current working directory,
+	// which is attacker-influenceable if the tool is launched from an
+	// unexpected CWD. Operators should inject config through the
+	// standard channels (env vars or starnion.yaml), which config.Load()
+	// already consults.
 
 	cfg := config.Load()
 
@@ -33,7 +52,7 @@ func main() {
 		log.Fatal("ENCRYPTION_KEY is not set. Cannot migrate without an encryption key.")
 	}
 
-	db, err := sql.Open("postgres", cfg.DatabaseURL)
+	db, err := sql.Open("pgx", cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("open db: %v", err)
 	}
@@ -56,7 +75,10 @@ func main() {
 		n, s, e, f := migrateColumn(ctx, db, key,
 			"providers", "id", "api_key", nil)
 		report("providers.api_key", n, s, e, f)
-		total += n; skipped += s; encrypted += e; failed += f
+		total += n
+		skipped += s
+		encrypted += e
+		failed += f
 	}
 
 	// ── 2. integration_keys.api_key ──────────────────────────────────────────
@@ -65,7 +87,10 @@ func main() {
 			"integration_keys", []string{"user_id", "provider"}, "api_key",
 			"api_key IS NOT NULL AND api_key <> ''")
 		report("integration_keys.api_key", n, s, e, f)
-		total += n; skipped += s; encrypted += e; failed += f
+		total += n
+		skipped += s
+		encrypted += e
+		failed += f
 	}
 
 	// ── 3. google_tokens.access_token ────────────────────────────────────────
@@ -73,7 +98,10 @@ func main() {
 		n, s, e, f := migrateColumn(ctx, db, key,
 			"google_tokens", "user_id", "access_token", nil)
 		report("google_tokens.access_token", n, s, e, f)
-		total += n; skipped += s; encrypted += e; failed += f
+		total += n
+		skipped += s
+		encrypted += e
+		failed += f
 	}
 
 	// ── 4. google_tokens.refresh_token (skip empty) ──────────────────────────
@@ -82,7 +110,10 @@ func main() {
 			"google_tokens", "user_id", "refresh_token",
 			func(v string) bool { return v == "" })
 		report("google_tokens.refresh_token", n, s, e, f)
-		total += n; skipped += s; encrypted += e; failed += f
+		total += n
+		skipped += s
+		encrypted += e
+		failed += f
 	}
 
 	// ── 5. telegram_bot_configs.bot_token ────────────────────────────────────
@@ -90,7 +121,10 @@ func main() {
 		n, s, e, f := migrateColumn(ctx, db, key,
 			"telegram_bot_configs", "id", "bot_token", nil)
 		report("telegram_bot_configs.bot_token", n, s, e, f)
-		total += n; skipped += s; encrypted += e; failed += f
+		total += n
+		skipped += s
+		encrypted += e
+		failed += f
 	}
 
 	// ── 6. channel_settings.bot_token (telegram channel only) ────────────────
@@ -99,7 +133,10 @@ func main() {
 			"channel_settings", []string{"user_id", "channel"}, "bot_token",
 			"channel = 'telegram' AND bot_token IS NOT NULL AND bot_token <> ''")
 		report("channel_settings.bot_token (telegram)", n, s, e, f)
-		total += n; skipped += s; encrypted += e; failed += f
+		total += n
+		skipped += s
+		encrypted += e
+		failed += f
 	}
 
 	fmt.Printf("\n──────────────────────────────────────────\n")
@@ -131,7 +168,7 @@ func migrateColumnWhere(
 	db *sql.DB,
 	key, table, pkCol, col, where string,
 ) (total, skipped, encrypted, failed int) {
-	query := fmt.Sprintf(`SELECT %s, %s FROM %s WHERE %s`, pq.QuoteIdentifier(pkCol), pq.QuoteIdentifier(col), pq.QuoteIdentifier(table), where)
+	query := fmt.Sprintf(`SELECT %s, %s FROM %s WHERE %s`, quoteIdent(pkCol), quoteIdent(col), quoteIdent(table), where)
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		log.Printf("ERROR querying %s.%s: %v", table, col, err)
@@ -171,7 +208,7 @@ func migrateColumnWhere(
 			failed++
 			continue
 		}
-		upd := fmt.Sprintf(`UPDATE %s SET %s = $1 WHERE %s = $2`, pq.QuoteIdentifier(table), pq.QuoteIdentifier(col), pq.QuoteIdentifier(pkCol))
+		upd := fmt.Sprintf(`UPDATE %s SET %s = $1 WHERE %s = $2`, quoteIdent(table), quoteIdent(col), quoteIdent(pkCol))
 		if _, err := db.ExecContext(ctx, upd, enc, r.pk); err != nil {
 			log.Printf("ERROR update %s pk=%s: %v", table, r.pk, err)
 			failed++
@@ -191,10 +228,10 @@ func migrateColumnCompositePK(
 ) (total, skipped, encrypted, failed int) {
 	quotedPKs := make([]string, len(pkCols))
 	for i, pk := range pkCols {
-		quotedPKs[i] = pq.QuoteIdentifier(pk)
+		quotedPKs[i] = quoteIdent(pk)
 	}
-	selectCols := strings.Join(quotedPKs, ", ") + ", " + pq.QuoteIdentifier(col)
-	query := fmt.Sprintf(`SELECT %s FROM %s WHERE %s`, selectCols, pq.QuoteIdentifier(table), where)
+	selectCols := strings.Join(quotedPKs, ", ") + ", " + quoteIdent(col)
+	query := fmt.Sprintf(`SELECT %s FROM %s WHERE %s`, selectCols, quoteIdent(table), where)
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		log.Printf("ERROR querying %s.%s: %v", table, col, err)
@@ -245,11 +282,11 @@ func migrateColumnCompositePK(
 		args := make([]interface{}, len(pkCols)+1)
 		args[0] = enc
 		for i, c := range pkCols {
-			whereParts[i] = fmt.Sprintf("%s = $%d", pq.QuoteIdentifier(c), i+2)
+			whereParts[i] = fmt.Sprintf("%s = $%d", quoteIdent(c), i+2)
 			args[i+1] = r.pkVals[i]
 		}
 		upd := fmt.Sprintf(`UPDATE %s SET %s = $1 WHERE %s`,
-			pq.QuoteIdentifier(table), pq.QuoteIdentifier(col), strings.Join(whereParts, " AND "))
+			quoteIdent(table), quoteIdent(col), strings.Join(whereParts, " AND "))
 		if _, err := db.ExecContext(ctx, upd, args...); err != nil {
 			log.Printf("ERROR update %s pk=%v: %v", table, r.pkVals, err)
 			failed++

@@ -225,11 +225,11 @@ function ChatPageInner() {
           isThinking={isThinking}
           conversationId={activeThreadId}
           onMessageDeleted={removeMessage}
-          onSuggest={(text) => handleSend(text)}
+          onSuggest={handleSend}
           onRetry={retry}
         />
         <ChatInput
-          onSend={(text, files) => handleSend(text, files)}
+          onSend={handleSend}
           disabled={!isConnected || isStreaming}
           placeholder={undefined}
           botPersonas={botPersonas}

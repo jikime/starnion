@@ -62,6 +62,20 @@ func runDev(noDB bool) error {
 	PrintBanner(Version)
 	cfg, _ := LoadConfig()
 
+	// Top-up any secrets missing from an older starnion.yaml (e.g. a
+	// config written before browser_auth_token became mandatory).
+	// EnsureSecrets only fills empty fields, so existing values survive;
+	// the rewrite is persisted so the next boot doesn't regenerate.
+	// This mirrors runStart so `starnion dev` is a drop-in replacement
+	// for `starnion start` during development.
+	if EnsureSecrets(&cfg) {
+		if err := SaveConfig(cfg); err != nil {
+			PrintFail("Config 저장", err.Error())
+			return err
+		}
+		PrintOK("Config 자동 업데이트", "starnion.yaml 에 누락된 시크릿을 추가했습니다")
+	}
+
 	fmt.Printf("  %s  %s\n", sGold.Render("★"), sBold.Render("StarNion Dev"))
 	fmt.Printf("  %s\n\n", sNebula.Render(root))
 	fmt.Printf("  %s  gRPC :%d\n", styleDevAgent.Render("● agent  "), cfg.Gateway.GRPCPort)
@@ -82,6 +96,23 @@ func runDev(noDB bool) error {
 			}
 		}
 	}
+
+	// ── Build child env with the starnion venv prepended to PATH ───────────
+	// The isolated Python at ~/.starnion/venv/bin holds the skill
+	// runtime dependencies (requests, psycopg2, google-api-python-
+	// client, …). Without prepending it to PATH, bare `python3`
+	// invocations inside skill scripts resolve to the system Python
+	// (typically homebrew) which does NOT have these modules, and
+	// every skill fails with `ModuleNotFoundError: No module named
+	// 'requests'`. `starnion start` already does this, but `starnion
+	// dev` used to just inherit the developer shell's PATH and miss
+	// the venv entirely.
+	venvBin := filepath.Join(starnionHome(), "venv", "bin")
+	currentPath := os.Getenv("PATH")
+	if _, err := os.Stat(venvBin); err == nil {
+		currentPath = venvBin + string(os.PathListSeparator) + currentPath
+	}
+	childEnv := append(os.Environ(), "PATH="+currentPath)
 
 	services := []devService{
 		{
@@ -109,9 +140,9 @@ func runDev(noDB bool) error {
 
 	// ── Launch processes ──────────────────────────────────────────────────────
 	var (
-		mu      sync.Mutex
-		procs   []*exec.Cmd
-		wg      sync.WaitGroup
+		mu    sync.Mutex
+		procs []*exec.Cmd
+		wg    sync.WaitGroup
 	)
 
 	stopAll := func() {
@@ -140,6 +171,7 @@ func runDev(noDB bool) error {
 			defer wg.Done()
 			c := exec.Command(s.bin, s.args...)
 			c.Dir = s.dir
+			c.Env = childEnv
 
 			mu.Lock()
 			procs = append(procs, c)

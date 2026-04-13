@@ -81,58 +81,67 @@ const proto = grpc.loadPackageDefinition(packageDefinition) as any;
 function chat(
   call: grpc.ServerWritableStream<any, any>
 ): void {
-  const { user_id, session_id, message, model, metadata } = call.request;
-  const provider: string = metadata?.provider ?? "";
-  const apiKey: string = metadata?.api_key ?? "";
-  const systemPrompt: string = metadata?.system_prompt ?? "";
-  const timezone: string = metadata?.timezone ?? "";
-  const previousMessagesRaw: string = metadata?.previous_messages ?? "";
-  let previousMessages: Array<{ role: string; content: string }> = [];
-  if (previousMessagesRaw) {
-    try {
-      previousMessages = JSON.parse(previousMessagesRaw);
-    } catch {
-      // ignore malformed JSON
-    }
-  }
-  const imagesRaw: string = metadata?.images ?? "";
-  const imageURLsRaw: string = metadata?.image_urls ?? "";
-  const configuredProvidersRaw: string = metadata?.configured_providers ?? "";
-  let configuredProviders: string[] | undefined;
-  if (configuredProvidersRaw) {
-    try {
-      const parsed = JSON.parse(configuredProvidersRaw);
-      if (Array.isArray(parsed)) configuredProviders = parsed;
-    } catch {
-      // ignore malformed JSON
-    }
-  }
-  const skillEnvRaw: string = metadata?.skill_env_json ?? "";
-  let skillEnv: Record<string, string> = {};
-  if (skillEnvRaw) {
-    try {
-      const parsed = JSON.parse(skillEnvRaw);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        skillEnv = parsed as Record<string, string>;
-      }
-    } catch {
-      // ignore malformed JSON
-    }
-  }
-  const disabledSkillsRaw: string = metadata?.disabled_skills_json ?? "";
-  let disabledSkillIds: string[] | undefined;
-  if (disabledSkillsRaw) {
-    try {
-      const parsed = JSON.parse(disabledSkillsRaw);
-      if (Array.isArray(parsed)) disabledSkillIds = parsed;
-    } catch {
-      // ignore malformed JSON
-    }
-  }
-  const platform: string | undefined = metadata?.platform || undefined;
-  const secondaryModel: string | undefined = metadata?.secondary_model || undefined;
-  const fallbackProvidersRaw: string = metadata?.fallback_providers ?? "";
-  const fallbackProviders = parseFallbackChain(fallbackProvidersRaw);
+  // The gateway now sends a fully typed ChatRequest — every field that
+  // used to be stuffed into `metadata` has a dedicated sub-message. We
+  // read from those directly and never JSON.parse on the hot path.
+  const {
+    user_id,
+    session_id,
+    message,
+    model,
+    provider: providerMsg,
+    user_context: userCtx,
+    persona: personaMsg,
+    history: historyMsg,
+    vision: visionMsg,
+    skills: skillsMsg,
+    client: clientMsg,
+  } = call.request;
+
+  const provider: string = providerMsg?.name ?? "";
+  const apiKey: string = providerMsg?.api_key ?? "";
+  const secondaryModel: string | undefined = providerMsg?.secondary_model || undefined;
+  const configuredProviders: string[] | undefined =
+    Array.isArray(providerMsg?.configured_providers) && providerMsg.configured_providers.length > 0
+      ? providerMsg.configured_providers
+      : undefined;
+
+  // FallbackChain arrives as repeated FallbackProvider; map it through the
+  // existing helper so downstream code keeps working. parseFallbackChain
+  // accepts a JSON string for backwards compat, so we serialise once.
+  const fallbackProviders = parseFallbackChain(
+    Array.isArray(providerMsg?.fallback_chain) && providerMsg.fallback_chain.length > 0
+      ? JSON.stringify(
+          providerMsg.fallback_chain.map((f: { provider: string; api_key: string; model: string; base_url?: string }) => ({
+            provider: f.provider,
+            api_key: f.api_key,
+            model: f.model,
+            base_url: f.base_url ?? "",
+          })),
+        )
+      : "",
+  );
+
+  const systemPrompt: string = personaMsg?.system_prompt ?? "";
+  const timezone: string = userCtx?.timezone ?? "";
+  const platform: string | undefined = clientMsg?.platform || undefined;
+
+  const previousMessages: Array<{ role: string; content: string }> =
+    Array.isArray(historyMsg?.messages)
+      ? historyMsg.messages.map((m: { role: string; content: string }) => ({
+          role: m.role,
+          content: m.content,
+        }))
+      : [];
+
+  const skillEnv: Record<string, string> =
+    skillsMsg?.env && typeof skillsMsg.env === "object" && !Array.isArray(skillsMsg.env)
+      ? (skillsMsg.env as Record<string, string>)
+      : {};
+  const disabledSkillIds: string[] | undefined =
+    Array.isArray(skillsMsg?.disabled) && skillsMsg.disabled.length > 0
+      ? skillsMsg.disabled
+      : undefined;
 
   console.log(`[grpc] chat called: user=${user_id} session=${session_id} model=${model} provider=${provider}`);
   console.log(`[Persona] grpc received: system_prompt_set=${systemPrompt !== ""}`);
@@ -149,104 +158,106 @@ function chat(
     }
   });
 
-  // Resolve images: base64 (Path 1, Telegram) or analyze via Gemini Vision skill (Path 2, web chat).
+  // Resolve images: raw bytes (Path 1, Telegram) or analyze via Gemini Vision skill (Path 2, web chat).
   (async () => {
-    // Path 1: base64-encoded images passed directly (Telegram).
+    // Path 1: raw image bytes passed directly (Telegram). The new proto
+    // carries them as proper `bytes` fields (Buffer/Uint8Array); the LLM
+    // wrapper expects a base64 string so we re-encode here.
     let images: Array<{ type: "image"; data: string; mimeType: string }> | undefined;
-    if (imagesRaw) {
-      try {
-        const parsed = JSON.parse(imagesRaw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          images = parsed.map((img: { Data: string; MimeType: string }) => ({
+    const rawImages = Array.isArray(visionMsg?.images) ? visionMsg.images : [];
+    if (rawImages.length > 0) {
+      images = rawImages.map(
+        (img: { data: Uint8Array | Buffer; mime_type: string }) => {
+          const buf = Buffer.isBuffer(img.data)
+            ? img.data
+            : Buffer.from(img.data);
+          return {
             type: "image" as const,
-            data: img.Data,
-            mimeType: img.MimeType,
-          }));
-        }
-      } catch {
-        // ignore malformed JSON
-      }
+            data: buf.toString("base64"),
+            mimeType: img.mime_type,
+          };
+        },
+      );
     }
 
     // Path 2: web chat image URLs — analyze each with Gemini Vision skill (analyze.py)
     // and inject the analysis results into the message text.
     // [image:URL] markers are already in the message (added by ws.go).
     let enrichedMessage = message as string;
-    if (imageURLsRaw) {
-      try {
-        const urlList = JSON.parse(imageURLsRaw) as Array<{ URL: string; MimeType: string }>;
-        if (Array.isArray(urlList) && urlList.length > 0) {
-          const gatewayBase = (process.env.GATEWAY_URL ?? "http://localhost:8080").replace(/\/$/, "");
-          console.log(`[image-skill] START: ${urlList.length} image(s) — user=${user_id.slice(0, 8)}… session=${session_id}`);
-          console.log(`[image-skill] skill path: ${path.join(SKILLS_DIR, "image", "scripts", "analyze.py")}`);
+    const urlList: Array<{ URL: string; MimeType: string }> = Array.isArray(visionMsg?.image_urls)
+      ? visionMsg.image_urls.map((u: { url: string; mime_type: string }) => ({
+          URL: u.url,
+          MimeType: u.mime_type,
+        }))
+      : [];
+    if (urlList.length > 0) {
+      const gatewayBase = (process.env.GATEWAY_URL ?? "http://localhost:8080").replace(/\/$/, "");
+      console.log(`[image-skill] START: ${urlList.length} image(s) — user=${user_id.slice(0, 8)}… session=${session_id}`);
+      console.log(`[image-skill] skill path: ${path.join(SKILLS_DIR, "image", "scripts", "analyze.py")}`);
 
-          // Partial-result strategy: each image mutates its slot in-place; we
-          // wait for all to settle OR for the total deadline — whichever comes first.
-          // This guarantees we never block for more than TOTAL_IMAGE_TIMEOUT_MS
-          // regardless of how many images are being analysed in parallel.
-          const analyses: Array<{ url: string; analysis: string | null }> =
-            urlList.slice(0, 4).map((img) => ({ url: img.URL, analysis: null }));
+      // Partial-result strategy: each image mutates its slot in-place; we
+      // wait for all to settle OR for the total deadline — whichever comes first.
+      // This guarantees we never block for more than TOTAL_IMAGE_TIMEOUT_MS
+      // regardless of how many images are being analysed in parallel.
+      const analyses: Array<{ url: string; analysis: string | null }> =
+        urlList.slice(0, 4).map((img) => ({ url: img.URL, analysis: null }));
 
-          const imagePromises = urlList.slice(0, 4).map(async (img, idx) => {
-            const url = img.URL.startsWith("http") ? img.URL : `${gatewayBase}${img.URL}`;
-            const fileName = url.split("/").pop() ?? url;
-            console.log(`[image-skill] [${idx + 1}/${urlList.length}] analyzing: ${fileName}`);
-            const startMs = Date.now();
-            try {
-              const analysis = await analyzeImageWithGemini(user_id, url);
-              const elapsed = Date.now() - startMs;
-              console.log(`[image-skill] [${idx + 1}/${urlList.length}] ✅ done in ${elapsed}ms — ${fileName} (${analysis.length} chars)`);
-              analyses[idx].analysis = analysis;
-            } catch (err) {
-              const elapsed = Date.now() - startMs;
-              const errMsg = err instanceof Error ? err.message.split("\n")[0] : String(err);
-              console.error(`[image-skill] [${idx + 1}/${urlList.length}] ❌ failed in ${elapsed}ms — ${fileName}: ${errMsg}`);
-            }
-          });
-
-          await Promise.race([
-            Promise.allSettled(imagePromises),
-            new Promise<void>((resolve) =>
-              setTimeout(() => {
-                console.warn(`[image-skill] total timeout (${TOTAL_IMAGE_TIMEOUT_MS}ms) — using partial results`);
-                resolve();
-              }, TOTAL_IMAGE_TIMEOUT_MS),
-            ),
-          ]);
-
-          const successCount = analyses.filter((a) => a.analysis !== null).length;
-          console.log(`[image-skill] END: ${successCount}/${urlList.length} succeeded`);
-
-          // If ALL images failed to analyze, send error to client — do NOT let LLM hallucinate.
-          if (successCount === 0) {
-            console.error(`[image-skill] all analyses failed — returning error to client`);
-            if (active) {
-              try {
-                call.write({ error: { message: "이미지 분석에 실패했습니다. Gemini API 키가 설정되어 있는지 확인해주세요.", code: "IMAGE_ANALYSIS_FAILED" } });
-                completed = true;
-                call.end();
-              } catch { /* stream already closed */ }
-            }
-            return;
-          }
-
-          // Replace [image:URL] markers with Gemini analysis results.
-          // Remove markers whose analysis failed so LLM doesn't see raw [image:URL] and hallucinate.
-          for (const { url, analysis } of analyses) {
-            const marker = `[image:${url}]`;
-            if (analysis) {
-              const replacement = `[이미지 분석 결과]\n${analysis}\n[/이미지 분석 결과]`;
-              enrichedMessage = enrichedMessage.replace(marker, replacement);
-            } else {
-              // Strip failed marker — do not expose raw URL to LLM
-              enrichedMessage = enrichedMessage.replace(marker, "");
-            }
-          }
-          enrichedMessage = enrichedMessage.trim();
+      const imagePromises = urlList.slice(0, 4).map(async (img, idx) => {
+        const url = img.URL.startsWith("http") ? img.URL : `${gatewayBase}${img.URL}`;
+        const fileName = url.split("/").pop() ?? url;
+        console.log(`[image-skill] [${idx + 1}/${urlList.length}] analyzing: ${fileName}`);
+        const startMs = Date.now();
+        try {
+          const analysis = await analyzeImageWithGemini(user_id, url);
+          const elapsed = Date.now() - startMs;
+          console.log(`[image-skill] [${idx + 1}/${urlList.length}] ✅ done in ${elapsed}ms — ${fileName} (${analysis.length} chars)`);
+          analyses[idx].analysis = analysis;
+        } catch (err) {
+          const elapsed = Date.now() - startMs;
+          const errMsg = err instanceof Error ? err.message.split("\n")[0] : String(err);
+          console.error(`[image-skill] [${idx + 1}/${urlList.length}] ❌ failed in ${elapsed}ms — ${fileName}: ${errMsg}`);
         }
-      } catch {
-        // ignore malformed imageURLsRaw — proceed with original message
+      });
+
+      await Promise.race([
+        Promise.allSettled(imagePromises),
+        new Promise<void>((resolve) =>
+          setTimeout(() => {
+            console.warn(`[image-skill] total timeout (${TOTAL_IMAGE_TIMEOUT_MS}ms) — using partial results`);
+            resolve();
+          }, TOTAL_IMAGE_TIMEOUT_MS),
+        ),
+      ]);
+
+      const successCount = analyses.filter((a) => a.analysis !== null).length;
+      console.log(`[image-skill] END: ${successCount}/${urlList.length} succeeded`);
+
+      // If ALL images failed to analyze, send error to client — do NOT let LLM hallucinate.
+      if (successCount === 0) {
+        console.error(`[image-skill] all analyses failed — returning error to client`);
+        if (active) {
+          try {
+            call.write({ error: { message: "이미지 분석에 실패했습니다. Gemini API 키가 설정되어 있는지 확인해주세요.", code: "IMAGE_ANALYSIS_FAILED" } });
+            completed = true;
+            call.end();
+          } catch { /* stream already closed */ }
+        }
+        return;
       }
+
+      // Replace [image:URL] markers with Gemini analysis results.
+      // Remove markers whose analysis failed so LLM doesn't see raw [image:URL] and hallucinate.
+      for (const { url, analysis } of analyses) {
+        const marker = `[image:${url}]`;
+        if (analysis) {
+          const replacement = `[이미지 분석 결과]\n${analysis}\n[/이미지 분석 결과]`;
+          enrichedMessage = enrichedMessage.replace(marker, replacement);
+        } else {
+          // Strip failed marker — do not expose raw URL to LLM
+          enrichedMessage = enrichedMessage.replace(marker, "");
+        }
+      }
+      enrichedMessage = enrichedMessage.trim();
     }
 
     handleChat({
@@ -542,38 +553,49 @@ function healthCheck(
   callback(null, { status: "ok", version: "1.0.0" });
 }
 
-/** Server interceptor that validates the x-shared-secret metadata header. */
-function sharedSecretInterceptor(
-  _methodDescriptor: grpc.ServerMethodDefinition<unknown, unknown>,
-  call: grpc.ServerInterceptingCall
-): grpc.ServerInterceptingCall {
-  const expectedSecret = process.env["GRPC_SHARED_SECRET"];
-  if (!expectedSecret) {
-    // Secret not configured — allow all (backwards-compat with local dev).
-    return call;
-  }
-  return new grpc.ServerInterceptingCall(call, {
-    start(next: (listener: grpc.ServerListener) => void) {
-      next({
-        onReceiveMetadata(metadata: grpc.Metadata, metadataNext: (m: grpc.Metadata) => void) {
-          const provided = metadata.get("x-shared-secret");
-          if (!provided.length || provided[0] !== expectedSecret) {
-            call.sendStatus({
-              code: grpc.status.UNAUTHENTICATED,
-              details: "invalid or missing shared secret",
-            });
-            return;
-          }
-          metadataNext(metadata);
-        },
-      });
-    },
-  });
+/**
+ * Server interceptor that validates the x-shared-secret metadata header.
+ * The expected secret is captured at server-creation time (not per-request) so
+ * that an env var unset during startup cannot silently disable authentication.
+ */
+function makeSharedSecretInterceptor(
+  expectedSecret: string,
+): (_methodDescriptor: grpc.ServerMethodDefinition<unknown, unknown>, call: grpc.ServerInterceptingCall) => grpc.ServerInterceptingCall {
+  return (
+    _methodDescriptor: grpc.ServerMethodDefinition<unknown, unknown>,
+    call: grpc.ServerInterceptingCall,
+  ): grpc.ServerInterceptingCall => {
+    return new grpc.ServerInterceptingCall(call, {
+      start(next: (listener: grpc.ServerListener) => void) {
+        next({
+          onReceiveMetadata(metadata: grpc.Metadata, metadataNext: (m: grpc.Metadata) => void) {
+            const provided = metadata.get("x-shared-secret");
+            if (!provided.length || provided[0] !== expectedSecret) {
+              call.sendStatus({
+                code: grpc.status.UNAUTHENTICATED,
+                details: "invalid or missing shared secret",
+              });
+              return;
+            }
+            metadataNext(metadata);
+          },
+        });
+      },
+    });
+  };
 }
 
 export function createAgentGrpcServer(): grpc.Server {
+  const expectedSecret = process.env["GRPC_SHARED_SECRET"]?.trim();
+  if (!expectedSecret) {
+    console.error(
+      "[grpc] FATAL: GRPC_SHARED_SECRET is not set. The agent will not start without a shared secret — set it in the environment or starnion.yaml (auth.grpc_shared_secret).",
+    );
+    process.exit(1);
+  }
+  const interceptor = makeSharedSecretInterceptor(expectedSecret);
   const server = new grpc.Server({
-    interceptors: [sharedSecretInterceptor as unknown as grpc.ServerInterceptor],
+    interceptors: [interceptor as unknown as grpc.ServerInterceptor],
   });
   server.addService(proto.agent.AgentService.service, {
     Chat: chat,

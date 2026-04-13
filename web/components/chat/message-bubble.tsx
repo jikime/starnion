@@ -1,5 +1,6 @@
 "use client"
 
+import { memo } from "react"
 import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { Loader2, Volume2, Trash2, RefreshCw } from "lucide-react"
@@ -12,23 +13,23 @@ import type { ChatMessage } from "@/hooks/use-chat"
 
 interface MessageBubbleProps {
   message: ChatMessage
-  conversationId?: string | null
-  speakingId: string | null
-  voiceState: string
+  canDelete: boolean
+  isSpeaking: boolean
+  isSpeakingLoading: boolean
+  isDeleting: boolean
   onSpeak: (msg: ChatMessage) => void
   onDelete: (msgId: string) => void
-  deletingId: string | null
   onRetry?: () => void
 }
 
-export function MessageBubble({
+function MessageBubbleInner({
   message,
-  conversationId,
-  speakingId,
-  voiceState,
+  canDelete,
+  isSpeaking,
+  isSpeakingLoading,
+  isDeleting,
   onSpeak,
   onDelete,
-  deletingId,
   onRetry,
 }: MessageBubbleProps) {
   const t = useTranslations("chat")
@@ -161,7 +162,7 @@ export function MessageBubble({
               className={cn(
                 "flex items-center gap-0.5 transition-opacity duration-150",
                 "opacity-0 group-hover:opacity-100",
-                speakingId === message.id && "opacity-100"
+                isSpeaking && "opacity-100"
               )}
             >
               <Button
@@ -169,27 +170,27 @@ export function MessageBubble({
                 size="icon"
                 className={cn(
                   "h-6 w-6 text-muted-foreground/50 hover:text-foreground",
-                  speakingId === message.id && "text-primary"
+                  isSpeaking && "text-primary"
                 )}
                 onClick={() => onSpeak(message)}
                 title={t("readAloud")}
               >
-                {speakingId === message.id && voiceState === "loading"
+                {isSpeakingLoading
                   ? <Loader2 className="size-4 animate-spin" />
                   : <Volume2 className="size-4" />
                 }
               </Button>
               <CopyButton text={message.text} />
-              {conversationId && (
+              {canDelete && (
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 text-muted-foreground/50 hover:text-destructive"
                   onClick={() => onDelete(message.id)}
-                  disabled={deletingId === message.id}
+                  disabled={isDeleting}
                   title={t("delete")}
                 >
-                  {deletingId === message.id
+                  {isDeleting
                     ? <Loader2 className="size-4 animate-spin" />
                     : <Trash2 className="size-4" />
                   }
@@ -202,3 +203,13 @@ export function MessageBubble({
     </div>
   )
 }
+
+/**
+ * `MessageBubble` is wrapped in React.memo so that a streaming chat turn
+ * (which re-creates the `messages` array on every token delta) only
+ * re-renders the single bubble whose `message` reference changes. All
+ * per-bubble state — whether this bubble is currently speaking, loading,
+ * or being deleted — is passed in as a boolean so neighbouring bubbles are
+ * unaffected when, e.g., the global `voiceState` ticks.
+ */
+export const MessageBubble = memo(MessageBubbleInner)

@@ -16,13 +16,36 @@ export function MagicBar() {
   const { addTask, updateTask, roles } = usePlannerStore()
   const [title, setTitle] = useState("")
   const [priority, setPriority] = useState<Priority>("A")
-  const [order, setOrder] = useState("1")
+  // Order defaults to empty so a quick-add with no order specified lets
+  // the store append the task naturally. Previously this was "1", which
+  // (a) forced every quick-add to the top of its priority group and
+  // (b) created a mobile UX trap where typing "3" produced "13" because
+  // the pre-filled "1" sat in the input and wasn't auto-selected on
+  // focus. The `selectOnFocus` handler below handles the "user sets an
+  // order, changes their mind, re-types" flow without needing a
+  // hardcoded default.
+  const [order, setOrder] = useState("")
   const [roleId, setRoleId] = useState("")
   const [timeStart, setTimeStart] = useState("")
   const [timeEnd, setTimeEnd] = useState("")
   const [feedback, setFeedback] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
+
+  // Keep only the first two digits (0–99) so the narrow input never
+  // silently grows beyond the store's ordering contract.
+  const handleOrderChange = useCallback((raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, 2)
+    setOrder(digits)
+  }, [])
+
+  // Select-all on focus: solves the exact mobile complaint — "나는 3을
+  // 치고 싶은데 13이 되어서 1을 지워야 한다". After .select() the
+  // keyboard's first keystroke replaces the existing digits, matching
+  // the iOS/Android native address-bar editing pattern.
+  const handleOrderFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.select()
+  }, [])
 
   const commit = useCallback(() => {
     if (!title.trim()) return
@@ -52,7 +75,7 @@ export function MagicBar() {
     setFeedback(`[${parts.join(" · ")}] "${title.trim()}" ${t("taskAdded")}`)
 
     setTitle("")
-    setOrder("1")
+    setOrder("")
     setTimeStart("")
     setTimeEnd("")
     setTimeout(() => setFeedback(null), 2800)
@@ -114,8 +137,15 @@ export function MagicBar() {
             </button>
           ))}
           <Input
-            type="number" min={1} max={99} value={order}
-            onChange={e => { const v = e.target.value.replace(/\D/g, ""); setOrder(v || "1") }}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={2}
+            value={order}
+            placeholder="#"
+            aria-label={t("order")}
+            onChange={e => handleOrderChange(e.target.value)}
+            onFocus={handleOrderFocus}
             onKeyDown={e => { if (["e", "E", "+", "-", "."].includes(e.key)) e.preventDefault() }}
             className="w-12 h-8 text-center text-xs px-1"
           />
@@ -145,8 +175,15 @@ export function MagicBar() {
             </button>
           ))}
           <Input
-            type="number" min={1} max={99} value={order}
-            onChange={e => { const v = e.target.value.replace(/\D/g, ""); setOrder(v || "1") }}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={2}
+            value={order}
+            placeholder="#"
+            aria-label={t("order")}
+            onChange={e => handleOrderChange(e.target.value)}
+            onFocus={handleOrderFocus}
             onKeyDown={e => { if (["e", "E", "+", "-", "."].includes(e.key)) e.preventDefault() }}
             className="w-14 h-9 text-center text-xs px-1"
           />

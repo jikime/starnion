@@ -32,6 +32,19 @@ func runStart() error {
 	home := starnionHome()
 	cfg, _ := LoadConfig()
 
+	// Top-up any secrets missing from an older starnion.yaml (e.g. a
+	// config written before grpc_shared_secret / internal_log_secret /
+	// webhook_secret became mandatory). EnsureSecrets only fills empty
+	// fields, so existing values survive; the rewrite is persisted so
+	// subsequent runs don't regenerate the same secrets on every boot.
+	if EnsureSecrets(&cfg) {
+		if err := SaveConfig(cfg); err != nil {
+			PrintFail("Config 저장", err.Error())
+			return err
+		}
+		PrintOK("Config 자동 업데이트", "starnion.yaml 에 누락된 시크릿을 추가했습니다")
+	}
+
 	// Verify installed components exist.
 	gatewayBin := filepath.Join(home, "bin", "starnion-gateway")
 	agentEntry := filepath.Join(home, "agent", "dist", "server", "index.js")
@@ -87,6 +100,9 @@ func runStart() error {
 		"JWT_SECRET="+cfg.Auth.JWTSecret,
 		"ENCRYPTION_KEY="+cfg.Auth.EncryptionKey,
 		"INTERNAL_LOG_SECRET="+cfg.Auth.InternalLogSecret,
+		"GRPC_SHARED_SECRET="+cfg.Auth.GRPCSharedSecret,
+		"TELEGRAM_WEBHOOK_SECRET="+cfg.Telegram.WebhookSecret,
+		"BROWSER_AUTH_TOKEN="+cfg.Auth.BrowserAuthToken,
 		"MINIO_ENDPOINT="+cfg.Minio.Endpoint,
 		"MINIO_ACCESS_KEY="+cfg.Minio.AccessKey,
 		"MINIO_SECRET_KEY="+cfg.Minio.SecretKey,

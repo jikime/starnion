@@ -1,7 +1,15 @@
-// cmd/test-notify — local notification test runner
+//go:build devtools
+
+// cmd/test-notify — local notification test runner.
 //
 // Triggers every builtin scheduler job once for a given user and prints
 // whether the message was sent (or skipped due to no data).
+//
+// Hidden behind the `devtools` build tag so `go build ./...` does not
+// pull this one-off tool into production binaries. Run with:
+//
+//	go build -tags devtools ./cmd/test-notify
+//	go run -tags devtools ./cmd/test-notify
 //
 // Usage:
 //
@@ -92,7 +100,7 @@ func main() {
 	}
 	if userID == "" {
 		// 3rd choice: any active user (may fail Telegram delivery)
-		if err := db.QueryRowContext(ctx,
+		if err := db.Pool().QueryRow(ctx,
 			`SELECT id::text FROM users WHERE is_active = true ORDER BY created_at LIMIT 1`,
 		).Scan(&userID); err != nil {
 			logger.Fatal("no active user found", zap.Error(err))
@@ -139,7 +147,7 @@ func main() {
 
 			// Resolve bot token
 			var rawToken string
-			if err := db.QueryRowContext(ctx,
+			if err := db.Pool().QueryRow(ctx,
 				`SELECT bot_token FROM channel_settings
 				 WHERE user_id = $1::uuid AND channel = 'telegram' AND enabled = true AND bot_token <> ''
 				 LIMIT 1`,
@@ -170,10 +178,10 @@ func main() {
 		}
 	}
 
-	reportFn := func(_ context.Context, _, _ string) error { return nil }
-
 	// ── Scheduler ─────────────────────────────────────────────────────────────
-	sched := scheduler.New(db, logger, reportFn, notifyFn)
+	// reportFn removed together with the reports HTTP handler —
+	// the scheduler no longer exposes a "report" action-type.
+	sched := scheduler.New(db, logger, notifyFn)
 	sched.SetNaverCredentials(cfg.NaverSearchClientID, cfg.NaverSearchClientSecret)
 	sched.SetEncryptionKey(cfg.EncryptionKey)
 

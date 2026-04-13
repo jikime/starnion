@@ -134,7 +134,17 @@ function PriorityGroup({ priority }: PriorityGroupProps) {
   return (
     <div
       className={cn(
-        "border border-border rounded-lg overflow-hidden",
+        "flex flex-col border border-border rounded-lg overflow-hidden",
+        // Expanded groups share the available height of the AbcTaskList flex
+        // column equally (flex-1 + min-h-0 allows them to shrink below content
+        // size, activating the inner scroll). Collapsed groups take only the
+        // header height so the remaining groups absorb the freed space.
+        //
+        // Why min-h-0: without it, flex items default to min-height:auto, which
+        // refuses to shrink below the intrinsic size of their content — that
+        // would let a group with 50 tasks push its siblings off-screen, which
+        // is the exact problem we are fixing.
+        collapsed ? "shrink-0" : "flex-1 min-h-0",
         priority === "A" &&
           pendingACount > 0 &&
           tasks.length > 0 &&
@@ -142,9 +152,10 @@ function PriorityGroup({ priority }: PriorityGroupProps) {
           "border-[var(--priority-a)]/40"
       )}
     >
-      {/* Group header */}
+      {/* Group header — shrink-0 so it never loses its row to the inner
+          scroll area even when a group has many tasks. */}
       <button
-        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-accent/30 transition-colors"
+        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-accent/30 transition-colors shrink-0"
         onClick={() => setCollapsed(!collapsed)}
         aria-expanded={!collapsed}
       >
@@ -188,9 +199,15 @@ function PriorityGroup({ priority }: PriorityGroupProps) {
         </div>
       </button>
 
-      {/* Tasks */}
+      {/* Tasks — flex-1 min-h-0 claims the expanded group's remaining
+          height (after the sticky header), and overflow-y-auto kicks in
+          whenever the task list is taller than that share. Each A/B/C
+          group therefore scrolls independently: a 50-task "A" group no
+          longer pushes "B" and "C" out of view, which was the exact
+          symptom the user reported. The .planner-scroll utility styles
+          the scrollbar to match the rest of the planner surface. */}
       {!collapsed && (
-        <div className="pb-1">
+        <div className="flex-1 min-h-0 overflow-y-auto planner-scroll pb-1">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}

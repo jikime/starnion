@@ -9,9 +9,9 @@ package notification
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/newstarnion/gateway/internal/infrastructure/database"
 	"go.uber.org/zap"
 )
@@ -31,9 +31,9 @@ type Notifier interface {
 //
 // Default channel when the user has no preference: ["telegram"].
 type Dispatcher struct {
-	db       *database.DB
+	db        *database.DB
 	notifiers map[string]Notifier
-	logger   *zap.Logger
+	logger    *zap.Logger
 }
 
 // NewDispatcher creates a Dispatcher with the supplied Notifier implementations.
@@ -46,8 +46,14 @@ func NewDispatcher(db *database.DB, logger *zap.Logger, notifiers ...Notifier) *
 }
 
 // Dispatch sends the notification to every enabled channel for the user.
-// Failures on individual channels are logged but do not stop other channels.
-func (d *Dispatcher) Dispatch(ctx context.Context, userID, notifType, message string) error {
+// Failures on individual channels are logged but do not stop other channels
+// from firing — the dispatcher prioritises "at least one channel delivers"
+// over "all-or-nothing". The signature has no return value because every
+// call site was discarding a nil error anyway; removing it makes the
+// "best effort" semantics explicit and prunes dead error-handling
+// boilerplate from both the scheduler wire.go and the agent-facing
+// /internal/notify handler.
+func (d *Dispatcher) Dispatch(ctx context.Context, userID, notifType, message string) {
 	channels := d.enabledChannels(ctx, userID)
 
 	for _, ch := range channels {
@@ -63,14 +69,13 @@ func (d *Dispatcher) Dispatch(ctx context.Context, userID, notifType, message st
 				zap.Error(err))
 		}
 	}
-	return nil
 }
 
 // enabledChannels reads preferences -> notifications -> channels from the user row.
 // Falls back to defaultChannels when the preference is absent or malformed.
 func (d *Dispatcher) enabledChannels(ctx context.Context, userID string) []string {
-	var prefsJSON sql.NullString
-	d.db.QueryRowContext(ctx,
+	var prefsJSON pgtype.Text
+	d.db.Pool().QueryRow(ctx,
 		`SELECT preferences FROM users WHERE id = $1::uuid`, userID,
 	).Scan(&prefsJSON)
 
@@ -83,14 +88,12 @@ func (d *Dispatcher) enabledChannels(ctx context.Context, userID string) []strin
 		return defaultChannels
 	}
 
-	notifRaw, _ := prefs["notifications"]
-	notif, ok := notifRaw.(map[string]any)
+	notif, ok := prefs["notifications"].(map[string]any)
 	if !ok {
 		return defaultChannels
 	}
 
-	chRaw, _ := notif["channels"]
-	chArr, ok := chRaw.([]any)
+	chArr, ok := notif["channels"].([]any)
 	if !ok {
 		return defaultChannels
 	}

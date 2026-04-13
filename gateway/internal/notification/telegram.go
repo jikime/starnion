@@ -38,7 +38,7 @@ func (n *TelegramNotifier) Send(ctx context.Context, userID, _ /*notifType*/, me
 	// Primary source: platform_identities (populated by ApprovePairing flow).
 	// Fallback: users.telegram_id (populated by LinkTelegram / LinkTelegramByCode flows).
 	var platformID string
-	n.db.QueryRowContext(ctx,
+	n.db.Pool().QueryRow(ctx,
 		`SELECT COALESCE(
 		     (SELECT platform_id FROM platform_identities
 		      WHERE user_id = $1::uuid AND platform = 'telegram' LIMIT 1),
@@ -61,7 +61,7 @@ func (n *TelegramNotifier) Send(ctx context.Context, userID, _ /*notifType*/, me
 	// Tokens are stored encrypted by the gateway; decrypt before use.
 	// Falls back to the raw value for legacy unencrypted rows.
 	var rawToken string
-	if err := n.db.QueryRowContext(ctx,
+	if err := n.db.Pool().QueryRow(ctx,
 		`SELECT bot_token FROM channel_settings
 		 WHERE user_id = $1::uuid AND channel = 'telegram' AND enabled = true AND bot_token <> ''
 		 LIMIT 1`,

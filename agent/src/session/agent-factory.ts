@@ -1,3 +1,4 @@
+import fs from "fs";
 import path from "path";
 import {
   createAgentSession,
@@ -18,6 +19,108 @@ const AGENT_DIR = path.resolve(process.env.AGENT_DIR ?? process.cwd());
 const SKILLS_DIR = path.resolve(
   process.env.SKILLS_DIR ?? path.join(AGENT_DIR, "skills"),
 );
+
+/**
+ * Rewrite any stale absolute paths in a pi-coding-agent session jsonl
+ * file so that resumed sessions don't feed the LLM an old project
+ * root. The session file records `cwd` on its first line AND replays
+ * tool_use / tool_result entries verbatim — when the project is moved
+ * or renamed, those frozen absolute paths leak back into the LLM's
+ * context and the model dutifully mimics them in new bash commands
+ * (e.g. `cd /old/path/skills && python3 weather/...`).
+ *
+ * This helper is defensive and surgical:
+ *
+ *   - It looks for the substring form of SKILLS_DIR without the final
+ *     "/skills" segment (i.e. the agent root) and compares against
+ *     whatever the session thinks its cwd is.
+ *   - When a mismatch is detected, the entire file is streamed through
+ *     a single search/replace that swaps the stale agent root for the
+ *     current one. No JSON parsing — we don't want to corrupt any
+ *     exotic fields the pi-coding-agent SDK writes.
+ *   - A `.bak` backup is kept on the first rewrite of each file.
+ *
+ * Safe to call on every session load: returns immediately when the
+ * file does not exist, when it's empty, or when the session already
+ * references the current path.
+ */
+function rewriteStaleSessionPaths(sessionDir: string): void {
+  try {
+    if (!fs.existsSync(sessionDir)) return;
+    const entries = fs.readdirSync(sessionDir, { withFileTypes: true });
+    const currentAgentRoot = path.dirname(SKILLS_DIR); // .../agent
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+      const filePath = path.join(sessionDir, entry.name);
+      let raw: string;
+      try {
+        raw = fs.readFileSync(filePath, "utf8");
+      } catch {
+        continue;
+      }
+      if (!raw) continue;
+
+      // Grab the session header's cwd (first line, if it is a JSON
+      // object with a cwd field). We only need the prefix to identify
+      // the stale agent root.
+      const firstLineEnd = raw.indexOf("\n");
+      const firstLine = firstLineEnd >= 0 ? raw.slice(0, firstLineEnd) : raw;
+      let staleCwd: string | undefined;
+      try {
+        const header = JSON.parse(firstLine) as { cwd?: string };
+        if (typeof header.cwd === "string") staleCwd = header.cwd;
+      } catch {
+        // First line isn't JSON (corrupt file) — bail rather than
+        // guess at the stale prefix.
+        continue;
+      }
+      if (!staleCwd) continue;
+
+      // Derive the stale agent root from the stored cwd. We strip the
+      // trailing "/skills" (or whatever component the session was
+      // created under) so paths like `skills/weather/scripts/...`
+      // inside bash commands also get rewritten.
+      const staleAgentRoot = path.dirname(staleCwd);
+      if (staleAgentRoot === currentAgentRoot) continue; // already current
+
+      // Prefer rewriting whole "agent" parents so nested subpaths
+      // (skills/, SOUL.md, sessions/, etc.) all come along for the
+      // ride. If that can't match the whole file, fall back to
+      // rewriting just the skills directory.
+      const replacements: Array<[string, string]> = [
+        [staleAgentRoot, currentAgentRoot],
+        [staleCwd, SKILLS_DIR],
+      ];
+      let rewritten = raw;
+      for (const [from, to] of replacements) {
+        if (!from || from === to) continue;
+        rewritten = rewritten.split(from).join(to);
+      }
+      if (rewritten === raw) continue;
+
+      // Keep a one-time backup the first time we touch this file.
+      const backupPath = filePath + ".bak.stalepath";
+      if (!fs.existsSync(backupPath)) {
+        try {
+          fs.copyFileSync(filePath, backupPath);
+        } catch {
+          // Non-fatal: proceed without the backup rather than fail
+          // the whole session load.
+        }
+      }
+      fs.writeFileSync(filePath, rewritten, "utf8");
+      console.log(
+        `[AgentFactory] Migrated stale session paths: ${filePath} ` +
+          `(${staleAgentRoot} → ${currentAgentRoot})`,
+      );
+    }
+  } catch (err) {
+    console.warn(
+      "[AgentFactory] rewriteStaleSessionPaths: failed to sweep " +
+        `${sessionDir}: ${(err as Error).message}`,
+    );
+  }
+}
 
 const MODEL_ALIAS_MAP: Record<string, string> = {
   "claude-sonnet-4-5": "claude-sonnet-4-5",
@@ -168,6 +271,16 @@ export class AgentFactory {
     // (e.g. ~/.starnion/sessions/{userId}/{sessionId}/).
     // continueRecent() opens the most recent JSONL in that dir (resuming after
     // restart) or creates a new one if the directory is empty.
+    //
+    // Defensive: when the agent binary is moved (fresh clone, rename, or the
+    // user switched between project checkouts), resumed sessions still carry
+    // the old absolute cwd in their header + every historical tool_use entry.
+    // The LLM mimics those absolute paths in new bash commands, producing
+    // "No such file or directory" errors pointing at the previous project
+    // location. Sweep the session directory before handing it to
+    // continueRecent() so any jsonl that predates the move has its stale
+    // paths rewritten in place.
+    rewriteStaleSessionPaths(sessionFilePath);
     const sessionManager = SessionManager.continueRecent(SKILLS_DIR, sessionFilePath);
 
     console.log(`[AgentFactory] Creating new session cwd=${SKILLS_DIR}`);

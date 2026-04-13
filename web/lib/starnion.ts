@@ -11,42 +11,45 @@
 import fs from "fs"
 import os from "os"
 import path from "path"
+import yaml from "js-yaml"
 
 const STARNION_YAML = path.join(os.homedir(), ".starnion", "starnion.yaml")
 
-/** Minimal two-level YAML parser — matches the same format as agent/src/system/config.ts */
+/**
+ * Parse ~/.starnion/starnion.yaml via js-yaml. Previously this file had
+ * a hand-rolled two-level parser that silently corrupted quoted values
+ * and multi-line strings — the agent side had the same bug and now also
+ * uses js-yaml for the same reason.
+ */
 function loadStarnionYaml(): Record<string, Record<string, string> | string> {
   if (!fs.existsSync(STARNION_YAML)) return {}
 
-  const config: Record<string, Record<string, string> | string> = {}
-  let section: string | null = null
-
-  const lines = fs.readFileSync(STARNION_YAML, "utf-8").split("\n")
-  for (const rawLine of lines) {
-    const line = rawLine.trimEnd()
-    if (!line || line.trimStart().startsWith("#")) continue
-    if (!line.includes(":")) continue
-
-    const indent = line.length - line.trimStart().length
-    const stripped = line.trimStart()
-    const colonIdx = stripped.indexOf(":")
-    const key = stripped.slice(0, colonIdx).trim()
-    const val = stripped.slice(colonIdx + 1).trim()
-
-    if (indent === 0) {
-      if (val) {
-        config[key] = val
-        section = null
-      } else {
-        config[key] = {}
-        section = key
+  try {
+    const raw = fs.readFileSync(STARNION_YAML, "utf-8")
+    const parsed = yaml.load(raw)
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const out: Record<string, Record<string, string> | string> = {}
+      for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+        if (v == null) continue
+        if (typeof v === "object" && !Array.isArray(v)) {
+          const sub: Record<string, string> = {}
+          for (const [sk, sv] of Object.entries(v as Record<string, unknown>)) {
+            if (sv == null) continue
+            sub[sk] = typeof sv === "string" ? sv : String(sv)
+          }
+          out[k] = sub
+        } else if (typeof v === "string") {
+          out[k] = v
+        } else {
+          out[k] = String(v)
+        }
       }
-    } else if (section !== null) {
-      (config[section] as Record<string, string>)[key] = val
+      return out
     }
+  } catch (err) {
+    console.warn("[starnion.ts] failed to parse starnion.yaml:", (err as Error).message)
   }
-
-  return config
+  return {}
 }
 
 function sect(

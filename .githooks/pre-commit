@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# starnion pre-commit hook
+#
+# Rejects a commit when any staged Go file is not gofmt-clean. Prints the
+# offending paths and exits 1 so the developer can run `gofmt -w` and
+# re-stage before committing. Non-Go commits are untouched.
+#
+# Install once per clone:
+#   git config core.hooksPath .githooks
+
+set -euo pipefail
+
+staged_go=$(git diff --cached --name-only --diff-filter=ACMR -- '*.go' || true)
+
+if [ -z "$staged_go" ]; then
+    exit 0
+fi
+
+unformatted=()
+while IFS= read -r file; do
+    [ -z "$file" ] && continue
+    [ ! -f "$file" ] && continue
+    if ! diff -q <(gofmt "$file") "$file" > /dev/null 2>&1; then
+        unformatted+=("$file")
+    fi
+done <<< "$staged_go"
+
+if [ "${#unformatted[@]}" -gt 0 ]; then
+    echo "pre-commit: the following Go files are not gofmt-clean:" >&2
+    for f in "${unformatted[@]}"; do
+        echo "  $f" >&2
+    done
+    echo "" >&2
+    echo "Run: gofmt -w ${unformatted[*]}" >&2
+    exit 1
+fi
+
+exit 0

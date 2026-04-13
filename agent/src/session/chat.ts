@@ -7,7 +7,7 @@ import { createCheckpointTools } from "../tools/checkpoint.js";
 import { createCronTools } from "../tools/cron-tools.js";
 import {
   type ChatContext,
-  type ChatMiddleware,
+  ChatMiddleware,
   SessionSetupMiddleware,
   UserMemoryMiddleware,
   ProjectContextMiddleware,
@@ -85,6 +85,17 @@ const MIDDLEWARES: ChatMiddleware[] = [
   new IterationBudgetMiddleware(),         // safety: abort on excessive tool call loops
   new ContextLengthProbingMiddleware(),    // probe model context window size
 ];
+
+// EVENT_MIDDLEWARES is the fast-path subset that actually overrides
+// onEvent. Middlewares that only use beforeSession / afterComplete still
+// live in MIDDLEWARES (the full list is consulted for those phases) but
+// are skipped during the per-event streaming loop. Without this filter a
+// single text_delta triggered 16 awaited onEvent calls even though only
+// 5-6 middlewares do anything for that event type, which was the
+// dominant cap on per-turn throughput for long streaming responses.
+const EVENT_MIDDLEWARES: ChatMiddleware[] = MIDDLEWARES.filter(
+  (mw) => (mw as { onEvent?: unknown }).onEvent !== (ChatMiddleware.prototype as { onEvent?: unknown }).onEvent,
+);
 
 // ── Harness singletons ────────────────────────────────────────────────────────
 // PromptComposer: identity resolution + ResourceLoader (with SOUL.md hot-reload)
@@ -182,8 +193,10 @@ export async function handleChat(options: ChatOptions): Promise<void> {
     try {
       await new Promise<void>((resolve, reject) => {
         unsubscribe = ctx.session!.subscribe(async (event: AgentSessionEvent) => {
-          // Each middleware processes the event and may emit output events
-          for (const mw of MIDDLEWARES) {
+          // Iterate only the middlewares that actually override onEvent.
+          // Middlewares like SessionSetupMiddleware that only use
+          // beforeSession/afterComplete are excluded from this hot loop.
+          for (const mw of EVENT_MIDDLEWARES) {
             try {
               const outEvents = await mw.onEvent(ctx, event);
               for (const e of outEvents) ctx.onEvent(e);

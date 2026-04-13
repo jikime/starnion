@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useState } from "react"
 import { useTranslations } from "next-intl"
 import { usePlannerStore } from "@/lib/planner-store"
 import { useShallow } from "zustand/react/shallow"
 import { cn } from "@/lib/utils"
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react"
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, RefreshCw } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { format, addDays, subDays, parseISO, isToday, isTomorrow, isYesterday } from "date-fns"
@@ -16,9 +16,27 @@ interface DateHeaderProps {
 }
 
 export function DateHeader({ rightSlot }: DateHeaderProps = {}) {
-  const { selectedDate, setSelectedDate } = usePlannerStore()
+  const { selectedDate, setSelectedDate, hydrateFromAPI } = usePlannerStore()
   const t = useTranslations("planner.dateHeader")
   const parsed = parseISO(selectedDate)
+
+  // Refresh button state — local to the header so the rest of the
+  // planner store isn't re-rendered on every spinner tick. While
+  // `hydrateFromAPI` itself can settle in well under 200ms on a
+  // warm cache, keep the spinning icon visible for a minimum of
+  // ~400ms so the user always sees feedback and doesn't perceive
+  // "nothing happened" when they tap the button.
+  const [refreshing, setRefreshing] = useState(false)
+  const handleRefresh = useCallback(async () => {
+    if (refreshing) return
+    setRefreshing(true)
+    const minDuration = new Promise<void>((resolve) => setTimeout(resolve, 400))
+    try {
+      await Promise.all([hydrateFromAPI(), minDuration])
+    } finally {
+      setRefreshing(false)
+    }
+  }, [hydrateFromAPI, refreshing])
 
   const goBack = () => setSelectedDate(format(subDays(parsed, 1), "yyyy-MM-dd"))
   const goForward = () => setSelectedDate(format(addDays(parsed, 1), "yyyy-MM-dd"))
@@ -96,6 +114,15 @@ export function DateHeader({ rightSlot }: DateHeaderProps = {}) {
       {/* Right controls */}
       <div className="flex items-center gap-2">
         {rightSlot}
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          aria-label={t("refresh")}
+          title={t("refresh")}
+          className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors border border-border disabled:opacity-60 disabled:cursor-wait"
+        >
+          <RefreshCw className={cn("w-3.5 h-3.5", refreshing && "animate-spin")} />
+        </button>
         {!isCurrentToday && (
           <button
             onClick={goToday}

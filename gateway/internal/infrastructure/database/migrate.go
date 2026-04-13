@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 )
 
@@ -25,8 +26,9 @@ var migrationFiles embed.FS
 // is only meant to be run when bootstrapping a completely fresh database via
 // docker-compose initdb.
 func RunMigrations(ctx context.Context, db *DB, logger *zap.Logger) error {
+	pool := db.Pool()
 	// Ensure the tracking table exists.
-	_, err := db.ExecContext(ctx, `
+	_, err := pool.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			version    TEXT        NOT NULL PRIMARY KEY,
 			applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -36,7 +38,7 @@ func RunMigrations(ctx context.Context, db *DB, logger *zap.Logger) error {
 	}
 
 	// Load already-applied versions.
-	rows, err := db.QueryContext(ctx, `SELECT version FROM schema_migrations`)
+	rows, err := pool.Query(ctx, `SELECT version FROM schema_migrations`)
 	if err != nil {
 		return fmt.Errorf("query schema_migrations: %w", err)
 	}
@@ -83,25 +85,25 @@ func RunMigrations(ctx context.Context, db *DB, logger *zap.Logger) error {
 		logger.Info("[migrate] applying migration", zap.String("file", name))
 
 		// Execute the entire script in a single transaction.
-		tx, err := db.BeginTx(ctx, nil)
+		tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
 		if err != nil {
 			return fmt.Errorf("begin tx for %s: %w", name, err)
 		}
 
-		if _, err := tx.ExecContext(ctx, string(sql)); err != nil {
-			tx.Rollback() //nolint:errcheck
+		if _, err := tx.Exec(ctx, string(sql)); err != nil {
+			_ = tx.Rollback(ctx)
 			return fmt.Errorf("execute migration %s: %w", name, err)
 		}
 
-		if _, err := tx.ExecContext(ctx,
+		if _, err := tx.Exec(ctx,
 			`INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING`,
 			version,
 		); err != nil {
-			tx.Rollback() //nolint:errcheck
+			_ = tx.Rollback(ctx)
 			return fmt.Errorf("record migration %s: %w", name, err)
 		}
 
-		if err := tx.Commit(); err != nil {
+		if err := tx.Commit(ctx); err != nil {
 			return fmt.Errorf("commit migration %s: %w", name, err)
 		}
 

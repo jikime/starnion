@@ -2,15 +2,21 @@ package grpc
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"os"
 	"time"
 
-	"github.com/newstarnion/gateway/internal/infrastructure/grpc/proto"
+	proto "github.com/newstarnion/gateway/proto/agent"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
@@ -25,11 +31,118 @@ type AgentClient struct {
 	sharedSecret string
 }
 
+// TLSOptions bundles the optional transport-security paths for dialing the agent.
+// When CAPath is empty, the client falls back to insecure credentials — but only
+// if the target address is a loopback host.
+type TLSOptions struct {
+	CAPath     string // server-cert verification root
+	CertPath   string // client cert (optional, enables mTLS)
+	KeyPath    string // client key (required when CertPath is set)
+	ServerName string // SNI / hostname override for server cert verification
+}
+
+// buildTransportCredentials decides between TLS and insecure based on TLSOptions
+// and whether the target address is loopback. It refuses insecure dialing across
+// the network so the agent never sees plaintext credentials from another host.
+func buildTransportCredentials(addr string, opts TLSOptions) (credentials.TransportCredentials, error) {
+	if opts.CAPath != "" {
+		caPEM, err := os.ReadFile(opts.CAPath)
+		if err != nil {
+			return nil, fmt.Errorf("read agent TLS CA %s: %w", opts.CAPath, err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(caPEM) {
+			return nil, fmt.Errorf("agent TLS CA %s contains no valid certificates", opts.CAPath)
+		}
+		tlsCfg := &tls.Config{
+			RootCAs:    pool,
+			MinVersion: tls.VersionTLS12,
+		}
+		if opts.ServerName != "" {
+			tlsCfg.ServerName = opts.ServerName
+		}
+		if opts.CertPath != "" || opts.KeyPath != "" {
+			if opts.CertPath == "" || opts.KeyPath == "" {
+				return nil, fmt.Errorf("agent TLS requires both cert and key paths for mTLS")
+			}
+			cert, err := tls.LoadX509KeyPair(opts.CertPath, opts.KeyPath)
+			if err != nil {
+				return nil, fmt.Errorf("load agent TLS client keypair: %w", err)
+			}
+			tlsCfg.Certificates = []tls.Certificate{cert}
+		}
+		return credentials.NewTLS(tlsCfg), nil
+	}
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr
+	}
+	if !isLoopbackHost(host) {
+		return nil, fmt.Errorf(
+			"refusing to dial non-loopback agent %q without TLS; set AGENT_GRPC_TLS_CA or bind agent to localhost",
+			addr,
+		)
+	}
+	return insecure.NewCredentials(), nil
+}
+
+// base64DecodeTolerant decodes either standard or URL-safe base64 and,
+// failing that, returns the original bytes untouched so the agent can at
+// least attempt a passthrough. Images coming from Telegram are standard
+// base64; some clients use URL-safe encoding.
+func base64DecodeTolerant(s string) ([]byte, error) {
+	if s == "" {
+		return nil, nil
+	}
+	if b, err := base64.StdEncoding.DecodeString(s); err == nil {
+		return b, nil
+	}
+	if b, err := base64.URLEncoding.DecodeString(s); err == nil {
+		return b, nil
+	}
+	if b, err := base64.RawStdEncoding.DecodeString(s); err == nil {
+		return b, nil
+	}
+	return nil, fmt.Errorf("base64 decode failed for %d-byte payload", len(s))
+}
+
+func isLoopbackHost(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
+}
+
 // NewAgentClient dials the agent gRPC server and returns a ready-to-use client.
 // sharedSecret is attached to every outgoing call as the "x-shared-secret" metadata header.
-func NewAgentClient(addr, sharedSecret string, logger *zap.Logger) (*AgentClient, error) {
+// When tls.CAPath is empty the client refuses to dial a non-loopback address to prevent
+// plaintext credentials crossing the network.
+func NewAgentClient(addr, sharedSecret string, tlsOpts TLSOptions, logger *zap.Logger) (*AgentClient, error) {
+	// Defensive check — config.Load() already fail-fasts when the shared
+	// secret is empty, but a test or future bootstrap variant that skips
+	// config validation would otherwise build an unauthenticated client
+	// and send RPCs in the clear. Refuse here as well.
+	if sharedSecret == "" {
+		return nil, fmt.Errorf("agent grpc client: refusing to build without a shared secret")
+	}
+	creds, err := buildTransportCredentials(addr, tlsOpts)
+	if err != nil {
+		return nil, err
+	}
+	const maxMsgSize = 16 * 1024 * 1024 // 16 MiB — covers 4+ MB Telegram photos
 	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(creds),
+		// Explicit message size. Previously the default 4 MiB applied,
+		// which meant a single larger image or a batched VisionInputs
+		// payload could be rejected with RESOURCE_EXHAUSTED. 16 MiB gives
+		// headroom for the worst realistic payload (four 4 MB images).
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallSendMsgSize(maxMsgSize),
+			grpc.MaxCallRecvMsgSize(maxMsgSize),
+		),
 		// Keepalive: ping every 10s of inactivity so dead connections are detected quickly.
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                10 * time.Second,
@@ -72,9 +185,13 @@ type PreviousMessage struct {
 	Content string `json:"content"`
 }
 
-// ImageContent holds a base64-encoded image for vision requests.
+// ImageContent holds a raw image payload for vision requests. The bytes
+// are passed to the agent through the typed proto `ImageContent.data`
+// field — no base64 round-trip on the gateway→agent hop. The agent
+// re-encodes to base64 only when handing the image to the LLM wrapper,
+// which expects a base64 string for historical reasons.
 type ImageContent struct {
-	Data     string `json:"Data"`     // base64-encoded bytes
+	Data     []byte `json:"Data"`     // raw bytes
 	MimeType string `json:"MimeType"` // e.g. "image/jpeg"
 }
 
@@ -87,12 +204,12 @@ type ImageURL struct {
 
 // ChatEvent is a decoded event from the agent stream.
 type ChatEvent struct {
-	Type      string // "text", "tool_use", "tool_result", "done", "error"
-	Text      string // type == "text"
-	ToolName  string // type == "tool_use" | "tool_result"
-	InputJSON string // type == "tool_use"
-	Result    string // type == "tool_result"
-	IsError   bool   // type == "tool_result"
+	Type             string  // "text", "tool_use", "tool_result", "done", "error"
+	Text             string  // type == "text"
+	ToolName         string  // type == "tool_use" | "tool_result"
+	InputJSON        string  // type == "tool_use"
+	Result           string  // type == "tool_result"
+	IsError          bool    // type == "tool_result"
 	SessionID        string  // type == "done"
 	InputTokens      int     // type == "done"
 	OutputTokens     int     // type == "done"
@@ -102,7 +219,7 @@ type ChatEvent struct {
 	Model            string  // type == "done" — model used for this turn
 	ContextTokens    int     // type == "done" — current context usage in tokens (0 if unknown)
 	ContextWindow    int     // type == "done" — model context window size in tokens
-	ErrorMsg  string // type == "error"
+	ErrorMsg         string  // type == "error"
 }
 
 // Generate calls the agent Generate RPC for one-shot text generation.
@@ -121,70 +238,155 @@ func (c *AgentClient) Generate(ctx context.Context, prompt, model string) (strin
 	return resp.Text, nil
 }
 
-// StreamChat calls the agent Chat RPC and streams decoded events to the out channel.
-// The channel is closed when streaming is complete or ctx is cancelled.
-// provider, apiKey, systemPrompt are passed via the metadata map; empty strings are omitted.
-// images, if non-empty, are JSON-serialised into metadata["images"] for vision requests (base64).
-// imageURLs, if non-empty, are JSON-serialised into metadata["image_urls"]; the agent fetches and encodes them.
-func (c *AgentClient) StreamChat(ctx context.Context, userID, sessionID, message, model, provider, apiKey, systemPrompt, timezone, secondaryModel string, previousMessages []PreviousMessage, images []ImageContent, imageURLs []ImageURL, configuredProviders []string, platform string, fallbackProviders string, skillEnvJSON string, disabledSkillsJSON string) (<-chan ChatEvent, error) {
-	metadata := map[string]string{}
-	if provider != "" {
-		metadata["provider"] = provider
-	}
-	if apiKey != "" {
-		metadata["api_key"] = apiKey
-	}
-	if systemPrompt != "" {
-		metadata["system_prompt"] = systemPrompt
-	}
-	if timezone != "" {
-		metadata["timezone"] = timezone
-	}
-	if secondaryModel != "" {
-		metadata["secondary_model"] = secondaryModel
-	}
-	if len(previousMessages) > 0 {
-		data, err := json.Marshal(previousMessages)
-		if err == nil {
-			metadata["previous_messages"] = string(data)
-		}
-	}
-	if len(images) > 0 {
-		data, err := json.Marshal(images)
-		if err == nil {
-			metadata["images"] = string(data)
-		}
-	}
-	if len(imageURLs) > 0 {
-		data, err := json.Marshal(imageURLs)
-		if err == nil {
-			metadata["image_urls"] = string(data)
-		}
-	}
-	if len(configuredProviders) > 0 {
-		data, err := json.Marshal(configuredProviders)
-		if err == nil {
-			metadata["configured_providers"] = string(data)
-		}
-	}
-	if platform != "" {
-		metadata["platform"] = platform
+// ChatInput groups all per-request parameters for StreamChat. Using a
+// struct with named fields eliminates the prior 17-positional-argument
+// signature — callers can no longer accidentally swap `fallbackProviders`
+// and `skillEnvJSON`, which were both plain strings. Defaults for
+// unspecified fields are the zero value.
+type ChatInput struct {
+	UserID    string
+	SessionID string
+	Message   string
+	Model     string
+
+	Provider       string
+	APIKey         string
+	SystemPrompt   string
+	Timezone       string
+	SecondaryModel string
+
+	PreviousMessages    []PreviousMessage
+	Images              []ImageContent
+	ImageURLs           []ImageURL
+	ConfiguredProviders []string
+	Platform            string
+
+	// The three JSON-string fields below are still accepted as strings
+	// because the existing resolver helpers produce them that way; the
+	// eventual next step is to plumb typed slices from the resolvers so
+	// StreamChat does not need to re-parse JSON on the hot path.
+	FallbackProviders  string
+	SkillEnvJSON       string
+	DisabledSkillsJSON string
+}
+
+// StreamChat calls the agent Chat RPC and streams decoded events to the
+// out channel. The channel is closed when streaming is complete or ctx
+// is cancelled. See ChatInput for per-field semantics.
+func (c *AgentClient) StreamChat(ctx context.Context, in ChatInput) (<-chan ChatEvent, error) {
+	userID := in.UserID
+	sessionID := in.SessionID
+	message := in.Message
+	model := in.Model
+	provider := in.Provider
+	apiKey := in.APIKey
+	systemPrompt := in.SystemPrompt
+	timezone := in.Timezone
+	secondaryModel := in.SecondaryModel
+	previousMessages := in.PreviousMessages
+	images := in.Images
+	imageURLs := in.ImageURLs
+	configuredProviders := in.ConfiguredProviders
+	platform := in.Platform
+	fallbackProviders := in.FallbackProviders
+	skillEnvJSON := in.SkillEnvJSON
+	disabledSkillsJSON := in.DisabledSkillsJSON
+	// ── ProviderConfig ────────────────────────────────────────────────────
+	providerCfg := &proto.ProviderConfig{
+		Name:                provider,
+		ApiKey:              apiKey,
+		SecondaryModel:      secondaryModel,
+		ConfiguredProviders: append([]string(nil), configuredProviders...),
 	}
 	if fallbackProviders != "" {
-		metadata["fallback_providers"] = fallbackProviders
+		var chain []struct {
+			Provider string `json:"provider"`
+			APIKey   string `json:"api_key"`
+			Model    string `json:"model"`
+			BaseURL  string `json:"base_url,omitempty"`
+		}
+		if err := json.Unmarshal([]byte(fallbackProviders), &chain); err == nil {
+			for _, entry := range chain {
+				providerCfg.FallbackChain = append(providerCfg.FallbackChain, &proto.FallbackProvider{
+					Provider: entry.Provider,
+					ApiKey:   entry.APIKey,
+					Model:    entry.Model,
+					BaseUrl:  entry.BaseURL,
+				})
+			}
+		} else {
+			c.logger.Warn("fallback provider chain parse failed", zap.Error(err))
+		}
 	}
-	if skillEnvJSON != "" {
-		metadata["skill_env_json"] = skillEnvJSON
+
+	// ── ChatHistory ───────────────────────────────────────────────────────
+	var history *proto.ChatHistory
+	if len(previousMessages) > 0 {
+		history = &proto.ChatHistory{Messages: make([]*proto.PreviousMessage, 0, len(previousMessages))}
+		for _, pm := range previousMessages {
+			history.Messages = append(history.Messages, &proto.PreviousMessage{
+				Role:    pm.Role,
+				Content: pm.Content,
+			})
+		}
 	}
-	if disabledSkillsJSON != "" {
-		metadata["disabled_skills_json"] = disabledSkillsJSON
+
+	// ── VisionInputs ──────────────────────────────────────────────────────
+	// ImageContent.Data is already a []byte now, so we forward it directly
+	// to the proto bytes field without any base64 dance. Previously we
+	// paid encode (caller) → decode (here) → encode (agent) for the same
+	// payload on every Telegram photo; the caller side now skips encode.
+	var vision *proto.VisionInputs
+	if len(images) > 0 || len(imageURLs) > 0 {
+		vision = &proto.VisionInputs{}
+		for _, img := range images {
+			vision.Images = append(vision.Images, &proto.ImageContent{
+				Data:     img.Data,
+				MimeType: img.MimeType,
+			})
+		}
+		for _, u := range imageURLs {
+			vision.ImageUrls = append(vision.ImageUrls, &proto.ImageURL{
+				Url:      u.URL,
+				MimeType: u.MimeType,
+			})
+		}
 	}
+
+	// ── SkillConfig ───────────────────────────────────────────────────────
+	var skillCfg *proto.SkillConfig
+	if skillEnvJSON != "" || disabledSkillsJSON != "" {
+		skillCfg = &proto.SkillConfig{}
+		if skillEnvJSON != "" {
+			env := map[string]string{}
+			if err := json.Unmarshal([]byte(skillEnvJSON), &env); err == nil {
+				skillCfg.Env = env
+			} else {
+				c.logger.Warn("skill env json parse failed", zap.Error(err))
+			}
+		}
+		if disabledSkillsJSON != "" {
+			var disabled []string
+			if err := json.Unmarshal([]byte(disabledSkillsJSON), &disabled); err == nil {
+				skillCfg.Disabled = disabled
+			} else {
+				c.logger.Warn("disabled skills json parse failed", zap.Error(err))
+			}
+		}
+	}
+
 	req := &proto.ChatRequest{
-		UserId:    userID,
-		SessionId: sessionID,
-		Message:   message,
-		Model:     model,
-		Metadata:  metadata,
+		UserId:      userID,
+		SessionId:   sessionID,
+		Message:     message,
+		Model:       model,
+		Provider:    providerCfg,
+		UserContext: &proto.UserContext{Timezone: timezone},
+		Persona:     &proto.PersonaConfig{SystemPrompt: systemPrompt},
+		History:     history,
+		Vision:      vision,
+		Skills:      skillCfg,
+		Client:      &proto.ClientInfo{Platform: platform},
 	}
 
 	// Retry the stream dial up to 3 times with exponential backoff.

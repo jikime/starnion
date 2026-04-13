@@ -11,6 +11,11 @@ dist/
 # Go
 gateway/bin/
 gateway/*.test
+bin/
+gateway/migrate-encrypt
+
+# TypeScript incremental build cache
+**/tsconfig.tsbuildinfo
 
 # Session data
 ~/.starnion/
@@ -27,3 +32,4 @@ agent/skills/.pi/
 __pycache__/
 _workspace/
 *.swp
+_workspace/

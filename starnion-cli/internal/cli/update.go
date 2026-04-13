@@ -198,6 +198,29 @@ func runUpdate(checkOnly, force bool) error {
 		}
 	}
 
+	// ── Post-install: top up missing secrets in starnion.yaml ────────────
+	// An older release may have written a yaml that predates a new
+	// mandatory secret (the historical pattern: `grpc_shared_secret`
+	// and `internal_log_secret` were added after 0.1.x, `telegram.
+	// webhook_secret` after 0.2.x, and `auth.browser_auth_token`
+	// after 0.2.1). EnsureSecrets is idempotent — it only fills
+	// empty fields — so running it here is safe for users who
+	// already have a complete config. `starnion start` / `starnion
+	// dev` also do this, but putting it in `update` means the yaml
+	// is coherent the moment the new binary lands, before the user
+	// even runs start. If they stay on `pnpm dev` / a systemd unit
+	// that directly invokes the gateway binary (bypassing the
+	// starnion CLI wrapper), this is their only backfill hook.
+	if cfg, err := LoadConfig(); err == nil {
+		if EnsureSecrets(&cfg) {
+			if saveErr := SaveConfig(cfg); saveErr != nil {
+				PrintWarn("Config", fmt.Sprintf("starnion.yaml 저장 실패: %v", saveErr))
+			} else {
+				PrintOK("Config 자동 업데이트", "starnion.yaml 에 누락된 시크릿을 추가했습니다")
+			}
+		}
+	}
+
 	// ── Post-install: update systemd service files (Linux only) ──────────
 	updateSystemdServices(starnionHome)
 
@@ -513,7 +536,7 @@ func extractTarGz(src, destDir string) error {
 		}
 
 		// Security: strip path traversal
-		target := filepath.Join(destDir, filepath.Clean("/"+hdr.Name)[1:])
+		target := filepath.Join(destDir, filepath.Clean("/" + hdr.Name)[1:])
 
 		switch hdr.Typeflag {
 		case tar.TypeDir:

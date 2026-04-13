@@ -1,8 +1,33 @@
 import { getRequestConfig } from "next-intl/server"
 import { cookies, headers } from "next/headers"
 
+// Static imports so Turbopack (Next 15+/16) tracks each locale JSON
+// as a proper module dependency and invalidates the request config
+// on HMR when any `messages/*.json` file is edited. Previously this
+// file used `await import(`../messages/${locale}.json`)`, whose
+// module specifier is not known at compile time — Turbopack can't
+// wire the JSON files into its HMR graph through that form, and
+// edits to a message catalog would silently ship with the stale
+// bundle until the dev server was restarted (manifesting as
+// `MISSING_MESSAGE: Could not resolve ... in messages for locale …`
+// errors for freshly added keys).
+import koMessages from "../messages/ko.json"
+import enMessages from "../messages/en.json"
+import jaMessages from "../messages/ja.json"
+import zhMessages from "../messages/zh.json"
+
 const SUPPORTED_LOCALES = ["ko", "en", "zh", "ja"] as const
 type Locale = (typeof SUPPORTED_LOCALES)[number]
+
+// Map locale → statically-imported catalog. `unknown` cast around
+// the JSON modules keeps TypeScript happy without fabricating a
+// shared message-shape type (next-intl infers it at call sites).
+const MESSAGES: Record<Locale, Record<string, unknown>> = {
+  ko: koMessages as Record<string, unknown>,
+  en: enMessages as Record<string, unknown>,
+  ja: jaMessages as Record<string, unknown>,
+  zh: zhMessages as Record<string, unknown>,
+}
 
 function isValidLocale(locale: string): locale is Locale {
   return (SUPPORTED_LOCALES as readonly string[]).includes(locale)
@@ -33,6 +58,6 @@ export default getRequestConfig(async () => {
 
   return {
     locale,
-    messages: (await import(`../messages/${locale}.json`)).default,
+    messages: MESSAGES[locale],
   }
 })

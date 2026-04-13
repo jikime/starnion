@@ -2,6 +2,7 @@ import { execSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import yaml from "js-yaml";
 
 const STARNION_YAML = path.join(os.homedir(), ".starnion", "starnion.yaml");
 const AUTH_JSON_PATH = path.join(os.homedir(), ".pi", "agent", "auth.json");
@@ -96,41 +97,46 @@ function syncAuthJson(creds: OAuthCredentials): void {
 }
 
 /**
- * Minimal two-level YAML parser for ~/.starnion/starnion.yaml.
- * Supports only the flat key: value and section: / key: value patterns used by starnion.
+ * Parse ~/.starnion/starnion.yaml using js-yaml. Previously this was a
+ * hand-rolled two-level parser that silently dropped anything it did not
+ * recognise (quoted strings, escapes, multi-line values), meaning a
+ * secret containing a colon could be loaded with the wrong value. The
+ * canonical YAML parser fixes that and matches the gateway's parsing.
+ *
+ * Returns an empty object when the file does not exist or the content
+ * fails to parse so callers can fall back to environment variables.
  */
 function loadStarnionYaml(): Record<string, Record<string, string> | string> {
   if (!fs.existsSync(STARNION_YAML)) return {};
 
-  const config: Record<string, Record<string, string> | string> = {};
-  let section: string | null = null;
-
-  const lines = fs.readFileSync(STARNION_YAML, "utf-8").split("\n");
-  for (const rawLine of lines) {
-    const line = rawLine.trimEnd();
-    if (!line || line.trimStart().startsWith("#")) continue;
-    if (!line.includes(":")) continue;
-
-    const indent = line.length - line.trimStart().length;
-    const stripped = line.trimStart();
-    const colonIdx = stripped.indexOf(":");
-    const key = stripped.slice(0, colonIdx).trim();
-    const val = stripped.slice(colonIdx + 1).trim();
-
-    if (indent === 0) {
-      if (val) {
-        config[key] = val;
-        section = null;
-      } else {
-        config[key] = {};
-        section = key;
+  try {
+    const raw = fs.readFileSync(STARNION_YAML, "utf-8");
+    const parsed = yaml.load(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      // Coerce nested scalars to strings so downstream code can keep
+      // using `cfg.auth.internal_log_secret` without type-gymnastics.
+      const out: Record<string, Record<string, string> | string> = {};
+      for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+        if (v == null) continue;
+        if (typeof v === "object" && !Array.isArray(v)) {
+          const sub: Record<string, string> = {};
+          for (const [sk, sv] of Object.entries(v as Record<string, unknown>)) {
+            if (sv == null) continue;
+            sub[sk] = typeof sv === "string" ? sv : String(sv);
+          }
+          out[k] = sub;
+        } else if (typeof v === "string") {
+          out[k] = v;
+        } else {
+          out[k] = String(v);
+        }
       }
-    } else if (section !== null) {
-      (config[section] as Record<string, string>)[key] = val;
+      return out;
     }
+  } catch (err) {
+    console.warn("[config] failed to parse starnion.yaml:", (err as Error).message);
   }
-
-  return config;
+  return {};
 }
 
 /**
@@ -142,6 +148,24 @@ export function loadStarnionConfig(): void {
   // Always apply prompt caching default regardless of yaml presence
   if (!process.env.PI_CACHE_RETENTION) {
     process.env.PI_CACHE_RETENTION = "long";
+  }
+
+  // Prepend the starnion Python venv to PATH so skill scripts can
+  // resolve `python3` (and pip-installed modules like `requests`,
+  // `psycopg2`, `google-api-python-client`) even when the agent was
+  // launched from a shell that has no venv in its PATH. This matters
+  // for every non-CLI entry point — `pnpm dev`, `tsx watch`, direct
+  // `node dist/server/index.js`, VS Code's debug launcher, etc.
+  // `starnion start` and `starnion dev` do the same at the Go-CLI
+  // layer, but duplicating it here makes the agent robust to any
+  // launch path. The prepend is idempotent: once venvBin is in
+  // PATH, the block is a no-op.
+  const venvBin = path.join(os.homedir(), ".starnion", "venv", "bin");
+  if (fs.existsSync(venvBin)) {
+    const pathParts = (process.env.PATH ?? "").split(path.delimiter);
+    if (!pathParts.includes(venvBin)) {
+      process.env.PATH = venvBin + path.delimiter + (process.env.PATH ?? "");
+    }
   }
 
   const yaml = loadStarnionYaml();
@@ -195,6 +219,13 @@ export function loadStarnionConfig(): void {
   // Encryption key (for skill scripts that decrypt DB-stored tokens)
   if (!process.env.ENCRYPTION_KEY && auth.encryption_key) process.env.ENCRYPTION_KEY = auth.encryption_key;
 
+  // gRPC shared secret — the agent's sharedSecretInterceptor rejects every
+  // incoming call when this is unset, so it must be populated from the yaml
+  // when running the agent outside `starnion start` (e.g. `node dist/server/index.js`).
+  if (!process.env.GRPC_SHARED_SECRET && auth.grpc_shared_secret) {
+    process.env.GRPC_SHARED_SECRET = auth.grpc_shared_secret;
+  }
+
   // Default LLM OAuth token + auth.json sync for pi-coding-agent
   // 1. Set ANTHROPIC_OAUTH_TOKEN env var
   // 2. Sync credentials to ~/.pi/agent/auth.json for auto-refresh
@@ -223,6 +254,18 @@ export function loadStarnionConfig(): void {
   if (!process.env.BROWSER_HEADLESS && br.headless)         process.env.BROWSER_HEADLESS           = br.headless;
   if (!process.env.BROWSER_EVALUATE_ENABLED && br.evaluate_enabled) process.env.BROWSER_EVALUATE_ENABLED = br.evaluate_enabled;
   if (!process.env.BROWSER_URL && br.url)                   process.env.BROWSER_URL                = br.url;
+  // Browser control bridge auth token (auto-generated by `starnion setup`
+  // / `starnion start` / `starnion dev` via EnsureSecrets). Without this
+  // the agent disables its browser bridge on boot; with it any local
+  // process still needs to present the token to drive Chrome.
+  //
+  // The token now lives under auth.browser_auth_token alongside the
+  // other shared secrets (jwt_secret, encryption_key, ...). The old
+  // browser.auth_token path is kept as a fallback so yamls written by
+  // older starnion-cli versions continue to work; the next `starnion
+  // start|dev|setup` run will migrate the value to the new location.
+  const browserAuthToken = auth.browser_auth_token || br.auth_token;
+  if (!process.env.BROWSER_AUTH_TOKEN && browserAuthToken) process.env.BROWSER_AUTH_TOKEN = browserAuthToken;
 
   // Naver Search API (used by finance skill for Korean geocoding)
   const nv = (yaml.naver ?? {}) as Record<string, string>;
