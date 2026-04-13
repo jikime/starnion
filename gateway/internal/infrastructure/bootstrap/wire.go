@@ -33,6 +33,7 @@ import (
 	anomalyusecase "github.com/newstarnion/gateway/internal/usecase/anomaly"
 	budgetusecase "github.com/newstarnion/gateway/internal/usecase/budget"
 	channelsusecase "github.com/newstarnion/gateway/internal/usecase/channels"
+	connectusecase "github.com/newstarnion/gateway/internal/usecase/connect"
 	conversationusecase "github.com/newstarnion/gateway/internal/usecase/conversation"
 	cronusecase "github.com/newstarnion/gateway/internal/usecase/cron"
 	filesusecase "github.com/newstarnion/gateway/internal/usecase/files"
@@ -76,6 +77,7 @@ type UseCases struct {
 	Anomaly      *anomalyusecase.UseCase
 	Budget       *budgetusecase.UseCase
 	Channels     *channelsusecase.UseCase
+	Connect      *connectusecase.UseCase
 	Conversation *conversationusecase.UseCase
 	Cron         *cronusecase.UseCase
 	Files        *filesusecase.UseCase
@@ -136,6 +138,7 @@ func New(ctx context.Context, cfg *config.Config, rootLogger *zap.Logger) (*Cont
 	anomalyRepo := postgresrepo.NewAnomalyRepository(db)
 	budgetRepo := postgresrepo.NewBudgetRepository(db)
 	channelsRepo := postgresrepo.NewChannelsRepository(db, cfg.EncryptionKey)
+	connectRepo := postgresrepo.NewConnectionRepository(db)
 	conversationRepo := postgresrepo.NewConversationRepository(db)
 	cronRepo := postgresrepo.NewCronRepository(db)
 	fileRepo := postgresrepo.NewFileRepository(db)
@@ -191,6 +194,7 @@ func New(ctx context.Context, cfg *config.Config, rootLogger *zap.Logger) (*Cont
 		Anomaly:      anomalyusecase.NewUseCase(anomalyRepo),
 		Budget:       budgetusecase.NewUseCase(budgetRepo),
 		Channels:     channelsUC,
+		Connect:      connectusecase.NewUseCase(connectRepo),
 		Conversation: conversationusecase.NewUseCase(conversationRepo),
 		Cron:         cronusecase.NewUseCase(cronRepo),
 		Files:        filesUC,
