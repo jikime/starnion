@@ -305,7 +305,7 @@ export const execTool: ToolDefinition<typeof execSchema, ExecDetails> = {
     const refuseReason = validateCommand(command);
     if (refuseReason) {
       return {
-        output: `exec refused: ${refuseReason}`,
+        content: [{ type: "text" as const, text: `exec refused: ${refuseReason}` }],
         details: { command, exitCode: 126, background },
       };
     }

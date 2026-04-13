@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import { DefaultResourceLoader } from "@mariozechner/pi-coding-agent";
+import { DefaultResourceLoader, type Skill, type ResourceDiagnostic } from "@mariozechner/pi-coding-agent";
 import {
   type SkillMeta,
   loadAllSkillMeta,
@@ -247,14 +247,13 @@ export class PromptComposer {
     const disabledSet = disabledSkillIds?.length ? new Set(disabledSkillIds) : undefined;
     const lowerMessage = userMessage?.toLowerCase();
     const needsFilter = !!(configuredProviders?.length || platform || disabledSet || lowerMessage);
-    // Minimal shape of a skill entry — we only read `filePath` so a full
-    // pi-coding-agent Skill typing isn't needed here. Using `unknown` for
-    // diagnostics keeps the override contract surface small without
-    // falling back to `any`.
-    type SkillLike = { filePath?: string } & Record<string, unknown>;
-    type SkillsOverrideInput = { skills: SkillLike[]; diagnostics: unknown };
-    const skillsOverrideFn = needsFilter
-      ? (base: SkillsOverrideInput) => {
+    // Build the override using the actual Skill/ResourceDiagnostic types
+    // exported by pi-coding-agent. DefaultResourceLoaderOptions itself is
+    // not exported from the package root, so we reconstruct the exact
+    // shape expected by `skillsOverride` from its constituent types.
+    type SkillsBase = { skills: Skill[]; diagnostics: ResourceDiagnostic[] };
+    const skillsOverrideFn: ((base: SkillsBase) => SkillsBase) | undefined = needsFilter
+      ? (base: SkillsBase) => {
           // Pre-compute whether any keyword-bearing skill matches the message.
           // Uses the same helper as buildFilteredSkillIndex to keep both
           // filtering paths consistent (no false-negative divergence).
