@@ -1,6 +1,6 @@
 'use client'
 
-import { CreditCard, LayoutGrid, List, Star } from 'lucide-react'
+import { CreditCard, LayoutGrid, List, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SAMPLE_CONNECTIONS, isDrifting } from '@/lib/connect-data'
 
@@ -21,18 +21,11 @@ export default function NavBar({
 
   return (
     <header className="flex items-center justify-between px-5 h-14 border-b border-border bg-card/80 backdrop-blur-sm shrink-0">
-      {/* Brand */}
-      <div className="flex items-center gap-3">
-        <div className="w-7 h-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
-          <Star className="w-3.5 h-3.5 text-primary" />
-        </div>
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-sm font-bold text-foreground tracking-tight">StarNion</span>
-          <span className="text-xs text-muted-foreground">/</span>
-          <span className="text-sm text-primary font-medium">Connect</span>
-          <span className="hidden sm:inline text-xs text-muted-foreground ml-1">인연의 별자리</span>
-        </div>
-      </div>
+      {/* Title */}
+      <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+        <Users className="size-6 text-blue-500" />
+        인맥
+      </h1>
 
       {/* Center — view toggle */}
       <div className="hidden md:flex items-center gap-1 bg-secondary rounded-lg p-1">
