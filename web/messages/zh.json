@@ -2112,6 +2112,22 @@
     "email": "邮箱",
     "name": "姓名"
   },
+  "connect": {
+    "sns": {
+      "section": "社交媒体",
+      "addPrompt": "是否要添加这位联系人的社交账号？",
+      "addNow": "立即添加",
+      "later": "稍后",
+      "add": "添加",
+      "facebook": "Facebook",
+      "instagram": "Instagram",
+      "x": "X",
+      "linkedin": "LinkedIn",
+      "threads": "Threads",
+      "invalidUrl": "网址格式无效",
+      "emptyHint": "暂无社交账号"
+    }
+  },
   "assets": {
     "title": "资产管理",
     "subtitle": "StarNion Financial Intelligence",

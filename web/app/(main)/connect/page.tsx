@@ -1,23 +1,39 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import NavBar from '@/components/connect/nav-bar'
 import ListView from '@/components/connect/list-view'
 import GridView from '@/components/connect/grid-view'
 import PersonaCard from '@/components/connect/persona-card'
 import RemindersPanel from '@/components/connect/reminders-panel'
-import OcrScanner from '@/components/connect/ocr-scanner'
-import { SAMPLE_CONNECTIONS, Category, isDrifting } from '@/lib/connect-data'
-import { Search, SlidersHorizontal, Bell } from 'lucide-react'
+import OcrScanner, { type ParsedScanResult } from '@/components/connect/ocr-scanner'
+import {
+  Category,
+  Connection,
+  SocialPlatform,
+  isDrifting,
+} from '@/lib/connect-data'
+import {
+  ConnectApiError,
+  getConnection,
+  listConnections,
+  submitBusinessCardScan,
+  updateSocialProfiles,
+  type ListConnectionsQuery,
+} from '@/lib/connect-api'
+import { Search, SlidersHorizontal, Bell, Loader2 } from 'lucide-react'
 
 type ViewMode = 'list' | 'grid'
-type SortMode = 'score' | 'name' | 'recent'
+type SortMode = ListConnectionsQuery['sort']
 type RightPanel = 'reminders' | 'persona'
 
-const SORT_LABELS: Record<SortMode, string> = {
-  score: '연결도순',
-  name: '이름순',
-  recent: '최근 연락순',
+const SORT_LABELS: Record<Exclude<SortMode, undefined>, string> = {
+  score_desc: '연결도순',
+  name_asc: '이름순',
+  last_contact_desc: '최근 연락순',
+  last_contact_asc: '오래된 연락순',
+  created_desc: '최근 등록순',
 }
 
 const CATEGORY_FILTER_LABELS: Record<Category | 'all', string> = {
@@ -25,29 +41,173 @@ const CATEGORY_FILTER_LABELS: Record<Category | 'all', string> = {
   business: '비즈니스',
   friend: '친구',
   family: '가족',
-  community: '커뮤니티',
+  acquaintance: '지인',
 }
 
+const DEFAULT_SORT: Exclude<SortMode, undefined> = 'score_desc'
+
 export default function ConnectPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const urlCategory = (searchParams.get('category') as Category | null) ?? null
+  const urlSort = (searchParams.get('sort') as Exclude<SortMode, undefined> | null) ?? null
+  const urlQ = searchParams.get('q') ?? ''
+
   const [viewMode, setViewMode] = useState<ViewMode>('list')
-  const [selectedId, setSelectedId] = useState<string | null>('1')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [sortMode, setSortMode] = useState<SortMode>('score')
-  const [filterCategory, setFilterCategory] = useState<Category | 'all'>('all')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState(urlQ)
+  const [sortMode, setSortMode] = useState<Exclude<SortMode, undefined>>(
+    urlSort ?? DEFAULT_SORT
+  )
+  const [filterCategory, setFilterCategory] = useState<Category | 'all'>(
+    urlCategory ?? 'all'
+  )
   const [rightPanel, setRightPanel] = useState<RightPanel>('persona')
   const [showScanner, setShowScanner] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
 
-  const nudgeCount = SAMPLE_CONNECTIONS.filter(isDrifting).length
-  const selectedConnection = SAMPLE_CONNECTIONS.find(c => c.id === selectedId) ?? null
+  const [connections, setConnections] = useState<Connection[]>([])
+  const [selectedConnection, setSelectedConnection] = useState<Connection | null>(
+    null
+  )
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [openSnsEdit, setOpenSnsEdit] = useState(false)
+
+  // Persist filter/sort/search to URL
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (filterCategory !== 'all') params.set('category', filterCategory)
+    if (sortMode !== DEFAULT_SORT) params.set('sort', sortMode)
+    if (searchQuery) params.set('q', searchQuery)
+    const qs = params.toString()
+    router.replace(qs ? `/connect?${qs}` : '/connect', { scroll: false })
+  }, [filterCategory, sortMode, searchQuery, router])
+
+  // Fetch list whenever filters change
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setLoadError(null)
+
+    const query: ListConnectionsQuery = { sort: sortMode }
+    if (filterCategory !== 'all') query.category = filterCategory
+    if (searchQuery.trim()) query.q = searchQuery.trim()
+
+    listConnections(query)
+      .then(result => {
+        if (cancelled) return
+        setConnections(result.items)
+        if (result.items.length > 0 && !selectedId) {
+          setSelectedId(result.items[0].id)
+        }
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        if (err instanceof ConnectApiError) {
+          setLoadError(err.message)
+        } else {
+          setLoadError('인맥 목록을 불러오지 못했습니다')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterCategory, sortMode, searchQuery])
+
+  // Fetch full connection detail when selection changes
+  useEffect(() => {
+    if (!selectedId) {
+      setSelectedConnection(null)
+      return
+    }
+    let cancelled = false
+    // Seed from list cache if available
+    const cached = connections.find(c => c.id === selectedId) ?? null
+    if (cached) setSelectedConnection(cached)
+
+    getConnection(selectedId)
+      .then(full => {
+        if (!cancelled) setSelectedConnection(full)
+      })
+      .catch(() => {
+        // swallow — cached value (if any) already shown
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId])
+
+  const nudgeCount = useMemo(
+    () => connections.filter(isDrifting).length,
+    [connections]
+  )
 
   const handleSelect = (id: string) => {
     setSelectedId(id)
     setRightPanel('persona')
+    setOpenSnsEdit(false)
   }
 
-  const handleScannerAdd = (card: Record<string, string>) => {
+  const handleConnectionUpdated = useCallback((updated: Connection) => {
+    setConnections(prev =>
+      prev.map(c => (c.id === updated.id ? updated : c))
+    )
+    setSelectedConnection(prev =>
+      prev && prev.id === updated.id ? updated : prev
+    )
+  }, [])
+
+  const handleScannerAdd = async (parsed: ParsedScanResult) => {
+    try {
+      const created = await submitBusinessCardScan({
+        name: parsed.name,
+        role: parsed.role || undefined,
+        company: parsed.company || undefined,
+        email: parsed.email || undefined,
+        phone: parsed.phone || undefined,
+        meeting_location: parsed.meetingLocation || undefined,
+        tags: parsed.tags,
+        business_card: parsed.address
+          ? { address: parsed.address }
+          : undefined,
+      })
+      // Prepend into list, select, leave scanner to handle its own closing
+      setConnections(prev => [created, ...prev])
+      setSelectedId(created.id)
+      setRightPanel('persona')
+      return created
+    } catch (err) {
+      if (err instanceof ConnectApiError) {
+        throw err
+      }
+      throw new Error('명함 스캔 결과를 저장하지 못했습니다')
+    }
+  }
+
+  const handleScannerSnsPrompt = (connectionId: string, addNow: boolean) => {
     setShowScanner(false)
+    if (addNow) {
+      setSelectedId(connectionId)
+      setRightPanel('persona')
+      setOpenSnsEdit(true)
+    }
+  }
+
+  const handleSocialSubmit = async (
+    patch: Partial<Record<SocialPlatform, string | null>>
+  ) => {
+    if (!selectedId) return
+    const updated = await updateSocialProfiles(selectedId, patch)
+    handleConnectionUpdated(updated)
   }
 
   return (
@@ -56,28 +216,27 @@ export default function ConnectPage() {
         viewMode={viewMode}
         onViewChange={setViewMode}
         onScanClick={() => setShowScanner(true)}
+        driftCount={nudgeCount}
       />
 
       {/* Toolbar: search + filter + stats */}
       <div className="flex items-center gap-3 px-5 py-2.5 border-b border-border bg-card/30 shrink-0">
-        {/* Search */}
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
           <input
             type="search"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="이름, 회사, 태그 검색..."
+            placeholder="이름 검색..."
             className="w-full h-8 pl-8 pr-3 text-xs bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
             aria-label="인맥 검색"
           />
         </div>
 
-        {/* Filter toggle */}
         <button
           onClick={() => setShowFilters(v => !v)}
           className={`flex items-center gap-1.5 h-8 px-3 text-xs rounded-lg border transition-colors ${
-            showFilters || filterCategory !== 'all' || sortMode !== 'score'
+            showFilters || filterCategory !== 'all' || sortMode !== DEFAULT_SORT
               ? 'border-primary/40 text-primary bg-primary/8'
               : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
           }`}
@@ -90,9 +249,8 @@ export default function ConnectPage() {
           )}
         </button>
 
-        {/* Stats */}
         <div className="hidden sm:flex items-center gap-4 ml-auto">
-          <StatBadge label="전체" value={SAMPLE_CONNECTIONS.length} />
+          <StatBadge label="전체" value={connections.length} />
           <StatBadge
             label="연락 필요"
             value={nudgeCount}
@@ -100,7 +258,6 @@ export default function ConnectPage() {
           />
         </div>
 
-        {/* Right panel toggle */}
         <div className="hidden lg:flex items-center gap-1 bg-secondary rounded-lg p-0.5">
           <button
             onClick={() => setRightPanel('persona')}
@@ -128,34 +285,36 @@ export default function ConnectPage() {
         </div>
       </div>
 
-      {/* Filter bar (collapsible) */}
+      {/* Filter bar */}
       {showFilters && (
         <div className="flex items-center gap-6 px-5 py-2 border-b border-border bg-card/20 shrink-0">
-          {/* Category filter */}
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground shrink-0">카테고리</span>
             <div className="flex items-center gap-1">
-              {(Object.entries(CATEGORY_FILTER_LABELS) as [Category | 'all', string][]).map(([cat, label]) => (
-                <button
-                  key={cat}
-                  onClick={() => setFilterCategory(cat)}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                    filterCategory === cat
-                      ? 'border-primary/50 bg-primary/10 text-primary'
-                      : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+              {(Object.entries(CATEGORY_FILTER_LABELS) as [Category | 'all', string][]).map(
+                ([cat, label]) => (
+                  <button
+                    key={cat}
+                    onClick={() => setFilterCategory(cat)}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                      filterCategory === cat
+                        ? 'border-primary/50 bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                )
+              )}
             </div>
           </div>
 
-          {/* Sort */}
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground shrink-0">정렬</span>
             <div className="flex items-center gap-1">
-              {(Object.entries(SORT_LABELS) as [SortMode, string][]).map(([mode, label]) => (
+              {(
+                Object.entries(SORT_LABELS) as [Exclude<SortMode, undefined>, string][]
+              ).map(([mode, label]) => (
                 <button
                   key={mode}
                   onClick={() => setSortMode(mode)}
@@ -173,28 +332,48 @@ export default function ConnectPage() {
         </div>
       )}
 
-      {/* Main layout: content + right panel */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Center: list or grid */}
         <main className="flex-1 overflow-hidden min-w-0">
-          {viewMode === 'list' ? (
+          {loading ? (
+            <div className="flex items-center justify-center h-full gap-2 text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">불러오는 중...</span>
+            </div>
+          ) : loadError ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-8">
+              <p className="text-sm font-medium text-foreground">
+                {loadError}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                잠시 후 다시 시도해주세요
+              </p>
+            </div>
+          ) : connections.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-8">
+              <p className="text-sm font-medium text-foreground">
+                {searchQuery || filterCategory !== 'all'
+                  ? '필터에 해당하는 인연이 없습니다'
+                  : '아직 등록된 인연이 없습니다'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                명함 스캔으로 새 인연을 추가해보세요
+              </p>
+            </div>
+          ) : viewMode === 'list' ? (
             <ListView
+              connections={connections}
               selectedId={selectedId}
               onSelect={handleSelect}
-              searchQuery={searchQuery}
-              filterCategory={filterCategory}
-              sortMode={sortMode}
             />
           ) : (
             <GridView
+              connections={connections}
               selectedId={selectedId}
               onSelect={handleSelect}
-              searchQuery={searchQuery}
             />
           )}
         </main>
 
-        {/* Right panel */}
         <aside
           className="hidden lg:flex flex-col w-72 xl:w-80 shrink-0 border-l border-border bg-card/50 overflow-hidden"
           aria-label={rightPanel === 'persona' ? '인물 상세 정보' : '스마트 리마인더'}
@@ -204,21 +383,24 @@ export default function ConnectPage() {
               <PersonaCard
                 connection={selectedConnection}
                 onClose={() => setSelectedId(null)}
+                onSubmitSocial={handleSocialSubmit}
+                snsEditOpen={openSnsEdit}
+                onSnsEditOpenChange={setOpenSnsEdit}
               />
             ) : (
               <EmptyPersona onScanClick={() => setShowScanner(true)} />
             )
           ) : (
-            <RemindersPanel onSelectContact={handleSelect} />
+            <RemindersPanel />
           )}
         </aside>
       </div>
 
-      {/* OCR Scanner modal */}
       {showScanner && (
         <OcrScanner
           onClose={() => setShowScanner(false)}
-          onAdd={handleScannerAdd}
+          onSubmit={handleScannerAdd}
+          onSnsPrompt={handleScannerSnsPrompt}
         />
       )}
     </div>

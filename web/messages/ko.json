@@ -2510,6 +2510,22 @@
     "email": "이메일",
     "name": "이름"
   },
+  "connect": {
+    "sns": {
+      "section": "SNS",
+      "addPrompt": "이 분의 SNS 계정을 추가하시겠어요?",
+      "addNow": "추가하기",
+      "later": "나중에",
+      "add": "추가",
+      "facebook": "Facebook",
+      "instagram": "Instagram",
+      "x": "X",
+      "linkedin": "LinkedIn",
+      "threads": "Threads",
+      "invalidUrl": "URL 형식이 올바르지 않습니다",
+      "emptyHint": "등록된 SNS 계정이 없습니다"
+    }
+  },
   "assets": {
     "title": "자산 관리",
     "subtitle": "StarNion Financial Intelligence",

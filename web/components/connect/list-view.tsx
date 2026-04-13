@@ -1,50 +1,26 @@
 'use client'
 
 import {
-  SAMPLE_CONNECTIONS,
+  Connection,
   getCategoryColor,
   getDaysSinceContact,
   isDrifting,
   CATEGORY_LABELS,
-  Category,
 } from '@/lib/connect-data'
 import { AlertTriangle, ChevronRight } from 'lucide-react'
 
 interface ListViewProps {
+  connections: Connection[]
   selectedId: string | null
   onSelect: (id: string) => void
-  searchQuery: string
-  filterCategory: Category | 'all'
-  sortMode: 'score' | 'name' | 'recent'
 }
 
 export default function ListView({
+  connections,
   selectedId,
   onSelect,
-  searchQuery,
-  filterCategory,
-  sortMode,
 }: ListViewProps) {
-  const filtered = SAMPLE_CONNECTIONS
-    .filter(c => {
-      if (filterCategory !== 'all' && c.category !== filterCategory) return false
-      if (!searchQuery) return true
-      const q = searchQuery.toLowerCase()
-      return (
-        c.name.toLowerCase().includes(q) ||
-        c.company.toLowerCase().includes(q) ||
-        c.role.toLowerCase().includes(q) ||
-        c.tags.some(t => t.toLowerCase().includes(q))
-      )
-    })
-    .sort((a, b) => {
-      if (sortMode === 'score') return b.connectionScore - a.connectionScore
-      if (sortMode === 'name') return a.name.localeCompare(b.name)
-      // recent: sort by lastContactDate descending
-      return new Date(b.lastContactDate).getTime() - new Date(a.lastContactDate).getTime()
-    })
-
-  if (filtered.length === 0) {
+  if (connections.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-8">
         <p className="text-sm font-medium text-foreground">검색 결과 없음</p>
@@ -55,7 +31,7 @@ export default function ListView({
 
   return (
     <div className="flex flex-col divide-y divide-border overflow-y-auto h-full">
-      {filtered.map(conn => {
+      {connections.map(conn => {
         const color = getCategoryColor(conn.category)
         const days = getDaysSinceContact(conn.lastContactDate)
         const drift = isDrifting(conn)
@@ -73,7 +49,6 @@ export default function ListView({
             }`}
             aria-label={`${conn.name} - ${conn.role}, ${conn.company}`}
           >
-            {/* Score ring avatar */}
             <div className="relative shrink-0">
               <svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true">
                 <circle cx="19" cy="19" r="16" fill={`${color}18`} />
@@ -107,10 +82,11 @@ export default function ListView({
               )}
             </div>
 
-            {/* Name + role */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-foreground truncate">{conn.name}</span>
+                <span className="text-sm font-semibold text-foreground truncate">
+                  {conn.name}
+                </span>
                 <span
                   className="shrink-0 text-xs px-1.5 py-0.5 rounded-full"
                   style={{ backgroundColor: `${color}15`, color }}
@@ -119,13 +95,13 @@ export default function ListView({
                 </span>
               </div>
               <p className="text-xs text-muted-foreground truncate mt-0.5">
-                {conn.role} &middot; {conn.company}
+                {conn.role}
+                {conn.role && conn.company ? ' · ' : ''}
+                {conn.company}
               </p>
             </div>
 
-            {/* Score + days */}
             <div className="hidden sm:flex flex-col items-end gap-1 shrink-0">
-              {/* Score bar */}
               <div className="flex items-center gap-2">
                 <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
                   <div
@@ -137,12 +113,15 @@ export default function ListView({
                   {scoreW}
                 </span>
               </div>
-              <span className={`text-xs font-mono ${drift ? 'text-star-red' : 'text-muted-foreground'}`}>
-                {days}일 전
+              <span
+                className={`text-xs font-mono ${drift ? 'text-star-red' : 'text-muted-foreground'}`}
+              >
+                {conn.lastContactDate
+                  ? `${days}일 전`
+                  : '기록 없음'}
               </span>
             </div>
 
-            {/* Tags */}
             <div className="hidden lg:flex items-center gap-1 shrink-0 w-32">
               {conn.tags.slice(0, 2).map(tag => (
                 <span

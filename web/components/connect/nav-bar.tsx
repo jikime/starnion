@@ -2,7 +2,6 @@
 
 import { CreditCard, LayoutGrid, List, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { SAMPLE_CONNECTIONS, isDrifting } from '@/lib/connect-data'
 
 type ViewMode = 'list' | 'grid'
 
@@ -10,24 +9,22 @@ interface NavBarProps {
   viewMode: ViewMode
   onViewChange: (mode: ViewMode) => void
   onScanClick: () => void
+  driftCount?: number
 }
 
 export default function NavBar({
   viewMode,
   onViewChange,
   onScanClick,
+  driftCount = 0,
 }: NavBarProps) {
-  const driftCount = SAMPLE_CONNECTIONS.filter(isDrifting).length
-
   return (
     <header className="flex items-center justify-between px-5 h-14 border-b border-border bg-card/80 backdrop-blur-sm shrink-0">
-      {/* Title */}
       <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
         <Users className="size-6 text-blue-500" />
         인맥
       </h1>
 
-      {/* Center — view toggle */}
       <div className="hidden md:flex items-center gap-1 bg-secondary rounded-lg p-1">
         <button
           onClick={() => onViewChange('list')}
@@ -57,7 +54,6 @@ export default function NavBar({
         </button>
       </div>
 
-      {/* Right actions */}
       <div className="flex items-center gap-2">
         {driftCount > 0 && (
           <div className="hidden sm:flex items-center gap-1.5 text-xs text-star-red bg-star-red/10 border border-star-red/20 px-2.5 py-1 rounded-full">

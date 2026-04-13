@@ -1,37 +1,28 @@
 'use client'
 
 import {
-  SAMPLE_CONNECTIONS,
   Connection,
   getCategoryColor,
   getDaysSinceContact,
   isDrifting,
   CATEGORY_LABELS,
-  getScoreLabel,
 } from '@/lib/connect-data'
 import { AlertTriangle } from 'lucide-react'
 
 interface GridViewProps {
+  connections: Connection[]
   selectedId: string | null
   onSelect: (id: string) => void
-  searchQuery: string
 }
 
-export default function GridView({ selectedId, onSelect, searchQuery }: GridViewProps) {
-  const filtered = SAMPLE_CONNECTIONS.filter(c => {
-    if (!searchQuery) return true
-    const q = searchQuery.toLowerCase()
-    return (
-      c.name.toLowerCase().includes(q) ||
-      c.company.toLowerCase().includes(q) ||
-      c.role.toLowerCase().includes(q) ||
-      c.tags.some(t => t.toLowerCase().includes(q))
-    )
-  })
-
+export default function GridView({
+  connections,
+  selectedId,
+  onSelect,
+}: GridViewProps) {
   return (
     <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 p-4 overflow-y-auto h-full content-start">
-      {filtered.map(conn => {
+      {connections.map(conn => {
         const color = getCategoryColor(conn.category)
         const days = getDaysSinceContact(conn.lastContactDate)
         const drift = isDrifting(conn)
@@ -49,14 +40,12 @@ export default function GridView({ selectedId, onSelect, searchQuery }: GridView
             }`}
             aria-label={`${conn.name} - ${conn.role}, ${conn.company}`}
           >
-            {/* Drift badge */}
             {drift && (
               <div className="absolute top-3 right-3">
                 <AlertTriangle className="w-3.5 h-3.5 text-star-red" />
               </div>
             )}
 
-            {/* Avatar + score ring */}
             <div className="flex items-center gap-3 mb-3">
               <div className="relative shrink-0">
                 <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
@@ -91,19 +80,19 @@ export default function GridView({ selectedId, onSelect, searchQuery }: GridView
               </div>
             </div>
 
-            {/* Company */}
             <div
               className="inline-block text-xs px-2 py-0.5 rounded-full mb-3"
               style={{ backgroundColor: `${color}15`, color }}
             >
-              {conn.company}
+              {conn.company || CATEGORY_LABELS[conn.category]}
             </div>
 
-            {/* Score bar */}
             <div className="space-y-1">
               <div className="flex justify-between items-center">
                 <span className="text-xs text-muted-foreground font-mono">score</span>
-                <span className="text-xs font-mono" style={{ color }}>{scoreW}</span>
+                <span className="text-xs font-mono" style={{ color }}>
+                  {scoreW}
+                </span>
               </div>
               <div className="h-1 bg-muted rounded-full overflow-hidden">
                 <div
@@ -113,7 +102,6 @@ export default function GridView({ selectedId, onSelect, searchQuery }: GridView
               </div>
             </div>
 
-            {/* Category + days */}
             <div className="flex items-center justify-between mt-3">
               <span className="text-xs text-muted-foreground">
                 {CATEGORY_LABELS[conn.category]}
@@ -121,11 +109,10 @@ export default function GridView({ selectedId, onSelect, searchQuery }: GridView
               <span
                 className={`text-xs font-mono ${drift ? 'text-star-red' : 'text-muted-foreground'}`}
               >
-                {days}일 전
+                {conn.lastContactDate ? `${days}일 전` : '기록 없음'}
               </span>
             </div>
 
-            {/* Tags */}
             <div className="flex flex-wrap gap-1 mt-2">
               {conn.tags.slice(0, 2).map(tag => (
                 <span

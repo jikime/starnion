@@ -2513,6 +2513,22 @@
     "email": "Email",
     "name": "Name"
   },
+  "connect": {
+    "sns": {
+      "section": "SNS",
+      "addPrompt": "Add this person's social profiles?",
+      "addNow": "Add now",
+      "later": "Later",
+      "add": "Add",
+      "facebook": "Facebook",
+      "instagram": "Instagram",
+      "x": "X",
+      "linkedin": "LinkedIn",
+      "threads": "Threads",
+      "invalidUrl": "Invalid URL format",
+      "emptyHint": "No social profiles yet"
+    }
+  },
   "assets": {
     "title": "Asset Management",
     "subtitle": "StarNion Financial Intelligence",

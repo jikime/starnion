@@ -2112,6 +2112,22 @@
     "email": "メール",
     "name": "名前"
   },
+  "connect": {
+    "sns": {
+      "section": "SNS",
+      "addPrompt": "この方のSNSアカウントを追加しますか？",
+      "addNow": "追加する",
+      "later": "あとで",
+      "add": "追加",
+      "facebook": "Facebook",
+      "instagram": "Instagram",
+      "x": "X",
+      "linkedin": "LinkedIn",
+      "threads": "Threads",
+      "invalidUrl": "URL形式が正しくありません",
+      "emptyHint": "登録されたSNSアカウントはありません"
+    }
+  },
   "assets": {
     "title": "資産管理",
     "subtitle": "StarNion Financial Intelligence",
