@@ -176,9 +176,6 @@ export default function ConnectPage() {
         phone: parsed.phone || undefined,
         meeting_location: parsed.meetingLocation || undefined,
         tags: parsed.tags,
-        business_card: parsed.address
-          ? { address: parsed.address }
-          : undefined,
       })
       // Prepend into list, select, leave scanner to handle its own closing
       setConnections(prev => [created, ...prev])

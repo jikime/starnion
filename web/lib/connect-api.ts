@@ -60,8 +60,18 @@ interface WireListResponse {
 
 // ── Errors ───────────────────────────────────────────────────────────────────
 
+/**
+ * Gateway envelope: `{"error": {"code": "...", "field": "...", "message": "..."}}`
+ * `field` is present only for validation failures.
+ */
 export interface ConnectApiErrorPayload {
-  error?: string
+  error?:
+    | string
+    | {
+        code?: string
+        field?: string
+        message?: string
+      }
   code?: string
   field?: string
   message?: string
@@ -73,10 +83,17 @@ export class ConnectApiError extends Error {
   field?: string
 
   constructor(status: number, payload: ConnectApiErrorPayload) {
-    super(payload.message ?? payload.error ?? `Connect API error ${status}`)
+    const nested = typeof payload.error === 'object' ? payload.error : undefined
+    const topMessage = typeof payload.error === 'string' ? payload.error : undefined
+    super(
+      nested?.message ??
+        payload.message ??
+        topMessage ??
+        `Connect API error ${status}`
+    )
     this.status = status
-    this.code = payload.code
-    this.field = payload.field
+    this.code = nested?.code ?? payload.code
+    this.field = nested?.field ?? payload.field
   }
 }
 
@@ -193,6 +210,7 @@ export interface ParsedBusinessCard {
   meeting_location?: string
   tags?: string[]
   business_card?: {
+    image_url: string
     company_name_en?: string
     dept?: string
     address?: string
@@ -276,9 +294,9 @@ export async function updateSocialProfiles(
   patch: Partial<Record<SocialPlatform, string | null>>
 ): Promise<Connection> {
   const wire = await request<WireConnection>(
-    `/connections/${encodeURIComponent(id)}/social`,
+    `/connections/${encodeURIComponent(id)}/social-profiles`,
     {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify(patch),
     }
   )
@@ -292,7 +310,7 @@ export async function updateContextNotes(
   const wire = await request<WireConnection>(
     `/connections/${encodeURIComponent(id)}/context-notes`,
     {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify({ context_notes: notes }),
     }
   )
@@ -327,7 +345,7 @@ export async function deleteConnection(id: string): Promise<void> {
 export async function submitBusinessCardScan(
   parsed: ParsedBusinessCard
 ): Promise<Connection> {
-  const wire = await request<WireConnection>('/connections/scan', {
+  const wire = await request<WireConnection>('/connections/scan-business-card', {
     method: 'POST',
     body: JSON.stringify(parsed),
   })

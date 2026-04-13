@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { gatewayFetch } from "@/lib/gateway"
 
-export async function PATCH(
+export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -15,9 +15,9 @@ export async function PATCH(
   const { id } = await params
   const body = await req.json().catch(() => ({}))
   const res = await gatewayFetch(
-    `/api/v1/connections/${encodeURIComponent(id)}/social`,
+    `/api/v1/connections/${encodeURIComponent(id)}/social-profiles`,
     {
-      method: "PATCH",
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }

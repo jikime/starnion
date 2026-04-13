@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}))
-  const res = await gatewayFetch(`/api/v1/connections/scan`, {
+  const res = await gatewayFetch(`/api/v1/connections/scan-business-card`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

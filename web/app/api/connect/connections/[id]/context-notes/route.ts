@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { gatewayFetch } from "@/lib/gateway"
 
-export async function PATCH(
+export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -17,7 +17,7 @@ export async function PATCH(
   const res = await gatewayFetch(
     `/api/v1/connections/${encodeURIComponent(id)}/context-notes`,
     {
-      method: "PATCH",
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }
