@@ -342,6 +342,19 @@ func (a *GoogleOAuthAdapter) Exchange(ctx context.Context, clientID, clientSecre
 	}, nil
 }
 
+func (a *GoogleOAuthAdapter) RefreshAccessToken(ctx context.Context, clientID, clientSecret, refreshToken string) (integrationsusecase.GoogleTokens, error) {
+	t, err := a.client.RefreshAccessToken(ctx, clientID, clientSecret, refreshToken)
+	if err != nil {
+		return integrationsusecase.GoogleTokens{}, err
+	}
+	return integrationsusecase.GoogleTokens{
+		AccessToken:  t.AccessToken,
+		RefreshToken: t.RefreshToken,
+		ExpiresAt:    t.ExpiresAt,
+		Scope:        t.Scope,
+	}, nil
+}
+
 func (a *GoogleOAuthAdapter) Revoke(token string) error {
 	return a.client.Revoke(token)
 }

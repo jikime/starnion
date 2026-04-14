@@ -15,6 +15,7 @@ import (
 	authhttp "github.com/newstarnion/gateway/internal/adapter/http/auth"
 	budgethttp "github.com/newstarnion/gateway/internal/adapter/http/budget"
 	channelshttp "github.com/newstarnion/gateway/internal/adapter/http/channels"
+	connecthttp "github.com/newstarnion/gateway/internal/adapter/http/connect"
 	conversationhttp "github.com/newstarnion/gateway/internal/adapter/http/conversation"
 	cronhttp "github.com/newstarnion/gateway/internal/adapter/http/cron"
 	fileshttp "github.com/newstarnion/gateway/internal/adapter/http/files"
@@ -42,6 +43,7 @@ import (
 	anomalyusecase "github.com/newstarnion/gateway/internal/usecase/anomaly"
 	budgetusecase "github.com/newstarnion/gateway/internal/usecase/budget"
 	channelsusecase "github.com/newstarnion/gateway/internal/usecase/channels"
+	connectusecase "github.com/newstarnion/gateway/internal/usecase/connect"
 	conversationusecase "github.com/newstarnion/gateway/internal/usecase/conversation"
 	cronusecase "github.com/newstarnion/gateway/internal/usecase/cron"
 	filesusecase "github.com/newstarnion/gateway/internal/usecase/files"
@@ -72,6 +74,7 @@ type Router struct {
 	health               *healthhttp.Handler
 	finance              *financehttp.Handler
 	budget               *budgethttp.Handler
+	connect              *connecthttp.Handler
 	conversation         *conversationhttp.Handler
 	notificationHTTP     *notificationhttp.Handler         // CA-migrated user routes
 	notificationInternal *notificationhttp.InternalHandler // agent-facing /internal/notify
@@ -100,6 +103,7 @@ type RouterDeps struct {
 	AnomalyUseCase      *anomalyusecase.UseCase
 	BudgetUseCase       *budgetusecase.UseCase
 	ChannelsUseCase     *channelsusecase.UseCase
+	ConnectUseCase      *connectusecase.UseCase
 	ConversationUseCase *conversationusecase.UseCase
 	CronUseCase         *cronusecase.UseCase
 	FilesUseCase        *filesusecase.UseCase
@@ -129,6 +133,7 @@ func NewRouter(db *database.DB, cfg *config.Config, agentClient *agentgrpc.Agent
 		userProfile:          userhttp.NewHandler(deps.UserUseCase, logger),
 		persona:              personahttp.NewHandler(deps.PersonaUseCase, logger),
 		budget:               budgethttp.NewHandler(deps.BudgetUseCase, logger),
+		connect:              connecthttp.NewHandler(deps.ConnectUseCase, logger),
 		chat:                 agentchathttp.NewChatHandler(db, cfg, agentClient, deps.ConversationUseCase, logger),
 		telegram:             agentchathttp.NewTelegramHandler(db, cfg, agentClient, deps.ConversationUseCase, logger),
 		health:               healthhttp.NewHandler(agentClient),
@@ -271,6 +276,9 @@ func (r *Router) Register(e *echo.Echo) {
 
 	// ── Budget (sub-package /internal/adapter/http/budget) ───────────────
 	r.budget.Register(protected)
+
+	// ── Connect / 인맥 (sub-package /internal/adapter/http/connect) ──────
+	r.connect.Register(protected)
 
 	// ── Search (sub-package /internal/adapter/http/search) ───────────────
 	r.search.Register(protected)

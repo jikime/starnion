@@ -41,6 +41,17 @@ var BuiltinJobs = []Job{
 		NotifType: "inactive_reminder", Message: "오늘 하루 어떠셨나요? 오늘의 한마디나 노트를 작성해보세요."},
 	{ID: "budget_warning", CronExpr: "0 21 * * *", ActionType: "notify", DefaultEnabled: true,
 		NotifType: "budget_warning", Message: "오늘 예산 현황을 확인해보세요."},
+	// Level 1b: Connect reminder — default OFF (opt-in per user)
+	{ID: "connect_reminder", CronExpr: "0 18 * * 5", ActionType: "notify", DefaultEnabled: false,
+		NotifType: "connect_reminder", Message: "한 주 마무리 전에 오랜만에 연락해야 할 인연이 있는지 인맥 페이지를 확인해보세요."},
+	// Level 1c: Connect Phase 2 automation — all default OFF
+	// (Gmail/Calendar ingest needs Google OAuth; score recompute and
+	// drift reminder run on the data the ingest produces, so they are
+	// only meaningful once the user has opted into the ingest job.)
+	{ID: "connect_activity_ingest", CronExpr: "0 2 * * *", ActionType: "maintenance", DefaultEnabled: false},
+	{ID: "connect_score_recompute", CronExpr: "0 3 * * *", ActionType: "maintenance", DefaultEnabled: false},
+	{ID: "connect_drift_reminder", CronExpr: "0 9 * * *", ActionType: "smart_notify", DefaultEnabled: false,
+		NotifType: "connect_drift_reminder"},
 	// Level 2: Pattern-Learning
 	{ID: "planner_task_reminder", CronExpr: "0 9 * * *", ActionType: "smart_notify", DefaultEnabled: true,
 		NotifType: "planner_task_reminder"},

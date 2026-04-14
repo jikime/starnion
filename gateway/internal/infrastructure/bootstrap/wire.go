@@ -20,6 +20,7 @@ import (
 	integrationshttp "github.com/newstarnion/gateway/internal/adapter/http/integrations"
 	searchhttp "github.com/newstarnion/gateway/internal/adapter/http/search"
 	postgresrepo "github.com/newstarnion/gateway/internal/adapter/repository/postgres"
+	"github.com/newstarnion/gateway/internal/infrastructure/connectingest"
 	"github.com/newstarnion/gateway/internal/infrastructure/database"
 	"github.com/newstarnion/gateway/internal/infrastructure/embedding"
 	"github.com/newstarnion/gateway/internal/infrastructure/googleoauth"
@@ -33,6 +34,7 @@ import (
 	anomalyusecase "github.com/newstarnion/gateway/internal/usecase/anomaly"
 	budgetusecase "github.com/newstarnion/gateway/internal/usecase/budget"
 	channelsusecase "github.com/newstarnion/gateway/internal/usecase/channels"
+	connectusecase "github.com/newstarnion/gateway/internal/usecase/connect"
 	conversationusecase "github.com/newstarnion/gateway/internal/usecase/conversation"
 	cronusecase "github.com/newstarnion/gateway/internal/usecase/cron"
 	filesusecase "github.com/newstarnion/gateway/internal/usecase/files"
@@ -76,6 +78,7 @@ type UseCases struct {
 	Anomaly      *anomalyusecase.UseCase
 	Budget       *budgetusecase.UseCase
 	Channels     *channelsusecase.UseCase
+	Connect      *connectusecase.UseCase
 	Conversation *conversationusecase.UseCase
 	Cron         *cronusecase.UseCase
 	Files        *filesusecase.UseCase
@@ -136,6 +139,7 @@ func New(ctx context.Context, cfg *config.Config, rootLogger *zap.Logger) (*Cont
 	anomalyRepo := postgresrepo.NewAnomalyRepository(db)
 	budgetRepo := postgresrepo.NewBudgetRepository(db)
 	channelsRepo := postgresrepo.NewChannelsRepository(db, cfg.EncryptionKey)
+	connectRepo := postgresrepo.NewConnectionRepository(db)
 	conversationRepo := postgresrepo.NewConversationRepository(db)
 	cronRepo := postgresrepo.NewCronRepository(db)
 	fileRepo := postgresrepo.NewFileRepository(db)
@@ -191,6 +195,7 @@ func New(ctx context.Context, cfg *config.Config, rootLogger *zap.Logger) (*Cont
 		Anomaly:      anomalyusecase.NewUseCase(anomalyRepo),
 		Budget:       budgetusecase.NewUseCase(budgetRepo),
 		Channels:     channelsUC,
+		Connect:      connectusecase.NewUseCase(connectRepo),
 		Conversation: conversationusecase.NewUseCase(conversationRepo),
 		Cron:         cronusecase.NewUseCase(cronRepo),
 		Files:        filesUC,
@@ -245,6 +250,15 @@ func New(ctx context.Context, cfg *config.Config, rootLogger *zap.Logger) (*Cont
 	sched.SetNaverCredentials(cfg.NaverSearchClientID, cfg.NaverSearchClientSecret)
 	sched.SetEncryptionKey(cfg.EncryptionKey)
 	sched.SetGoogleCredentials(cfg.GoogleClientID, cfg.GoogleClientSecret)
+
+	// Connect Phase 2 — wire the Gmail/Calendar ingestor and the
+	// connect usecase into the scheduler so the nightly maintenance
+	// jobs (connect_activity_ingest, connect_score_recompute) and the
+	// daily smart-notify job (connect_drift_reminder) have something
+	// to invoke. The narrow ports defined on Scheduler keep the
+	// dependency direction clean.
+	connectIngestor := connectingest.New(integrationsUC, connectRepo, logger)
+	sched.SetConnectPhase2(connectIngestor, useCases.Connect, useCases.Connect)
 
 	// Media store wraps MinIO + local-filesystem fallback so the
 	// http/media handler never has to branch between the two.

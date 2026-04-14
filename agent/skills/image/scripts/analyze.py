@@ -11,7 +11,7 @@ import argparse, sys, os, json, base64
 import urllib.request, urllib.error
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "_shared"))
-from starnion_utils import _load_starnion_yaml, decrypt_value, psql as _psql
+from starnion_utils import _load_starnion_yaml, decrypt_value, psql as _psql, sign_file_url
 
 _yaml = _load_starnion_yaml()
 _db   = _yaml.get("database", {}) if isinstance(_yaml.get("database"), dict) else {}
@@ -26,6 +26,7 @@ _db_url_default = (
 DB_URL         = os.environ.get("DATABASE_URL") or _db_url_default
 ENCRYPTION_KEY = os.environ.get("ENCRYPTION_KEY") or _auth.get("encryption_key", "")
 GATEWAY_URL    = os.environ.get("GATEWAY_URL", "http://localhost:8080").rstrip("/")
+JWT_SECRET     = os.environ.get("JWT_SECRET") or _auth.get("jwt_secret", "")
 
 # Same model as image generation for consistency
 GEMINI_VISION_MODEL = "gemini-3.1-flash-image-preview"
@@ -69,9 +70,18 @@ def resolve_url(file_url: str) -> str:
     return GATEWAY_URL + file_url
 
 
-def fetch_image(url: str) -> tuple[bytes, str]:
-    """Fetch image bytes and detect MIME type."""
+def fetch_image(url: str, user_id: str = "") -> tuple[bytes, str]:
+    """Fetch image bytes and detect MIME type.
+
+    When the URL is a user-scoped `/api/files/users/<user_id>/…` path, we
+    sign it with the gateway's HMAC scheme so the file-serve handler
+    authorises the read. Bare fetches against user-scoped files return
+    401 now that the gateway enforces signed or bearer-authenticated
+    access (S-H3 mitigation).
+    """
     url = resolve_url(url)
+    if user_id and JWT_SECRET:
+        url = sign_file_url(url, user_id, JWT_SECRET)
     req = urllib.request.Request(url, headers={"User-Agent": "StarNion-Agent/1.0"})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -157,7 +167,7 @@ def cmd_analyze(args):
         sys.exit(1)
 
     print(f"🔍 Fetching image: {args.file_url.split('/')[-1]}", flush=True, file=sys.stderr)
-    image_bytes, mime_type = fetch_image(args.file_url)
+    image_bytes, mime_type = fetch_image(args.file_url, args.user_id)
     print(f"📐 Image size: {len(image_bytes) // 1024}KB | MIME: {mime_type}", flush=True, file=sys.stderr)
 
     print("🤖 Analyzing with Gemini Vision...", flush=True, file=sys.stderr)

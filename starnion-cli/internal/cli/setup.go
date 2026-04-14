@@ -2,26 +2,19 @@ package cli
 
 import (
 	"context"
-	"embed"
 	"fmt"
-	"io/fs"
 	"net"
 	"net/http"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/jackc/pgx/v5"
+	"github.com/newstarnion/migrations"
 	"golang.org/x/crypto/bcrypt"
 )
-
-// migrations embeds all SQL files in the migrations subdirectory.
-//
-//go:embed migrations
-var migrationFS embed.FS
 
 // RunSetup executes the interactive 9-step setup wizard.
 func RunSetup() error {
@@ -733,66 +726,39 @@ func ensureDatabase(cfg StarNionConfig) error {
 	return nil
 }
 
+// runMigrations delegates to the shared `migrations` module so the
+// installer wizard, the long-running gateway server, and Docker's
+// postgres bootstrap all reference the exact same SQL files. No more
+// embed FS in this package — see migrations/runner.go.
 func runMigrations(cfg StarNionConfig) error {
-	conn, err := pgx.Connect(context.Background(), cfg.Database.DatabaseURL())
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, cfg.Database.DatabaseURL())
 	if err != nil {
 		return fmt.Errorf("DB 연결 실패: %w", err)
 	}
-	defer conn.Close(context.Background())
+	defer conn.Close(ctx)
 
-	// Ensure migration tracking table.
-	if _, err := conn.Exec(context.Background(), `
-		CREATE TABLE IF NOT EXISTS schema_migrations (
-			version    TEXT        NOT NULL PRIMARY KEY,
-			applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-		)
-	`); err != nil {
-		return fmt.Errorf("schema_migrations 테이블 생성 실패: %w", err)
+	if err := migrations.Run(ctx, conn, cliMigrationLogger{}); err != nil {
+		return fmt.Errorf("마이그레이션 실패: %w", err)
 	}
-
-	// Collect migration files.
-	entries, err := fs.ReadDir(migrationFS, "migrations")
-	if err != nil {
-		return fmt.Errorf("migrations 디렉토리 읽기 실패: %w", err)
-	}
-
-	var files []string
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql") {
-			files = append(files, e.Name())
-		}
-	}
-	sort.Strings(files)
-
-	for _, filename := range files {
-		version := strings.TrimSuffix(filename, ".sql")
-
-		var applied bool
-		conn.QueryRow(context.Background(),
-			`SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = $1)`, version,
-		).Scan(&applied)
-		if applied {
-			continue
-		}
-
-		content, err := migrationFS.ReadFile("migrations/" + filename)
-		if err != nil {
-			return fmt.Errorf("마이그레이션 읽기 실패 (%s): %w", filename, err)
-		}
-
-		PrintInfo(fmt.Sprintf("마이그레이션 적용 중: %s", filename))
-		if _, err := conn.Exec(context.Background(), string(content)); err != nil {
-			return fmt.Errorf("마이그레이션 실패 (%s): %w", filename, err)
-		}
-		if _, err := conn.Exec(context.Background(),
-			`INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING`, version,
-		); err != nil {
-			return fmt.Errorf("schema_migrations 기록 실패 (%s): %w", version, err)
-		}
-		PrintOK("Migration", version+" 완료")
-	}
-
 	return nil
+}
+
+// cliMigrationLogger forwards the shared migrations runner's progress
+// lines into the existing PrintOK / PrintInfo helpers so the wizard
+// keeps its colored TTY output instead of dumping raw zap records.
+type cliMigrationLogger struct{}
+
+func (cliMigrationLogger) Infof(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	switch {
+	case strings.HasPrefix(msg, "[migrate] applying "):
+		PrintInfo(strings.TrimPrefix(msg, "[migrate] "))
+	case strings.HasPrefix(msg, "[migrate] applied "):
+		PrintOK("Migration", strings.TrimPrefix(msg, "[migrate] applied ")+" 완료")
+	default:
+		PrintInfo(msg)
+	}
 }
 
 func createAdminUser(cfg StarNionConfig, name, email, password, language string) (string, error) {

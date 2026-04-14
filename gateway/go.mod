@@ -7,8 +7,9 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/jackc/pgx/v5 v5.7.1
+	github.com/jackc/pgx/v5 v5.8.0
 	github.com/labstack/echo/v4 v4.12.0
+	github.com/newstarnion/migrations v0.0.0-00010101000000-000000000000
 	github.com/rwcarlsen/goexif v0.0.0-20190401172101-9e8deecbddbd
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.49.0
@@ -55,3 +56,9 @@ require (
 	google.golang.org/grpc v1.68.0
 	google.golang.org/protobuf v1.35.2
 )
+
+// The shared migrations module lives in this monorepo. The `use`
+// directive in ../go.work makes builds work; `replace` here makes
+// `go mod tidy` and IDE language servers resolve the import without
+// reaching out to a non-existent github repo.
+replace github.com/newstarnion/migrations => ../migrations

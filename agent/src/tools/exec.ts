@@ -318,7 +318,23 @@ export const execTool: ToolDefinition<typeof execSchema, ExecDetails> = {
       : {};
     const env: NodeJS.ProcessEnv = { ...process.env, ...filteredEnv };
 
-    // Use StarNion venv python if available (isolates from system python)
+    // Prepend the StarNion venv's bin/ to PATH so any `python3` invocation
+    // inside the spawned shell — including patterns like
+    // "cd foo && python3 bar.py" or "VAR=val python3 bar.py" — resolves to
+    // the isolated venv that has psycopg2/cryptography/requests installed.
+    // This is more robust than string-matching the command, which only
+    // catches commands that *start* with "python3 ".
+    if (_venvPython) {
+      const venvBin = path.dirname(_venvPython);
+      const currentPath = env.PATH ?? "";
+      if (!currentPath.split(path.delimiter).includes(venvBin)) {
+        env.PATH = venvBin + path.delimiter + currentPath;
+      }
+    }
+
+    // Belt-and-braces: also rewrite a leading `python3 ` / `python ` to the
+    // absolute venv path. Catches the case where a child shell ignores PATH
+    // (e.g. `env -i bash -c '...'`).
     command = resolveVenvPython(command);
 
     if (background) {

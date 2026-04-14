@@ -135,10 +135,11 @@ export default function CronPage() {
   })), [t])
 
   const REPORT_TYPES = useMemo(() => [
-    { value: "custom_reminder", label: t("reportTypes.custom_reminder") },
-    { value: "daily",           label: t("reportTypes.daily") },
-    { value: "weekly",          label: t("reportTypes.weekly") },
-    { value: "monthly",         label: t("reportTypes.monthly") },
+    { value: "custom_reminder",  label: t("reportTypes.custom_reminder") },
+    { value: "daily",            label: t("reportTypes.daily") },
+    { value: "weekly",           label: t("reportTypes.weekly") },
+    { value: "monthly",          label: t("reportTypes.monthly") },
+    { value: "connect_reminder", label: t("reportTypes.connect_reminder") },
   ], [t])
 
   const DOW_OPTIONS = useMemo(() => [
@@ -450,7 +451,8 @@ export default function CronPage() {
                           <div className="flex gap-3 mt-0.5 text-xs text-muted-foreground flex-wrap">
                             <span>{scheduleDisplay(s.schedule, s.type)}</span>
                             {/* #6 메시지 전체 내용 Tooltip으로 확인 */}
-                            {s.report_type === "custom_reminder" && s.message && (
+                            {(s.report_type === "custom_reminder" ||
+                              s.report_type === "connect_reminder") && s.message && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <span className="truncate max-w-xs cursor-help underline decoration-dashed underline-offset-2">
@@ -664,11 +666,16 @@ export default function CronPage() {
                   </SelectContent>
                 </Select>
               </div>
-              {cronForm.report_type === "custom_reminder" && (
+              {(cronForm.report_type === "custom_reminder" ||
+                cronForm.report_type === "connect_reminder") && (
                 <div className="space-y-1.5">
                   <Label>{t("fieldMessage")}</Label>
                   <Input
-                    placeholder={t("fieldMessagePlaceholder")}
+                    placeholder={
+                      cronForm.report_type === "connect_reminder"
+                        ? t("fieldMessagePlaceholderConnect")
+                        : t("fieldMessagePlaceholder")
+                    }
                     value={cronForm.message}
                     onChange={(e) => setCronForm({ ...cronForm, message: e.target.value })}
                   />

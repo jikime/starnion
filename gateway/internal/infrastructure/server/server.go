@@ -138,6 +138,7 @@ func New(rootLogger *zap.Logger) (*Server, error) {
 		AnomalyUseCase:      container.UseCases.Anomaly,
 		BudgetUseCase:       container.UseCases.Budget,
 		ChannelsUseCase:     container.UseCases.Channels,
+		ConnectUseCase:      container.UseCases.Connect,
 		ConversationUseCase: container.UseCases.Conversation,
 		CronUseCase:         container.UseCases.Cron,
 		FilesUseCase:        container.UseCases.Files,
