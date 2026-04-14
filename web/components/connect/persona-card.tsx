@@ -43,6 +43,7 @@ import {
 } from '@/lib/connect-data'
 import SnsSection from '@/components/connect/sns-section'
 import ActivityTimeline from '@/components/connect/activity-timeline'
+import NionSuggestion from '@/components/connect/nion-suggestion'
 
 interface PersonaCardProps {
   connection: Connection
@@ -461,6 +462,9 @@ export default function PersonaCard({
           <p className="text-xs text-muted-foreground/60 italic">{t('personaCard.noMemo')}</p>
         )}
       </div>
+
+      {/* Nion Suggestion — data-driven summary above the timeline. */}
+      <NionSuggestion connection={connection} />
 
       {/* Activity Timeline (UC-111/112/113) */}
       <ActivityTimeline connection={connection} />

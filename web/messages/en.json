@@ -2787,6 +2787,45 @@
         "telegram": "Telegram"
       }
     },
+    "suggestion": {
+      "title": "Nion's Suggestion",
+      "loading": "Analyzing…",
+      "loadFailed": "Could not load activity stats",
+      "neverContacted": "No contact recorded yet",
+      "recentlyContacted": "Contacted within the last {days} days",
+      "withinTarget": "{days} days since contact (target {target})",
+      "overdue": "{days} days without contact (target {target})",
+      "today": "today",
+      "yesterday": "yesterday",
+      "daysAgo": "{days} days ago",
+      "kind": {
+        "email": "Email",
+        "calendar": "Calendar",
+        "manual": "Manual",
+        "telegram": "Telegram"
+      },
+      "counts": {
+        "label": "Last 90 days",
+        "none": "no activity",
+        "email": "email {n}",
+        "calendar": "events {n}",
+        "manual": "manual {n}",
+        "telegram": "messages {n}"
+      },
+      "lastActivity": {
+        "label": "Last activity"
+      },
+      "actions": {
+        "neverContacted": "Send a first hello — a single short line is enough.",
+        "healthy": "You're staying in touch nicely 👍",
+        "familyOverdue": "It's family. How about a quick check-in today?",
+        "businessLight": "The next regular check-in is coming up — drop a quick note now.",
+        "businessOverdue": "Time for a quarterly check-in message.",
+        "friendLight": "How about a casual hello after a while?",
+        "friendOverdue": "It's been a while — suggest grabbing coffee.",
+        "longDrift": "It's been a long silence. Even a short hello helps."
+      }
+    },
     "reminders": {
       "title": "Smart Nudge",
       "empty": "You're on top of everything 👍",

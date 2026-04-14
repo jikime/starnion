@@ -2784,6 +2784,45 @@
         "telegram": "텔레그램"
       }
     },
+    "suggestion": {
+      "title": "Nion의 제안",
+      "loading": "분석 중…",
+      "loadFailed": "활동 통계를 불러오지 못했어요",
+      "neverContacted": "아직 연락 기록이 없어요",
+      "recentlyContacted": "최근 {days}일 안에 연락하셨어요",
+      "withinTarget": "{days}일째 연락 (목표 {target}일)",
+      "overdue": "{days}일째 연락 없음 (목표 {target}일)",
+      "today": "오늘",
+      "yesterday": "어제",
+      "daysAgo": "{days}일 전",
+      "kind": {
+        "email": "이메일",
+        "calendar": "일정",
+        "manual": "직접 기록",
+        "telegram": "텔레그램"
+      },
+      "counts": {
+        "label": "최근 90일",
+        "none": "기록 없음",
+        "email": "이메일 {n}",
+        "calendar": "일정 {n}",
+        "manual": "수동 {n}",
+        "telegram": "메시지 {n}"
+      },
+      "lastActivity": {
+        "label": "마지막 활동"
+      },
+      "actions": {
+        "neverContacted": "첫 인사를 건네보세요. 짧은 메시지 한 줄이면 충분해요.",
+        "healthy": "주기적으로 잘 챙기고 있어요 👍",
+        "familyOverdue": "가족이에요. 오늘 안부 한 마디 어떠세요?",
+        "businessLight": "곧 정기 연락 주기예요. 미리 한 번 인사를 건네보세요.",
+        "businessOverdue": "분기 안부 메시지를 보낼 시점이에요.",
+        "friendLight": "오랜만에 가벼운 안부를 전해보는 건 어떨까요?",
+        "friendOverdue": "오래 못 봤네요. 커피 한 잔 제안해보세요.",
+        "longDrift": "꽤 오랫동안 연락이 없었어요. 짧게라도 안부를 전해보세요."
+      }
+    },
     "reminders": {
       "title": "Smart Nudge",
       "empty": "모두 잘 챙기고 있어요 👍",

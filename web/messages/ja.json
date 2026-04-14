@@ -2386,6 +2386,45 @@
         "telegram": "Telegram"
       }
     },
+    "suggestion": {
+      "title": "Nionの提案",
+      "loading": "分析中…",
+      "loadFailed": "アクティビティ統計を取得できませんでした",
+      "neverContacted": "まだ連絡記録がありません",
+      "recentlyContacted": "ここ{days}日以内に連絡しています",
+      "withinTarget": "最終連絡から{days}日(目標 {target}日)",
+      "overdue": "{days}日間連絡なし(目標 {target}日)",
+      "today": "今日",
+      "yesterday": "昨日",
+      "daysAgo": "{days}日前",
+      "kind": {
+        "email": "メール",
+        "calendar": "カレンダー",
+        "manual": "手動",
+        "telegram": "Telegram"
+      },
+      "counts": {
+        "label": "直近90日",
+        "none": "記録なし",
+        "email": "メール {n}",
+        "calendar": "予定 {n}",
+        "manual": "手動 {n}",
+        "telegram": "メッセージ {n}"
+      },
+      "lastActivity": {
+        "label": "最終アクティビティ"
+      },
+      "actions": {
+        "neverContacted": "短くてもよいので、最初のひと言を送ってみましょう。",
+        "healthy": "定期的に連絡が取れています 👍",
+        "familyOverdue": "ご家族です。今日、近況を伝えてみませんか?",
+        "businessLight": "そろそろ定期連絡の時期です。先に一言送ってみましょう。",
+        "businessOverdue": "四半期のご挨拶を送る頃合いです。",
+        "friendLight": "久しぶりに軽い挨拶を送ってみませんか?",
+        "friendOverdue": "しばらく会っていません。コーヒーでも誘ってみては?",
+        "longDrift": "長い間連絡が途絶えています。短くても近況を送ってみましょう。"
+      }
+    },
     "reminders": {
       "title": "Smart Nudge",
       "empty": "すべてしっかり管理できています 👍",

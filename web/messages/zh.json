@@ -2386,6 +2386,45 @@
         "telegram": "Telegram"
       }
     },
+    "suggestion": {
+      "title": "Nion 的建议",
+      "loading": "分析中…",
+      "loadFailed": "无法加载活动统计",
+      "neverContacted": "尚无联系记录",
+      "recentlyContacted": "最近 {days} 天内有联系",
+      "withinTarget": "已 {days} 天未联系（目标 {target} 天）",
+      "overdue": "{days} 天未联系（目标 {target} 天）",
+      "today": "今天",
+      "yesterday": "昨天",
+      "daysAgo": "{days} 天前",
+      "kind": {
+        "email": "邮件",
+        "calendar": "日历",
+        "manual": "手动",
+        "telegram": "Telegram"
+      },
+      "counts": {
+        "label": "近 90 天",
+        "none": "无记录",
+        "email": "邮件 {n}",
+        "calendar": "日程 {n}",
+        "manual": "手动 {n}",
+        "telegram": "消息 {n}"
+      },
+      "lastActivity": {
+        "label": "最近活动"
+      },
+      "actions": {
+        "neverContacted": "发条简短的问候开个头吧。",
+        "healthy": "您一直在保持联系 👍",
+        "familyOverdue": "是家人。今天发条问候如何?",
+        "businessLight": "下次定期联系即将到来,可以先发个简短的问候。",
+        "businessOverdue": "该发季度问候了。",
+        "friendLight": "好久没联系了,发条轻松的问候怎么样?",
+        "friendOverdue": "好久没见了,约一杯咖啡吧。",
+        "longDrift": "已经很久没联系了。发条简短的问候也好。"
+      }
+    },
     "reminders": {
       "title": "Smart Nudge",
       "empty": "一切都在您的掌握之中 👍",
