@@ -22,9 +22,14 @@ const (
 	revokeURL = "https://oauth2.googleapis.com/revoke"
 )
 
-// Scopes is the fixed OAuth scope set the gateway asks for: openid,
-// email, profile, calendar (readonly), drive (readonly).
-const Scopes = "openid email profile https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.readonly"
+// Scopes is the fixed OAuth scope set the gateway asks for via the
+// /integrations/google/auth-url endpoint: openid, email, profile,
+// calendar (readonly), drive (readonly), and contacts (readonly —
+// added 2026-04 for UC-302 Google Contacts import).
+const Scopes = "openid email profile " +
+	"https://www.googleapis.com/auth/calendar.readonly " +
+	"https://www.googleapis.com/auth/drive.readonly " +
+	"https://www.googleapis.com/auth/contacts.readonly"
 
 // AuthURL exports the Google consent-screen URL so the handler can
 // still compose query params server-side without importing this

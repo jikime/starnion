@@ -172,11 +172,14 @@ func (h *Handler) oauthURL(c echo.Context) error {
 		// Skill-level flow asks for broader scopes than the
 		// generic /integrations/google/auth-url endpoint — match
 		// the legacy handler so the UI keeps working unchanged.
+		// contacts.readonly added 2026-04 for UC-302 Google Contacts
+		// import (connect-contacts-import skill).
 		"scope": {"openid email profile " +
 			"https://www.googleapis.com/auth/calendar " +
 			"https://www.googleapis.com/auth/drive " +
 			"https://www.googleapis.com/auth/documents " +
 			"https://www.googleapis.com/auth/tasks " +
+			"https://www.googleapis.com/auth/contacts.readonly " +
 			"https://mail.google.com/"},
 		"access_type": {"offline"},
 		"prompt":      {"consent"},
