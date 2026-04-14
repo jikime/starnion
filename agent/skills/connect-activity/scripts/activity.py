@@ -238,7 +238,16 @@ def _insert_activity(conn, user_id, connection_id, kind, label, occurred_at, dur
 
 
 def _bump_last_contact(conn, user_id: str, connection_id: str, occurred_at: datetime):
-    """Monotonic update — only advances last_contact_at, never rewinds."""
+    """Monotonic update — only advances last_contact_at, never rewinds.
+
+    Future occurred_at values are silently ignored. last_contact_at
+    means "when did I LAST contact them"; an upcoming calendar event
+    is a scheduled future plan, not a past contact, and bumping
+    last_contact_at into the future breaks drift detection and the
+    score recompute's recency term.
+    """
+    if occurred_at > datetime.now(timezone.utc):
+        return
     cur = conn.cursor()
     cur.execute(
         """

@@ -499,6 +499,13 @@ func (r *ConnectionRepository) IngestActivities(ctx context.Context, userID uuid
 
 	inserted := 0
 	maxByConn := make(map[uuid.UUID]time.Time)
+	// last_contact_at means "when did I LAST contact them" — only
+	// past activities qualify. Future calendar events (now that the
+	// ingestor scans 14 days ahead) belong on the timeline but must
+	// NOT bump last_contact_at, because that breaks drift detection
+	// (negative days_since) and inflates the score recompute's
+	// recency component.
+	now := time.Now().UTC()
 	for i, in := range batch {
 		cid := connIDs[i]
 		if _, ok := allowed[cid]; !ok {
@@ -530,8 +537,10 @@ func (r *ConnectionRepository) IngestActivities(ctx context.Context, userID uuid
 		}
 		if tag.RowsAffected() > 0 {
 			inserted++
-			if prev, ok := maxByConn[cid]; !ok || in.OccurredAt.After(prev) {
-				maxByConn[cid] = in.OccurredAt
+			if !in.OccurredAt.After(now) {
+				if prev, ok := maxByConn[cid]; !ok || in.OccurredAt.After(prev) {
+					maxByConn[cid] = in.OccurredAt
+				}
 			}
 		}
 	}
