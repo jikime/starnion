@@ -85,6 +85,50 @@ func (c *Client) Exchange(ctx context.Context, clientID, clientSecret, redirectU
 	return t, nil
 }
 
+// RefreshAccessToken trades a long-lived refresh_token for a fresh
+// access_token. Called by the integrations usecase from the nightly
+// ingest cron when the stored access token is near its expiry.
+//
+// Google's refresh flow returns everything except `refresh_token`
+// itself (since that one persists), so callers should keep the
+// stored refresh_token in place and only overwrite access_token +
+// expires_at on the returned struct.
+func (c *Client) RefreshAccessToken(ctx context.Context, clientID, clientSecret, refreshToken string) (Tokens, error) {
+	params := url.Values{
+		"client_id":     {clientID},
+		"client_secret": {clientSecret},
+		"refresh_token": {refreshToken},
+		"grant_type":    {"refresh_token"},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL,
+		bytes.NewBufferString(params.Encode()))
+	if err != nil {
+		return Tokens{}, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return Tokens{}, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return Tokens{}, fmt.Errorf("google token refresh %d: %s", resp.StatusCode, body)
+	}
+	var t Tokens
+	if err := json.Unmarshal(body, &t); err != nil {
+		return Tokens{}, err
+	}
+	// The refresh_token is NOT returned by Google on refresh. The
+	// caller should preserve the one it already has.
+	if t.RefreshToken == "" {
+		t.RefreshToken = refreshToken
+	}
+	t.ExpiresAt = time.Now().Add(time.Duration(t.ExpiresIn) * time.Second)
+	return t, nil
+}
+
 // Revoke invalidates the access token on Google's side. It is
 // best-effort; callers should log and swallow errors.
 func (c *Client) Revoke(token string) error {

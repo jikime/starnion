@@ -27,6 +27,7 @@ import (
 // internal/infrastructure/googleoauth.Client.
 type GoogleOAuthClient interface {
 	Exchange(ctx context.Context, clientID, clientSecret, redirectURL, code string) (GoogleTokens, error)
+	RefreshAccessToken(ctx context.Context, clientID, clientSecret, refreshToken string) (GoogleTokens, error)
 	Revoke(token string) error
 }
 
@@ -350,6 +351,56 @@ func (u *UseCase) GoogleDisconnect(ctx context.Context, userID uuid.UUID) error 
 		_ = u.google.Revoke(token)
 	}
 	return u.repo.DeleteGoogleTokens(ctx, userID)
+}
+
+// GetValidGoogleAccessToken returns a non-expired access_token for
+// the user, refreshing via the OAuth refresh flow when the stored
+// one is within 60s of its expiry. Returns ("", false, nil) when no
+// token is stored at all — callers should treat that as "user never
+// connected Google" and silently skip (used by the Phase 2 Connect
+// activity ingestor, which runs per-user and must be tolerant of
+// users who have no Google connection yet).
+//
+// Any refresh error is returned as err with the second return false.
+// When refresh succeeds the new tokens are UPSERTed back via the
+// existing repo method so the next call hits the fast path.
+func (u *UseCase) GetValidGoogleAccessToken(ctx context.Context, userID uuid.UUID) (string, bool, error) {
+	stored, found, err := u.repo.GetGoogleTokens(ctx, userID)
+	if err != nil {
+		return "", false, err
+	}
+	if !found {
+		return "", false, nil
+	}
+	// Not yet near expiry → return cached token.
+	if time.Until(stored.ExpiresAt) > 60*time.Second {
+		return stored.AccessToken, true, nil
+	}
+	// Otherwise refresh.
+	if stored.RefreshToken == "" {
+		return "", false, fmt.Errorf("google refresh token missing for user %s", userID)
+	}
+	clientID, clientSecret := u.resolveGoogleCredentials(ctx, userID)
+	if clientID == "" {
+		clientID = u.defaultCreds.ClientID
+		clientSecret = u.defaultCreds.ClientSecret
+	}
+	if clientID == "" {
+		return "", false, fmt.Errorf("google oauth client not configured")
+	}
+	refreshed, err := u.google.RefreshAccessToken(ctx, clientID, clientSecret, stored.RefreshToken)
+	if err != nil {
+		return "", false, err
+	}
+	if err := u.repo.UpsertGoogleTokens(ctx, userID, entity.GoogleTokens{
+		AccessToken:  refreshed.AccessToken,
+		RefreshToken: refreshed.RefreshToken,
+		Scopes:       stored.Scopes, // scope stays the same on refresh
+		ExpiresAt:    refreshed.ExpiresAt,
+	}); err != nil {
+		return "", false, err
+	}
+	return refreshed.AccessToken, true, nil
 }
 
 // resolveGoogleCredentials returns (clientID, clientSecret) for the
