@@ -58,6 +58,9 @@ func (h *Handler) Register(protected *echo.Group) {
 	protected.GET("/connections", h.list)
 	protected.POST("/connections", h.create)
 	protected.POST("/connections/scan-business-card", h.scanBusinessCard)
+	// Reminders must be registered before "/connections/:id" so the
+	// literal path wins over the parameterised one.
+	protected.GET("/connections/reminders", h.listReminders)
 	protected.GET("/connections/:id", h.get)
 	protected.PATCH("/connections/:id", h.update)
 	protected.DELETE("/connections/:id", h.delete)
@@ -65,6 +68,10 @@ func (h *Handler) Register(protected *echo.Group) {
 	protected.PATCH("/connections/:id/social-profiles", h.updateSocialProfiles)
 	protected.PATCH("/connections/:id/context-notes", h.updateContextNotes)
 	protected.POST("/connections/:id/touch", h.touch)
+	// Activity timeline (UC-111/112/113)
+	protected.GET("/connections/:id/activities", h.listActivities)
+	protected.POST("/connections/:id/activities", h.createActivity)
+	protected.DELETE("/connections/:id/activities/:activityId", h.deleteActivity)
 }
 
 // ── JSON resource shapes ──────────────────────────────────────────
@@ -499,6 +506,152 @@ func (h *Handler) touch(c echo.Context) error {
 		return h.mapError(c, err, "connect touch failed")
 	}
 	return c.JSON(http.StatusOK, toResource(updated))
+}
+
+// ── Activity timeline (UC-111/112/113) ────────────────────────────
+
+// activityResource is the wire shape for a single connection_activities row.
+type activityResource struct {
+	ID           int64     `json:"id"`
+	ConnectionID uuid.UUID `json:"connection_id"`
+	Kind         string    `json:"kind"`
+	Label        *string   `json:"label"`
+	OccurredAt   time.Time `json:"occurred_at"`
+	DurationMin  int       `json:"duration_min"`
+	Weight       float64   `json:"weight"`
+	Note         *string   `json:"note"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+func toActivityResource(a entity.ConnectionActivity) activityResource {
+	return activityResource{
+		ID:           a.ID,
+		ConnectionID: a.ConnectionID,
+		Kind:         string(a.Kind),
+		Label:        a.Label,
+		OccurredAt:   a.OccurredAt,
+		DurationMin:  a.DurationMin,
+		Weight:       a.Weight,
+		Note:         a.Note,
+		CreatedAt:    a.CreatedAt,
+	}
+}
+
+func (h *Handler) listActivities(c echo.Context) error {
+	userID, err := httpauth.UserIDFromContext(c)
+	if err != nil {
+		return unauthorized(c)
+	}
+	id, err := parseIDParam(c)
+	if err != nil {
+		return badRequestField(c, "id", "invalid_id", "id must be a uuid")
+	}
+	limit, _ := strconv.Atoi(c.QueryParam("limit"))
+	offset, _ := strconv.Atoi(c.QueryParam("offset"))
+
+	res, err := h.uc.ListActivities(c.Request().Context(), userID, id, limit, offset)
+	if err != nil {
+		return h.mapError(c, err, "connect list activities failed")
+	}
+	items := make([]activityResource, 0, len(res.Items))
+	for _, a := range res.Items {
+		items = append(items, toActivityResource(a))
+	}
+	return c.JSON(http.StatusOK, echo.Map{
+		"items":  items,
+		"total":  res.Total,
+		"limit":  res.Limit,
+		"offset": res.Offset,
+	})
+}
+
+type createActivityRequest struct {
+	Kind        string     `json:"kind"`
+	Label       string     `json:"label"`
+	OccurredAt  *time.Time `json:"occurred_at"`
+	DurationMin int        `json:"duration_min"`
+	Note        string     `json:"note"`
+}
+
+func (h *Handler) createActivity(c echo.Context) error {
+	userID, err := httpauth.UserIDFromContext(c)
+	if err != nil {
+		return unauthorized(c)
+	}
+	id, err := parseIDParam(c)
+	if err != nil {
+		return badRequestField(c, "id", "invalid_id", "id must be a uuid")
+	}
+	var req createActivityRequest
+	if err := c.Bind(&req); err != nil {
+		return badRequest(c, "invalid_json", "invalid request body")
+	}
+	a, err := h.uc.CreateActivity(c.Request().Context(), userID, id, connectusecase.CreateActivityInput{
+		Kind:        req.Kind,
+		Label:       req.Label,
+		OccurredAt:  req.OccurredAt,
+		DurationMin: req.DurationMin,
+		Note:        req.Note,
+	})
+	if err != nil {
+		return h.mapError(c, err, "connect create activity failed")
+	}
+	return c.JSON(http.StatusCreated, toActivityResource(a))
+}
+
+func (h *Handler) deleteActivity(c echo.Context) error {
+	userID, err := httpauth.UserIDFromContext(c)
+	if err != nil {
+		return unauthorized(c)
+	}
+	// `:id` is the parent connection id — not strictly needed by the
+	// usecase but kept on the URL so the REST shape is consistent.
+	// Re-validate it so a malformed path still 400s cleanly.
+	if _, err := parseIDParam(c); err != nil {
+		return badRequestField(c, "id", "invalid_id", "id must be a uuid")
+	}
+	activityID, err := strconv.ParseInt(c.Param("activityId"), 10, 64)
+	if err != nil || activityID <= 0 {
+		return badRequestField(c, "activity_id", "invalid_activity_id", "activity_id must be a positive integer")
+	}
+	if err := h.uc.DeleteActivity(c.Request().Context(), userID, activityID); err != nil {
+		return h.mapError(c, err, "connect delete activity failed")
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// ── UC-204 ListReminders ──────────────────────────────────────────
+
+type reminderResource struct {
+	ID            uuid.UUID  `json:"id"`
+	Name          string     `json:"name"`
+	Company       *string    `json:"company"`
+	Category      string     `json:"category"`
+	LastContactAt *time.Time `json:"last_contact_at"`
+	DaysOverdue   int        `json:"days_overdue"`
+}
+
+func (h *Handler) listReminders(c echo.Context) error {
+	userID, err := httpauth.UserIDFromContext(c)
+	if err != nil {
+		return unauthorized(c)
+	}
+	items, err := h.uc.ListReminders(c.Request().Context(), userID)
+	if err != nil {
+		return h.mapError(c, err, "connect list reminders failed")
+	}
+	out := make([]reminderResource, 0, len(items))
+	for _, d := range items {
+		out = append(out, reminderResource{
+			ID:            d.ID,
+			Name:          d.Name,
+			Company:       d.Company,
+			Category:      string(d.Category),
+			LastContactAt: d.LastContactAt,
+			DaysOverdue:   d.DaysOverdue,
+		})
+	}
+	return c.JSON(http.StatusOK, echo.Map{"items": out})
 }
 
 // ── helpers ───────────────────────────────────────────────────────

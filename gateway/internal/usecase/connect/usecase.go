@@ -40,6 +40,13 @@ const (
 	defaultFreqTarget    = 30
 	defaultScore         = 0.5
 	touchFutureTolerance = 60 * time.Second
+
+	// Activity timeline limits (UC-111/112/113)
+	maxActivityLabelChars = 40
+	maxActivityNoteChars  = 1000
+	maxActivityDurationMin = 24 * 60 // 24 hours
+	defaultActivityLimit  = 20
+	maxActivityLimit      = 200
 )
 
 // socialPlatformRegex is the closed set of allowed social_profiles keys
@@ -494,6 +501,121 @@ func (u *UseCase) RecordManualContact(ctx context.Context, userID, id uuid.UUID,
 		return entity.Connection{}, err
 	}
 	return c, nil
+}
+
+// ── UC-111 ListActivities ─────────────────────────────────────────
+
+// ListActivities returns the paginated activity timeline for a single
+// connection, most recent first. Fails with domain.ErrNotFound when
+// the connection is missing or owned by another user (ownership is
+// verified via GetByID before calling the repo — so the repo's
+// unconditional user_id scope is belt-and-braces).
+func (u *UseCase) ListActivities(ctx context.Context, userID, connID uuid.UUID, limit, offset int) (entity.ActivityListResult, error) {
+	if _, err := u.repo.GetByID(ctx, userID, connID); err != nil {
+		return entity.ActivityListResult{}, err
+	}
+	if limit <= 0 {
+		limit = defaultActivityLimit
+	}
+	if limit > maxActivityLimit {
+		limit = maxActivityLimit
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return u.repo.ListActivities(ctx, userID, connID, limit, offset)
+}
+
+// ── UC-112 CreateActivity ─────────────────────────────────────────
+
+// CreateActivityInput is the write DTO for UC-112. `Kind` defaults to
+// "manual" when empty; manual entries are the only supported path
+// from the HTTP handler. The batch ingest path (UC-201) calls the
+// repo directly with its own ActivityInput shape.
+type CreateActivityInput struct {
+	Kind        string
+	Label       string
+	OccurredAt  *time.Time
+	DurationMin int
+	Note        string
+}
+
+func (u *UseCase) CreateActivity(ctx context.Context, userID, connID uuid.UUID, in CreateActivityInput) (entity.ConnectionActivity, error) {
+	// Ownership check up front so the validation errors go to the
+	// right endpoint (404 beats 400 for cross-tenant access).
+	if _, err := u.repo.GetByID(ctx, userID, connID); err != nil {
+		return entity.ConnectionActivity{}, err
+	}
+
+	// Kind: default to manual, validate against the allow-list.
+	kindStr := strings.TrimSpace(in.Kind)
+	if kindStr == "" {
+		kindStr = string(entity.ActivityKindManual)
+	}
+	kind := entity.ActivityKind(kindStr)
+	if !kind.IsValid() {
+		return entity.ConnectionActivity{}, badField("kind", "invalid_kind", fmt.Sprintf("kind must be one of email|calendar|manual|telegram (got %q)", kindStr))
+	}
+
+	// Label: trim, clamp length. Empty string is valid (label is
+	// optional — auto-ingested rows have none).
+	label := strings.TrimSpace(in.Label)
+	if len([]rune(label)) > maxActivityLabelChars {
+		return entity.ConnectionActivity{}, badField("label", "label_too_long", fmt.Sprintf("label must be ≤%d chars", maxActivityLabelChars))
+	}
+
+	// Note: trim, clamp length. Empty string is valid.
+	note := strings.TrimSpace(in.Note)
+	if len([]rune(note)) > maxActivityNoteChars {
+		return entity.ConnectionActivity{}, badField("note", "note_too_long", fmt.Sprintf("note must be ≤%d chars", maxActivityNoteChars))
+	}
+
+	// Duration: clamp negative to 0, reject oversize.
+	dur := in.DurationMin
+	if dur < 0 {
+		dur = 0
+	}
+	if dur > maxActivityDurationMin {
+		return entity.ConnectionActivity{}, badField("duration_min", "duration_too_long", fmt.Sprintf("duration_min must be ≤%d (24h)", maxActivityDurationMin))
+	}
+
+	// occurred_at: default to now, reject > now+60s (BR-109-1 symmetry).
+	now := u.now().UTC()
+	occurredAt := now
+	if in.OccurredAt != nil && !in.OccurredAt.IsZero() {
+		occurredAt = in.OccurredAt.UTC()
+	}
+	if occurredAt.After(now.Add(touchFutureTolerance)) {
+		return entity.ConnectionActivity{}, badField("occurred_at", "future_occurred_at", "occurred_at cannot be more than 60 seconds in the future")
+	}
+
+	return u.repo.CreateActivity(ctx, userID, connID, entity.ActivityInput{
+		Kind:        kind,
+		Label:       label,
+		OccurredAt:  occurredAt,
+		DurationMin: dur,
+		Weight:      1,
+		Note:        note,
+	})
+}
+
+// ── UC-113 DeleteActivity ─────────────────────────────────────────
+
+func (u *UseCase) DeleteActivity(ctx context.Context, userID uuid.UUID, activityID int64) error {
+	if activityID <= 0 {
+		return badField("activity_id", "invalid_activity_id", "activity_id must be positive")
+	}
+	return u.repo.DeleteActivity(ctx, userID, activityID)
+}
+
+// ── UC-204 ListReminders ──────────────────────────────────────────
+
+// ListReminders returns the drift list rendered by the web
+// RemindersPanel and consumed by the connect_drift_reminder smart
+// notification. Each row carries `DaysOverdue` so the UI can say
+// "N일째 연락 없음" without recomputing the delta client-side.
+func (u *UseCase) ListReminders(ctx context.Context, userID uuid.UUID) ([]entity.DriftingConnection, error) {
+	return u.repo.ListDriftingConnections(ctx, userID)
 }
 
 // ── helpers ───────────────────────────────────────────────────────

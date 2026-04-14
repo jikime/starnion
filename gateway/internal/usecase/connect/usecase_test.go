@@ -814,3 +814,155 @@ func TestList_CategoryCSVValidation(t *testing.T) {
 		t.Fatalf("expected rejection of capitalized category, got %v", err)
 	}
 }
+
+// ── UC-111/112/113 Activity timeline ──────────────────────────────
+
+func TestCreateActivity_ValidatesLengths(t *testing.T) {
+	uc := NewUseCase(newFakeConnRepo())
+	userID := uuid.New()
+	c := mustCreate(t, uc, userID, CreateInput{Name: "Alice"})
+
+	// label too long
+	_, err := uc.CreateActivity(context.Background(), userID, c.ID, CreateActivityInput{
+		Label: strings.Repeat("가", maxActivityLabelChars+1),
+		Note:  "x",
+	})
+	if !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Errorf("expected label_too_long, got %v", err)
+	}
+
+	// note too long
+	_, err = uc.CreateActivity(context.Background(), userID, c.ID, CreateActivityInput{
+		Note: strings.Repeat("a", maxActivityNoteChars+1),
+	})
+	if !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Errorf("expected note_too_long, got %v", err)
+	}
+
+	// duration too long
+	_, err = uc.CreateActivity(context.Background(), userID, c.ID, CreateActivityInput{
+		DurationMin: maxActivityDurationMin + 1,
+	})
+	if !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Errorf("expected duration_too_long, got %v", err)
+	}
+}
+
+func TestCreateActivity_RejectsFutureOccurredAt(t *testing.T) {
+	uc := NewUseCase(newFakeConnRepo())
+	userID := uuid.New()
+	c := mustCreate(t, uc, userID, CreateInput{Name: "Bob"})
+
+	future := time.Now().Add(5 * time.Minute)
+	_, err := uc.CreateActivity(context.Background(), userID, c.ID, CreateActivityInput{
+		Label:      "meeting",
+		OccurredAt: &future,
+	})
+	if !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatalf("expected future_occurred_at rejection, got %v", err)
+	}
+}
+
+func TestCreateActivity_RejectsInvalidKind(t *testing.T) {
+	uc := NewUseCase(newFakeConnRepo())
+	userID := uuid.New()
+	c := mustCreate(t, uc, userID, CreateInput{Name: "Carol"})
+
+	_, err := uc.CreateActivity(context.Background(), userID, c.ID, CreateActivityInput{
+		Kind:  "linkedin_message",
+		Label: "chat",
+	})
+	if !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Errorf("expected invalid_kind rejection, got %v", err)
+	}
+}
+
+func TestCreateActivity_AdvancesLastContactAt(t *testing.T) {
+	uc := NewUseCase(newFakeConnRepo())
+	userID := uuid.New()
+	c := mustCreate(t, uc, userID, CreateInput{Name: "Dave"})
+
+	t1 := time.Now().Add(-48 * time.Hour)
+	_, err := uc.CreateActivity(context.Background(), userID, c.ID, CreateActivityInput{
+		Label:      "meeting",
+		OccurredAt: &t1,
+		Note:       "Q2 kickoff",
+	})
+	if err != nil {
+		t.Fatalf("CreateActivity failed: %v", err)
+	}
+
+	reloaded, err := uc.Get(context.Background(), userID, c.ID)
+	if err != nil {
+		t.Fatalf("Show failed: %v", err)
+	}
+	if reloaded.LastContactAt == nil || !reloaded.LastContactAt.Equal(t1) {
+		t.Errorf("expected last_contact_at = %v, got %v", t1, reloaded.LastContactAt)
+	}
+}
+
+func TestListActivities_PaginatesByOccurredAt(t *testing.T) {
+	uc := NewUseCase(newFakeConnRepo())
+	userID := uuid.New()
+	c := mustCreate(t, uc, userID, CreateInput{Name: "Eve"})
+
+	base := time.Now().Add(-7 * 24 * time.Hour)
+	for i := 0; i < 5; i++ {
+		occ := base.Add(time.Duration(i) * 24 * time.Hour)
+		_, err := uc.CreateActivity(context.Background(), userID, c.ID, CreateActivityInput{
+			Label:      "note",
+			OccurredAt: &occ,
+			Note:       "entry",
+		})
+		if err != nil {
+			t.Fatalf("CreateActivity #%d: %v", i, err)
+		}
+	}
+
+	res, err := uc.ListActivities(context.Background(), userID, c.ID, 3, 0)
+	if err != nil {
+		t.Fatalf("ListActivities failed: %v", err)
+	}
+	if res.Total != 5 || len(res.Items) != 3 {
+		t.Errorf("expected 3 of 5 items on page 1, got %d of %d", len(res.Items), res.Total)
+	}
+	// DESC: first item is the newest (index 4 from the loop).
+	if !res.Items[0].OccurredAt.Equal(base.Add(4 * 24 * time.Hour)) {
+		t.Errorf("expected newest first, got %v", res.Items[0].OccurredAt)
+	}
+}
+
+func TestDeleteActivity_TenantIsolation(t *testing.T) {
+	uc := NewUseCase(newFakeConnRepo())
+	alice := uuid.New()
+	bob := uuid.New()
+	c := mustCreate(t, uc, alice, CreateInput{Name: "A"})
+
+	a, err := uc.CreateActivity(context.Background(), alice, c.ID, CreateActivityInput{Label: "m", Note: "n"})
+	if err != nil {
+		t.Fatalf("CreateActivity: %v", err)
+	}
+
+	// Bob tries to delete Alice's activity.
+	err = uc.DeleteActivity(context.Background(), bob, a.ID)
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("expected ErrNotFound across tenants, got %v", err)
+	}
+
+	// Alice's delete succeeds.
+	if err := uc.DeleteActivity(context.Background(), alice, a.ID); err != nil {
+		t.Errorf("expected success for owner, got %v", err)
+	}
+}
+
+func TestListActivities_CrossTenantBlocked(t *testing.T) {
+	uc := NewUseCase(newFakeConnRepo())
+	alice := uuid.New()
+	bob := uuid.New()
+	c := mustCreate(t, uc, alice, CreateInput{Name: "A"})
+
+	_, err := uc.ListActivities(context.Background(), bob, c.ID, 10, 0)
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("expected ErrNotFound for cross-tenant list, got %v", err)
+	}
+}
