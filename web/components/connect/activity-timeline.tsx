@@ -8,9 +8,6 @@ import {
   Loader2,
   Save,
   X,
-  Mail,
-  Calendar as CalIcon,
-  Send,
 } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -36,13 +33,15 @@ const PAGE_SIZE = 10
 const MAX_LABEL_CHARS = 40
 const MAX_NOTE_CHARS = 1000
 
-// Maps `kind` to a lucide icon. `manual` is the default for
-// user-entered rows and uses the Clock icon (neutral "it happened").
-const KIND_ICON: Record<ActivityKind, typeof Clock> = {
-  email: Mail,
-  calendar: CalIcon,
-  manual: Clock,
-  telegram: Send,
+// Per-kind color tokens for the timeline bullet. Strings are
+// intentionally fully spelled out so Tailwind's JIT scanner picks
+// them up at build time — interpolated class names don't survive
+// the build. Tone-matched against the dark background palette.
+const KIND_DOT_CLASS: Record<ActivityKind, string> = {
+  email: 'bg-sky-400',
+  calendar: 'bg-emerald-400',
+  manual: 'bg-violet-400',
+  telegram: 'bg-cyan-400',
 }
 
 export default function ActivityTimeline({ connection }: Props) {
@@ -355,46 +354,54 @@ export default function ActivityTimeline({ connection }: Props) {
       )}
 
       {items.length > 0 && (
-        <ul className="space-y-2">
-          {items.map(a => {
-            const Icon = KIND_ICON[a.kind] || Clock
+        <ul className="relative">
+          {items.map((a, idx) => {
+            const isLast = idx === items.length - 1
+            const title = a.label?.trim() || t(`kind.${a.kind}`)
+            const durationSuffix =
+              a.durationMin > 0 ? ` (${t('duration', { min: a.durationMin })})` : ''
+            const description = a.note ? `${a.note}${durationSuffix}` : durationSuffix.trim()
             return (
               <li
                 key={a.id}
-                className="group flex items-start gap-2 rounded-md border border-border/60 bg-secondary/20 px-3 py-2"
+                className={`group relative pl-6 ${isLast ? 'pb-1' : 'pb-6'}`}
               >
-                <Icon className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {a.label && (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                        {a.label}
-                      </span>
+                {/* Vertical trail to the next item */}
+                {!isLast && (
+                  <span
+                    aria-hidden
+                    className="absolute left-[5px] top-4 bottom-0 w-px bg-border/40"
+                  />
+                )}
+                {/* Colored bullet — color encodes the kind */}
+                <span
+                  aria-hidden
+                  className={`absolute left-0 top-1.5 w-3 h-3 rounded-full ring-2 ring-background ${KIND_DOT_CLASS[a.kind]}`}
+                />
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-sm font-semibold text-foreground leading-tight">
+                      {title}
+                    </h4>
+                    {description && (
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed break-words">
+                        {description}
+                      </p>
                     )}
-                    <span className="text-[11px] text-muted-foreground font-mono">
+                    <p className="text-[11px] text-muted-foreground/60 mt-1">
                       {formatOccurredAt(a.occurredAt, dateLocale, t)}
-                    </span>
-                    {a.durationMin > 0 && (
-                      <span className="text-[11px] text-muted-foreground/70">
-                        · {t('duration', { min: a.durationMin })}
-                      </span>
-                    )}
-                  </div>
-                  {a.note && (
-                    <p className="text-xs text-foreground/80 mt-1 leading-relaxed break-words">
-                      {a.note}
                     </p>
-                  )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(a.id)}
+                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-star-red transition-opacity shrink-0 mt-0.5"
+                    aria-label={t('deleteAction')}
+                    title={t('deleteAction')}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(a.id)}
-                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-star-red transition-opacity"
-                  aria-label={t('deleteAction')}
-                  title={t('deleteAction')}
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
               </li>
             )
           })}
