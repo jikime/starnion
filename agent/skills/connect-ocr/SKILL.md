@@ -49,15 +49,16 @@ triggers:
 
 # 명함 스캔 (Business Card OCR)
 
-Uses `python3 connect-ocr/scripts/scan.py` to OCR a business card image with Gemini Vision and emit a **structured JSON payload** that the agent forwards to `POST /api/v1/connections/scan-business-card` to create a new Connect (인맥) entry.
+Uses `python3 connect-ocr/scripts/scan.py` to OCR a business card image with Gemini Vision and **insert the extracted fields directly into the `connections` table**, creating a new Connect (인맥) entry in one shot. Writes to the DB are made with the same `DATABASE_URL` credentials the finance/budget skills use — the agent does NOT need to call the gateway HTTP layer afterwards.
 
 Always pass `--user-id {user_id}`.
 
 ## Prerequisites
 
 - Gemini API key is injected as `GEMINI_API_KEY` when configured. If missing, the script prints an error — tell the user to configure it in Web UI → Integrations → Gemini.
-- Environment: `DATABASE_URL`, `GATEWAY_URL`
-- BR-SOCIAL-3 — **the skill MUST NOT populate `social_profiles`**. The gateway's scan-business-card endpoint will refuse any social fields anyway; this skill never emits them.
+- Environment: `DATABASE_URL`, `GATEWAY_URL`, `JWT_SECRET` (for signing `/api/files/…` fetches).
+- `psycopg2-binary` must be installed in the starnion venv (it already is — same package other skills use).
+- BR-SOCIAL-3 — **the skill MUST NOT populate `social_profiles`**. The INSERT always passes `'{}'::jsonb` for that column, and Gemini is prompted to never emit social handles.
 
 ---
 
@@ -74,12 +75,13 @@ If the user just wants to *read* the card without saving it, use the `image` ski
 
 ## How it works
 
-1. Fetch the image from `--file-url` (MinIO URL or `/api/files/...` relative).
+1. Fetch the image from `--file-url` (MinIO URL or `/api/files/...` relative). User-scoped `/api/files/users/<id>/...` URLs are signed automatically with `JWT_SECRET` so the gateway allows the read.
 2. Send it to Gemini Vision with a structured-extraction prompt.
 3. Parse Gemini's JSON response into the `business_card` schema.
-4. Print the full POST body to stdout — the agent is responsible for actually calling `POST /api/v1/connections/scan-business-card` with it.
+4. **INSERT a new row into `connections`** (columns: `user_id`, `name`, `role`, `company`, `email`, `phone`, `meeting_location`, `tags`, `business_card`, `social_profiles`). Table defaults fill in `category`, `contact_frequency_target`, `connection_score`, `created_at`, `updated_at`.
+5. Print a result JSON containing the new `connection_id` plus the populated fields so the agent can confirm the registration to the user.
 
-The agent **must not** re-OCR the raw text or inject SNS links — the skill is the single source of truth for business-card extraction.
+The agent **must not** re-OCR the raw text, inject SNS links, or call the gateway afterwards — the skill is the single source of truth for business-card registration.
 
 ## Command
 
@@ -90,31 +92,23 @@ python3 connect-ocr/scripts/scan.py \
   [--meeting-location "{where you met}"]
 ```
 
-The script prints a JSON object on stdout, e.g.:
+The script prints a JSON object on stdout after a successful insert, e.g.:
 
 ```json
 {
-  "name": "김철수",
-  "role": "Product Manager",
+  "business_card_image_url": "/api/files/users/abc/2026/card.webp",
   "company": "ACME Corp",
+  "connection_id": "f3c2e5a1-…",
   "email": "cs.kim@acme.com",
-  "phone": "+82-10-1234-5678",
   "meeting_location": null,
-  "tags": [],
-  "business_card": {
-    "image_url": "http://localhost:9000/starnion-files/users/abc/2026/card.webp",
-    "company_name_en": "ACME Corp",
-    "dept": "Product",
-    "address": "Seoul, Gangnam-gu",
-    "website": "https://acme.com",
-    "fax": "",
-    "scanned_at": "2026-04-13T12:00:00Z",
-    "ocr_raw_text": "…"
-  }
+  "name": "김철수",
+  "phone": "+82-10-1234-5678",
+  "role": "Product Manager",
+  "status": "created"
 }
 ```
 
-Once you have this JSON, immediately POST it to the gateway and return the created connection id to the user.
+Use `connection_id` + `name` in your reply to the user.
 
 ## Example
 
@@ -127,16 +121,18 @@ python3 connect-ocr/scripts/scan.py \
   --file-url "/api/files/users/abc/2026/card.webp"
 ```
 
-Then POST the stdout JSON to `POST /api/v1/connections/scan-business-card` and reply "김철수 님을 인맥에 등록했습니다 (회사: ACME Corp)".
+Reply: "김철수 님을 인맥에 등록했습니다 (회사: ACME Corp). 인맥 페이지에서 SNS 계정도 추가해보세요."
 
 ## Error cases
 
 - **No Gemini API key** → script exits 1 with a configuration error. Ask the user to register the key.
-- **Image fetch 404 / network error** → script exits 1. Ask the user to re-upload.
+- **Image fetch 404 / 401** → script exits 1. For 401 on `/api/files/users/…`, the skill should have signed the URL automatically using `JWT_SECRET`; if it still fails, check that `JWT_SECRET` is exported or present in `~/.starnion/starnion.yaml`.
 - **Gemini returned non-JSON or missing name** → the script prints an error and exits 1. Fall back to the plain `image` skill so the user can see the raw analysis.
+- **DB insert failed** → script exits 1 and prints the driver error. Most common cause: `DATABASE_URL` missing or `psycopg2` not installed in the starnion venv.
 
 ## Notes
 
 - Uses the same `gemini-3.1-flash-image-preview` model as the `image` skill.
-- **Never** populates `social_profiles`. If the card has SNS handles visible, the user must add them manually via the Web UI (BR-SOCIAL-3).
-- The `business_card.image_url` field is the exact URL you passed to `--file-url` (so the gateway can serve the card thumbnail later).
+- **Never** populates `social_profiles` — the INSERT passes `'{}'::jsonb` unconditionally (BR-SOCIAL-3). If the card has SNS handles visible, the user must add them manually via the Web UI after the scan.
+- The `business_card.image_url` field is the exact URL you passed to `--file-url` (so the persona card can render the scanned thumbnail later).
+- DB writes bypass the gateway's HTTP layer. This matches how finance/budget skills work and removes the need for service-token auth between agent and gateway.

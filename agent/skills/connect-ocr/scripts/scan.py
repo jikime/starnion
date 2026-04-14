@@ -227,9 +227,14 @@ def _nonempty(s):
 
 
 def build_payload(ocr, file_url: str, meeting_location: str | None):
-    """Turn the Gemini OCR dict into a POST body for the gateway's
-    scan-business-card endpoint. Fields we can't confidently fill are
-    omitted (None) so the gateway defaults kick in."""
+    """Normalise the Gemini OCR dict into a connection row shape.
+
+    Mirrors the /api/v1/connections/scan-business-card gateway contract
+    so the downstream DB insert writes exactly the same columns the
+    gateway handler would. Fields we can't confidently fill are omitted
+    so the table defaults (category='acquaintance', frequency=30,
+    score=0.5) apply.
+    """
     top = {
         "name": (ocr.get("name") or "").strip(),
         "role": _nonempty(ocr.get("role")),
@@ -244,7 +249,7 @@ def build_payload(ocr, file_url: str, meeting_location: str | None):
         sys.exit(2)
 
     bc = {
-        "image_url": file_url,  # gateway requires this
+        "image_url": file_url,  # required by the connection schema
         "scanned_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     for k in _ALLOWED_BC_KEYS:
@@ -257,6 +262,64 @@ def build_payload(ocr, file_url: str, meeting_location: str | None):
     # Our prompt forbids it but we defend in depth.
     top.pop("social_profiles", None)
     return top
+
+
+def insert_connection(user_id: str, payload: dict) -> str | None:
+    """INSERT the parsed card into the connections table via _psql.
+
+    Returns the new row's UUID on success, None on failure. We write
+    directly to the DB (matching finance/budget skill pattern) because
+    the skill has no way to authenticate as the user over HTTP —
+    /api/v1/connections/scan-business-card is JWT-protected and
+    service tokens aren't issued to skills.
+
+    BR-SOCIAL-3 is enforced by always passing `'{}'::jsonb` for
+    social_profiles regardless of what's in the payload.
+    """
+    if not DB_URL:
+        print("❌ DATABASE_URL not configured", file=sys.stderr)
+        return None
+
+    try:
+        import psycopg2
+        from psycopg2.extras import Json
+    except ImportError:
+        print("❌ psycopg2 is required for connect-ocr. Install with: pip install psycopg2-binary", file=sys.stderr)
+        return None
+
+    try:
+        conn = psycopg2.connect(DB_URL)
+        conn.autocommit = True
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO connections
+                (user_id, name, role, company, email, phone,
+                 meeting_location, tags, business_card, social_profiles)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+            RETURNING id::text;
+            """,
+            (
+                user_id,
+                payload["name"],
+                payload.get("role"),
+                payload.get("company"),
+                payload.get("email"),
+                payload.get("phone"),
+                payload.get("meeting_location"),
+                payload.get("tags") or [],
+                Json(payload.get("business_card") or {}),
+                "{}",
+            ),
+        )
+        row = cur.fetchone()
+        new_id = row[0] if row else None
+        cur.close()
+        conn.close()
+        return new_id
+    except Exception as e:
+        print(f"❌ DB insert failed: {e}", file=sys.stderr)
+        return None
 
 
 def cmd_scan(args):
@@ -277,8 +340,27 @@ def cmd_scan(args):
     ocr = analyze_with_gemini(api_key, image_bytes, mime_type)
 
     payload = build_payload(ocr, args.file_url, args.meeting_location)
-    # Stable key order so downstream diffs are clean.
-    print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+
+    print("💾 Saving connection…", flush=True, file=sys.stderr)
+    new_id = insert_connection(args.user_id, payload)
+    if not new_id:
+        print("❌ Failed to save connection to database.", file=sys.stderr)
+        sys.exit(1)
+
+    # Result object: stable key order so the agent's reply templating
+    # is deterministic.
+    result = {
+        "status": "created",
+        "connection_id": new_id,
+        "name": payload["name"],
+        "role": payload.get("role"),
+        "company": payload.get("company"),
+        "email": payload.get("email"),
+        "phone": payload.get("phone"),
+        "meeting_location": payload.get("meeting_location"),
+        "business_card_image_url": (payload.get("business_card") or {}).get("image_url"),
+    }
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
