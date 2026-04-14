@@ -2,119 +2,34 @@ package database
 
 import (
 	"context"
-	"embed"
 	"fmt"
-	"io/fs"
-	"sort"
-	"strings"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/newstarnion/migrations"
 	"go.uber.org/zap"
 )
 
-//go:embed all:migrations
-var migrationFiles embed.FS
-
-// RunMigrations applies any pending SQL migration files from the embedded
-// migrations directory.  Files are sorted alphabetically and applied in order.
+// RunMigrations applies any pending SQL migrations against db. The
+// canonical SQL files and the apply-with-tracking logic live in the
+// shared `migrations` module so the gateway, the starnion-cli
+// installer, and Docker's postgres bootstrap all reference the same
+// source of truth.
 //
-// Each file is recorded in schema_migrations (version = filename without
-// extension) once applied.  Already-recorded files are skipped, so the
-// runner is safe to call on every server start.
-//
-// phase0_full_schema.sql is excluded — it contains DROP TABLE statements and
-// is only meant to be run when bootstrapping a completely fresh database via
-// docker-compose initdb.
+// This function exists as a thin shim so the bootstrap code calling
+// it stays unchanged — wire.go still does
+// `database.RunMigrations(ctx, db, logger)` exactly as before.
 func RunMigrations(ctx context.Context, db *DB, logger *zap.Logger) error {
-	pool := db.Pool()
-	// Ensure the tracking table exists.
-	_, err := pool.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS schema_migrations (
-			version    TEXT        NOT NULL PRIMARY KEY,
-			applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-		)`)
-	if err != nil {
-		return fmt.Errorf("create schema_migrations: %w", err)
-	}
-
-	// Load already-applied versions.
-	rows, err := pool.Query(ctx, `SELECT version FROM schema_migrations`)
-	if err != nil {
-		return fmt.Errorf("query schema_migrations: %w", err)
-	}
-	applied := make(map[string]bool)
-	for rows.Next() {
-		var v string
-		if rows.Scan(&v) == nil {
-			applied[v] = true
-		}
-	}
-	rows.Close()
-
-	// Collect candidate files from the embedded FS.
-	entries, err := fs.ReadDir(migrationFiles, "migrations")
-	if err != nil {
-		return fmt.Errorf("read embedded migrations: %w", err)
-	}
-
-	// Sort alphabetically so phase1 < phase2 < … < phase9 < phase10 etc.
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Name() < entries[j].Name()
-	})
-
-	pending := 0
-	for _, e := range entries {
-		name := e.Name()
-
-		// Skip the full-schema bootstrap file — it has destructive DROP statements.
-		if strings.HasPrefix(name, "phase0") {
-			continue
-		}
-
-		// Derive the version key from the filename without extension.
-		version := strings.TrimSuffix(name, ".sql")
-		if applied[version] {
-			continue
-		}
-
-		sql, err := migrationFiles.ReadFile("migrations/" + name)
-		if err != nil {
-			return fmt.Errorf("read migration %s: %w", name, err)
-		}
-
-		logger.Info("[migrate] applying migration", zap.String("file", name))
-
-		// Execute the entire script in a single transaction.
-		tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
-		if err != nil {
-			return fmt.Errorf("begin tx for %s: %w", name, err)
-		}
-
-		if _, err := tx.Exec(ctx, string(sql)); err != nil {
-			_ = tx.Rollback(ctx)
-			return fmt.Errorf("execute migration %s: %w", name, err)
-		}
-
-		if _, err := tx.Exec(ctx,
-			`INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING`,
-			version,
-		); err != nil {
-			_ = tx.Rollback(ctx)
-			return fmt.Errorf("record migration %s: %w", name, err)
-		}
-
-		if err := tx.Commit(ctx); err != nil {
-			return fmt.Errorf("commit migration %s: %w", name, err)
-		}
-
-		logger.Info("[migrate] migration applied", zap.String("version", version))
-		pending++
-	}
-
-	if pending == 0 {
-		logger.Info("[migrate] all migrations up to date")
-	} else {
-		logger.Info("[migrate] migrations complete", zap.Int("applied", pending))
+	if err := migrations.Run(ctx, db.Pool(), zapAdapter{logger}); err != nil {
+		return fmt.Errorf("database: %w", err)
 	}
 	return nil
+}
+
+// zapAdapter satisfies migrations.Logger by forwarding Infof calls
+// into the gateway's structured zap logger. The migrations package is
+// dependency-free of zap so the rest of the workspace can use it
+// without dragging zap into smaller modules.
+type zapAdapter struct{ z *zap.Logger }
+
+func (a zapAdapter) Infof(format string, args ...any) {
+	a.z.Sugar().Infof(format, args...)
 }

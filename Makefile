@@ -1,22 +1,22 @@
 .PHONY: starnion gateway all clean proto \
         docker-build docker-up docker-up-build docker-down \
         docker-down-volumes docker-logs docker-ps \
-        sync-migrations release-dry
+        release-dry
 
-DOCKER_DIR   := docker
-COMPOSE      := docker compose -f $(DOCKER_DIR)/docker-compose.yml
-CLI_DIR      := starnion-cli/internal/cli/migrations
-GW_DIR       := gateway/internal/infrastructure/database/migrations
-MIGRATE_SRC  := db/migrations
+DOCKER_DIR := docker
+COMPOSE    := docker compose -f $(DOCKER_DIR)/docker-compose.yml
 
 # ── Build targets ─────────────────────────────────────────────────────────────
+#
+# SQL migrations live in the shared `migrations/` Go module and are
+# embedded into both binaries automatically — no copy step needed.
 
-# Build starnion CLI (syncs migrations first)
-starnion: sync-migrations
+# Build starnion CLI
+starnion:
 	cd starnion-cli && go build -o ../starnion ./cmd/starnion
 
-# Build gateway server binary (syncs migrations first)
-gateway: sync-migrations
+# Build gateway server binary
+gateway:
 	cd gateway && go build -o ../bin/gateway ./cmd
 
 # Build TypeScript agent
@@ -24,7 +24,7 @@ agent:
 	cd agent && pnpm install --frozen-lockfile && pnpm build
 
 # Build all
-all: sync-migrations starnion gateway agent
+all: starnion gateway agent
 
 # ── Proto codegen ─────────────────────────────────────────────────────────────
 
@@ -45,25 +45,11 @@ proto:
 		proto/agent.proto
 	@echo "Done."
 
-# ── Migration sync ────────────────────────────────────────────────────────────
-
-# Copy canonical migrations (db/migrations/) → both Go embed targets.
-# This is the SINGLE SOURCE OF TRUTH enforcement: the sync targets are
-# git-ignored (see .gitignore) so drift is physically impossible — a
-# hand-edit to a copied file is wiped on the next build.
-sync-migrations:
-	@echo "Syncing migrations from $(MIGRATE_SRC)..."
-	@rm -rf $(CLI_DIR) $(GW_DIR)
-	@mkdir -p $(CLI_DIR) $(GW_DIR)
-	@cp $(MIGRATE_SRC)/*.sql $(CLI_DIR)/ 2>/dev/null || true
-	@cp $(MIGRATE_SRC)/*.sql $(GW_DIR)/   2>/dev/null || true
-	@echo "Synced $$(ls $(CLI_DIR)/*.sql 2>/dev/null | wc -l | tr -d ' ') migrations → cli, $$(ls $(GW_DIR)/*.sql 2>/dev/null | wc -l | tr -d ' ') → gateway"
-
 # ── Clean ─────────────────────────────────────────────────────────────────────
 
 clean:
 	@rm -f starnion bin/gateway
-	@rm -rf $(CLI_DIR) .staging agent/dist
+	@rm -rf .staging agent/dist
 	@echo "Cleaned"
 
 # ── Docker targets ────────────────────────────────────────────────────────────
