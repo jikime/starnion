@@ -120,9 +120,12 @@ export default function GridView({
               </div>
             </div>
 
-            {/* Contact info — up to two lines, fills the card body */}
-            {visibleContactLines.length > 0 && (
-              <div className="space-y-1 mb-3">
+            {/* Contact + Score row — contact lines on the left (flex-1),
+                compact score block (number + bar) docked to the right.
+                When there are no contact fields, the left column is
+                empty and the score naturally sits against the right edge. */}
+            <div className="flex items-center gap-3 mb-3 min-h-[2.5rem]">
+              <div className="flex-1 min-w-0 space-y-1">
                 {visibleContactLines.map(({ icon: Icon, text }) => (
                   <div
                     key={text}
@@ -133,19 +136,24 @@ export default function GridView({
                   </div>
                 ))}
               </div>
-            )}
-
-            {/* Score bar — full width */}
-            <div className="flex items-center gap-2 mb-3">
-              <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{ width: `${scoreW}%`, backgroundColor: color, opacity: 0.8 }}
-                />
+              <div className="shrink-0 flex flex-col items-end gap-1">
+                <span
+                  className="text-sm font-mono font-semibold leading-none"
+                  style={{ color }}
+                >
+                  {scoreW}
+                </span>
+                <div className="w-14 h-1 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${scoreW}%`,
+                      backgroundColor: color,
+                      opacity: 0.8,
+                    }}
+                  />
+                </div>
               </div>
-              <span className="text-[11px] font-mono w-7 text-right" style={{ color }}>
-                {scoreW}
-              </span>
             </div>
 
             {/* Footer: last contact / drift + tags */}
