@@ -1096,6 +1096,7 @@
     "fieldReportType": "알림 유형",
     "fieldMessage": "메시지",
     "fieldMessagePlaceholder": "전송할 메시지",
+    "fieldMessagePlaceholderConnect": "예: 오랫동안 연락 못한 인연 확인하기",
     "fieldTime": "시간",
     "fieldHour": "시",
     "fieldMinute": "분",
@@ -1133,7 +1134,8 @@
       "custom_reminder": "커스텀 메시지",
       "daily": "일간 요약",
       "weekly": "주간 리포트",
-      "monthly": "월간 리포트"
+      "monthly": "월간 리포트",
+      "connect_reminder": "인맥 관리"
     },
     "dow": {
       "monday": "월요일",

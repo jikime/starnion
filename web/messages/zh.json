@@ -1099,6 +1099,7 @@
     "fieldReportType": "通知类型",
     "fieldMessage": "消息",
     "fieldMessagePlaceholder": "要发送的消息",
+    "fieldMessagePlaceholderConnect": "例如:检查最近没联系的人脉",
     "fieldTime": "时间",
     "fieldHour": "时",
     "fieldMinute": "分",
@@ -1136,7 +1137,8 @@
       "custom_reminder": "自定义消息",
       "daily": "每日摘要",
       "weekly": "每周报告",
-      "monthly": "每月报告"
+      "monthly": "每月报告",
+      "connect_reminder": "人脉提醒"
     },
     "dow": {
       "monday": "周一",

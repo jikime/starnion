@@ -1099,6 +1099,7 @@
     "fieldReportType": "通知タイプ",
     "fieldMessage": "メッセージ",
     "fieldMessagePlaceholder": "送信するメッセージ",
+    "fieldMessagePlaceholderConnect": "例: 久しく連絡していない人脈を確認",
     "fieldTime": "時刻",
     "fieldHour": "時",
     "fieldMinute": "分",
@@ -1136,7 +1137,8 @@
       "custom_reminder": "カスタムメッセージ",
       "daily": "日次サマリー",
       "weekly": "週次レポート",
-      "monthly": "月次レポート"
+      "monthly": "月次レポート",
+      "connect_reminder": "人脈リマインダー"
     },
     "dow": {
       "monday": "月曜日",
