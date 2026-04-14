@@ -1,6 +1,6 @@
 'use client'
 
-import { CreditCard, LayoutGrid, List, Users } from 'lucide-react'
+import { CreditCard, LayoutGrid, List, UserPlus, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 type ViewMode = 'list' | 'grid'
@@ -9,6 +9,7 @@ interface NavBarProps {
   viewMode: ViewMode
   onViewChange: (mode: ViewMode) => void
   onScanClick: () => void
+  onAddClick: () => void
   driftCount?: number
 }
 
@@ -16,6 +17,7 @@ export default function NavBar({
   viewMode,
   onViewChange,
   onScanClick,
+  onAddClick,
   driftCount = 0,
 }: NavBarProps) {
   return (
@@ -69,7 +71,16 @@ export default function NavBar({
           onClick={onScanClick}
         >
           <CreditCard className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">명함 스캔</span>
+          <span className="hidden sm:inline">명함 등록</span>
+        </Button>
+
+        <Button
+          size="sm"
+          className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
+          onClick={onAddClick}
+        >
+          <UserPlus className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">새 인연 추가</span>
         </Button>
       </div>
     </header>

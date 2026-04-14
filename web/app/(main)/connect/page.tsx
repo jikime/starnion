@@ -8,6 +8,7 @@ import GridView from '@/components/connect/grid-view'
 import PersonaCard from '@/components/connect/persona-card'
 import RemindersPanel from '@/components/connect/reminders-panel'
 import OcrScanner, { type ParsedScanResult } from '@/components/connect/ocr-scanner'
+import NewConnectionDialog from '@/components/connect/new-connection-dialog'
 import {
   Category,
   Connection,
@@ -65,6 +66,7 @@ export default function ConnectPage() {
   )
   const [rightPanel, setRightPanel] = useState<RightPanel>('persona')
   const [showScanner, setShowScanner] = useState(false)
+  const [showNewDialog, setShowNewDialog] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
 
   const [connections, setConnections] = useState<Connection[]>([])
@@ -216,6 +218,7 @@ export default function ConnectPage() {
         viewMode={viewMode}
         onViewChange={setViewMode}
         onScanClick={() => setShowScanner(true)}
+        onAddClick={() => setShowNewDialog(true)}
         driftCount={nudgeCount}
       />
 
@@ -403,6 +406,16 @@ export default function ConnectPage() {
           onSnsPrompt={handleScannerSnsPrompt}
         />
       )}
+
+      <NewConnectionDialog
+        open={showNewDialog}
+        onOpenChange={setShowNewDialog}
+        onCreated={created => {
+          setConnections(prev => [created, ...prev])
+          setSelectedId(created.id)
+          setRightPanel('persona')
+        }}
+      />
     </div>
   )
 }
