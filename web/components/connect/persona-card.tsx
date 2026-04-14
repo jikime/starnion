@@ -567,6 +567,14 @@ export default function PersonaCard({
                     src={connection.businessCard.imageUrl}
                     alt={`${connection.name} ${t('personaCard.businessCard')}`}
                     fill
+                    // Sparse personas (no memo, no timeline yet) put this
+                    // card above the fold — Next.js flags it as the LCP
+                    // element. priority opts into eager loading + a
+                    // preload hint; sizes matches the aside's fixed
+                    // widths so the optimizer doesn't download a 1920w
+                    // asset for a ~400px slot.
+                    priority
+                    sizes="(max-width: 1280px) 320px, (max-width: 1536px) 384px, 448px"
                     className="object-cover transition-transform duration-300 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-background/0 group-hover:bg-background/30 transition-colors duration-200 flex items-center justify-center">
