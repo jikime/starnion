@@ -17,6 +17,7 @@ import {
 } from '@/lib/connect-data'
 import {
   ConnectApiError,
+  deleteConnection,
   getConnection,
   listConnections,
   submitBusinessCardScan,
@@ -204,6 +205,22 @@ export default function ConnectPage() {
     }
   }
 
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      await deleteConnection(id)
+      setConnections(prev => prev.filter(c => c.id !== id))
+      setSelectedConnection(null)
+      setSelectedId(prev => (prev === id ? null : prev))
+    } catch (err) {
+      if (err instanceof ConnectApiError) {
+        setLoadError(err.message)
+      } else {
+        setLoadError('삭제에 실패했습니다')
+      }
+      throw err
+    }
+  }, [])
+
   const handleSocialSubmit = async (
     patch: Partial<Record<SocialPlatform, string | null>>
   ) => {
@@ -387,6 +404,7 @@ export default function ConnectPage() {
                 connection={selectedConnection}
                 onClose={() => setSelectedId(null)}
                 onSubmitSocial={handleSocialSubmit}
+                onDelete={handleDelete}
                 snsEditOpen={openSnsEdit}
                 onSnsEditOpenChange={setOpenSnsEdit}
               />

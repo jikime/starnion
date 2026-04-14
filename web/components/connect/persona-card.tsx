@@ -15,8 +15,20 @@ import {
   Printer,
   ScanLine,
   ZoomIn,
+  Trash2,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import Image from 'next/image'
 import {
   Connection,
@@ -35,6 +47,7 @@ interface PersonaCardProps {
   onSubmitSocial: (
     patch: Partial<Record<SocialPlatform, string | null>>
   ) => Promise<void>
+  onDelete?: (id: string) => Promise<void>
   snsEditOpen: boolean
   onSnsEditOpenChange: (open: boolean) => void
 }
@@ -43,9 +56,23 @@ export default function PersonaCard({
   connection,
   onClose,
   onSubmitSocial,
+  onDelete,
   snsEditOpen,
   onSnsEditOpenChange,
 }: PersonaCardProps) {
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDeleteConfirm = async () => {
+    if (!onDelete) return
+    setDeleting(true)
+    try {
+      await onDelete(connection.id)
+      setDeleteOpen(false)
+    } finally {
+      setDeleting(false)
+    }
+  }
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const days = getDaysSinceContact(connection.lastContactDate)
   const drift = isDrifting(connection)
@@ -109,16 +136,55 @@ export default function PersonaCard({
             )}
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onClose}
-          className="text-muted-foreground hover:text-foreground shrink-0 -mt-1"
-          aria-label="닫기"
-        >
-          <X className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1 shrink-0 -mt-1">
+          {onDelete && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setDeleteOpen(true)}
+              className="text-muted-foreground hover:text-star-red"
+              aria-label="인연 삭제"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="닫기"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{connection.name} 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              정말 삭제하시겠어요? 이 인연과 관련된 활동 기록도 함께 삭제되며,
+              이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={e => {
+                e.preventDefault()
+                handleDeleteConfirm()
+              }}
+              disabled={deleting}
+              className="bg-star-red text-white hover:bg-star-red/90"
+            >
+              {deleting && <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />}
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Connection Score */}
       <div className="px-5 py-4 border-b border-border">
