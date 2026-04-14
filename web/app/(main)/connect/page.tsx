@@ -454,7 +454,12 @@ export default function ConnectPage() {
               <EmptyPersona onScanClick={() => setShowScanner(true)} />
             )
           ) : (
-            <RemindersPanel />
+            <RemindersPanel
+              onSelect={id => {
+                setSelectedId(id)
+                setRightPanel('persona')
+              }}
+            />
           )}
         </aside>
       </div>
