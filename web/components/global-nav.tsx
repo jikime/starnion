@@ -37,8 +37,8 @@ const NAV_ITEMS = [
   { href: "/files",     tKey: "files",     icon: FolderOpen,    activeClass: "bg-amber-600 text-white" },
   { href: "/planners",  tKey: "planners",  icon: CalendarDays,  activeClass: "bg-violet-600 text-white" },
   { href: "/assets",    tKey: "assets",    icon: BarChart3,     activeClass: "bg-rose-600 text-white" },
-  { href: "/analytics", tKey: "analytics", icon: TrendingUp,    activeClass: "bg-cyan-600 text-white" },
   { href: "/connect",   tKey: "connect",   icon: Users,         activeClass: "bg-blue-600 text-white"  },
+  { href: "/analytics", tKey: "analytics", icon: TrendingUp,    activeClass: "bg-cyan-600 text-white" },
 ] as const
 
 const SETTINGS_GROUPS = [
