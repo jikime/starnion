@@ -5,9 +5,9 @@ import {
   getCategoryColor,
   getDaysSinceContact,
   isDrifting,
-  CATEGORY_LABELS,
 } from '@/lib/connect-data'
 import { AlertTriangle } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 interface GridViewProps {
   connections: Connection[]
@@ -20,6 +20,8 @@ export default function GridView({
   selectedId,
   onSelect,
 }: GridViewProps) {
+  const t = useTranslations('connect')
+
   return (
     <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 p-4 overflow-y-auto h-full content-start">
       {connections.map(conn => {
@@ -84,7 +86,7 @@ export default function GridView({
               className="inline-block text-xs px-2 py-0.5 rounded-full mb-3"
               style={{ backgroundColor: `${color}15`, color }}
             >
-              {conn.company || CATEGORY_LABELS[conn.category]}
+              {conn.company || t(`category.${conn.category}`)}
             </div>
 
             <div className="space-y-1">
@@ -104,12 +106,12 @@ export default function GridView({
 
             <div className="flex items-center justify-between mt-3">
               <span className="text-xs text-muted-foreground">
-                {CATEGORY_LABELS[conn.category]}
+                {t(`category.${conn.category}`)}
               </span>
               <span
                 className={`text-xs font-mono ${drift ? 'text-star-red' : 'text-muted-foreground'}`}
               >
-                {conn.lastContactDate ? `${days}일 전` : '기록 없음'}
+                {conn.lastContactDate ? t('daysAgo', { days }) : t('noRecord')}
               </span>
             </div>
 

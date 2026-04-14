@@ -80,11 +80,14 @@ export function isDrifting(conn: Connection): boolean {
   return getDaysSinceContact(conn.lastContactDate) > conn.contactFrequencyTarget
 }
 
-export function getScoreLabel(score: number): string {
-  if (score >= 0.8) return '매우 가까운 인연'
-  if (score >= 0.6) return '가까운 인연'
-  if (score >= 0.4) return '보통 인연'
-  return '멀어지는 인연'
+/** Translation key (connect.scoreLabel.*) for a numeric connection score. */
+export type ScoreKey = 'veryClose' | 'close' | 'normal' | 'drifting'
+
+export function getScoreKey(score: number): ScoreKey {
+  if (score >= 0.8) return 'veryClose'
+  if (score >= 0.6) return 'close'
+  if (score >= 0.4) return 'normal'
+  return 'drifting'
 }
 
 export function getCategoryColor(category: Category): string {
@@ -98,13 +101,6 @@ export function getCategoryColor(category: Category): string {
     case 'acquaintance':
       return '#a78bfa'
   }
-}
-
-export const CATEGORY_LABELS: Record<Category, string> = {
-  family: '가족',
-  business: '비즈니스',
-  friend: '친구',
-  acquaintance: '지인',
 }
 
 export function validateSocialUrl(platform: SocialPlatform, url: string): boolean {

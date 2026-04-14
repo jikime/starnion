@@ -1,6 +1,7 @@
 'use client'
 
 import { CreditCard, LayoutGrid, List, UserPlus, Users } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 
 type ViewMode = 'list' | 'grid'
@@ -20,11 +21,13 @@ export default function NavBar({
   onAddClick,
   driftCount = 0,
 }: NavBarProps) {
+  const t = useTranslations('connect')
+
   return (
     <header className="flex items-center justify-between px-5 h-14 border-b border-border bg-card/80 backdrop-blur-sm shrink-0">
       <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
         <Users className="size-6 text-blue-500" />
-        인맥
+        {t('title')}
       </h1>
 
       <div className="hidden md:flex items-center gap-1 bg-secondary rounded-lg p-1">
@@ -35,11 +38,11 @@ export default function NavBar({
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
-          aria-label="목록 뷰"
+          aria-label={t('navBar.listView')}
           aria-pressed={viewMode === 'list'}
         >
           <List className="w-3.5 h-3.5" />
-          목록 뷰
+          {t('navBar.listView')}
         </button>
         <button
           onClick={() => onViewChange('grid')}
@@ -48,11 +51,11 @@ export default function NavBar({
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
-          aria-label="카드 뷰"
+          aria-label={t('navBar.gridView')}
           aria-pressed={viewMode === 'grid'}
         >
           <LayoutGrid className="w-3.5 h-3.5" />
-          카드 뷰
+          {t('navBar.gridView')}
         </button>
       </div>
 
@@ -60,7 +63,7 @@ export default function NavBar({
         {driftCount > 0 && (
           <div className="hidden sm:flex items-center gap-1.5 text-xs text-star-red bg-star-red/10 border border-star-red/20 px-2.5 py-1 rounded-full">
             <div className="w-1.5 h-1.5 rounded-full bg-star-red animate-pulse" />
-            {driftCount}명 연락 필요
+            {t('navBar.driftNeeded', { count: driftCount })}
           </div>
         )}
 
@@ -71,7 +74,7 @@ export default function NavBar({
           onClick={onScanClick}
         >
           <CreditCard className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">명함 등록</span>
+          <span className="hidden sm:inline">{t('navBar.scanCard')}</span>
         </Button>
 
         <Button
@@ -80,7 +83,7 @@ export default function NavBar({
           onClick={onAddClick}
         >
           <UserPlus className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">새 인연 추가</span>
+          <span className="hidden sm:inline">{t('navBar.addConnection')}</span>
         </Button>
       </div>
     </header>

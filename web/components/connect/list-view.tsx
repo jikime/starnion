@@ -5,9 +5,9 @@ import {
   getCategoryColor,
   getDaysSinceContact,
   isDrifting,
-  CATEGORY_LABELS,
 } from '@/lib/connect-data'
 import { AlertTriangle, ChevronRight } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 interface ListViewProps {
   connections: Connection[]
@@ -20,11 +20,13 @@ export default function ListView({
   selectedId,
   onSelect,
 }: ListViewProps) {
+  const t = useTranslations('connect')
+
   if (connections.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-8">
-        <p className="text-sm font-medium text-foreground">검색 결과 없음</p>
-        <p className="text-xs text-muted-foreground">다른 키워드나 필터를 시도해보세요</p>
+        <p className="text-sm font-medium text-foreground">{t('empty.noResults')}</p>
+        <p className="text-xs text-muted-foreground">{t('empty.noResultsHint')}</p>
       </div>
     )
   }
@@ -91,7 +93,7 @@ export default function ListView({
                   className="shrink-0 text-xs px-1.5 py-0.5 rounded-full"
                   style={{ backgroundColor: `${color}15`, color }}
                 >
-                  {CATEGORY_LABELS[conn.category]}
+                  {t(`category.${conn.category}`)}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground truncate mt-0.5">
@@ -117,8 +119,8 @@ export default function ListView({
                 className={`text-xs font-mono ${drift ? 'text-star-red' : 'text-muted-foreground'}`}
               >
                 {conn.lastContactDate
-                  ? `${days}일 전`
-                  : '기록 없음'}
+                  ? t('daysAgo', { days })
+                  : t('noRecord')}
               </span>
             </div>
 

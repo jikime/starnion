@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Loader2, UserPlus } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import {
   Dialog,
   DialogContent,
@@ -14,12 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Category, Connection } from '@/lib/connect-data'
 import { createConnection, ConnectApiError } from '@/lib/connect-api'
 
-const CATEGORY_OPTIONS: { value: Category; label: string }[] = [
-  { value: 'business', label: '비즈니스' },
-  { value: 'friend', label: '친구' },
-  { value: 'family', label: '가족' },
-  { value: 'acquaintance', label: '지인' },
-]
+const CATEGORY_OPTIONS: Category[] = ['business', 'friend', 'family', 'acquaintance']
 
 interface NewConnectionDialogProps {
   open: boolean
@@ -32,6 +28,9 @@ export default function NewConnectionDialog({
   onOpenChange,
   onCreated,
 }: NewConnectionDialogProps) {
+  const t = useTranslations('connect.newDialog')
+  const tc = useTranslations('connect.category')
+
   const [name, setName] = useState('')
   const [category, setCategory] = useState<Category>('acquaintance')
   const [email, setEmail] = useState('')
@@ -55,7 +54,7 @@ export default function NewConnectionDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) {
-      setError('이름은 필수 입력입니다')
+      setError(t('nameRequired'))
       return
     }
     setSubmitting(true)
@@ -76,7 +75,7 @@ export default function NewConnectionDialog({
       if (err instanceof ConnectApiError) {
         setError(err.message)
       } else {
-        setError('인맥을 추가하지 못했습니다')
+        setError(t('createFailed'))
       }
     } finally {
       setSubmitting(false)
@@ -96,20 +95,21 @@ export default function NewConnectionDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <UserPlus className="w-4 h-4 text-primary" />새 인연 추가
+            <UserPlus className="w-4 h-4 text-primary" />
+            {t('title')}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label htmlFor="new-conn-name" className="text-xs text-muted-foreground">
-              이름 *
+              {t('name')}
             </label>
             <Input
               id="new-conn-name"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="홍길동"
+              placeholder={t('namePlaceholder')}
               required
               autoFocus
               disabled={submitting}
@@ -117,21 +117,21 @@ export default function NewConnectionDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs text-muted-foreground">카테고리</label>
+            <label className="text-xs text-muted-foreground">{t('category')}</label>
             <div className="flex flex-wrap gap-1.5">
-              {CATEGORY_OPTIONS.map(opt => (
+              {CATEGORY_OPTIONS.map(value => (
                 <button
                   type="button"
-                  key={opt.value}
-                  onClick={() => setCategory(opt.value)}
+                  key={value}
+                  onClick={() => setCategory(value)}
                   disabled={submitting}
                   className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                    category === opt.value
+                    category === value
                       ? 'border-primary/50 bg-primary/10 text-primary'
                       : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
                   }`}
                 >
-                  {opt.label}
+                  {tc(value)}
                 </button>
               ))}
             </div>
@@ -140,25 +140,25 @@ export default function NewConnectionDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor="new-conn-role" className="text-xs text-muted-foreground">
-                직함
+                {t('role')}
               </label>
               <Input
                 id="new-conn-role"
                 value={role}
                 onChange={e => setRole(e.target.value)}
-                placeholder="디자이너"
+                placeholder={t('rolePlaceholder')}
                 disabled={submitting}
               />
             </div>
             <div className="space-y-1.5">
               <label htmlFor="new-conn-company" className="text-xs text-muted-foreground">
-                회사
+                {t('company')}
               </label>
               <Input
                 id="new-conn-company"
                 value={company}
                 onChange={e => setCompany(e.target.value)}
-                placeholder="스타니온"
+                placeholder={t('companyPlaceholder')}
                 disabled={submitting}
               />
             </div>
@@ -166,27 +166,27 @@ export default function NewConnectionDialog({
 
           <div className="space-y-1.5">
             <label htmlFor="new-conn-email" className="text-xs text-muted-foreground">
-              이메일
+              {t('email')}
             </label>
             <Input
               id="new-conn-email"
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="hong@example.com"
+              placeholder={t('emailPlaceholder')}
               disabled={submitting}
             />
           </div>
 
           <div className="space-y-1.5">
             <label htmlFor="new-conn-phone" className="text-xs text-muted-foreground">
-              전화번호
+              {t('phone')}
             </label>
             <Input
               id="new-conn-phone"
               value={phone}
               onChange={e => setPhone(e.target.value)}
-              placeholder="010-0000-0000"
+              placeholder={t('phonePlaceholder')}
               disabled={submitting}
             />
           </div>
@@ -207,7 +207,7 @@ export default function NewConnectionDialog({
               }}
               disabled={submitting}
             >
-              취소
+              {t('cancel')}
             </Button>
             <Button
               type="submit"
@@ -215,7 +215,7 @@ export default function NewConnectionDialog({
               className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {submitting && <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />}
-              추가
+              {t('add')}
             </Button>
           </DialogFooter>
         </form>

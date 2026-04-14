@@ -20,6 +20,7 @@ import {
   PhoneCall,
   Save,
 } from 'lucide-react'
+import { useLocale, useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -36,9 +37,8 @@ import {
   Connection,
   getDaysSinceContact,
   isDrifting,
-  getScoreLabel,
+  getScoreKey,
   getCategoryColor,
-  CATEGORY_LABELS,
   SocialPlatform,
 } from '@/lib/connect-data'
 import SnsSection from '@/components/connect/sns-section'
@@ -70,6 +70,9 @@ export default function PersonaCard({
   snsEditOpen,
   onSnsEditOpenChange,
 }: PersonaCardProps) {
+  const t = useTranslations('connect')
+  const locale = useLocale()
+  const dateLocale = locale === 'ko' ? 'ko-KR' : locale === 'ja' ? 'ja-JP' : locale === 'zh' ? 'zh-CN' : 'en-US'
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [touching, setTouching] = useState(false)
@@ -112,7 +115,7 @@ export default function PersonaCard({
     if (!onSubmitContextNotes) return
     const draft = notesDraft.trim()
     if (draft.length > CONTEXT_NOTES_MAX) {
-      setNotesError(`${CONTEXT_NOTES_MAX.toLocaleString()}자 이내로 입력해주세요`)
+      setNotesError(t('personaCard.memoLengthExceeded', { max: CONTEXT_NOTES_MAX }))
       return
     }
     setNotesSaving(true)
@@ -121,7 +124,7 @@ export default function PersonaCard({
       await onSubmitContextNotes(connection.id, draft)
       setNotesEditing(false)
     } catch (err) {
-      setNotesError(err instanceof Error ? err.message : '저장에 실패했습니다')
+      setNotesError(err instanceof Error ? err.message : t('personaCard.memoSaveFailed'))
     } finally {
       setNotesSaving(false)
     }
@@ -197,8 +200,8 @@ export default function PersonaCard({
               onClick={handleTouchClick}
               disabled={touching}
               className="text-muted-foreground hover:text-primary"
-              aria-label="오늘 연락함"
-              title="오늘 연락함"
+              aria-label={t('personaCard.touch')}
+              title={t('personaCard.touch')}
             >
               {touching ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -213,8 +216,8 @@ export default function PersonaCard({
               size="icon"
               onClick={onEdit}
               className="text-muted-foreground hover:text-foreground"
-              aria-label="인연 편집"
-              title="편집"
+              aria-label={t('personaCard.edit')}
+              title={t('personaCard.edit')}
             >
               <Pencil className="w-4 h-4" />
             </Button>
@@ -225,8 +228,8 @@ export default function PersonaCard({
               size="icon"
               onClick={() => setDeleteOpen(true)}
               className="text-muted-foreground hover:text-star-red"
-              aria-label="인연 삭제"
-              title="삭제"
+              aria-label={t('personaCard.delete')}
+              title={t('personaCard.delete')}
             >
               <Trash2 className="w-4 h-4" />
             </Button>
@@ -236,7 +239,7 @@ export default function PersonaCard({
             size="icon"
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground"
-            aria-label="닫기"
+            aria-label={t('personaCard.close')}
           >
             <X className="w-4 h-4" />
           </Button>
@@ -246,14 +249,13 @@ export default function PersonaCard({
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{connection.name} 삭제</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteDialog.title', { name: connection.name })}</AlertDialogTitle>
             <AlertDialogDescription>
-              정말 삭제하시겠어요? 이 인연과 관련된 활동 기록도 함께 삭제되며,
-              이 작업은 되돌릴 수 없습니다.
+              {t('deleteDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>취소</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t('deleteDialog.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={e => {
                 e.preventDefault()
@@ -263,7 +265,7 @@ export default function PersonaCard({
               className="bg-star-red text-white hover:bg-star-red/90"
             >
               {deleting && <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />}
-              삭제
+              {t('deleteDialog.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -273,7 +275,7 @@ export default function PersonaCard({
       <div className="px-5 py-4 border-b border-border">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs text-muted-foreground uppercase tracking-wider font-mono">
-            Connection Score
+            {t('personaCard.connectionScore')}
           </span>
           <span className="text-sm font-mono" style={{ color }}>
             {scorePercent}
@@ -286,7 +288,7 @@ export default function PersonaCard({
           />
         </div>
         <p className="text-xs text-muted-foreground mt-1.5">
-          {getScoreLabel(connection.connectionScore)}
+          {t(`scoreLabel.${getScoreKey(connection.connectionScore)}`)}
         </p>
       </div>
 
@@ -295,9 +297,9 @@ export default function PersonaCard({
         <div className="mx-5 mt-4 flex items-start gap-2 rounded-lg border border-star-red/30 bg-star-red/10 px-3 py-2.5">
           <div className="w-1.5 h-1.5 rounded-full bg-star-red mt-1 shrink-0" />
           <div>
-            <p className="text-xs text-star-red font-medium">연락이 멀어지고 있어요</p>
+            <p className="text-xs text-star-red font-medium">{t('personaCard.driftTitle')}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              마지막 연락 {days}일 전 · 목표 {connection.contactFrequencyTarget}일 주기
+              {t('personaCard.driftBody', { days, target: connection.contactFrequencyTarget })}
             </p>
           </div>
         </div>
@@ -306,7 +308,7 @@ export default function PersonaCard({
       {/* Contact info */}
       <div className="px-5 pt-4 space-y-2">
         <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono mb-3">
-          연락처
+          {t('personaCard.contactInfo')}
         </p>
         {connection.email ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -323,13 +325,13 @@ export default function PersonaCard({
         {connection.birthday && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="w-3.5 h-3.5 shrink-0" />
-            <span>생일: {connection.birthday}</span>
+            <span>{t('personaCard.birthdayWithDate', { date: connection.birthday })}</span>
           </div>
         )}
         {connection.meetingLocation && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="w-3.5 h-3.5 shrink-0" />
-            <span>{connection.meetingLocation}에서 만남</span>
+            <span>{t('personaCard.meetingAt', { place: connection.meetingLocation })}</span>
           </div>
         )}
       </div>
@@ -349,7 +351,7 @@ export default function PersonaCard({
           style={{ backgroundColor: `${color}20`, color }}
         >
           <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
-          {CATEGORY_LABELS[connection.category]}
+          {t(`category.${connection.category}`)}
         </span>
       </div>
 
@@ -359,7 +361,7 @@ export default function PersonaCard({
           <div className="flex items-center gap-1.5 mb-2">
             <Tag className="w-3 h-3 text-muted-foreground" />
             <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono">
-              태그
+              {t('personaCard.tags')}
             </p>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -379,17 +381,17 @@ export default function PersonaCard({
       <div className="px-5 pt-4">
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono">
-            Context Memo
+            {t('personaCard.contextMemo')}
           </p>
           {onSubmitContextNotes && !notesEditing && (
             <button
               type="button"
               onClick={() => setNotesEditing(true)}
               className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
-              aria-label="메모 편집"
+              aria-label={t('personaCard.editMemo')}
             >
               <Pencil className="w-3 h-3" />
-              편집
+              {t('personaCard.edit')}
             </button>
           )}
         </div>
@@ -401,7 +403,7 @@ export default function PersonaCard({
               maxLength={CONTEXT_NOTES_MAX}
               disabled={notesSaving}
               rows={5}
-              placeholder="이 분의 특징, 취향, 기억할 만한 것을 적어두세요..."
+              placeholder={t('personaCard.memoPlaceholder')}
               className="w-full text-sm text-foreground bg-secondary/50 rounded-lg p-3 border border-border focus:outline-none focus:ring-1 focus:ring-primary/50 resize-y leading-relaxed"
               autoFocus
             />
@@ -428,7 +430,7 @@ export default function PersonaCard({
                   }}
                   disabled={notesSaving}
                 >
-                  취소
+                  {t('personaCard.memoCancel')}
                 </Button>
                 <Button
                   type="button"
@@ -442,7 +444,7 @@ export default function PersonaCard({
                   ) : (
                     <Save className="w-3 h-3 mr-1" />
                   )}
-                  저장
+                  {t('personaCard.memoSave')}
                 </Button>
               </div>
             </div>
@@ -455,7 +457,7 @@ export default function PersonaCard({
             {connection.contextNotes}
           </p>
         ) : (
-          <p className="text-xs text-muted-foreground/60 italic">메모 없음</p>
+          <p className="text-xs text-muted-foreground/60 italic">{t('personaCard.noMemo')}</p>
         )}
       </div>
 
@@ -465,16 +467,14 @@ export default function PersonaCard({
           <div className="flex items-center gap-1.5">
             <CreditCard className="w-3 h-3 text-muted-foreground" />
             <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono">
-              명함
+              {t('personaCard.businessCard')}
             </p>
           </div>
           {connection.businessCard?.scannedAt && (
             <div className="flex items-center gap-1">
               <ScanLine className="w-2.5 h-2.5 text-muted-foreground/50" />
               <span className="text-[10px] text-muted-foreground/50 font-mono">
-                {new Date(connection.businessCard.scannedAt).toLocaleDateString(
-                  'ko-KR'
-                )}
+                {new Date(connection.businessCard.scannedAt).toLocaleDateString(dateLocale)}
               </span>
             </div>
           )}
@@ -486,12 +486,12 @@ export default function PersonaCard({
               <button
                 className="group relative w-full block"
                 onClick={() => setLightboxOpen(true)}
-                aria-label="명함 이미지 크게 보기"
+                aria-label={t('personaCard.cardEnlarge')}
               >
                 <div className="relative w-full aspect-[1.75/1] overflow-hidden bg-muted">
                   <Image
                     src={connection.businessCard.imageUrl}
-                    alt={`${connection.name} 명함`}
+                    alt={`${connection.name} ${t('personaCard.businessCard')}`}
                     fill
                     className="object-cover transition-transform duration-300 group-hover:scale-105"
                   />
@@ -506,7 +506,7 @@ export default function PersonaCard({
               <div className="w-full aspect-[1.75/1] bg-muted flex items-center justify-center">
                 <div className="text-center space-y-1">
                   <CreditCard className="w-8 h-8 text-muted-foreground/30 mx-auto" />
-                  <p className="text-[10px] text-muted-foreground/40">이미지 없음</p>
+                  <p className="text-[10px] text-muted-foreground/40">{t('personaCard.noImage')}</p>
                 </div>
               </div>
             )}
@@ -554,7 +554,7 @@ export default function PersonaCard({
         ) : (
           <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/60 py-5 px-3 text-center">
             <CreditCard className="w-6 h-6 text-muted-foreground/40" />
-            <p className="text-xs text-muted-foreground/60">등록된 명함이 없습니다</p>
+            <p className="text-xs text-muted-foreground/60">{t('personaCard.noBusinessCard')}</p>
           </div>
         )}
       </div>
@@ -565,13 +565,13 @@ export default function PersonaCard({
           className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-6"
           onClick={() => setLightboxOpen(false)}
           role="dialog"
-          aria-label="명함 이미지 확대"
+          aria-label={t('personaCard.lightboxAria')}
           aria-modal="true"
         >
           <button
             className="absolute top-4 right-4 p-2 rounded-full bg-secondary border border-border text-foreground hover:bg-muted transition-colors"
             onClick={() => setLightboxOpen(false)}
-            aria-label="닫기"
+            aria-label={t('personaCard.close')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -581,7 +581,7 @@ export default function PersonaCard({
           >
             <Image
               src={connection.businessCard.imageUrl}
-              alt={`${connection.name} 명함 확대`}
+              alt={t('personaCard.cardAltLarge', { name: connection.name })}
               width={680}
               height={388}
               className="w-full h-auto"

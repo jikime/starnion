@@ -28,42 +28,45 @@ import {
   type ListConnectionsQuery,
 } from '@/lib/connect-api'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import { Search, SlidersHorizontal, Bell, Loader2 } from 'lucide-react'
 
 type ViewMode = 'list' | 'grid'
 type SortMode = ListConnectionsQuery['sort']
+type NonEmptySort = Exclude<SortMode, undefined>
 type RightPanel = 'reminders' | 'persona'
 
-const SORT_LABELS: Record<Exclude<SortMode, undefined>, string> = {
-  score_desc: '연결도순',
-  name_asc: '이름순',
-  last_contact_desc: '최근 연락순',
-  last_contact_asc: '오래된 연락순',
-  created_desc: '최근 등록순',
-}
+const SORT_OPTIONS: NonEmptySort[] = [
+  'score_desc',
+  'name_asc',
+  'last_contact_desc',
+  'last_contact_asc',
+  'created_desc',
+]
 
-const CATEGORY_FILTER_LABELS: Record<Category | 'all', string> = {
-  all: '전체',
-  business: '비즈니스',
-  friend: '친구',
-  family: '가족',
-  acquaintance: '지인',
-}
+const CATEGORY_FILTER_OPTIONS: (Category | 'all')[] = [
+  'all',
+  'business',
+  'friend',
+  'family',
+  'acquaintance',
+]
 
-const DEFAULT_SORT: Exclude<SortMode, undefined> = 'score_desc'
+const DEFAULT_SORT: NonEmptySort = 'score_desc'
 
 export default function ConnectPage() {
+  const t = useTranslations('connect')
   const router = useRouter()
   const searchParams = useSearchParams()
 
   const urlCategory = (searchParams.get('category') as Category | null) ?? null
-  const urlSort = (searchParams.get('sort') as Exclude<SortMode, undefined> | null) ?? null
+  const urlSort = (searchParams.get('sort') as NonEmptySort | null) ?? null
   const urlQ = searchParams.get('q') ?? ''
 
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState(urlQ)
-  const [sortMode, setSortMode] = useState<Exclude<SortMode, undefined>>(
+  const [sortMode, setSortMode] = useState<NonEmptySort>(
     urlSort ?? DEFAULT_SORT
   )
   const [filterCategory, setFilterCategory] = useState<Category | 'all'>(
@@ -116,7 +119,7 @@ export default function ConnectPage() {
         if (err instanceof ConnectApiError) {
           setLoadError(err.message)
         } else {
-          setLoadError('인맥 목록을 불러오지 못했습니다')
+          setLoadError(t('empty.loadFailed'))
         }
       })
       .finally(() => {
@@ -197,7 +200,7 @@ export default function ConnectPage() {
       if (err instanceof ConnectApiError) {
         throw err
       }
-      throw new Error('명함 저장에 실패했습니다')
+      throw new Error(t('toasts.scanSaveFailed'))
     }
   }
 
@@ -223,14 +226,14 @@ export default function ConnectPage() {
         : null
       toast.success(
         daysSince !== null
-          ? `${updated.name}님과 ${daysSince}일 만의 연락이에요`
-          : `${updated.name}님과 첫 연락 기록이 추가되었어요`
+          ? t('toasts.touched', { name: updated.name, days: daysSince })
+          : t('toasts.touchedFirst', { name: updated.name })
       )
     } catch (err) {
       if (err instanceof ConnectApiError) {
         toast.error(err.message)
       } else {
-        toast.error('연락 기록 저장에 실패했습니다')
+        toast.error(t('toasts.touchFailed'))
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -240,7 +243,7 @@ export default function ConnectPage() {
     async (id: string, notes: string) => {
       const updated = await updateContextNotes(id, notes)
       handleConnectionUpdated(updated)
-      toast.success('메모를 저장했습니다')
+      toast.success(t('toasts.memoSaved'))
     },
     [handleConnectionUpdated]
   )
@@ -255,7 +258,7 @@ export default function ConnectPage() {
       if (err instanceof ConnectApiError) {
         setLoadError(err.message)
       } else {
-        setLoadError('삭제에 실패했습니다')
+        setLoadError(t('toasts.deleteFailed'))
       }
       throw err
     }
@@ -287,9 +290,9 @@ export default function ConnectPage() {
             type="search"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="이름 검색..."
+            placeholder={t('searchPlaceholder')}
             className="w-full h-8 pl-8 pr-3 text-xs bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
-            aria-label="인맥 검색"
+            aria-label={t('empty.searchAria')}
           />
         </div>
 
@@ -303,16 +306,16 @@ export default function ConnectPage() {
           aria-expanded={showFilters}
         >
           <SlidersHorizontal className="w-3.5 h-3.5" />
-          필터
+          {t('filter')}
           {filterCategory !== 'all' && (
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
           )}
         </button>
 
         <div className="hidden sm:flex items-center gap-4 ml-auto">
-          <StatBadge label="전체" value={connections.length} />
+          <StatBadge label={t('toolbar.total')} value={connections.length} />
           <StatBadge
-            label="연락 필요"
+            label={t('toolbar.needContact')}
             value={nudgeCount}
             color={nudgeCount > 0 ? 'var(--star-red)' : undefined}
           />
@@ -327,7 +330,7 @@ export default function ConnectPage() {
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            인물 카드
+            {t('toolbar.personCard')}
           </button>
           <button
             onClick={() => setRightPanel('reminders')}
@@ -337,7 +340,7 @@ export default function ConnectPage() {
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            리마인더
+            {t('toolbar.reminders')}
             {nudgeCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-star-gold rounded-full" />
             )}
@@ -349,32 +352,28 @@ export default function ConnectPage() {
       {showFilters && (
         <div className="flex items-center gap-6 px-5 py-2 border-b border-border bg-card/20 shrink-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground shrink-0">카테고리</span>
+            <span className="text-xs text-muted-foreground shrink-0">{t('categoryLabel')}</span>
             <div className="flex items-center gap-1">
-              {(Object.entries(CATEGORY_FILTER_LABELS) as [Category | 'all', string][]).map(
-                ([cat, label]) => (
-                  <button
-                    key={cat}
-                    onClick={() => setFilterCategory(cat)}
-                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                      filterCategory === cat
-                        ? 'border-primary/50 bg-primary/10 text-primary'
-                        : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                )
-              )}
+              {CATEGORY_FILTER_OPTIONS.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setFilterCategory(cat)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    filterCategory === cat
+                      ? 'border-primary/50 bg-primary/10 text-primary'
+                      : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
+                  }`}
+                >
+                  {t(`category.${cat}`)}
+                </button>
+              ))}
             </div>
           </div>
 
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground shrink-0">정렬</span>
+            <span className="text-xs text-muted-foreground shrink-0">{t('sort.label')}</span>
             <div className="flex items-center gap-1">
-              {(
-                Object.entries(SORT_LABELS) as [Exclude<SortMode, undefined>, string][]
-              ).map(([mode, label]) => (
+              {SORT_OPTIONS.map(mode => (
                 <button
                   key={mode}
                   onClick={() => setSortMode(mode)}
@@ -384,7 +383,7 @@ export default function ConnectPage() {
                       : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
                   }`}
                 >
-                  {label}
+                  {t(`sort.${mode}`)}
                 </button>
               ))}
             </div>
@@ -397,7 +396,7 @@ export default function ConnectPage() {
           {loading ? (
             <div className="flex items-center justify-center h-full gap-2 text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">불러오는 중...</span>
+              <span className="text-sm">{t('empty.loading')}</span>
             </div>
           ) : loadError ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-8">
@@ -405,18 +404,18 @@ export default function ConnectPage() {
                 {loadError}
               </p>
               <p className="text-xs text-muted-foreground">
-                잠시 후 다시 시도해주세요
+                {t('empty.loadRetry')}
               </p>
             </div>
           ) : connections.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-8">
               <p className="text-sm font-medium text-foreground">
                 {searchQuery || filterCategory !== 'all'
-                  ? '필터에 해당하는 인연이 없습니다'
-                  : '아직 등록된 인연이 없습니다'}
+                  ? t('empty.noFiltered')
+                  : t('empty.noConnections')}
               </p>
               <p className="text-xs text-muted-foreground">
-                명함 스캔으로 새 인연을 추가해보세요
+                {t('empty.scanCta')}
               </p>
             </div>
           ) : viewMode === 'list' ? (
@@ -436,7 +435,7 @@ export default function ConnectPage() {
 
         <aside
           className="hidden lg:flex flex-col w-80 xl:w-96 2xl:w-[28rem] shrink-0 border-l border-border bg-card/50 overflow-hidden"
-          aria-label={rightPanel === 'persona' ? '인물 상세 정보' : '스마트 리마인더'}
+          aria-label={rightPanel === 'persona' ? t('empty.personaAria') : t('empty.remindersAria')}
         >
           {rightPanel === 'persona' ? (
             selectedConnection ? (
@@ -513,22 +512,25 @@ function StatBadge({
 }
 
 function EmptyPersona({ onScanClick }: { onScanClick: () => void }) {
+  const t = useTranslations('connect.empty')
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 px-6 text-center">
       <div className="w-12 h-12 rounded-full border border-border bg-secondary flex items-center justify-center">
         <Bell className="w-5 h-5 text-muted-foreground" />
       </div>
       <div>
-        <p className="text-sm font-medium text-foreground">인물을 선택하세요</p>
+        <p className="text-sm font-medium text-foreground">{t('title')}</p>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-          목록이나 카드에서 인연을 클릭하면<br />상세 정보가 여기에 표시됩니다
+          {t('bodyLine1')}
+          <br />
+          {t('bodyLine2')}
         </p>
       </div>
       <button
         onClick={onScanClick}
         className="text-xs text-primary/70 hover:text-primary underline underline-offset-2 transition-colors"
       >
-        명함을 스캔하여 새 인연 추가하기
+        {t('scanCta')}
       </button>
     </div>
   )

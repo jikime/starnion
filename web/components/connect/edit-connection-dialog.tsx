@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2, Pencil, Upload, X } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import {
   Dialog,
   DialogContent,
@@ -19,21 +20,16 @@ import {
   type UpdateConnectionPatch,
 } from '@/lib/connect-api'
 
-const CATEGORY_OPTIONS: { value: Category; label: string }[] = [
-  { value: 'business', label: '비즈니스' },
-  { value: 'friend', label: '친구' },
-  { value: 'family', label: '가족' },
-  { value: 'acquaintance', label: '지인' },
-]
+const CATEGORY_OPTIONS: Category[] = ['business', 'friend', 'family', 'acquaintance']
 
-const FREQUENCY_OPTIONS = [
-  { value: 7, label: '매주' },
-  { value: 14, label: '2주마다' },
-  { value: 30, label: '월 1회' },
-  { value: 60, label: '2개월마다' },
-  { value: 90, label: '분기별' },
-  { value: 180, label: '반년에 한 번' },
-  { value: 365, label: '연 1회' },
+const FREQUENCY_OPTIONS: { value: number; key: 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual' }[] = [
+  { value: 7, key: 'weekly' },
+  { value: 14, key: 'biweekly' },
+  { value: 30, key: 'monthly' },
+  { value: 60, key: 'bimonthly' },
+  { value: 90, key: 'quarterly' },
+  { value: 180, key: 'semiannual' },
+  { value: 365, key: 'annual' },
 ]
 
 interface EditConnectionDialogProps {
@@ -49,6 +45,10 @@ export default function EditConnectionDialog({
   connection,
   onUpdated,
 }: EditConnectionDialogProps) {
+  const t = useTranslations('connect.editDialog')
+  const tc = useTranslations('connect.category')
+  const tf = useTranslations('connect.frequency')
+
   const [name, setName] = useState(connection.name)
   const [category, setCategory] = useState<Category>(connection.category)
   const [role, setRole] = useState(connection.role)
@@ -94,7 +94,7 @@ export default function EditConnectionDialog({
 
   const handleAttachCard = async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      setError('이미지 파일만 업로드할 수 있습니다')
+      setError(t('imageOnly'))
       return
     }
     setUploading(true)
@@ -105,16 +105,16 @@ export default function EditConnectionDialog({
       const res = await fetch('/api/upload', { method: 'POST', body: form })
       if (!res.ok) {
         const body = await res.json().catch(() => null)
-        throw new Error(body?.error ?? `업로드 실패 (${res.status})`)
+        throw new Error(body?.error ?? t('uploadFailed', { status: res.status }))
       }
       const data = (await res.json()) as { url?: string }
-      if (!data?.url) throw new Error('업로드 응답에 URL이 없습니다')
+      if (!data?.url) throw new Error(t('uploadNoUrl'))
       const updated = await attachBusinessCard(connection.id, {
         image_url: data.url,
       })
       onUpdated(updated)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '명함 첨부 실패'
+      const msg = err instanceof Error ? err.message : t('attachFailed')
       setError(msg)
     } finally {
       setUploading(false)
@@ -124,7 +124,7 @@ export default function EditConnectionDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) {
-      setError('이름은 필수 입력입니다')
+      setError(t('nameRequired'))
       return
     }
     setSubmitting(true)
@@ -165,7 +165,7 @@ export default function EditConnectionDialog({
       if (err instanceof ConnectApiError) {
         setError(err.message)
       } else {
-        setError('수정에 실패했습니다')
+        setError(t('updateFailed'))
       }
     } finally {
       setSubmitting(false)
@@ -183,14 +183,14 @@ export default function EditConnectionDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Pencil className="w-4 h-4 text-primary" />
-            인연 정보 편집
+            {t('title')}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label htmlFor="edit-name" className="text-xs text-muted-foreground">
-              이름 *
+              {t('name')}
             </label>
             <Input
               id="edit-name"
@@ -202,21 +202,21 @@ export default function EditConnectionDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs text-muted-foreground">카테고리</label>
+            <label className="text-xs text-muted-foreground">{t('category')}</label>
             <div className="flex flex-wrap gap-1.5">
-              {CATEGORY_OPTIONS.map(opt => (
+              {CATEGORY_OPTIONS.map(value => (
                 <button
                   type="button"
-                  key={opt.value}
-                  onClick={() => setCategory(opt.value)}
+                  key={value}
+                  onClick={() => setCategory(value)}
                   disabled={submitting}
                   className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                    category === opt.value
+                    category === value
                       ? 'border-primary/50 bg-primary/10 text-primary'
                       : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
                   }`}
                 >
-                  {opt.label}
+                  {tc(value)}
                 </button>
               ))}
             </div>
@@ -225,7 +225,7 @@ export default function EditConnectionDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor="edit-role" className="text-xs text-muted-foreground">
-                직함
+                {t('role')}
               </label>
               <Input
                 id="edit-role"
@@ -236,7 +236,7 @@ export default function EditConnectionDialog({
             </div>
             <div className="space-y-1.5">
               <label htmlFor="edit-company" className="text-xs text-muted-foreground">
-                회사
+                {t('company')}
               </label>
               <Input
                 id="edit-company"
@@ -250,7 +250,7 @@ export default function EditConnectionDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor="edit-email" className="text-xs text-muted-foreground">
-                이메일
+                {t('email')}
               </label>
               <Input
                 id="edit-email"
@@ -262,7 +262,7 @@ export default function EditConnectionDialog({
             </div>
             <div className="space-y-1.5">
               <label htmlFor="edit-phone" className="text-xs text-muted-foreground">
-                전화번호
+                {t('phone')}
               </label>
               <Input
                 id="edit-phone"
@@ -276,7 +276,7 @@ export default function EditConnectionDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor="edit-birthday" className="text-xs text-muted-foreground">
-                생일
+                {t('birthday')}
               </label>
               <Input
                 id="edit-birthday"
@@ -288,13 +288,13 @@ export default function EditConnectionDialog({
             </div>
             <div className="space-y-1.5">
               <label htmlFor="edit-meeting" className="text-xs text-muted-foreground">
-                만난 장소
+                {t('meetingLocation')}
               </label>
               <Input
                 id="edit-meeting"
                 value={meetingLocation}
                 onChange={e => setMeetingLocation(e.target.value)}
-                placeholder="예: COEX 컨퍼런스"
+                placeholder={t('meetingPlaceholder')}
                 disabled={submitting}
               />
             </div>
@@ -302,7 +302,7 @@ export default function EditConnectionDialog({
 
           <div className="space-y-1.5">
             <label className="text-xs text-muted-foreground">
-              연락 주기 목표
+              {t('contactFrequency')}
             </label>
             <div className="flex flex-wrap gap-1.5">
               {FREQUENCY_OPTIONS.map(opt => (
@@ -317,26 +317,26 @@ export default function EditConnectionDialog({
                       : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
                   }`}
                 >
-                  {opt.label}
+                  {tf(opt.key)}
                 </button>
               ))}
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs text-muted-foreground">태그</label>
+            <label className="text-xs text-muted-foreground">{t('tags')}</label>
             <div className="flex flex-wrap gap-1.5 mb-2">
-              {tags.map(t => (
+              {tags.map(tag => (
                 <span
-                  key={t}
+                  key={tag}
                   className="flex items-center gap-1 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded text-xs text-primary"
                 >
-                  {t}
+                  {tag}
                   <button
                     type="button"
-                    onClick={() => setTags(ts => ts.filter(x => x !== t))}
+                    onClick={() => setTags(ts => ts.filter(x => x !== tag))}
                     className="hover:text-star-red"
-                    aria-label={`${t} 태그 제거`}
+                    aria-label={t('tagRemoveAria', { tag })}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -353,7 +353,7 @@ export default function EditConnectionDialog({
                     addTag()
                   }
                 }}
-                placeholder="태그 추가..."
+                placeholder={t('tagPlaceholder')}
                 className="h-8 text-xs"
                 disabled={submitting}
               />
@@ -365,7 +365,7 @@ export default function EditConnectionDialog({
                 onClick={addTag}
                 disabled={submitting}
               >
-                추가
+                {t('tagAdd')}
               </Button>
             </div>
           </div>
@@ -373,9 +373,9 @@ export default function EditConnectionDialog({
           {/* Business card attach */}
           <div className="space-y-1.5 border-t border-border pt-4">
             <label className="text-xs text-muted-foreground flex items-center justify-between">
-              <span>명함 이미지</span>
+              <span>{t('businessCardLabel')}</span>
               {connection.businessCard?.imageUrl && (
-                <span className="text-primary/70 text-xs">이미 첨부됨</span>
+                <span className="text-primary/70 text-xs">{t('alreadyAttached')}</span>
               )}
             </label>
             <label
@@ -388,14 +388,14 @@ export default function EditConnectionDialog({
               {uploading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  업로드 중...
+                  {t('uploading')}
                 </>
               ) : (
                 <>
                   <Upload className="w-4 h-4" />
                   {connection.businessCard?.imageUrl
-                    ? '명함 이미지 교체'
-                    : '명함 이미지 업로드'}
+                    ? t('replaceCard')
+                    : t('uploadCard')}
                 </>
               )}
               <input
@@ -425,7 +425,7 @@ export default function EditConnectionDialog({
               onClick={() => onOpenChange(false)}
               disabled={submitting || uploading}
             >
-              취소
+              {t('cancel')}
             </Button>
             <Button
               type="submit"
@@ -433,7 +433,7 @@ export default function EditConnectionDialog({
               className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {submitting && <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />}
-              저장
+              {t('save')}
             </Button>
           </DialogFooter>
         </form>

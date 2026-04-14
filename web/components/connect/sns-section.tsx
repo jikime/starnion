@@ -12,6 +12,7 @@ import {
   X,
   Check,
 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import {
   SOCIAL_PLATFORMS,
   SOCIAL_PLATFORM_LABELS,
@@ -42,18 +43,19 @@ export default function SnsSection({
   onEditOpenChange,
   onSubmit,
 }: SnsSectionProps) {
+  const t = useTranslations('connect.sns')
   return (
     <div className="px-5 pt-4">
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono">
-          SNS
+          {t('section')}
         </p>
         <button
           type="button"
           onClick={() => onEditOpenChange(!editOpen)}
           className="text-[11px] text-primary/70 hover:text-primary underline underline-offset-2 transition-colors"
         >
-          {editOpen ? '닫기' : '편집'}
+          {editOpen ? t('cancel') : t('edit')}
         </button>
       </div>
 
@@ -80,11 +82,13 @@ function SnsRows({
   profiles: SocialProfiles
   onAdd: () => void
 }) {
+  const t = useTranslations('connect.sns')
   return (
     <div className="flex flex-col divide-y divide-border/60 rounded-lg border border-border bg-secondary/30">
       {SOCIAL_PLATFORMS.map(platform => {
         const url = profiles[platform] ?? null
         const Icon = ICON_MAP[platform]
+        const label = SOCIAL_PLATFORM_LABELS[platform]
         if (url) {
           return (
             <a
@@ -93,11 +97,11 @@ function SnsRows({
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2.5 px-3 py-2 hover:bg-secondary/60 transition-colors"
-              aria-label={`${SOCIAL_PLATFORM_LABELS[platform]} 프로필 열기`}
+              aria-label={`${label} profile`}
             >
               <Icon className="w-3.5 h-3.5 text-foreground shrink-0" />
               <span className="text-xs text-foreground w-16 shrink-0">
-                {SOCIAL_PLATFORM_LABELS[platform]}
+                {label}
               </span>
               <span className="text-xs text-primary/80 truncate">{url}</span>
             </a>
@@ -112,11 +116,11 @@ function SnsRows({
           >
             <Icon className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
             <span className="text-xs text-muted-foreground/80 w-16 shrink-0">
-              {SOCIAL_PLATFORM_LABELS[platform]}
+              {label}
             </span>
             <span className="flex items-center gap-1 text-xs text-muted-foreground/60">
               <Plus className="w-3 h-3" />
-              추가
+              {t('add')}
             </span>
           </button>
         )
@@ -172,11 +176,13 @@ function SnsEditForm({
     })
   }, [initial])
 
+  const t = useTranslations('connect.sns')
+
   const errors: Partial<Record<SocialPlatform, string>> = {}
   for (const p of SOCIAL_PLATFORMS) {
     const v = values[p].trim()
     if (v && !validateSocialUrl(p, v)) {
-      errors[p] = `${SOCIAL_PLATFORM_LABELS[p]} URL 형식이 올바르지 않습니다`
+      errors[p] = t('invalidPlatformUrl', { platform: SOCIAL_PLATFORM_LABELS[p] })
     }
   }
   const hasErrors = Object.keys(errors).length > 0
@@ -208,7 +214,7 @@ function SnsEditForm({
       await onSubmit(patch)
     } catch (err) {
       if (err instanceof Error) setSubmitError(err.message)
-      else setSubmitError('저장에 실패했습니다')
+      else setSubmitError(t('invalidUrl'))
     } finally {
       setSubmitting(false)
     }
@@ -265,7 +271,7 @@ function SnsEditForm({
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded"
         >
           <X className="w-3 h-3" />
-          취소
+          {t('cancel')}
         </button>
         <button
           type="button"
@@ -278,7 +284,7 @@ function SnsEditForm({
           ) : (
             <Check className="w-3 h-3" />
           )}
-          저장
+          {t('save')}
         </button>
       </div>
     </div>
