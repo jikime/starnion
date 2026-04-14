@@ -435,7 +435,7 @@ export default function ConnectPage() {
         </main>
 
         <aside
-          className="hidden lg:flex flex-col w-72 xl:w-80 shrink-0 border-l border-border bg-card/50 overflow-hidden"
+          className="hidden lg:flex flex-col w-80 xl:w-96 2xl:w-[28rem] shrink-0 border-l border-border bg-card/50 overflow-hidden"
           aria-label={rightPanel === 'persona' ? '인물 상세 정보' : '스마트 리마인더'}
         >
           {rightPanel === 'persona' ? (

@@ -139,8 +139,8 @@ export default function PersonaCard({
   return (
     <div className="flex flex-col h-full bg-card border-l border-border overflow-y-auto">
       {/* Header */}
-      <div className="flex items-start justify-between p-5 border-b border-border">
-        <div className="flex items-center gap-4">
+      <div className="flex items-start justify-between gap-3 p-5 border-b border-border">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
           <div className="relative shrink-0">
             <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
               <circle cx="28" cy="28" r="26" fill="#1a2644" />
@@ -177,15 +177,15 @@ export default function PersonaCard({
               />
             </svg>
           </div>
-          <div>
-            <h2 className="text-foreground font-semibold text-lg leading-tight">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-foreground font-semibold text-lg leading-tight truncate">
               {connection.name}
             </h2>
             {connection.role && (
-              <p className="text-muted-foreground text-sm">{connection.role}</p>
+              <p className="text-muted-foreground text-sm truncate">{connection.role}</p>
             )}
             {connection.company && (
-              <p className="text-muted-foreground text-sm">{connection.company}</p>
+              <p className="text-muted-foreground text-sm truncate">{connection.company}</p>
             )}
           </div>
         </div>
