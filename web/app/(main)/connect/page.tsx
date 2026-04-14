@@ -9,6 +9,7 @@ import PersonaCard from '@/components/connect/persona-card'
 import RemindersPanel from '@/components/connect/reminders-panel'
 import OcrScanner, { type ParsedScanResult } from '@/components/connect/ocr-scanner'
 import NewConnectionDialog from '@/components/connect/new-connection-dialog'
+import EditConnectionDialog from '@/components/connect/edit-connection-dialog'
 import {
   Category,
   Connection,
@@ -21,9 +22,12 @@ import {
   getConnection,
   listConnections,
   submitBusinessCardScan,
+  touchConnection,
+  updateContextNotes,
   updateSocialProfiles,
   type ListConnectionsQuery,
 } from '@/lib/connect-api'
+import { toast } from 'sonner'
 import { Search, SlidersHorizontal, Bell, Loader2 } from 'lucide-react'
 
 type ViewMode = 'list' | 'grid'
@@ -68,6 +72,7 @@ export default function ConnectPage() {
   const [rightPanel, setRightPanel] = useState<RightPanel>('persona')
   const [showScanner, setShowScanner] = useState(false)
   const [showNewDialog, setShowNewDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
 
   const [connections, setConnections] = useState<Connection[]>([])
@@ -204,6 +209,41 @@ export default function ConnectPage() {
       setOpenSnsEdit(true)
     }
   }
+
+  const handleTouch = useCallback(async (id: string) => {
+    try {
+      const previousContact = connections.find(c => c.id === id)?.lastContactDate
+      const updated = await touchConnection(id)
+      handleConnectionUpdated(updated)
+      const daysSince = previousContact
+        ? Math.floor(
+            (Date.now() - new Date(previousContact).getTime()) /
+              (1000 * 60 * 60 * 24)
+          )
+        : null
+      toast.success(
+        daysSince !== null
+          ? `${updated.name}님과 ${daysSince}일 만의 연락이에요`
+          : `${updated.name}님과 첫 연락 기록이 추가되었어요`
+      )
+    } catch (err) {
+      if (err instanceof ConnectApiError) {
+        toast.error(err.message)
+      } else {
+        toast.error('연락 기록 저장에 실패했습니다')
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connections, handleConnectionUpdated])
+
+  const handleContextNotesSave = useCallback(
+    async (id: string, notes: string) => {
+      const updated = await updateContextNotes(id, notes)
+      handleConnectionUpdated(updated)
+      toast.success('메모를 저장했습니다')
+    },
+    [handleConnectionUpdated]
+  )
 
   const handleDelete = useCallback(async (id: string) => {
     try {
@@ -405,6 +445,9 @@ export default function ConnectPage() {
                 onClose={() => setSelectedId(null)}
                 onSubmitSocial={handleSocialSubmit}
                 onDelete={handleDelete}
+                onEdit={() => setShowEditDialog(true)}
+                onTouch={handleTouch}
+                onSubmitContextNotes={handleContextNotesSave}
                 snsEditOpen={openSnsEdit}
                 onSnsEditOpenChange={setOpenSnsEdit}
               />
@@ -434,6 +477,15 @@ export default function ConnectPage() {
           setRightPanel('persona')
         }}
       />
+
+      {selectedConnection && (
+        <EditConnectionDialog
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          connection={selectedConnection}
+          onUpdated={handleConnectionUpdated}
+        />
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   X,
   Mail,
@@ -17,6 +17,9 @@ import {
   ZoomIn,
   Trash2,
   Loader2,
+  Pencil,
+  PhoneCall,
+  Save,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -48,20 +51,42 @@ interface PersonaCardProps {
     patch: Partial<Record<SocialPlatform, string | null>>
   ) => Promise<void>
   onDelete?: (id: string) => Promise<void>
+  onEdit?: () => void
+  onTouch?: (id: string) => Promise<void>
+  onSubmitContextNotes?: (id: string, notes: string) => Promise<void>
   snsEditOpen: boolean
   onSnsEditOpenChange: (open: boolean) => void
 }
+
+const CONTEXT_NOTES_MAX = 4096
 
 export default function PersonaCard({
   connection,
   onClose,
   onSubmitSocial,
   onDelete,
+  onEdit,
+  onTouch,
+  onSubmitContextNotes,
   snsEditOpen,
   onSnsEditOpenChange,
 }: PersonaCardProps) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [touching, setTouching] = useState(false)
+
+  const [notesEditing, setNotesEditing] = useState(false)
+  const [notesDraft, setNotesDraft] = useState(connection.contextNotes)
+  const [notesSaving, setNotesSaving] = useState(false)
+  const [notesError, setNotesError] = useState<string | null>(null)
+
+  // Re-seed draft when selection changes or edit mode exits.
+  useEffect(() => {
+    if (!notesEditing) {
+      setNotesDraft(connection.contextNotes)
+      setNotesError(null)
+    }
+  }, [connection.id, connection.contextNotes, notesEditing])
 
   const handleDeleteConfirm = async () => {
     if (!onDelete) return
@@ -71,6 +96,35 @@ export default function PersonaCard({
       setDeleteOpen(false)
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const handleTouchClick = async () => {
+    if (!onTouch) return
+    setTouching(true)
+    try {
+      await onTouch(connection.id)
+    } finally {
+      setTouching(false)
+    }
+  }
+
+  const handleNotesSave = async () => {
+    if (!onSubmitContextNotes) return
+    const draft = notesDraft.trim()
+    if (draft.length > CONTEXT_NOTES_MAX) {
+      setNotesError(`${CONTEXT_NOTES_MAX.toLocaleString()}자 이내로 입력해주세요`)
+      return
+    }
+    setNotesSaving(true)
+    setNotesError(null)
+    try {
+      await onSubmitContextNotes(connection.id, draft)
+      setNotesEditing(false)
+    } catch (err) {
+      setNotesError(err instanceof Error ? err.message : '저장에 실패했습니다')
+    } finally {
+      setNotesSaving(false)
     }
   }
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -137,6 +191,35 @@ export default function PersonaCard({
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0 -mt-1">
+          {onTouch && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleTouchClick}
+              disabled={touching}
+              className="text-muted-foreground hover:text-primary"
+              aria-label="오늘 연락함"
+              title="오늘 연락함"
+            >
+              {touching ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <PhoneCall className="w-4 h-4" />
+              )}
+            </Button>
+          )}
+          {onEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onEdit}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="인연 편집"
+              title="편집"
+            >
+              <Pencil className="w-4 h-4" />
+            </Button>
+          )}
           {onDelete && (
             <Button
               variant="ghost"
@@ -144,6 +227,7 @@ export default function PersonaCard({
               onClick={() => setDeleteOpen(true)}
               className="text-muted-foreground hover:text-star-red"
               aria-label="인연 삭제"
+              title="삭제"
             >
               <Trash2 className="w-4 h-4" />
             </Button>
@@ -294,11 +378,81 @@ export default function PersonaCard({
 
       {/* Context memo */}
       <div className="px-5 pt-4">
-        <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono mb-2">
-          Context Memo
-        </p>
-        {connection.contextNotes ? (
-          <p className="text-sm text-foreground/80 leading-relaxed bg-secondary/50 rounded-lg p-3 border border-border">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono">
+            Context Memo
+          </p>
+          {onSubmitContextNotes && !notesEditing && (
+            <button
+              type="button"
+              onClick={() => setNotesEditing(true)}
+              className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+              aria-label="메모 편집"
+            >
+              <Pencil className="w-3 h-3" />
+              편집
+            </button>
+          )}
+        </div>
+        {notesEditing ? (
+          <div className="space-y-2">
+            <textarea
+              value={notesDraft}
+              onChange={e => setNotesDraft(e.target.value)}
+              maxLength={CONTEXT_NOTES_MAX}
+              disabled={notesSaving}
+              rows={5}
+              placeholder="이 분의 특징, 취향, 기억할 만한 것을 적어두세요..."
+              className="w-full text-sm text-foreground bg-secondary/50 rounded-lg p-3 border border-border focus:outline-none focus:ring-1 focus:ring-primary/50 resize-y leading-relaxed"
+              autoFocus
+            />
+            <div className="flex items-center justify-between text-xs">
+              <span
+                className={`font-mono ${
+                  notesDraft.length > CONTEXT_NOTES_MAX * 0.9
+                    ? 'text-star-red'
+                    : 'text-muted-foreground'
+                }`}
+              >
+                {notesDraft.length.toLocaleString()} / {CONTEXT_NOTES_MAX.toLocaleString()}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    setNotesEditing(false)
+                    setNotesDraft(connection.contextNotes)
+                    setNotesError(null)
+                  }}
+                  disabled={notesSaving}
+                >
+                  취소
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                  onClick={handleNotesSave}
+                  disabled={notesSaving}
+                >
+                  {notesSaving ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : (
+                    <Save className="w-3 h-3 mr-1" />
+                  )}
+                  저장
+                </Button>
+              </div>
+            </div>
+            {notesError && (
+              <p className="text-xs text-star-red">{notesError}</p>
+            )}
+          </div>
+        ) : connection.contextNotes ? (
+          <p className="text-sm text-foreground/80 leading-relaxed bg-secondary/50 rounded-lg p-3 border border-border whitespace-pre-wrap">
             {connection.contextNotes}
           </p>
         ) : (
