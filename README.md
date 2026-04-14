@@ -24,9 +24,10 @@ StarNion is a self-hosted personal AI agent platform. All your data stays on you
 **Key highlights:**
 - **Planner** — ABC priority tasks linked to weekly key plans, monthly calendar, D-Day goals, roles & mission
 - **Finance & Assets** — expense tracking, spending map, budget management, statistics & analytics
+- **Connect (Relationships)** — business card OCR, activity timeline, Gmail/Calendar auto-ingest, drift detection with Telegram reminders, Google Contacts bulk import
 - **AI Chat** — multi-provider LLM with personas, web search, and file management
 - **Multi-provider LLM** — Anthropic Claude, Google Gemini, OpenAI, GLM (Z.AI), Ollama support
-- **System Scheduler** — notification jobs (budget warning, daily summary, etc.) individually enabled/disabled per user
+- **System Scheduler** — notification jobs (budget warning, daily summary, drift reminders, etc.) individually enabled/disabled per user
 - **Language & Theme** — 4-language i18n (Korean, English, Japanese, Chinese) + dark/light theme
 - **Personas** — configure custom AI personalities per conversation context
 - **Telegram Integration** — full planner CRUD, chat, and notifications via Telegram bot
@@ -212,7 +213,8 @@ starnion/
 │   │   ├── finance/      # Finance (ledger) view
 │   │   ├── budget/       # Budget management view
 │   │   ├── statistics/   # Spending statistics view
-│   │   └── finance-map/  # Naver Maps spending map
+│   │   ├── finance-map/  # Naver Maps spending map
+│   │   └── connect/      # Relationship management (persona card, timeline, reminders)
 │   └── messages/         # i18n translations (ko, en, ja, zh)
 ├── agent/                # TypeScript AI agent (gRPC :50051)
 │   └── skills/           # 30+ skill definitions
@@ -226,6 +228,10 @@ starnion/
 │       ├── planner-mission/  # Mission statement
 │       ├── finance/          # Finance tracking
 │       ├── budget/           # Budget management
+│       ├── connect-ocr/      # Business card OCR → new connection
+│       ├── connect-memo/     # Context-memo edits
+│       ├── connect-activity/ # Activity timeline + Gmail/Calendar sync
+│       ├── connect-contacts-import/ # Google Contacts bulk import
 │       ├── websearch/        # Web search
 │       ├── image/            # Image generation/analysis
 │       ├── audio/            # Audio transcription/TTS
@@ -250,6 +256,7 @@ starnion/
 |----------|----------|
 | **Planner** | ABC priority tasks linked to weekly key plans (1:N) · Monthly calendar · D-Day goals · Mission & Roles · Diary (markdown) & Reflection |
 | **Finance** | Expense tracking · Spending map (Naver Maps) · Budget management · Statistics & Analytics |
+| **Connect** | Business card OCR · Context memo · Activity timeline · Gmail + Calendar auto-ingest · Drift detection + Telegram reminders · Connection score · Google Contacts bulk import |
 | **AI Chat** | Multi-LLM conversations · Personas · WebSocket streaming · Telegram integration |
 | **Files** | Document & image upload · Audio transcription · AI document search · MinIO storage |
 | **Web Search** | AI-powered web search with streaming · Search history & auto-save |
@@ -303,6 +310,7 @@ Key proxy routes:
 | Files | `/files` | File management with grid/list view, search, upload |
 | Planner | `/planners` | Planner (daily/weekly/monthly/goals/compass) |
 | Assets | `/assets` | Finance ledger · Statistics · Budget · Spending map |
+| Connect | `/connect` | Relationship management · Activity timeline · Reminders · Nion Suggestion · Google Contacts import |
 | Analytics | `/analytics` | Message analytics · Channel breakdown · Anomaly detection |
 | Search | `/search` | AI web search with history |
 | Skills | `/skills` | Skill management with API keys |
