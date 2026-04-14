@@ -42,6 +42,7 @@ import {
   SocialPlatform,
 } from '@/lib/connect-data'
 import SnsSection from '@/components/connect/sns-section'
+import ActivityTimeline from '@/components/connect/activity-timeline'
 
 interface PersonaCardProps {
   connection: Connection
@@ -460,6 +461,9 @@ export default function PersonaCard({
           <p className="text-xs text-muted-foreground/60 italic">{t('personaCard.noMemo')}</p>
         )}
       </div>
+
+      {/* Activity Timeline (UC-111/112/113) */}
+      <ActivityTimeline connection={connection} />
 
       {/* Business Card */}
       <div className="px-5 pt-4">
