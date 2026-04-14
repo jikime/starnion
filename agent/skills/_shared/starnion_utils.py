@@ -51,53 +51,106 @@ def _load_starnion_yaml() -> dict:
     return config
 
 
-# ── AES-256-GCM decrypt (mirrors gateway/internal/crypto/aes.go) ──────────────
+# ── AES-256-GCM decrypt / encrypt (mirrors gateway/internal/crypto/aes.go) ────
+#
+# Two ciphertext formats coexist on disk:
+#
+#   v2 (current, written by gateway 2026-04+):
+#       "enc:v2:" + base64(salt[16] || nonce[12] || ciphertext)
+#       key = HKDF-SHA256(master_key, salt=random16, info="starnion-aes-v2")
+#
+#   v1 (legacy):
+#       "enc:" + base64(nonce[12] || ciphertext)
+#       key = SHA256(master_key)
+#
+# Decrypt understands both so old rows still open. Encrypt always writes v2
+# so any new rows the skills create stay consistent with the gateway.
 
-def _derive_key(master_key: str) -> bytes:
-    """SHA-256 of master_key UTF-8 bytes → 32-byte AES key."""
+V2_PREFIX = "enc:v2:"
+V1_PREFIX = "enc:"
+V2_INFO = b"starnion-aes-v2"
+V2_SALT_LEN = 16
+GCM_NONCE_LEN = 12
+
+
+def _derive_key_v1(master_key: str) -> bytes:
+    """SHA-256 of master_key UTF-8 bytes → 32-byte AES key (legacy v1)."""
     return hashlib.sha256(master_key.encode()).digest()
+
+
+def _derive_key_v2(master_key: str, salt: bytes) -> bytes:
+    """HKDF-SHA256 with per-record salt and fixed info tag (current v2)."""
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+    from cryptography.hazmat.primitives import hashes
+    hkdf = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        info=V2_INFO,
+    )
+    return hkdf.derive(master_key.encode())
 
 
 def decrypt_value(val: str, master_key: str) -> str:
     """Decrypt a value encrypted by Go's crypto.Encrypt.
 
+    Recognises both v2 ("enc:v2:") and v1 ("enc:") formats.
     Values NOT prefixed with "enc:" are returned unchanged (backwards-compat).
     Returns the original value on any error.
     """
     if not val or not master_key:
         return val
-    if not val.startswith("enc:"):
-        return val  # plaintext stored before encryption was enabled
 
     try:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     except ImportError:
-        # cryptography package not installed — return raw value and warn
         import sys
         print("[starnion_utils] WARNING: 'cryptography' package not installed. "
               "Run: pip install cryptography", file=sys.stderr)
         return val
 
-    try:
-        raw = base64.b64decode(val[4:])
-        nonce_size = 12  # standard GCM nonce
-        if len(raw) < nonce_size:
+    # v2: salt(16) || nonce(12) || ciphertext, HKDF-derived key
+    if val.startswith(V2_PREFIX):
+        try:
+            raw = base64.b64decode(val[len(V2_PREFIX):])
+            if len(raw) < V2_SALT_LEN + GCM_NONCE_LEN:
+                return val
+            salt = raw[:V2_SALT_LEN]
+            nonce = raw[V2_SALT_LEN:V2_SALT_LEN + GCM_NONCE_LEN]
+            ciphertext = raw[V2_SALT_LEN + GCM_NONCE_LEN:]
+            key = _derive_key_v2(master_key, salt)
+            plaintext = AESGCM(key).decrypt(nonce, ciphertext, None)
+            return plaintext.decode()
+        except Exception:
             return val
-        nonce, ciphertext = raw[:nonce_size], raw[nonce_size:]
-        key = _derive_key(master_key)
-        aesgcm = AESGCM(key)
-        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
-        return plaintext.decode()
-    except Exception:
-        return val
+
+    # v1: nonce(12) || ciphertext, SHA256-derived key
+    if val.startswith(V1_PREFIX):
+        try:
+            raw = base64.b64decode(val[len(V1_PREFIX):])
+            if len(raw) < GCM_NONCE_LEN:
+                return val
+            nonce, ciphertext = raw[:GCM_NONCE_LEN], raw[GCM_NONCE_LEN:]
+            key = _derive_key_v1(master_key)
+            plaintext = AESGCM(key).decrypt(nonce, ciphertext, None)
+            return plaintext.decode()
+        except Exception:
+            return val
+
+    # plaintext stored before encryption was enabled
+    return val
 
 
 def encrypt_value(val: str, master_key: str) -> str:
-    """Encrypt a value using AES-256-GCM (mirrors Go's crypto.Encrypt).
+    """Encrypt a value using AES-256-GCM in the current v2 format.
 
-    Returns "enc:<base64(nonce+ciphertext)>" or plain value if encryption unavailable.
+    Returns "enc:v2:<base64(salt+nonce+ciphertext)>" or the original
+    value when encryption is unavailable / fails. Already-encrypted
+    inputs (either v1 or v2) are returned unchanged.
     """
     if not val or not master_key:
+        return val
+    if val.startswith(V1_PREFIX):  # already encrypted (v1 or v2)
         return val
 
     try:
@@ -106,11 +159,11 @@ def encrypt_value(val: str, master_key: str) -> str:
         return val
 
     try:
-        nonce = os.urandom(12)
-        key = _derive_key(master_key)
-        aesgcm = AESGCM(key)
-        ciphertext = aesgcm.encrypt(nonce, val.encode(), None)
-        return "enc:" + base64.b64encode(nonce + ciphertext).decode()
+        salt = os.urandom(V2_SALT_LEN)
+        nonce = os.urandom(GCM_NONCE_LEN)
+        key = _derive_key_v2(master_key, salt)
+        ciphertext = AESGCM(key).encrypt(nonce, val.encode(), None)
+        return V2_PREFIX + base64.b64encode(salt + nonce + ciphertext).decode()
     except Exception:
         return val
 
