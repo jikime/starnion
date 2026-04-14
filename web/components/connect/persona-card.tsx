@@ -7,7 +7,6 @@ import {
   Phone,
   MapPin,
   Tag,
-  Sparkles,
   Calendar,
   CreditCard,
   Globe,
@@ -597,23 +596,7 @@ export default function PersonaCard({
         </div>
       )}
 
-      {/* AI Suggestion — Phase 2 placeholder */}
-      <div className="px-5 pt-4 pb-5">
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-3.5 h-3.5 text-primary" />
-            <p className="text-xs text-primary font-medium">Nion의 제안</p>
-          </div>
-          <p className="text-sm text-foreground/80 leading-relaxed">
-            {drift
-              ? `${connection.name}님과의 연락이 뜸해졌어요. 가벼운 안부 인사를 건네보는 건 어떨까요?`
-              : `${connection.name}님은 ${CATEGORY_LABELS[connection.category]} 그룹의 소중한 인연입니다.`}
-          </p>
-          <p className="text-[11px] text-muted-foreground mt-2">
-            스마트 제안은 Phase 2에서 제공됩니다.
-          </p>
-        </div>
-      </div>
+      <div className="pb-5" />
     </div>
   )
 }
