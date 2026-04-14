@@ -45,13 +45,14 @@ const (
 // socialPlatformRegex is the closed set of allowed social_profiles keys
 // and their URL shape guards (BR-SOCIAL-1). The character class is kept
 // intentionally permissive so real-world handles with `.`, `_`, `-`, `?`,
-// `=`, `&` work; per-platform prefix is what blocks drift.
+// `=`, `&`, `%` (percent-encoded segments) and `#` (fragments) work; the
+// per-platform prefix is what blocks drift.
 var socialPlatformRegex = map[string]*regexp.Regexp{
-	"facebook":  regexp.MustCompile(`^https?://(www\.)?(facebook|fb)\.com/[\w.\-/?=&]+$`),
-	"instagram": regexp.MustCompile(`^https?://(www\.)?instagram\.com/[\w.\-/?=&]+$`),
-	"x":         regexp.MustCompile(`^https?://(www\.)?(x|twitter)\.com/[\w.\-/?=&]+$`),
-	"linkedin":  regexp.MustCompile(`^https?://(www\.)?linkedin\.com/(in|company)/[\w.\-/?=&]+$`),
-	"threads":   regexp.MustCompile(`^https?://(www\.)?threads\.(net|com)/@?[\w.\-/?=&]+$`),
+	"facebook":  regexp.MustCompile(`^https?://(www\.)?(facebook|fb)\.com/[\w.\-/?=&%#]+$`),
+	"instagram": regexp.MustCompile(`^https?://(www\.)?instagram\.com/[\w.\-/?=&%#]+$`),
+	"x":         regexp.MustCompile(`^https?://(www\.)?(x|twitter)\.com/[\w.\-/?=&%#]+$`),
+	"linkedin":  regexp.MustCompile(`^https?://(www\.)?linkedin\.com/(in|company)/[\w.\-/?=&%#]+$`),
+	"threads":   regexp.MustCompile(`^https?://(www\.)?threads\.(net|com)/@?[\w.\-/?=&%#]+$`),
 }
 
 // FieldError is a typed validation failure. The HTTP handler translates

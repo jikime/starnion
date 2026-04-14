@@ -8,8 +8,8 @@
 //	DELETE /api/v1/connections/:id
 //	POST   /api/v1/connections/scan-business-card
 //	POST   /api/v1/connections/:id/business-card
-//	PUT    /api/v1/connections/:id/social-profiles
-//	PUT    /api/v1/connections/:id/context-notes
+//	PATCH  /api/v1/connections/:id/social-profiles
+//	PATCH  /api/v1/connections/:id/context-notes
 //	POST   /api/v1/connections/:id/touch
 //
 // The handler translates JSON payloads into usecase DTOs (the `**string`
@@ -38,7 +38,7 @@ import (
 )
 
 // contextNotesRawLimit is the max raw body size accepted by the
-// PUT /context-notes endpoint. BR-CONTEXT-1 caps the *validated*
+// PATCH /context-notes endpoint. BR-CONTEXT-1 caps the *validated*
 // string at 4096 chars; the 16 KiB raw cap protects the decoder
 // from pathological payloads (multi-byte runes, whitespace spam).
 const contextNotesRawLimit = 16 * 1024
@@ -62,8 +62,8 @@ func (h *Handler) Register(protected *echo.Group) {
 	protected.PATCH("/connections/:id", h.update)
 	protected.DELETE("/connections/:id", h.delete)
 	protected.POST("/connections/:id/business-card", h.attachBusinessCard)
-	protected.PUT("/connections/:id/social-profiles", h.updateSocialProfiles)
-	protected.PUT("/connections/:id/context-notes", h.updateContextNotes)
+	protected.PATCH("/connections/:id/social-profiles", h.updateSocialProfiles)
+	protected.PATCH("/connections/:id/context-notes", h.updateContextNotes)
 	protected.POST("/connections/:id/touch", h.touch)
 }
 
@@ -453,7 +453,7 @@ func (h *Handler) updateContextNotes(c echo.Context) error {
 	}
 	if len(body) > contextNotesRawLimit {
 		return c.JSON(http.StatusRequestEntityTooLarge, echo.Map{
-			"error": echo.Map{"code": "body_too_large", "message": "request body exceeds 16 KiB"},
+			"error": echo.Map{"code": "payload_too_large", "message": "request body exceeds 16 KiB"},
 		})
 	}
 	var req struct {

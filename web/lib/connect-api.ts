@@ -296,7 +296,7 @@ export async function updateSocialProfiles(
   const wire = await request<WireConnection>(
     `/connections/${encodeURIComponent(id)}/social-profiles`,
     {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(patch),
     }
   )
@@ -310,7 +310,7 @@ export async function updateContextNotes(
   const wire = await request<WireConnection>(
     `/connections/${encodeURIComponent(id)}/context-notes`,
     {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify({ context_notes: notes }),
     }
   )
