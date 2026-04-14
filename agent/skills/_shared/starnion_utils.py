@@ -1,19 +1,26 @@
 """starnion_utils — shared helpers for StarNion skill scripts.
 
 Provides:
-  - _load_starnion_yaml()  : parse ~/.starnion/starnion.yaml
-  - decrypt_value(val, key): AES-256-GCM decrypt for enc:-prefixed values
-  - psql(sql, db_url)      : run a psql query and return stripped stdout
+  - _load_starnion_yaml()        : parse ~/.starnion/starnion.yaml
+  - decrypt_value(val, key)      : AES-256-GCM decrypt for enc:-prefixed values
+  - psql(sql, db_url)            : run a psql query and return stripped stdout
+  - sign_file_url(url, user_id, jwt_secret, ttl=300)
+                                 : append ?exp&sig query to a /api/files/
+                                   URL so the skill can read user-scoped files
+                                   without the 401 that a bare fetch would hit
 
 Usage in skill scripts:
     import sys, os
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "_shared"))
-    from starnion_utils import _load_starnion_yaml, decrypt_value, psql
+    from starnion_utils import _load_starnion_yaml, decrypt_value, psql, sign_file_url
 """
 import base64
 import hashlib
+import hmac
 import os
 import subprocess
+import time
+from urllib.parse import urlparse, urlunparse
 
 
 # ── YAML loader ───────────────────────────────────────────────────────────────
@@ -165,3 +172,57 @@ def psql(sql: str, db_url: str, params: tuple | list | None = None) -> str:
         import sys
         print(f"DB error: {e}", file=sys.stderr)
         return ""
+
+
+# ── Signed /api/files URL helper ──────────────────────────────────────────────
+#
+# Mirrors gateway/internal/adapter/http/signedurl/signedurl.go#Sign. The
+# gateway's /api/files/* route rejects unauthenticated requests to user-
+# scoped paths; skills that fetch a file URL without signing it will get a
+# 401. This helper lets skills mint a short-lived HMAC signature that the
+# gateway verifies on the way in.
+#
+# Signature layout (must stay in sync with the Go side):
+#   payload = f"{object_key}:{exp}:{user_id}"
+#   sig     = HMAC-SHA256(jwt_secret, payload)[:16].hex()  → 32 hex chars
+#
+# The signed query is appended as "?exp=<unix>&sig=<hex>" (or "&…" when a
+# query string already exists on the URL).
+
+def sign_file_url(
+    file_url: str,
+    user_id: str,
+    jwt_secret: str,
+    ttl_seconds: int = 300,
+) -> str:
+    """Return the /api/files URL with an HMAC-signed `?exp&sig` query.
+
+    - Only URLs whose path starts with `/api/files/users/<user_id>/…` are
+      signed. Other URLs (absolute off-gateway, `/api/files/browser/…`,
+      or non-user-scoped) are returned unchanged.
+    - If the URL already carries `sig=`, it is returned unchanged.
+    - If `jwt_secret` or `user_id` is empty, the URL is returned unchanged
+      (the caller will fall back to its existing behaviour, which is usually
+      a bare fetch that 401s loudly).
+    """
+    if not file_url or not user_id or not jwt_secret:
+        return file_url
+
+    parsed = urlparse(file_url)
+    path = parsed.path or ""
+    if not path.startswith("/api/files/"):
+        return file_url
+    object_key = path[len("/api/files/"):]
+    if not object_key.startswith(f"users/{user_id}/"):
+        return file_url  # not this user's file — don't silently sign
+    if parsed.query and "sig=" in parsed.query:
+        return file_url  # already signed
+
+    exp = int(time.time()) + max(1, int(ttl_seconds))
+    payload = f"{object_key}:{exp}:{user_id}".encode("utf-8")
+    mac = hmac.new(jwt_secret.encode("utf-8"), payload, hashlib.sha256).digest()
+    sig = mac[:16].hex()
+    new_query = f"exp={exp}&sig={sig}"
+    if parsed.query:
+        new_query = f"{parsed.query}&{new_query}"
+    return urlunparse(parsed._replace(query=new_query))
