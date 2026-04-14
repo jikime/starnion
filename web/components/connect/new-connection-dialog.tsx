@@ -6,7 +6,6 @@ import { useTranslations } from 'next-intl'
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -197,7 +196,11 @@ export default function NewConnectionDialog({
             </p>
           )}
 
-          <DialogFooter>
+          {/* Footer: Cancel left, Add right (space-between). Custom
+              div instead of DialogFooter because the shadcn default
+              is flex-col-reverse on mobile + sm:justify-end, which
+              stacks/right-aligns the buttons. */}
+          <div className="flex flex-row items-center justify-between gap-2 pt-2">
             <Button
               type="button"
               variant="ghost"
@@ -217,7 +220,7 @@ export default function NewConnectionDialog({
               {submitting && <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />}
               {t('add')}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

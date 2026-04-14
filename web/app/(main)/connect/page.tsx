@@ -64,6 +64,22 @@ export default function ConnectPage() {
   const urlQ = searchParams.get('q') ?? ''
 
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+
+  // Mobile/tablet default → grid. Runs once on client mount so the
+  // SSR output stays deterministic ('list') and avoids a hydration
+  // mismatch. The viewport check matches Tailwind's `lg` breakpoint
+  // (1024px) — desktop keeps the list-based master-detail layout,
+  // anything narrower gets the card grid which reads better on a
+  // phone. If the user later toggles manually, that choice wins.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (window.matchMedia('(max-width: 1023px)').matches) {
+      setViewMode('grid')
+    }
+    // Intentionally no cleanup / resize listener — we honor the
+    // user's explicit toggle after the initial default.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState(urlQ)
   const [sortMode, setSortMode] = useState<NonEmptySort>(
