@@ -1,7 +1,7 @@
 ---
 name: connect-ocr
 display_name: 명함 스캔 (인맥)
-description: "Scan a business card image with Gemini Vision and extract structured contact fields (name, role, company, email, phone, address, etc.) to create a new Connect (인맥) entry. Use for: 명함 스캔, 명함 인식, business card OCR, scan business card, 연락처 등록"
+description: "Scan a business card image with Gemini Vision and extract structured contact fields (name, role, company, email, phone, address, etc.) to create a new Connect (인맥) entry. Use for: 명함, 명함 스캔, 명함 등록, 명함 인식, 명함 저장, 명함 추가, 인맥, 인맥 추가, 인맥 등록, 연락처 등록, 연락처 추가, 비즈니스 카드, business card, business card ocr, scan business card, contact card, register contact"
 version: 1.0.0
 emoji: "📇"
 category: productivity
@@ -15,15 +15,28 @@ allowed-tools:
   - Bash
   - exec
 triggers:
+  # NOTE: the active keyword list that the agent's dynamic-scoping filter
+  # actually reads is parsed from the `description` field's "Use for: ..."
+  # suffix above. This `triggers.keywords` block is kept in sync only as
+  # documentation — changing it alone has no runtime effect.
   keywords:
     - 명함
     - 명함 스캔
+    - 명함 등록
     - 명함 인식
-    - 연락처 등록
+    - 명함 저장
+    - 명함 추가
+    - 인맥
     - 인맥 추가
+    - 인맥 등록
+    - 연락처 등록
+    - 연락처 추가
+    - 비즈니스 카드
     - business card
-    - scan card
+    - business card ocr
+    - scan business card
     - contact card
+    - register contact
   when_to_use:
     - User uploads a photo of a business card and asks to register it
     - User says "이 명함 등록해줘" or "인맥에 추가해줘" with an `[image:URL]`

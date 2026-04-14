@@ -39,6 +39,13 @@ triggers:
     - User asks to generate or create an image based on a description
     - User asks "이 사진에서 뭐가 보여?" or "그림 그려줘"
     - User wants to edit or modify an existing image
+  not_for:
+    - Business card scanning — use the connect-ocr skill instead
+      (keywords: 명함, 명함 스캔, 명함 등록, 인맥 추가, business card)
+    - Receipt / invoice OCR for expense tracking — use the finance skill instead
+    - Reading structured documents (tables, forms) when the user wants
+      the extracted data saved somewhere specific — delegate to the
+      relevant domain skill
 ---
 
 # 이미지 분석 및 생성
