@@ -143,8 +143,8 @@ export default function PersonaCard({
 
   return (
     <div className="flex flex-col h-full bg-card border-l border-border overflow-y-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3 p-5 border-b border-border">
+      {/* Header — sticky so it stays visible while the body scrolls */}
+      <div className="sticky top-0 z-10 bg-card flex items-start justify-between gap-3 p-5 border-b border-border">
         <div className="flex items-center gap-4 min-w-0 flex-1">
           <div className="relative shrink-0">
             <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
