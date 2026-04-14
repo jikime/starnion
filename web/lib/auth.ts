@@ -57,8 +57,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (trigger === "update" && session?.userId) {
         token.userId = session.userId as string
       }
-      // Auto-refresh gateway token when it's about to expire
+      // Auto-refresh gateway token when it's about to expire.
+      //
+      // Failure semantics: if the refresh POST fails — whether the
+      // gateway rejected the token (`res.ok === false`) or the network
+      // call itself errored — we DROP the gateway credentials from the
+      // token. The alternative (silently keeping a stale token) leaves
+      // the user in a zombie state where NextAuth thinks they're
+      // logged in but every API call 401s. The session() callback
+      // below then sees no gatewayToken and blanks out session.user
+      // so `proxy.ts` redirects to /login on the next request.
       if (token.gatewayToken && token.gatewayTokenExp && Date.now() > (token.gatewayTokenExp as number)) {
+        let refreshed = false
         try {
           const res = await fetch(`${API_URL}/api/v1/auth/refresh`, {
             method: "POST",
@@ -68,14 +78,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             const data = await res.json()
             token.gatewayToken = data.token as string
             token.gatewayTokenExp = Date.now() + 23 * 60 * 60 * 1000
+            refreshed = true
           }
-        } catch { /* keep existing token */ }
+        } catch {
+          /* network error — fall through to clearing */
+        }
+        if (!refreshed) {
+          delete token.gatewayToken
+          delete token.gatewayTokenExp
+          delete token.userId
+        }
       }
       return token
     },
     session({ session, token }) {
+      // No gateway token → the session is effectively unauthenticated.
+      // Blank out session.user so proxy.ts's `!!req.auth?.user` check
+      // fails and the user is redirected to /login on the next hop.
+      if (!token.gatewayToken) {
+        session.user = undefined as unknown as typeof session.user
+        return session
+      }
       if (token.userId) session.user.id = token.userId as string
-      if (token.gatewayToken) (session as typeof session & { gatewayToken: string }).gatewayToken = token.gatewayToken as string
+      ;(session as typeof session & { gatewayToken: string }).gatewayToken = token.gatewayToken as string
       return session
     },
   },
