@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"net/mail"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -91,32 +92,46 @@ type Ingestor struct {
 	httpClient   *http.Client
 	logger       *zap.Logger
 	now          func() time.Time
-	// lookbackDays controls the rolling window. Defaults to 7. Tests
-	// can override via WithLookback. The cron always uses the default.
+	// lookbackDays controls how far INTO THE PAST Gmail and Calendar
+	// are scanned. Defaults to 7.
 	lookbackDays int
+	// lookaheadDays controls how far INTO THE FUTURE Calendar is
+	// scanned (Gmail has no future). Defaults to 14 — covers the
+	// upcoming-meetings preview the user wants on the persona card
+	// and gives enough room that an event scheduled for "next week"
+	// reliably falls inside the window regardless of UTC offset.
+	lookaheadDays int
 }
 
 // New constructs an Ingestor with production defaults: 30s HTTP
-// timeout, 7-day lookback, real time.Now.
+// timeout, 7-day lookback / 14-day lookahead, real time.Now.
 func New(integrations IntegrationsAccessor, repo ConnectionRepo, logger *zap.Logger) *Ingestor {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 	return &Ingestor{
-		integrations: integrations,
-		repo:         repo,
-		httpClient:   &http.Client{Timeout: httpTimeout},
-		logger:       logger,
-		now:          time.Now,
-		lookbackDays: 7,
+		integrations:  integrations,
+		repo:          repo,
+		httpClient:    &http.Client{Timeout: httpTimeout},
+		logger:        logger,
+		now:           time.Now,
+		lookbackDays:  7,
+		lookaheadDays: 14,
 	}
 }
 
-// SetLookbackDays overrides the rolling window. Used by ad-hoc
+// SetLookbackDays overrides the rolling past window. Used by ad-hoc
 // triggers (e.g. the connect-activity skill's `sync --days 90`).
 func (i *Ingestor) SetLookbackDays(d int) {
 	if d > 0 {
 		i.lookbackDays = d
+	}
+}
+
+// SetLookaheadDays overrides the future calendar window.
+func (i *Ingestor) SetLookaheadDays(d int) {
+	if d >= 0 {
+		i.lookaheadDays = d
 	}
 }
 
@@ -146,9 +161,12 @@ func (i *Ingestor) RunForUser(ctx context.Context, userID uuid.UUID) (int, error
 	}
 
 	emailIndex := buildEmailIndex(connections)
-	if len(emailIndex) == 0 {
-		// No connections have an email address — there's nothing the
-		// ingestor can match on yet. Silently skip.
+	nameIndex := buildNameIndex(connections)
+
+	// Gmail needs an email index — without one there's nothing to
+	// match against. Calendar can fall through to the name index, so
+	// we keep going even when emailIndex is empty.
+	if len(emailIndex) == 0 && len(nameIndex) == 0 {
 		return 0, nil
 	}
 
@@ -159,17 +177,19 @@ func (i *Ingestor) RunForUser(ctx context.Context, userID uuid.UUID) (int, error
 		calN    int
 	)
 
-	gmailBatch, gmailIDs, err := i.fetchGmail(ctx, token, emailIndex)
-	if err != nil {
-		i.logger.Warn("connectingest: gmail fetch failed",
-			zap.String("user_id", userID.String()), zap.Error(err))
-	} else {
-		gmailN = len(gmailBatch)
-		batch = append(batch, gmailBatch...)
-		connIDs = append(connIDs, gmailIDs...)
+	if len(emailIndex) > 0 {
+		gmailBatch, gmailIDs, err := i.fetchGmail(ctx, token, emailIndex)
+		if err != nil {
+			i.logger.Warn("connectingest: gmail fetch failed",
+				zap.String("user_id", userID.String()), zap.Error(err))
+		} else {
+			gmailN = len(gmailBatch)
+			batch = append(batch, gmailBatch...)
+			connIDs = append(connIDs, gmailIDs...)
+		}
 	}
 
-	calBatch, calIDs, err := i.fetchCalendar(ctx, token, emailIndex)
+	calBatch, calIDs, err := i.fetchCalendar(ctx, token, emailIndex, nameIndex)
 	if err != nil {
 		i.logger.Warn("connectingest: calendar fetch failed",
 			zap.String("user_id", userID.String()), zap.Error(err))
@@ -197,6 +217,57 @@ func (i *Ingestor) RunForUser(ctx context.Context, userID uuid.UUID) (int, error
 		zap.Int("inserted", inserted),
 		zap.Int("lookback_days", i.lookbackDays))
 	return inserted, nil
+}
+
+// ── Connection indexes ────────────────────────────────────────────────
+
+// nameMatch is one entry in the name-fallback index for the calendar
+// matcher. Holds the lowercased name (so substring matching is
+// case-insensitive in one direction) and the owning connection id.
+type nameMatch struct {
+	Name string
+	ID   uuid.UUID
+}
+
+// buildNameIndex returns connection names sorted longest-first so that
+// "임진수 과장" wins over "임진수" when both happen to be in the user's
+// Connect list. Names shorter than 2 runes are dropped — a single-
+// character name (e.g. just "박") would substring-match nearly every
+// Korean event title. Two-rune names are still risky but acceptable
+// for the typical 3-character Korean full name.
+func buildNameIndex(connections []entity.Connection) []nameMatch {
+	out := make([]nameMatch, 0, len(connections))
+	for _, c := range connections {
+		name := strings.TrimSpace(c.Name)
+		if len([]rune(name)) < 2 {
+			continue
+		}
+		out = append(out, nameMatch{
+			Name: strings.ToLower(name),
+			ID:   c.ID,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return len([]rune(out[i].Name)) > len([]rune(out[j].Name))
+	})
+	return out
+}
+
+// matchByName returns the first connection id whose name appears as a
+// case-insensitive substring of `text`, or uuid.Nil when nothing
+// matches. The index is sorted longest-first so the most-specific
+// name wins on ties.
+func matchByName(text string, names []nameMatch) uuid.UUID {
+	if text == "" || len(names) == 0 {
+		return uuid.Nil
+	}
+	lowered := strings.ToLower(text)
+	for _, nm := range names {
+		if strings.Contains(lowered, nm.Name) {
+			return nm.ID
+		}
+	}
+	return uuid.Nil
 }
 
 // ── Email index ───────────────────────────────────────────────────────
@@ -469,10 +540,15 @@ type calendarListResponse struct {
 	NextPageToken string `json:"nextPageToken"`
 }
 
-func (i *Ingestor) fetchCalendar(ctx context.Context, token string, emailIndex map[string]uuid.UUID) ([]entity.ActivityInput, []uuid.UUID, error) {
+func (i *Ingestor) fetchCalendar(
+	ctx context.Context,
+	token string,
+	emailIndex map[string]uuid.UUID,
+	nameIndex []nameMatch,
+) ([]entity.ActivityInput, []uuid.UUID, error) {
 	now := i.now().UTC()
 	timeMin := now.Add(-time.Duration(i.lookbackDays) * 24 * time.Hour).Format(time.RFC3339)
-	timeMax := now.Add(7 * 24 * time.Hour).Format(time.RFC3339)
+	timeMax := now.Add(time.Duration(i.lookaheadDays) * 24 * time.Hour).Format(time.RFC3339)
 	listURL := "https://www.googleapis.com/calendar/v3/calendars/primary/events?" + url.Values{
 		"timeMin":      {timeMin},
 		"timeMax":      {timeMax},
@@ -496,11 +572,13 @@ func (i *Ingestor) fetchCalendar(ctx context.Context, token string, emailIndex m
 		if strings.EqualFold(ev.Status, "cancelled") {
 			continue
 		}
-		if len(ev.Attendees) == 0 || len(ev.Attendees) > recipientLimit {
+		// Mailing-list-style invites with hundreds of attendees are
+		// almost always noise. Drop them outright regardless of any
+		// downstream match — they shouldn't crowd the timeline.
+		if len(ev.Attendees) > recipientLimit {
 			continue
 		}
-
-		// Skip all-day events: they're not interactive 1:1 time.
+		// Skip all-day events: not interactive 1:1 time.
 		if ev.Start.DateTime == "" {
 			continue
 		}
@@ -515,26 +593,46 @@ func (i *Ingestor) fetchCalendar(ctx context.Context, token string, emailIndex m
 			}
 		}
 		duration := max(int(end.Sub(start).Minutes()), 0)
-
-		weight := decayWeight(len(ev.Attendees))
 		note := truncate(strings.TrimSpace(ev.Summary), 280)
 		occurredAt := start.UTC()
 
-		matched := make(map[uuid.UUID]struct{}, len(ev.Attendees))
+		// Pass 1: email match against attendees (primary path).
+		matched := make(map[uuid.UUID]struct{}, len(ev.Attendees)+1)
 		for _, a := range ev.Attendees {
 			addr := strings.ToLower(strings.TrimSpace(a.Email))
 			if addr == "" {
 				continue
 			}
-			connID, ok := emailIndex[addr]
-			if !ok {
-				continue
+			if connID, ok := emailIndex[addr]; ok {
+				matched[connID] = struct{}{}
 			}
-			if _, dup := matched[connID]; dup {
-				continue
-			}
-			matched[connID] = struct{}{}
+		}
 
+		// Pass 2: name match against the event title (fallback for
+		// personal events with no attendees, e.g. "임진수 과장 미팅").
+		// Only fires when nothing matched on email — keeps the
+		// primary path authoritative when both signals are present.
+		if len(matched) == 0 {
+			if connID := matchByName(ev.Summary, nameIndex); connID != uuid.Nil {
+				matched[connID] = struct{}{}
+			}
+		}
+
+		if len(matched) == 0 {
+			continue
+		}
+
+		// Weight the event. Use the attendee count when known
+		// (multi-person meeting → less weight per connection); for a
+		// name-matched personal event with no attendees, treat it as
+		// a 1:1 (you + the matched person).
+		participants := len(ev.Attendees)
+		if participants <= 0 {
+			participants = 2
+		}
+		weight := decayWeight(participants)
+
+		for connID := range matched {
 			dedupKey := connID.String() + "|" + occurredAt.Format(time.RFC3339Nano)
 			if _, dup := seen[dedupKey]; dup {
 				continue

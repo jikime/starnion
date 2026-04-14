@@ -386,6 +386,41 @@ def _build_email_index(conn, user_id: str) -> dict:
     return out
 
 
+def _build_name_index(conn, user_id: str) -> list:
+    """Returns [(name_lower, connection_id)] sorted longest-first.
+
+    Names shorter than 2 characters are dropped — a single-character
+    name would substring-match nearly every event title. Mirrors the
+    Go ingestor's buildNameIndex.
+    """
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id::text, name FROM connections WHERE user_id = %s",
+        (user_id,),
+    )
+    out = []
+    for row in cur.fetchall():
+        name = (row[1] or "").strip()
+        if len(name) < 2:
+            continue
+        out.append((name.lower(), row[0]))
+    cur.close()
+    out.sort(key=lambda x: len(x[0]), reverse=True)
+    return out
+
+
+def _match_by_name(text: str, name_index: list) -> str | None:
+    """First connection_id whose name appears as a case-insensitive
+    substring of `text`. Returns None when nothing matches."""
+    if not text or not name_index:
+        return None
+    lowered = text.lower()
+    for name, cid in name_index:
+        if name in lowered:
+            return cid
+    return None
+
+
 _EMAIL_RE = re.compile(r"<([^>]+)>")
 
 
@@ -491,11 +526,12 @@ def _gmail_sync(google_request, conn, user_id: str, token: str, days: int, email
     return rows
 
 
-def _calendar_sync(google_request, conn, user_id: str, token: str, days: int, email_index: dict):
+def _calendar_sync(google_request, conn, user_id: str, token: str, days: int,
+                   email_index: dict, name_index: list, lookahead_days: int = 14):
     rows = []
     now = datetime.now(timezone.utc)
     time_min = (now - timedelta(days=days)).isoformat()
-    time_max = (now + timedelta(days=7)).isoformat()
+    time_max = (now + timedelta(days=lookahead_days)).isoformat()
     resp = google_request(
         "GET",
         "https://www.googleapis.com/calendar/v3/calendars/primary/events",
@@ -517,12 +553,13 @@ def _calendar_sync(google_request, conn, user_id: str, token: str, days: int, em
         if ev.get("status") == "cancelled":
             continue
         attendees = ev.get("attendees") or []
-        if not attendees or len(attendees) > RECIPIENT_LIMIT:
+        # Mailing-list-style invites are noise — drop outright.
+        if len(attendees) > RECIPIENT_LIMIT:
             continue
         start_dt = (ev.get("start") or {}).get("dateTime")
         end_dt = (ev.get("end") or {}).get("dateTime")
         if not start_dt:
-            continue
+            continue  # all-day events skipped
         try:
             start = datetime.fromisoformat(start_dt.replace("Z", "+00:00")).astimezone(timezone.utc)
         except Exception:  # noqa: BLE001
@@ -534,18 +571,33 @@ def _calendar_sync(google_request, conn, user_id: str, token: str, days: int, em
             except Exception:  # noqa: BLE001
                 pass
         duration = max(int((end - start).total_seconds() // 60), 0)
-        weight = _decay_weight(len(attendees))
         summary = (ev.get("summary") or "").strip()[:280]
 
+        # Pass 1: email match against attendees (primary).
         matched = set()
         for a in attendees:
             addr = (a.get("email") or "").strip().lower()
             if not addr:
                 continue
             cid = email_index.get(addr)
-            if not cid or cid in matched:
-                continue
-            matched.add(cid)
+            if cid:
+                matched.add(cid)
+
+        # Pass 2: name match against the title (fallback for personal
+        # events with no attendees, e.g. "임진수 과장 미팅").
+        if not matched:
+            cid = _match_by_name(summary, name_index)
+            if cid:
+                matched.add(cid)
+
+        if not matched:
+            continue
+
+        # 1:1 personal event with no attendees → treat as "you + them".
+        participants = len(attendees) if attendees else 2
+        weight = _decay_weight(participants)
+
+        for cid in matched:
             key = (cid, start.isoformat())
             if key in seen:
                 continue
@@ -582,19 +634,29 @@ def cmd_sync(args):
         return
 
     email_index = _build_email_index(conn, args.user_id)
-    if not email_index:
+    name_index = _build_name_index(conn, args.user_id)
+
+    # Gmail can only match on email; calendar can fall through to name
+    # matching, so we keep going as long as at least one signal exists.
+    if not email_index and not name_index:
         conn.close()
         print(
             json.dumps(
-                {"status": "ok", "ingested": 0, "reason": "no_emails", "days": days},
+                {"status": "ok", "ingested": 0, "reason": "no_connections", "days": days},
                 ensure_ascii=False,
                 indent=2,
             )
         )
         return
 
-    gmail_rows = _gmail_sync(google_request, conn, args.user_id, token, days, email_index)
-    calendar_rows = _calendar_sync(google_request, conn, args.user_id, token, days, email_index)
+    gmail_rows = (
+        _gmail_sync(google_request, conn, args.user_id, token, days, email_index)
+        if email_index
+        else []
+    )
+    calendar_rows = _calendar_sync(
+        google_request, conn, args.user_id, token, days, email_index, name_index
+    )
 
     inserted = 0
     bumped = set()
