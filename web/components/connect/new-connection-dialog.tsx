@@ -92,7 +92,7 @@ export default function NewConnectionDialog({
         }
       }}
     >
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="w-4 h-4 text-primary" />
@@ -137,7 +137,7 @@ export default function NewConnectionDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor="new-conn-role" className="text-xs text-muted-foreground">
                 {t('role')}
