@@ -48,4 +48,56 @@ type ConnectionRepository interface {
 	// connection so the handler can echo it back without a second GET.
 	// Monotonic semantics (BR-109-1) are enforced at the SQL layer.
 	Touch(ctx context.Context, userID, id uuid.UUID, occurredAt time.Time, note string, durationMin int) (entity.Connection, error)
+
+	// ListActivities returns the paginated activity timeline for a single
+	// connection (UC-111), DESC by occurred_at. Total is the unfiltered
+	// count for the same (user, connection) pair.
+	ListActivities(ctx context.Context, userID, connID uuid.UUID, limit, offset int) (entity.ActivityListResult, error)
+
+	// CreateActivity inserts one row into connection_activities and, when
+	// kind='manual' and occurred_at is newer than the stored
+	// last_contact_at, bumps the parent connection's last_contact_at
+	// (monotonic, same rule as Touch). Returns the new row with its
+	// assigned ID and server-side created_at. UC-112.
+	CreateActivity(ctx context.Context, userID, connID uuid.UUID, in entity.ActivityInput) (entity.ConnectionActivity, error)
+
+	// DeleteActivity removes one activity row owned by the caller. UC-113.
+	// Returns domain.ErrNotFound when the row is missing or belongs to
+	// another user.
+	DeleteActivity(ctx context.Context, userID uuid.UUID, activityID int64) error
+
+	// IngestActivities bulk-inserts a batch of activity rows for Phase 2
+	// automation (UC-201, called from the scheduler or the connect-activity
+	// skill via an internal call site). Each row uses
+	// `ON CONFLICT (connection_id, kind, occurred_at) DO NOTHING` so
+	// re-ingestion is safe. Returns the number of rows actually inserted.
+	//
+	// The connection_id on each input MUST already be resolved to a row
+	// owned by userID — the repo does not do name resolution here.
+	IngestActivities(ctx context.Context, userID uuid.UUID, batch []entity.ActivityInput, connIDs []uuid.UUID) (int, error)
+
+	// CountRecentActivities returns (count, sum_weight) for a single
+	// connection over the [since, NOW()] window. Used by the score
+	// recompute cron (UC-202). Safe to call with zero rows (returns
+	// 0, 0, nil).
+	CountRecentActivities(ctx context.Context, userID, connID uuid.UUID, since time.Time) (int, float64, error)
+
+	// UpdateConnectionScore persists a freshly-computed score. Scoped by
+	// user_id. Cron-only — the write path for /touch and /activities
+	// must not call this (score stays stale until the next 03:00 tick,
+	// which is the intended design from architecture-design.md §D).
+	UpdateConnectionScore(ctx context.Context, userID, connID uuid.UUID, score float64) error
+
+	// ListAllForUser returns every connection id + email + name owned by
+	// userID, for the Gmail/Calendar ingestor to match against. No
+	// pagination — a user with 10k connections is a theoretical edge
+	// case the cron iterator can handle in memory.
+	ListAllForUser(ctx context.Context, userID uuid.UUID) ([]entity.Connection, error)
+
+	// ListDriftingConnections returns connections whose
+	// last_contact_at + contact_frequency_target days < NOW(), ordered
+	// by days-overdue descending. Connections that have never been
+	// contacted (last_contact_at IS NULL) ARE included if
+	// created_at + contact_frequency_target days < NOW(). UC-204.
+	ListDriftingConnections(ctx context.Context, userID uuid.UUID) ([]entity.DriftingConnection, error)
 }

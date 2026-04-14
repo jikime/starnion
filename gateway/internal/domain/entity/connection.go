@@ -117,3 +117,90 @@ type ConnectionListResult struct {
 	Limit  int
 	Offset int
 }
+
+// ActivityKind classifies an entry in the activity timeline by source.
+// The DB CHECK on connection_activities.kind enforces these exact
+// lowercase values. `label` (on the row) is an orthogonal axis that
+// carries the user-visible category (미팅, 통화, ...) regardless of
+// kind.
+type ActivityKind string
+
+const (
+	ActivityKindEmail    ActivityKind = "email"
+	ActivityKindCalendar ActivityKind = "calendar"
+	ActivityKindManual   ActivityKind = "manual"
+	ActivityKindTelegram ActivityKind = "telegram"
+)
+
+// AllowedActivityKinds is iteration-friendly for validation.
+var AllowedActivityKinds = []ActivityKind{
+	ActivityKindEmail,
+	ActivityKindCalendar,
+	ActivityKindManual,
+	ActivityKindTelegram,
+}
+
+// IsValid returns true iff kind matches one of the four canonical
+// values.
+func (k ActivityKind) IsValid() bool {
+	for _, ok := range AllowedActivityKinds {
+		if k == ok {
+			return true
+		}
+	}
+	return false
+}
+
+// ConnectionActivity is one row of the per-connection timeline.
+// Append-only from the usecase perspective — users can DELETE but
+// not UPDATE, and automated ingest always INSERT ... ON CONFLICT
+// DO NOTHING against the (connection_id, kind, occurred_at) unique
+// index.
+type ConnectionActivity struct {
+	ID           int64
+	UserID       uuid.UUID
+	ConnectionID uuid.UUID
+	Kind         ActivityKind
+	Label        *string // UI category chip (미팅, 통화, ...); nullable
+	OccurredAt   time.Time
+	DurationMin  int
+	Weight       float64
+	Note         *string // nullable (auto-ingested rows may have no body)
+	CreatedAt    time.Time
+}
+
+// ActivityInput is the create-side DTO shared by UC-112 (manual
+// create) and UC-201 (batch ingest from Gmail/Calendar). Zero values
+// for Label / DurationMin / Note / Weight are acceptable; the repo
+// defaults Weight to 1.0 when it's zero.
+type ActivityInput struct {
+	Kind        ActivityKind
+	Label       string // "" when unknown
+	OccurredAt  time.Time
+	DurationMin int
+	Weight      float64 // 0 → default 1.0 at repo layer
+	Note        string
+}
+
+// ActivityListResult is the paginated return for UC-111. Items is
+// always non-nil.
+type ActivityListResult struct {
+	Items  []ConnectionActivity
+	Total  int
+	Limit  int
+	Offset int
+}
+
+// DriftingConnection is one row of UC-204's reminder list. The
+// DaysOverdue field is computed by the repo as
+// `floor(extract(epoch from NOW() - last_contact_at)/86400) - contact_frequency_target`,
+// i.e. "how many days past the target cadence has this connection
+// gone". Zero means "just past the target".
+type DriftingConnection struct {
+	ID            uuid.UUID
+	Name          string
+	Company       *string
+	Category      ConnectionCategory
+	LastContactAt *time.Time
+	DaysOverdue   int
+}

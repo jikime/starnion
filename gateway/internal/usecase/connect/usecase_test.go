@@ -11,6 +11,7 @@ package connect
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -25,6 +26,7 @@ import (
 type fakeConnRepo struct {
 	store      map[uuid.UUID]entity.Connection
 	activities []activityRecord
+	nextActID  int64
 
 	createErr error
 	updateErr error
@@ -34,11 +36,16 @@ type fakeConnRepo struct {
 }
 
 type activityRecord struct {
+	id           int64
+	userID       uuid.UUID
 	connectionID uuid.UUID
 	kind         string
+	label        string
 	occurredAt   time.Time
 	note         string
 	durationMin  int
+	weight       float64
+	createdAt    time.Time
 }
 
 func newFakeConnRepo() *fakeConnRepo {
@@ -116,14 +123,253 @@ func (f *fakeConnRepo) Touch(ctx context.Context, userID, id uuid.UUID, occurred
 		existing.LastContactAt = &t
 	}
 	f.store[id] = existing
+	f.nextActID++
 	f.activities = append(f.activities, activityRecord{
+		id:           f.nextActID,
+		userID:       userID,
 		connectionID: id,
 		kind:         "manual",
 		occurredAt:   occurredAt,
 		note:         note,
 		durationMin:  durationMin,
+		weight:       1,
+		createdAt:    time.Now().UTC(),
 	})
 	return existing, nil
+}
+
+// ── Activity timeline (UC-111/112/113) ────────────────────────────
+
+func (f *fakeConnRepo) ListActivities(ctx context.Context, userID, connID uuid.UUID, limit, offset int) (entity.ActivityListResult, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	// Ownership check: allow the query even if unowned — the repo
+	// returns empty. Usecase guards with GetByID.
+	matches := make([]activityRecord, 0)
+	for _, a := range f.activities {
+		if a.userID == userID && a.connectionID == connID {
+			matches = append(matches, a)
+		}
+	}
+	// DESC by occurred_at
+	sort.Slice(matches, func(i, j int) bool {
+		if !matches[i].occurredAt.Equal(matches[j].occurredAt) {
+			return matches[i].occurredAt.After(matches[j].occurredAt)
+		}
+		return matches[i].id > matches[j].id
+	})
+	total := len(matches)
+	if offset > total {
+		offset = total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	page := matches[offset:end]
+
+	items := make([]entity.ConnectionActivity, 0, len(page))
+	for _, a := range page {
+		items = append(items, recordToEntity(a))
+	}
+	return entity.ActivityListResult{
+		Items:  items,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	}, nil
+}
+
+func (f *fakeConnRepo) CreateActivity(ctx context.Context, userID, connID uuid.UUID, in entity.ActivityInput) (entity.ConnectionActivity, error) {
+	existing, ok := f.store[connID]
+	if !ok || existing.UserID != userID {
+		return entity.ConnectionActivity{}, domain.ErrNotFound
+	}
+	weight := in.Weight
+	if weight == 0 {
+		weight = 1
+	}
+	f.nextActID++
+	rec := activityRecord{
+		id:           f.nextActID,
+		userID:       userID,
+		connectionID: connID,
+		kind:         string(in.Kind),
+		label:        in.Label,
+		occurredAt:   in.OccurredAt,
+		note:         in.Note,
+		durationMin:  in.DurationMin,
+		weight:       weight,
+		createdAt:    time.Now().UTC(),
+	}
+	f.activities = append(f.activities, rec)
+
+	// Monotonic advance of last_contact_at (matches real repo).
+	if existing.LastContactAt == nil || in.OccurredAt.After(*existing.LastContactAt) {
+		t := in.OccurredAt
+		existing.LastContactAt = &t
+		f.store[connID] = existing
+	}
+	return recordToEntity(rec), nil
+}
+
+func (f *fakeConnRepo) DeleteActivity(ctx context.Context, userID uuid.UUID, activityID int64) error {
+	for i, a := range f.activities {
+		if a.id == activityID && a.userID == userID {
+			f.activities = append(f.activities[:i], f.activities[i+1:]...)
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
+func (f *fakeConnRepo) IngestActivities(ctx context.Context, userID uuid.UUID, batch []entity.ActivityInput, connIDs []uuid.UUID) (int, error) {
+	if len(batch) != len(connIDs) {
+		return 0, errors.New("fake ingest: length mismatch")
+	}
+	// De-dup helper on (connection_id, kind, occurred_at).
+	type key struct {
+		conn uuid.UUID
+		kind string
+		at   time.Time
+	}
+	seen := make(map[key]struct{})
+	for _, a := range f.activities {
+		seen[key{a.connectionID, a.kind, a.occurredAt}] = struct{}{}
+	}
+	inserted := 0
+	for i, in := range batch {
+		cid := connIDs[i]
+		existing, ok := f.store[cid]
+		if !ok || existing.UserID != userID {
+			continue // silently drop cross-tenant
+		}
+		k := key{cid, string(in.Kind), in.OccurredAt}
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		seen[k] = struct{}{}
+		weight := in.Weight
+		if weight == 0 {
+			weight = 1
+		}
+		f.nextActID++
+		f.activities = append(f.activities, activityRecord{
+			id:           f.nextActID,
+			userID:       userID,
+			connectionID: cid,
+			kind:         string(in.Kind),
+			label:        in.Label,
+			occurredAt:   in.OccurredAt,
+			note:         in.Note,
+			durationMin:  in.DurationMin,
+			weight:       weight,
+			createdAt:    time.Now().UTC(),
+		})
+		inserted++
+		// Advance last_contact_at.
+		if existing.LastContactAt == nil || in.OccurredAt.After(*existing.LastContactAt) {
+			t := in.OccurredAt
+			existing.LastContactAt = &t
+			f.store[cid] = existing
+		}
+	}
+	return inserted, nil
+}
+
+func (f *fakeConnRepo) CountRecentActivities(ctx context.Context, userID, connID uuid.UUID, since time.Time) (int, float64, error) {
+	count := 0
+	sum := 0.0
+	for _, a := range f.activities {
+		if a.userID == userID && a.connectionID == connID && !a.occurredAt.Before(since) {
+			count++
+			sum += a.weight
+		}
+	}
+	return count, sum, nil
+}
+
+func (f *fakeConnRepo) UpdateConnectionScore(ctx context.Context, userID, connID uuid.UUID, score float64) error {
+	existing, ok := f.store[connID]
+	if !ok || existing.UserID != userID {
+		return domain.ErrNotFound
+	}
+	if score < 0 {
+		score = 0
+	}
+	if score > 1 {
+		score = 1
+	}
+	existing.ConnectionScore = score
+	f.store[connID] = existing
+	return nil
+}
+
+func (f *fakeConnRepo) ListAllForUser(ctx context.Context, userID uuid.UUID) ([]entity.Connection, error) {
+	out := make([]entity.Connection, 0)
+	for _, c := range f.store {
+		if c.UserID == userID {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeConnRepo) ListDriftingConnections(ctx context.Context, userID uuid.UUID) ([]entity.DriftingConnection, error) {
+	out := make([]entity.DriftingConnection, 0)
+	now := time.Now()
+	for _, c := range f.store {
+		if c.UserID != userID {
+			continue
+		}
+		anchor := c.CreatedAt
+		if c.LastContactAt != nil {
+			anchor = *c.LastContactAt
+		}
+		overdue := int(now.Sub(anchor).Hours()/24) - c.ContactFrequencyTarget
+		if overdue <= 0 {
+			continue
+		}
+		out = append(out, entity.DriftingConnection{
+			ID:            c.ID,
+			Name:          c.Name,
+			Company:       c.Company,
+			Category:      c.Category,
+			LastContactAt: c.LastContactAt,
+			DaysOverdue:   overdue,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].DaysOverdue > out[j].DaysOverdue })
+	return out, nil
+}
+
+func recordToEntity(a activityRecord) entity.ConnectionActivity {
+	var label *string
+	if a.label != "" {
+		l := a.label
+		label = &l
+	}
+	var note *string
+	if a.note != "" {
+		n := a.note
+		note = &n
+	}
+	return entity.ConnectionActivity{
+		ID:           a.id,
+		UserID:       a.userID,
+		ConnectionID: a.connectionID,
+		Kind:         entity.ActivityKind(a.kind),
+		Label:        label,
+		OccurredAt:   a.occurredAt,
+		DurationMin:  a.durationMin,
+		Weight:       a.weight,
+		Note:         note,
+		CreatedAt:    a.createdAt,
+	}
 }
 
 // ── helpers ───────────────────────────────────────────────────────

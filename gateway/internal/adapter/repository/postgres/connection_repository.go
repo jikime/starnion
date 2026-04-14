@@ -312,6 +312,399 @@ func (r *ConnectionRepository) Touch(ctx context.Context, userID, id uuid.UUID, 
 	return c, nil
 }
 
+// ── Activity timeline (UC-111/112/113) ────────────────────────────
+
+// activitySelectCols is the column list used by ListActivities and
+// CreateActivity's RETURNING clause. Order is fixed to match
+// scanActivity().
+const activitySelectCols = `
+    id, user_id, connection_id, kind, label, occurred_at,
+    duration_min, weight, note, created_at`
+
+func (r *ConnectionRepository) ListActivities(ctx context.Context, userID, connID uuid.UUID, limit, offset int) (entity.ActivityListResult, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	// Ownership check: query is scoped by user_id on both sides,
+	// so a connection_id belonging to another user returns an empty
+	// result + total 0 (indistinguishable from "no activities yet",
+	// which is fine — the usecase layer guards GetByID before
+	// calling this).
+	var total int
+	if err := r.db.Pool().QueryRow(ctx, `
+        SELECT COUNT(*) FROM connection_activities
+         WHERE user_id = $1 AND connection_id = $2`,
+		userID, connID,
+	).Scan(&total); err != nil {
+		return entity.ActivityListResult{}, fmt.Errorf("postgres activities count: %w", err)
+	}
+
+	rows, err := r.db.Pool().Query(ctx, `
+        SELECT `+activitySelectCols+`
+          FROM connection_activities
+         WHERE user_id = $1 AND connection_id = $2
+         ORDER BY occurred_at DESC, id DESC
+         LIMIT $3 OFFSET $4`,
+		userID, connID, limit, offset,
+	)
+	if err != nil {
+		return entity.ActivityListResult{}, fmt.Errorf("postgres activities list: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]entity.ConnectionActivity, 0, limit)
+	for rows.Next() {
+		a, err := scanActivity(rows)
+		if err != nil {
+			return entity.ActivityListResult{}, fmt.Errorf("postgres activities scan: %w", err)
+		}
+		items = append(items, a)
+	}
+	if err := rows.Err(); err != nil {
+		return entity.ActivityListResult{}, fmt.Errorf("postgres activities iterate: %w", err)
+	}
+
+	return entity.ActivityListResult{
+		Items:  items,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	}, nil
+}
+
+func (r *ConnectionRepository) CreateActivity(ctx context.Context, userID, connID uuid.UUID, in entity.ActivityInput) (entity.ConnectionActivity, error) {
+	weight := in.Weight
+	if weight == 0 {
+		weight = 1
+	}
+
+	tx, err := r.db.Pool().Begin(ctx)
+	if err != nil {
+		return entity.ConnectionActivity{}, fmt.Errorf("postgres create activity begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Verify ownership up front so the INSERT doesn't waste a round
+	// trip when the connection belongs to another user. Using a
+	// SELECT instead of FK violation because the error message stays
+	// clean for the usecase layer.
+	var ownerOK bool
+	if err := tx.QueryRow(ctx, `
+        SELECT EXISTS(SELECT 1 FROM connections WHERE id = $1 AND user_id = $2)`,
+		connID, userID,
+	).Scan(&ownerOK); err != nil {
+		return entity.ConnectionActivity{}, fmt.Errorf("postgres create activity owner check: %w", err)
+	}
+	if !ownerOK {
+		return entity.ConnectionActivity{}, domain.ErrNotFound
+	}
+
+	var labelPg pgtype.Text
+	if in.Label != "" {
+		labelPg = pgtype.Text{String: in.Label, Valid: true}
+	}
+	var notePg pgtype.Text
+	if in.Note != "" {
+		notePg = pgtype.Text{String: in.Note, Valid: true}
+	}
+
+	row := tx.QueryRow(ctx, `
+        INSERT INTO connection_activities
+            (user_id, connection_id, kind, label, occurred_at,
+             duration_min, weight, note)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING `+activitySelectCols,
+		userID, connID, string(in.Kind), labelPg, in.OccurredAt,
+		in.DurationMin, weight, notePg,
+	)
+	activity, err := scanActivity(row)
+	if err != nil {
+		return entity.ConnectionActivity{}, fmt.Errorf("postgres create activity insert: %w", err)
+	}
+
+	// BR-109-1 parity: manual entries monotonically advance
+	// last_contact_at so the drift detector and the UI "N일 전" label
+	// both reflect the new activity immediately. Auto-ingested rows
+	// (email/calendar/telegram) also advance — they ARE contacts.
+	if _, err := tx.Exec(ctx, `
+        UPDATE connections
+           SET last_contact_at = GREATEST(
+                 COALESCE(last_contact_at, '-infinity'::timestamptz),
+                 $1)
+         WHERE id = $2 AND user_id = $3`,
+		in.OccurredAt, connID, userID,
+	); err != nil {
+		return entity.ConnectionActivity{}, fmt.Errorf("postgres create activity advance last_contact_at: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return entity.ConnectionActivity{}, fmt.Errorf("postgres create activity commit: %w", err)
+	}
+	return activity, nil
+}
+
+func (r *ConnectionRepository) DeleteActivity(ctx context.Context, userID uuid.UUID, activityID int64) error {
+	tag, err := r.db.Pool().Exec(ctx, `
+        DELETE FROM connection_activities
+         WHERE id = $1 AND user_id = $2`,
+		activityID, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("postgres delete activity: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+// IngestActivities batch-inserts rows from the Phase 2 ingestor. The
+// caller supplies two parallel slices: `batch` with the activity
+// payloads and `connIDs` with the pre-resolved connection_id for
+// each row (the ingestor does the name-to-id match locally). Rows
+// colliding on (connection_id, kind, occurred_at) are dropped by the
+// existing unique index — ON CONFLICT DO NOTHING is idempotent.
+//
+// The write is one transaction so a partial failure can't leave
+// half-ingested state. last_contact_at is updated once per distinct
+// connection_id after the INSERT batch completes.
+func (r *ConnectionRepository) IngestActivities(ctx context.Context, userID uuid.UUID, batch []entity.ActivityInput, connIDs []uuid.UUID) (int, error) {
+	if len(batch) == 0 {
+		return 0, nil
+	}
+	if len(batch) != len(connIDs) {
+		return 0, fmt.Errorf("postgres ingest activities: len(batch)=%d != len(connIDs)=%d", len(batch), len(connIDs))
+	}
+
+	tx, err := r.db.Pool().Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("postgres ingest activities begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Ownership check: any connection_id in the batch that isn't
+	// owned by userID is silently dropped. Cheaper than per-row
+	// checks — one SELECT returns the allowed set.
+	allowed, err := r.loadOwnedConnectionIDs(ctx, tx, userID, connIDs)
+	if err != nil {
+		return 0, err
+	}
+
+	inserted := 0
+	maxByConn := make(map[uuid.UUID]time.Time)
+	for i, in := range batch {
+		cid := connIDs[i]
+		if _, ok := allowed[cid]; !ok {
+			continue
+		}
+		weight := in.Weight
+		if weight == 0 {
+			weight = 1
+		}
+		var labelPg pgtype.Text
+		if in.Label != "" {
+			labelPg = pgtype.Text{String: in.Label, Valid: true}
+		}
+		var notePg pgtype.Text
+		if in.Note != "" {
+			notePg = pgtype.Text{String: in.Note, Valid: true}
+		}
+		tag, err := tx.Exec(ctx, `
+            INSERT INTO connection_activities
+                (user_id, connection_id, kind, label, occurred_at,
+                 duration_min, weight, note)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ON CONFLICT (connection_id, kind, occurred_at) DO NOTHING`,
+			userID, cid, string(in.Kind), labelPg, in.OccurredAt,
+			in.DurationMin, weight, notePg,
+		)
+		if err != nil {
+			return 0, fmt.Errorf("postgres ingest activities insert: %w", err)
+		}
+		if tag.RowsAffected() > 0 {
+			inserted++
+			if prev, ok := maxByConn[cid]; !ok || in.OccurredAt.After(prev) {
+				maxByConn[cid] = in.OccurredAt
+			}
+		}
+	}
+
+	// Advance last_contact_at once per connection — the GREATEST()
+	// makes this safe even when multiple ingestors race.
+	for cid, maxAt := range maxByConn {
+		if _, err := tx.Exec(ctx, `
+            UPDATE connections
+               SET last_contact_at = GREATEST(
+                     COALESCE(last_contact_at, '-infinity'::timestamptz),
+                     $1)
+             WHERE id = $2 AND user_id = $3`,
+			maxAt, cid, userID,
+		); err != nil {
+			return 0, fmt.Errorf("postgres ingest activities advance: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("postgres ingest activities commit: %w", err)
+	}
+	return inserted, nil
+}
+
+// loadOwnedConnectionIDs returns the subset of candidate ids that the
+// supplied user actually owns. Returned as a set for O(1) lookup.
+func (r *ConnectionRepository) loadOwnedConnectionIDs(ctx context.Context, tx pgx.Tx, userID uuid.UUID, candidates []uuid.UUID) (map[uuid.UUID]struct{}, error) {
+	if len(candidates) == 0 {
+		return map[uuid.UUID]struct{}{}, nil
+	}
+	// De-dup the candidate list so a batch with repeated ids doesn't
+	// bloat the IN clause.
+	seen := make(map[uuid.UUID]struct{}, len(candidates))
+	dedup := make([]uuid.UUID, 0, len(candidates))
+	for _, c := range candidates {
+		if _, ok := seen[c]; ok {
+			continue
+		}
+		seen[c] = struct{}{}
+		dedup = append(dedup, c)
+	}
+	rows, err := tx.Query(ctx, `
+        SELECT id FROM connections
+         WHERE user_id = $1 AND id = ANY($2)`,
+		userID, dedup,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("postgres owner lookup: %w", err)
+	}
+	defer rows.Close()
+	owned := make(map[uuid.UUID]struct{}, len(dedup))
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("postgres owner scan: %w", err)
+		}
+		owned[id] = struct{}{}
+	}
+	return owned, rows.Err()
+}
+
+// ── Score recompute support (UC-202) ──────────────────────────────
+
+func (r *ConnectionRepository) CountRecentActivities(ctx context.Context, userID, connID uuid.UUID, since time.Time) (int, float64, error) {
+	var (
+		count int
+		sum   float64
+	)
+	err := r.db.Pool().QueryRow(ctx, `
+        SELECT COUNT(*), COALESCE(SUM(weight), 0)
+          FROM connection_activities
+         WHERE user_id = $1 AND connection_id = $2 AND occurred_at >= $3`,
+		userID, connID, since,
+	).Scan(&count, &sum)
+	if err != nil {
+		return 0, 0, fmt.Errorf("postgres count activities: %w", err)
+	}
+	return count, sum, nil
+}
+
+func (r *ConnectionRepository) UpdateConnectionScore(ctx context.Context, userID, connID uuid.UUID, score float64) error {
+	if score < 0 {
+		score = 0
+	}
+	if score > 1 {
+		score = 1
+	}
+	tag, err := r.db.Pool().Exec(ctx, `
+        UPDATE connections
+           SET connection_score = $1
+         WHERE id = $2 AND user_id = $3`,
+		score, connID, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("postgres update score: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+// ── Ingestor support ──────────────────────────────────────────────
+
+func (r *ConnectionRepository) ListAllForUser(ctx context.Context, userID uuid.UUID) ([]entity.Connection, error) {
+	rows, err := r.db.Pool().Query(ctx,
+		`SELECT `+connectionSelectCols+` FROM connections WHERE user_id = $1`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("postgres list all connections: %w", err)
+	}
+	defer rows.Close()
+	out := make([]entity.Connection, 0, 32)
+	for rows.Next() {
+		c, err := scanConnection(rows)
+		if err != nil {
+			return nil, fmt.Errorf("postgres list all scan: %w", err)
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// ── Drift reminders (UC-203/204) ──────────────────────────────────
+
+func (r *ConnectionRepository) ListDriftingConnections(ctx context.Context, userID uuid.UUID) ([]entity.DriftingConnection, error) {
+	// A connection is "drifting" when the effective last_contact_at
+	// (or created_at for never-contacted rows) is older than
+	// contact_frequency_target days ago. The days_overdue field is
+	// computed server-side so the UI doesn't need to reason about
+	// time zones.
+	rows, err := r.db.Pool().Query(ctx, `
+        SELECT id, name, company, category, last_contact_at,
+               FLOOR(EXTRACT(EPOCH FROM
+                   (NOW() - COALESCE(last_contact_at, created_at))
+               ) / 86400)::int - contact_frequency_target AS days_overdue
+          FROM connections
+         WHERE user_id = $1
+           AND COALESCE(last_contact_at, created_at)
+               + (contact_frequency_target || ' days')::interval
+               < NOW()
+         ORDER BY days_overdue DESC
+         LIMIT 100`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("postgres list drifting: %w", err)
+	}
+	defer rows.Close()
+	out := make([]entity.DriftingConnection, 0, 16)
+	for rows.Next() {
+		var (
+			d       entity.DriftingConnection
+			company pgtype.Text
+			cat     string
+			last    pgtype.Timestamptz
+		)
+		if err := rows.Scan(&d.ID, &d.Name, &company, &cat, &last, &d.DaysOverdue); err != nil {
+			return nil, fmt.Errorf("postgres list drifting scan: %w", err)
+		}
+		d.Company = pgtypeToStringPtr(company)
+		d.Category = entity.ConnectionCategory(cat)
+		if last.Valid {
+			t := last.Time
+			d.LastContactAt = &t
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
 // ── helpers ───────────────────────────────────────────────────────
 
 // scannable abstracts over pgx.Row and pgx.Rows so scanConnection can
@@ -435,6 +828,25 @@ func timePtrToPgtype(t *time.Time) pgtype.Timestamptz {
 		return pgtype.Timestamptz{}
 	}
 	return pgtype.Timestamptz{Time: *t, Valid: true}
+}
+
+func scanActivity(row scannable) (entity.ConnectionActivity, error) {
+	var (
+		a     entity.ConnectionActivity
+		kind  string
+		label pgtype.Text
+		note  pgtype.Text
+	)
+	if err := row.Scan(
+		&a.ID, &a.UserID, &a.ConnectionID, &kind, &label,
+		&a.OccurredAt, &a.DurationMin, &a.Weight, &note, &a.CreatedAt,
+	); err != nil {
+		return entity.ConnectionActivity{}, err
+	}
+	a.Kind = entity.ActivityKind(kind)
+	a.Label = pgtypeToStringPtr(label)
+	a.Note = pgtypeToStringPtr(note)
+	return a, nil
 }
 
 // Compile-time guarantee the Postgres impl satisfies the port.
