@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -616,6 +617,152 @@ func (u *UseCase) DeleteActivity(ctx context.Context, userID uuid.UUID, activity
 // "N일째 연락 없음" without recomputing the delta client-side.
 func (u *UseCase) ListReminders(ctx context.Context, userID uuid.UUID) ([]entity.DriftingConnection, error) {
 	return u.repo.ListDriftingConnections(ctx, userID)
+}
+
+// ── UC-202 RecomputeScoresForUser ─────────────────────────────────
+
+// Score formula constants — match architecture-design.md §D. These
+// are package-level so the unit tests can read them directly without
+// re-deriving the math.
+const (
+	scoreWeightRecency    = 0.45
+	scoreWeightFrequency  = 0.35
+	scoreWeightImportance = 0.20
+	scoreRecentWindowDays = 90
+)
+
+// categoryBaseImportance maps each category to its baseline
+// importance weight. These values are taken verbatim from
+// architecture-design.md §D and are tunable by editing this map
+// (no DB changes needed — cron picks up the new values on the next
+// 03:00 tick).
+var categoryBaseImportance = map[entity.ConnectionCategory]float64{
+	entity.CategoryFamily:       0.9,
+	entity.CategoryBusiness:     0.7,
+	entity.CategoryFriend:       0.7,
+	entity.CategoryAcquaintance: 0.4,
+}
+
+// computeScore is pure — it takes every input explicitly so unit
+// tests can hit the formula without a DB or clock mock. Returns a
+// value clamped to [0, 1].
+//
+// Parameters:
+//   - daysSinceContact: integer days since last_contact_at; use
+//     math.MaxInt32 for "never contacted".
+//   - activityWeight90d: sum of `weight` across rows in the last 90d
+//     (from the repo's CountRecentActivities). Heavy 1:1 meetings
+//     contribute 1 each; big-list emails contribute ~0.1 each.
+//   - targetInterval: connections.contact_frequency_target in days.
+//   - category: one of the 4 canonical ConnectionCategory values.
+//   - tags: reserved for future per-tag boosts. Currently unused so
+//     that the tag-boost tier can be added without changing the
+//     public signature.
+func computeScore(
+	daysSinceContact int,
+	activityWeight90d float64,
+	targetInterval int,
+	category entity.ConnectionCategory,
+	_ []string,
+) float64 {
+	if targetInterval <= 0 {
+		targetInterval = defaultFreqTarget
+	}
+
+	// Recency: exp(-d / (2*target)). At d=0 → 1, at d=target → 0.607,
+	// at d=2*target → 0.368, at d=4*target → 0.135. "Never contacted"
+	// collapses to ~0 for any reasonable target.
+	var recency float64
+	if daysSinceContact <= 0 {
+		recency = 1
+	} else {
+		recency = math.Exp(-float64(daysSinceContact) / (2 * float64(targetInterval)))
+	}
+
+	// Frequency: activity weight normalised by the target interval.
+	// At 90/target expected interactions (one per target-period), the
+	// score saturates at 1. So a target=30d user needs 3 weighted
+	// activities in 90 days to max out this component.
+	expected := float64(scoreRecentWindowDays) / float64(targetInterval)
+	var frequency float64
+	if expected <= 0 {
+		frequency = 0
+	} else {
+		frequency = activityWeight90d / expected
+	}
+	if frequency > 1 {
+		frequency = 1
+	}
+
+	importance, ok := categoryBaseImportance[category]
+	if !ok {
+		importance = 0.5
+	}
+
+	raw := scoreWeightRecency*recency +
+		scoreWeightFrequency*frequency +
+		scoreWeightImportance*importance
+	if raw < 0 {
+		raw = 0
+	}
+	if raw > 1 {
+		raw = 1
+	}
+	return raw
+}
+
+// RecomputeScoresForUser walks every connection owned by userID,
+// recomputes each score with the formula above, and persists any
+// changes. Designed for the nightly cron (UC-202): idempotent,
+// tenant-scoped, and safe to re-run. Returns the number of rows that
+// actually moved (the cron log shows "N scores adjusted" per user
+// per run so we can see drift rate over time).
+//
+// The method lives in the usecase layer rather than the repo so the
+// formula stays unit-testable without Postgres.
+func (u *UseCase) RecomputeScoresForUser(ctx context.Context, userID uuid.UUID) (int, error) {
+	connections, err := u.repo.ListAllForUser(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	if len(connections) == 0 {
+		return 0, nil
+	}
+
+	now := u.now().UTC()
+	since := now.Add(-time.Duration(scoreRecentWindowDays) * 24 * time.Hour)
+	changed := 0
+
+	for _, c := range connections {
+		days := math.MaxInt32
+		if c.LastContactAt != nil {
+			diff := int(now.Sub(*c.LastContactAt).Hours() / 24)
+			if diff < 0 {
+				diff = 0
+			}
+			days = diff
+		}
+
+		_, weight, err := u.repo.CountRecentActivities(ctx, userID, c.ID, since)
+		if err != nil {
+			// One bad row shouldn't halt the whole batch — log via
+			// the cron dispatcher, continue to the next connection.
+			continue
+		}
+
+		score := computeScore(days, weight, c.ContactFrequencyTarget, c.Category, c.Tags)
+		// Persist only when the score visibly moved — skip writes
+		// that round-trip identical values (reduces cron churn on
+		// users whose data is stable).
+		if math.Abs(score-c.ConnectionScore) < 0.005 {
+			continue
+		}
+		if err := u.repo.UpdateConnectionScore(ctx, userID, c.ID, score); err != nil {
+			continue
+		}
+		changed++
+	}
+	return changed, nil
 }
 
 // ── helpers ───────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ package connect
 import (
 	"context"
 	"errors"
+	"math"
 	"sort"
 	"strings"
 	"testing"
@@ -964,5 +965,100 @@ func TestListActivities_CrossTenantBlocked(t *testing.T) {
 	_, err := uc.ListActivities(context.Background(), bob, c.ID, 10, 0)
 	if !errors.Is(err, domain.ErrNotFound) {
 		t.Errorf("expected ErrNotFound for cross-tenant list, got %v", err)
+	}
+}
+
+// ── UC-202 computeScore (pure function) ───────────────────────────
+
+func TestComputeScore_NeverContactedAcquaintance(t *testing.T) {
+	// daysSinceContact = "infinity" → recency ≈ 0
+	// activity_weight_90d = 0          → frequency = 0
+	// importance(acquaintance) = 0.4   → 0.2 * 0.4 = 0.08
+	got := computeScore(1_000_000, 0, 30, entity.CategoryAcquaintance, nil)
+	want := 0.20 * 0.4
+	if math.Abs(got-want) > 1e-6 {
+		t.Errorf("expected %.4f, got %.4f", want, got)
+	}
+}
+
+func TestComputeScore_FreshFamilyContact(t *testing.T) {
+	// Contacted today (d=0 → recency=1), no activities logged,
+	// category=family (importance 0.9). Max recency term.
+	got := computeScore(0, 0, 30, entity.CategoryFamily, nil)
+	want := 0.45*1 + 0.35*0 + 0.20*0.9
+	if math.Abs(got-want) > 1e-6 {
+		t.Errorf("expected %.4f, got %.4f", want, got)
+	}
+}
+
+func TestComputeScore_FrequencySaturation(t *testing.T) {
+	// target=30 → expected activities = 90/30 = 3
+	// weight >= 3 → frequency saturates at 1
+	got := computeScore(0, 5, 30, entity.CategoryFriend, nil)
+	want := 0.45*1 + 0.35*1 + 0.20*0.7
+	if math.Abs(got-want) > 1e-6 {
+		t.Errorf("expected %.4f, got %.4f", want, got)
+	}
+}
+
+func TestComputeScore_RecencyDecay(t *testing.T) {
+	// At d = 2*target the recency term is exp(-1) ≈ 0.3679.
+	// With no activities and business (0.7), expected:
+	//   0.45*0.3679 + 0.35*0 + 0.20*0.7 = 0.3055
+	got := computeScore(60, 0, 30, entity.CategoryBusiness, nil)
+	want := 0.45*math.Exp(-1) + 0.35*0 + 0.20*0.7
+	if math.Abs(got-want) > 1e-6 {
+		t.Errorf("expected %.4f, got %.4f", want, got)
+	}
+}
+
+func TestComputeScore_Clamped(t *testing.T) {
+	// Absurd inputs can't push the score out of [0, 1].
+	hi := computeScore(0, 1000, 30, entity.CategoryFamily, nil)
+	if hi > 1.0 || hi < 0.0 {
+		t.Errorf("hi out of range: %v", hi)
+	}
+	lo := computeScore(math.MaxInt32, 0, 1, entity.CategoryAcquaintance, nil)
+	if lo > 1.0 || lo < 0.0 {
+		t.Errorf("lo out of range: %v", lo)
+	}
+}
+
+func TestRecomputeScoresForUser_PersistsChange(t *testing.T) {
+	repo := newFakeConnRepo()
+	uc := NewUseCase(repo)
+	userID := uuid.New()
+
+	// Create a business connection contacted 2 days ago.
+	c := mustCreate(t, uc, userID, CreateInput{
+		Name:     "Test",
+		Category: strptr("business"),
+	})
+	two := time.Now().Add(-2 * 24 * time.Hour)
+	if _, err := uc.RecordManualContact(context.Background(), userID, c.ID, two, "", 0); err != nil {
+		t.Fatalf("touch: %v", err)
+	}
+
+	// Initial score is the default (0.5).
+	changed, err := uc.RecomputeScoresForUser(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("recompute: %v", err)
+	}
+	if changed != 1 {
+		t.Errorf("expected 1 score change (default → computed), got %d", changed)
+	}
+
+	reloaded, _ := uc.Get(context.Background(), userID, c.ID)
+	if reloaded.ConnectionScore == 0.5 {
+		t.Errorf("score stayed at default 0.5 — recompute did not persist")
+	}
+
+	// Running again with no new data should be a no-op.
+	changed2, err := uc.RecomputeScoresForUser(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("recompute 2: %v", err)
+	}
+	if changed2 != 0 {
+		t.Errorf("expected idempotent second pass, got %d changes", changed2)
 	}
 }
