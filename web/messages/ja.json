@@ -2339,10 +2339,58 @@
       "semiannual": "半年に一度",
       "annual": "年1回"
     },
+    "activity": {
+      "section": "活動履歴",
+      "add": "記録を追加",
+      "empty": "まだ記録された活動はありません",
+      "emptyHint": "最初の出会い、ミーティング、電話などを記録してみましょう",
+      "loadMore": "もっと見る",
+      "loading": "読み込み中...",
+      "today": "今日",
+      "yesterday": "昨日",
+      "daysAgo": "{days}日前",
+      "duration": "{min}分",
+      "deleteConfirm": "この記録を削除しますか?",
+      "deleteAction": "削除",
+      "form": {
+        "label": "分類",
+        "note": "内容",
+        "notePlaceholder": "何がありましたか?",
+        "occurredAt": "いつ",
+        "duration": "所要時間 (分、任意)",
+        "save": "保存",
+        "cancel": "キャンセル",
+        "customLabel": "自由入力…",
+        "suggestions": {
+          "meeting": "ミーティング",
+          "call": "通話",
+          "meal": "食事",
+          "work": "協業",
+          "message": "メッセージ",
+          "other": "その他"
+        }
+      },
+      "errors": {
+        "saveFailed": "保存に失敗しました",
+        "deleteFailed": "削除に失敗しました",
+        "loadFailed": "活動履歴を読み込めませんでした",
+        "noteRequired": "内容は必須です",
+        "labelTooLong": "分類は{max}文字以内で入力してください",
+        "noteTooLong": "内容は{max}文字以内で入力してください",
+        "futureOccurredAt": "未来の時点は記録できません"
+      },
+      "kind": {
+        "email": "メール",
+        "calendar": "カレンダー",
+        "manual": "手動",
+        "telegram": "Telegram"
+      }
+    },
     "reminders": {
       "title": "Smart Nudge",
-      "phase2Notice": "Phase 2で提供予定",
-      "phase2Body": "ドリフト通知や誕生日・記念日リマインダーは次のフェーズで追加予定です。"
+      "empty": "すべてしっかり管理できています 👍",
+      "item": "{name} · {days}日間連絡なし",
+      "loadFailed": "リマインダーを読み込めませんでした"
     },
     "toasts": {
       "touched": "{name}さんと{days}日ぶりの連絡です",

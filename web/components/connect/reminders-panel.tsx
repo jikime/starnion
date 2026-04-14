@@ -18,12 +18,7 @@ export default function RemindersPanel() {
         <div className="w-12 h-12 rounded-full border border-border bg-secondary flex items-center justify-center">
           <Sparkles className="w-5 h-5 text-muted-foreground" />
         </div>
-        <div>
-          <p className="text-sm font-medium text-foreground">{t('phase2Notice')}</p>
-          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-            {t('phase2Body')}
-          </p>
-        </div>
+        <p className="text-sm font-medium text-foreground">{t('empty')}</p>
       </div>
     </div>
   )

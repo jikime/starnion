@@ -2740,10 +2740,58 @@
       "semiannual": "Twice a year",
       "annual": "Yearly"
     },
+    "activity": {
+      "section": "Activity Timeline",
+      "add": "Add entry",
+      "empty": "No activity logged yet",
+      "emptyHint": "Record your first meeting, call, or chat",
+      "loadMore": "Load more",
+      "loading": "Loading…",
+      "today": "today",
+      "yesterday": "yesterday",
+      "daysAgo": "{days}d ago",
+      "duration": "{min}m",
+      "deleteConfirm": "Delete this entry?",
+      "deleteAction": "Delete",
+      "form": {
+        "label": "Category",
+        "note": "What happened",
+        "notePlaceholder": "What happened?",
+        "occurredAt": "When",
+        "duration": "Duration (min, optional)",
+        "save": "Save",
+        "cancel": "Cancel",
+        "customLabel": "Custom…",
+        "suggestions": {
+          "meeting": "Meeting",
+          "call": "Call",
+          "meal": "Meal",
+          "work": "Work",
+          "message": "Message",
+          "other": "Other"
+        }
+      },
+      "errors": {
+        "saveFailed": "Failed to save",
+        "deleteFailed": "Failed to delete",
+        "loadFailed": "Failed to load activities",
+        "noteRequired": "Note is required",
+        "labelTooLong": "Category must be ≤{max} characters",
+        "noteTooLong": "Note must be ≤{max} characters",
+        "futureOccurredAt": "Cannot log a future time"
+      },
+      "kind": {
+        "email": "Email",
+        "calendar": "Calendar",
+        "manual": "Manual",
+        "telegram": "Telegram"
+      }
+    },
     "reminders": {
       "title": "Smart Nudge",
-      "phase2Notice": "Coming in Phase 2",
-      "phase2Body": "Drift alerts and birthday / anniversary reminders are on the Phase 2 roadmap."
+      "empty": "You're on top of everything 👍",
+      "item": "{name} · {days}d without contact",
+      "loadFailed": "Failed to load reminders"
     },
     "toasts": {
       "touched": "{days} days since you last contacted {name}",

@@ -83,6 +83,50 @@ export function isDrifting(conn: Connection): boolean {
 /** Translation key (connect.scoreLabel.*) for a numeric connection score. */
 export type ScoreKey = 'veryClose' | 'close' | 'normal' | 'drifting'
 
+// ── Activity Timeline ─────────────────────────────────────────────
+
+/** Source classification for a connection_activities row. */
+export type ActivityKind = 'email' | 'calendar' | 'manual' | 'telegram'
+
+/** One row of the per-connection activity timeline. */
+export interface ConnectionActivity {
+  id: number
+  connectionId: string
+  kind: ActivityKind
+  /** User-visible category chip (미팅, 통화, 식사, ...) — nullable. */
+  label: string | null
+  /** ISO 8601 UTC timestamp of when the interaction happened. */
+  occurredAt: string
+  durationMin: number
+  weight: number
+  note: string | null
+  createdAt: string
+}
+
+/** Suggested category chip tokens for the add-activity form.
+ *  These are translation keys under `connect.activity.form.labelSuggestions.*`.
+ *  Users can type custom labels freeform — the chip list is just a helper. */
+export const ACTIVITY_LABEL_SUGGESTIONS = [
+  'meeting',
+  'call',
+  'meal',
+  'work',
+  'message',
+  'other',
+] as const
+
+export type ActivityLabelSuggestion = (typeof ACTIVITY_LABEL_SUGGESTIONS)[number]
+
+/** Reminder row for the RemindersPanel (UC-204). */
+export interface ReminderItem {
+  id: string
+  name: string
+  company: string | null
+  category: Category
+  lastContactAt: string | null
+  daysOverdue: number
+}
+
 export function getScoreKey(score: number): ScoreKey {
   if (score >= 0.8) return 'veryClose'
   if (score >= 0.6) return 'close'

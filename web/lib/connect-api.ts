@@ -9,8 +9,11 @@
  */
 
 import type {
+  ActivityKind,
   Category,
   Connection,
+  ConnectionActivity,
+  ReminderItem,
   SocialProfiles,
   SocialPlatform,
 } from '@/lib/connect-data'
@@ -364,4 +367,125 @@ export async function attachBusinessCard(
     }
   )
   return fromWire(wire)
+}
+
+// ── Activity Timeline (UC-111/112/113) ─────────────────────────────────────
+
+interface WireActivity {
+  id: number
+  connection_id: string
+  kind: ActivityKind
+  label: string | null
+  occurred_at: string
+  duration_min: number
+  weight: number
+  note: string | null
+  created_at: string
+}
+
+function fromWireActivity(w: WireActivity): ConnectionActivity {
+  return {
+    id: w.id,
+    connectionId: w.connection_id,
+    kind: w.kind,
+    label: w.label,
+    occurredAt: w.occurred_at,
+    durationMin: w.duration_min,
+    weight: w.weight,
+    note: w.note,
+    createdAt: w.created_at,
+  }
+}
+
+export interface ListActivitiesResult {
+  items: ConnectionActivity[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export async function listActivities(
+  connId: string,
+  query?: { limit?: number; offset?: number }
+): Promise<ListActivitiesResult> {
+  const qs = new URLSearchParams()
+  if (query?.limit) qs.set('limit', String(query.limit))
+  if (query?.offset) qs.set('offset', String(query.offset))
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  const wire = await request<{
+    items: WireActivity[]
+    total: number
+    limit: number
+    offset: number
+  }>(`/connections/${encodeURIComponent(connId)}/activities${suffix}`)
+  return {
+    items: wire.items.map(fromWireActivity),
+    total: wire.total,
+    limit: wire.limit,
+    offset: wire.offset,
+  }
+}
+
+export interface CreateActivityInput {
+  kind?: ActivityKind // default 'manual'
+  label?: string
+  /** ISO 8601. Defaults to server NOW() when omitted. */
+  occurredAt?: string
+  durationMin?: number
+  note?: string
+}
+
+export async function createActivity(
+  connId: string,
+  input: CreateActivityInput
+): Promise<ConnectionActivity> {
+  const wire = await request<WireActivity>(
+    `/connections/${encodeURIComponent(connId)}/activities`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        kind: input.kind ?? 'manual',
+        label: input.label ?? '',
+        occurred_at: input.occurredAt,
+        duration_min: input.durationMin ?? 0,
+        note: input.note ?? '',
+      }),
+    }
+  )
+  return fromWireActivity(wire)
+}
+
+export async function deleteActivity(
+  connId: string,
+  activityId: number
+): Promise<void> {
+  // The handler returns 204 No Content which `request()` already
+  // handles via its `res.status === 204` branch.
+  await request<void>(
+    `/connections/${encodeURIComponent(connId)}/activities/${activityId}`,
+    { method: 'DELETE' }
+  )
+}
+
+// ── Reminders (UC-204) ─────────────────────────────────────────────────────
+
+interface WireReminder {
+  id: string
+  name: string
+  company: string | null
+  category: Category
+  last_contact_at: string | null
+  days_overdue: number
+}
+
+export async function listReminders(): Promise<ReminderItem[]> {
+  const wire = await request<{ items: WireReminder[] }>(`/reminders`)
+  return wire.items.map(r => ({
+    id: r.id,
+    name: r.name,
+    company: r.company,
+    category: r.category,
+    lastContactAt: r.last_contact_at,
+    daysOverdue: r.days_overdue,
+  }))
 }

@@ -2339,10 +2339,58 @@
       "semiannual": "每半年一次",
       "annual": "每年一次"
     },
+    "activity": {
+      "section": "活动记录",
+      "add": "添加记录",
+      "empty": "暂无活动记录",
+      "emptyHint": "记录第一次见面、会议、通话等",
+      "loadMore": "加载更多",
+      "loading": "加载中...",
+      "today": "今天",
+      "yesterday": "昨天",
+      "daysAgo": "{days}天前",
+      "duration": "{min}分钟",
+      "deleteConfirm": "要删除这条记录吗?",
+      "deleteAction": "删除",
+      "form": {
+        "label": "分类",
+        "note": "内容",
+        "notePlaceholder": "发生了什么?",
+        "occurredAt": "时间",
+        "duration": "持续时间 (分钟、可选)",
+        "save": "保存",
+        "cancel": "取消",
+        "customLabel": "自定义…",
+        "suggestions": {
+          "meeting": "会议",
+          "call": "通话",
+          "meal": "用餐",
+          "work": "协作",
+          "message": "消息",
+          "other": "其他"
+        }
+      },
+      "errors": {
+        "saveFailed": "保存失败",
+        "deleteFailed": "删除失败",
+        "loadFailed": "无法加载活动记录",
+        "noteRequired": "内容为必填",
+        "labelTooLong": "分类请在 {max} 个字符以内",
+        "noteTooLong": "内容请在 {max} 个字符以内",
+        "futureOccurredAt": "不能记录未来时间"
+      },
+      "kind": {
+        "email": "邮件",
+        "calendar": "日历",
+        "manual": "手动",
+        "telegram": "Telegram"
+      }
+    },
     "reminders": {
       "title": "Smart Nudge",
-      "phase2Notice": "将在 Phase 2 提供",
-      "phase2Body": "疏远提醒以及生日 / 纪念日提醒计划在下一阶段加入。"
+      "empty": "一切都在您的掌握之中 👍",
+      "item": "{name} · {days}天未联系",
+      "loadFailed": "无法加载提醒"
     },
     "toasts": {
       "touched": "距离上次联系 {name} 已 {days} 天",

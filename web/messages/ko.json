@@ -2737,10 +2737,58 @@
       "semiannual": "반년에 한 번",
       "annual": "연 1회"
     },
+    "activity": {
+      "section": "활동 기록",
+      "add": "기록 추가",
+      "empty": "아직 기록된 활동이 없어요",
+      "emptyHint": "첫 만남, 미팅, 통화 등을 기록해보세요",
+      "loadMore": "더 보기",
+      "loading": "불러오는 중...",
+      "today": "오늘",
+      "yesterday": "어제",
+      "daysAgo": "{days}일 전",
+      "duration": "{min}분",
+      "deleteConfirm": "이 기록을 삭제할까요?",
+      "deleteAction": "삭제",
+      "form": {
+        "label": "분류",
+        "note": "내용",
+        "notePlaceholder": "무슨 일이 있었나요?",
+        "occurredAt": "언제",
+        "duration": "소요 시간 (분, 선택)",
+        "save": "저장",
+        "cancel": "취소",
+        "customLabel": "직접 입력…",
+        "suggestions": {
+          "meeting": "미팅",
+          "call": "통화",
+          "meal": "식사",
+          "work": "협업",
+          "message": "메시지",
+          "other": "기타"
+        }
+      },
+      "errors": {
+        "saveFailed": "저장에 실패했습니다",
+        "deleteFailed": "삭제에 실패했습니다",
+        "loadFailed": "활동 기록을 불러오지 못했습니다",
+        "noteRequired": "내용은 필수입니다",
+        "labelTooLong": "분류는 {max}자 이내로 입력해주세요",
+        "noteTooLong": "내용은 {max}자 이내로 입력해주세요",
+        "futureOccurredAt": "미래 시점은 기록할 수 없어요"
+      },
+      "kind": {
+        "email": "이메일",
+        "calendar": "일정",
+        "manual": "직접 기록",
+        "telegram": "텔레그램"
+      }
+    },
     "reminders": {
       "title": "Smart Nudge",
-      "phase2Notice": "Phase 2에서 제공됩니다",
-      "phase2Body": "드리프트 알림과 생일/기념일 리마인더는 다음 단계에서 추가될 예정입니다."
+      "empty": "모두 잘 챙기고 있어요 👍",
+      "item": "{name} · {days}일째 연락 없음",
+      "loadFailed": "리마인더를 불러오지 못했습니다"
     },
     "toasts": {
       "touched": "{name}님과 {days}일 만의 연락이에요",
