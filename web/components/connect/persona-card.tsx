@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   X,
   Mail,
@@ -35,15 +35,23 @@ import {
 import Image from 'next/image'
 import {
   Connection,
+  ConnectionActivity,
   getDaysSinceContact,
   isDrifting,
   getScoreKey,
   getCategoryColor,
   SocialPlatform,
 } from '@/lib/connect-data'
+import { listActivities } from '@/lib/connect-api'
 import SnsSection from '@/components/connect/sns-section'
 import ActivityTimeline from '@/components/connect/activity-timeline'
 import NionSuggestion from '@/components/connect/nion-suggestion'
+
+// One fetch at the PersonaCard level feeds both NionSuggestion (which
+// needs 90-day stats) and ActivityTimeline's initial page. Keeping the
+// window large enough for Nion's rolling 90-day counts means we don't
+// round-trip twice on every card mount.
+const ACTIVITY_INITIAL_LIMIT = 50
 
 interface PersonaCardProps {
   connection: Connection
@@ -84,6 +92,29 @@ export default function PersonaCard({
   const [notesSaving, setNotesSaving] = useState(false)
   const [notesError, setNotesError] = useState<string | null>(null)
 
+  // ── Shared activity state ───────────────────────────────────────
+  //
+  // Fetched once at the card level so NionSuggestion (needs 90-day
+  // stats → 50 rows) and ActivityTimeline (needs 10 for the visible
+  // first page) don't each kick off their own HTTP call. Both
+  // children receive the same data via props; mutations in the
+  // timeline (add/delete) invoke reloadActivities to resync.
+  const [activities, setActivities] = useState<ConnectionActivity[]>([])
+  const [activitiesTotal, setActivitiesTotal] = useState(0)
+  const [activitiesLoading, setActivitiesLoading] = useState(true)
+  const [activitiesError, setActivitiesError] = useState<string | null>(null)
+
+  const reloadActivities = useCallback(async () => {
+    try {
+      const res = await listActivities(connection.id, { limit: ACTIVITY_INITIAL_LIMIT })
+      setActivities(res.items)
+      setActivitiesTotal(res.total)
+      setActivitiesError(null)
+    } catch (err) {
+      setActivitiesError(err instanceof Error ? err.message : 'load failed')
+    }
+  }, [connection.id])
+
   // Re-seed draft when selection changes or edit mode exits.
   useEffect(() => {
     if (!notesEditing) {
@@ -91,6 +122,29 @@ export default function PersonaCard({
       setNotesError(null)
     }
   }, [connection.id, connection.contextNotes, notesEditing])
+
+  // Re-fetch activities when the selected connection changes.
+  useEffect(() => {
+    let cancelled = false
+    setActivitiesLoading(true)
+    setActivitiesError(null)
+    listActivities(connection.id, { limit: ACTIVITY_INITIAL_LIMIT })
+      .then(res => {
+        if (cancelled) return
+        setActivities(res.items)
+        setActivitiesTotal(res.total)
+      })
+      .catch(err => {
+        if (cancelled) return
+        setActivitiesError(err instanceof Error ? err.message : 'load failed')
+      })
+      .finally(() => {
+        if (!cancelled) setActivitiesLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [connection.id])
 
   const handleDeleteConfirm = async () => {
     if (!onDelete) return
@@ -464,10 +518,22 @@ export default function PersonaCard({
       </div>
 
       {/* Nion Suggestion — data-driven summary above the timeline. */}
-      <NionSuggestion connection={connection} />
+      <NionSuggestion
+        connection={connection}
+        activities={activities}
+        loading={activitiesLoading}
+        error={activitiesError}
+      />
 
       {/* Activity Timeline (UC-111/112/113) */}
-      <ActivityTimeline connection={connection} />
+      <ActivityTimeline
+        connection={connection}
+        initialItems={activities}
+        initialTotal={activitiesTotal}
+        initialLoading={activitiesLoading}
+        initialError={activitiesError}
+        onMutated={reloadActivities}
+      />
 
       {/* Business Card */}
       <div className="px-5 pt-4">

@@ -18,7 +18,7 @@
  * grounded in "why" (this summary).
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Sparkles, Mail, Calendar, Clock, Send } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import {
@@ -28,14 +28,18 @@ import {
   getDaysSinceContact,
   isDrifting,
 } from '@/lib/connect-data'
-import { listActivities } from '@/lib/connect-api'
 
 interface NionSuggestionProps {
   connection: Connection
+  /** Pre-fetched activity rows from the parent PersonaCard. */
+  activities: ConnectionActivity[]
+  /** True while the parent is still loading the initial batch. */
+  loading: boolean
+  /** Non-null when the parent's fetch failed. */
+  error: string | null
 }
 
 const RECENT_WINDOW_DAYS = 90
-const FETCH_LIMIT = 50
 
 interface ComputedStats {
   daysSinceContact: number | null
@@ -54,33 +58,13 @@ const KIND_ICON: Record<ActivityKind, typeof Mail> = {
   telegram: Send,
 }
 
-export default function NionSuggestion({ connection }: NionSuggestionProps) {
+export default function NionSuggestion({
+  connection,
+  activities,
+  loading,
+  error,
+}: NionSuggestionProps) {
   const t = useTranslations('connect.suggestion')
-  const [activities, setActivities] = useState<ConnectionActivity[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(false)
-    listActivities(connection.id, { limit: FETCH_LIMIT })
-      .then(res => {
-        if (cancelled) return
-        setActivities(res.items)
-      })
-      .catch(() => {
-        if (cancelled) return
-        setError(true)
-      })
-      .finally(() => {
-        if (cancelled) return
-        setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [connection.id])
 
   const stats = useMemo(
     () => computeStats(connection, activities),

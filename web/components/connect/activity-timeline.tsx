@@ -27,6 +27,16 @@ import {
 
 interface Props {
   connection: Connection
+  /** Pre-fetched activities from the parent PersonaCard (first 50 rows). */
+  initialItems?: ConnectionActivity[]
+  /** Total count matching the connection, as reported by the parent's fetch. */
+  initialTotal?: number
+  /** True while the parent is still loading the shared batch. */
+  initialLoading?: boolean
+  /** Non-null when the parent's shared fetch failed. */
+  initialError?: string | null
+  /** Called after create/delete so the parent can re-fetch the shared batch. */
+  onMutated?: () => void
 }
 
 const PAGE_SIZE = 10
@@ -44,7 +54,14 @@ const KIND_DOT_CLASS: Record<ActivityKind, string> = {
   telegram: 'bg-cyan-400',
 }
 
-export default function ActivityTimeline({ connection }: Props) {
+export default function ActivityTimeline({
+  connection,
+  initialItems,
+  initialTotal,
+  initialLoading,
+  initialError,
+  onMutated,
+}: Props) {
   const t = useTranslations('connect.activity')
   const locale = useLocale()
   const dateLocale =
@@ -56,11 +73,15 @@ export default function ActivityTimeline({ connection }: Props) {
       ? 'zh-CN'
       : 'en-US'
 
-  const [items, setItems] = useState<ConnectionActivity[]>([])
-  const [total, setTotal] = useState(0)
-  const [offset, setOffset] = useState(0)
-  const [loading, setLoading] = useState(false)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  // When the parent provides pre-fetched rows we seed our state from
+  // them and skip our own initial fetch. Pagination (load-more) and
+  // add/delete still work normally against the local state.
+  const parentSeeded = initialItems !== undefined
+  const [items, setItems] = useState<ConnectionActivity[]>(initialItems ?? [])
+  const [total, setTotal] = useState(initialTotal ?? 0)
+  const [offset, setOffset] = useState(initialItems?.length ?? 0)
+  const [loading, setLoading] = useState(initialLoading ?? false)
+  const [loadError, setLoadError] = useState<string | null>(initialError ?? null)
 
   // Add-form state
   const [formOpen, setFormOpen] = useState(false)
@@ -72,7 +93,11 @@ export default function ActivityTimeline({ connection }: Props) {
   const [formError, setFormError] = useState<string | null>(null)
   const [formSubmitting, setFormSubmitting] = useState(false)
 
-  // Reset timeline when the selected connection changes
+  // Reset timeline when the selected connection changes. When the
+  // parent has pre-fetched, we consume its snapshot instead of
+  // doing a second round-trip. Without a parent we fall back to the
+  // original standalone fetch so the component is still usable
+  // outside PersonaCard.
   const loadFirstPage = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
@@ -90,8 +115,21 @@ export default function ActivityTimeline({ connection }: Props) {
   }, [connection.id, t])
 
   useEffect(() => {
+    if (parentSeeded) return
     loadFirstPage()
-  }, [loadFirstPage])
+  }, [parentSeeded, loadFirstPage])
+
+  // When the parent's shared batch finishes loading or changes,
+  // re-seed our local state. Also re-seeds on connection switch
+  // because the parent's effect re-runs on connection.id.
+  useEffect(() => {
+    if (!parentSeeded) return
+    setItems(initialItems ?? [])
+    setTotal(initialTotal ?? 0)
+    setOffset(initialItems?.length ?? 0)
+    setLoading(initialLoading ?? false)
+    setLoadError(initialError ?? null)
+  }, [parentSeeded, initialItems, initialTotal, initialLoading, initialError])
 
   const loadMore = async () => {
     setLoading(true)
@@ -166,6 +204,9 @@ export default function ActivityTimeline({ connection }: Props) {
       setTotal(prev => prev + 1)
       setOffset(prev => prev + 1)
       closeForm()
+      // Tell the parent to re-fetch the shared batch so NionSuggestion
+      // sees the new row in its 90-day counts.
+      onMutated?.()
     } catch (err) {
       if (err instanceof ConnectApiError) setFormError(err.message)
       else setFormError(t('errors.saveFailed'))
@@ -182,6 +223,7 @@ export default function ActivityTimeline({ connection }: Props) {
       setItems(prev => prev.filter(a => a.id !== activityId))
       setTotal(prev => Math.max(0, prev - 1))
       setOffset(prev => Math.max(0, prev - 1))
+      onMutated?.()
     } catch (err) {
       if (err instanceof ConnectApiError) setLoadError(err.message)
       else setLoadError(t('errors.deleteFailed'))
