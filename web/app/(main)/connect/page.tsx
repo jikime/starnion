@@ -176,6 +176,9 @@ export default function ConnectPage() {
         phone: parsed.phone || undefined,
         meeting_location: parsed.meetingLocation || undefined,
         tags: parsed.tags,
+        business_card: parsed.imageUrl
+          ? { image_url: parsed.imageUrl }
+          : undefined,
       })
       // Prepend into list, select, leave scanner to handle its own closing
       setConnections(prev => [created, ...prev])
@@ -186,7 +189,7 @@ export default function ConnectPage() {
       if (err instanceof ConnectApiError) {
         throw err
       }
-      throw new Error('명함 스캔 결과를 저장하지 못했습니다')
+      throw new Error('명함 저장에 실패했습니다')
     }
   }
 
