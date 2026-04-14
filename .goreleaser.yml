@@ -102,12 +102,12 @@ release:
 
     Personal AI Assistant — CLI release.
 
-    ### 설치
+    ### Install
     ```bash
     curl -fsSL https://jikime.github.io/starnion/install.sh | bash
     ```
 
-    ### 업데이트
+    ### Update
     ```bash
     starnion update
     ```
@@ -119,13 +119,13 @@ changelog:
   use: github
   sort: asc
   groups:
-    - title: "새 기능"
+    - title: "Features"
       regexp: "^feat"
       order: 0
-    - title: "버그 수정"
+    - title: "Bug Fixes"
       regexp: "^fix"
       order: 1
-    - title: "기타"
+    - title: "Other"
       order: 999
   filters:
     exclude:
