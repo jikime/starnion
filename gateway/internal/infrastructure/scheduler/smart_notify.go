@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 )
@@ -107,6 +108,8 @@ func (s *Scheduler) computeSmartNotify(ctx context.Context, userID, jobID string
 		return s.smartGoogleCalendarDigest(ctx, userID)
 	case "google_gmail_digest":
 		return s.smartGoogleGmailDigest(ctx, userID)
+	case "connect_drift_reminder":
+		return s.smartConnectDriftReminder(ctx, userID)
 	default:
 		return "", true
 	}
@@ -491,4 +494,51 @@ func (s *Scheduler) smartPlannerGoalDday(ctx context.Context, userID string) (st
 		}
 	}
 	return "마감 임박 목표: " + strings.Join(parts, ", "), false
+}
+
+// smartConnectDriftReminder fires when one or more connections have
+// gone past their target contact cadence (UC-203). The message is a
+// single-line summary of the top three drifting names so the user
+// can scan it from a Telegram preview without opening the app.
+//
+// Returns ("", true) when:
+//   - the connect usecase isn't wired (test/isolated environments)
+//   - the user has no drifting connections
+//   - the user already received this notification today (dedup)
+func (s *Scheduler) smartConnectDriftReminder(ctx context.Context, userID string) (string, bool) {
+	if s.connectReminders == nil {
+		return "", true
+	}
+	if s.alreadySentToday(ctx, userID, "connect_drift_reminder") {
+		return "", true
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return "", true
+	}
+	drifting, err := s.connectReminders.ListReminders(ctx, uid)
+	if err != nil {
+		s.logger.Warn("scheduler: connect drift reminder load failed",
+			zap.String("user_id", userID), zap.Error(err))
+		return "", true
+	}
+	if len(drifting) == 0 {
+		return "", true
+	}
+
+	preview := drifting
+	if len(preview) > 3 {
+		preview = preview[:3]
+	}
+	names := make([]string, 0, len(preview))
+	for _, c := range preview {
+		names = append(names, c.Name)
+	}
+	suffix := ""
+	if len(drifting) > len(preview) {
+		suffix = fmt.Sprintf(" 외 %d명", len(drifting)-len(preview))
+	}
+	msg := fmt.Sprintf("%d명과 연락이 뜸해졌어요: %s%s. 인맥 페이지에서 확인하세요.",
+		len(drifting), strings.Join(names, ", "), suffix)
+	return msg, false
 }

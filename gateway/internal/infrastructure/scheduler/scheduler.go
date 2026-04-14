@@ -29,9 +29,35 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/newstarnion/gateway/internal/domain/entity"
 	"github.com/newstarnion/gateway/internal/infrastructure/database"
 	"go.uber.org/zap"
 )
+
+// ── Connect Phase 2 narrow ports ────────────────────────────────────
+//
+// The scheduler intentionally talks to the Connect feature through
+// these tiny interfaces rather than importing the connect usecase or
+// connectingest package directly. Keeping the dependency direction one
+// way (usecase + ingestor satisfy the port; scheduler holds the port)
+// avoids any import cycle and makes it trivial to fake the ports in
+// scheduler_test.go.
+
+// ConnectIngester is satisfied by *connectingest.Ingestor.
+type ConnectIngester interface {
+	RunForUser(ctx context.Context, userID uuid.UUID) (int, error)
+}
+
+// ConnectScorer is satisfied by *connectusecase.UseCase.
+type ConnectScorer interface {
+	RecomputeScoresForUser(ctx context.Context, userID uuid.UUID) (int, error)
+}
+
+// ConnectReminders is satisfied by *connectusecase.UseCase.
+type ConnectReminders interface {
+	ListReminders(ctx context.Context, userID uuid.UUID) ([]entity.DriftingConnection, error)
+}
 
 // NotifyFunc inserts a notification row for the given user.
 type NotifyFunc func(ctx context.Context, userID string, notifType string, message string) error
@@ -54,6 +80,13 @@ type Scheduler struct {
 
 	googleClientID     string
 	googleClientSecret string
+
+	// Connect Phase 2 — wired post-construction in bootstrap. Nil-safe:
+	// the per-job dispatch checks for nil before invoking, so a build
+	// without these wired (e.g. an isolated test) just skips the jobs.
+	connectIngester  ConnectIngester
+	connectScorer    ConnectScorer
+	connectReminders ConnectReminders
 }
 
 // maxConcurrentDispatches caps how many scheduler jobs may run in
@@ -143,6 +176,21 @@ func (s *Scheduler) SetEncryptionKey(key string) {
 func (s *Scheduler) SetGoogleCredentials(clientID, clientSecret string) {
 	s.googleClientID = clientID
 	s.googleClientSecret = clientSecret
+}
+
+// SetConnectPhase2 wires the Phase 2 Connect dependencies. Bootstrap
+// constructs the ingestor + connect usecase first and passes them in
+// here. Pass nil for any port to leave the corresponding job a no-op
+// (used by tests and by environments where Phase 2 is intentionally
+// disabled).
+func (s *Scheduler) SetConnectPhase2(
+	ingester ConnectIngester,
+	scorer ConnectScorer,
+	reminders ConnectReminders,
+) {
+	s.connectIngester = ingester
+	s.connectScorer = scorer
+	s.connectReminders = reminders
 }
 
 // Wake signals the scheduler to reload schedules and re-arm the user timer.

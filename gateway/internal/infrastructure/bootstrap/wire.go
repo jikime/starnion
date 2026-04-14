@@ -20,6 +20,7 @@ import (
 	integrationshttp "github.com/newstarnion/gateway/internal/adapter/http/integrations"
 	searchhttp "github.com/newstarnion/gateway/internal/adapter/http/search"
 	postgresrepo "github.com/newstarnion/gateway/internal/adapter/repository/postgres"
+	"github.com/newstarnion/gateway/internal/infrastructure/connectingest"
 	"github.com/newstarnion/gateway/internal/infrastructure/database"
 	"github.com/newstarnion/gateway/internal/infrastructure/embedding"
 	"github.com/newstarnion/gateway/internal/infrastructure/googleoauth"
@@ -249,6 +250,15 @@ func New(ctx context.Context, cfg *config.Config, rootLogger *zap.Logger) (*Cont
 	sched.SetNaverCredentials(cfg.NaverSearchClientID, cfg.NaverSearchClientSecret)
 	sched.SetEncryptionKey(cfg.EncryptionKey)
 	sched.SetGoogleCredentials(cfg.GoogleClientID, cfg.GoogleClientSecret)
+
+	// Connect Phase 2 — wire the Gmail/Calendar ingestor and the
+	// connect usecase into the scheduler so the nightly maintenance
+	// jobs (connect_activity_ingest, connect_score_recompute) and the
+	// daily smart-notify job (connect_drift_reminder) have something
+	// to invoke. The narrow ports defined on Scheduler keep the
+	// dependency direction clean.
+	connectIngestor := connectingest.New(integrationsUC, connectRepo, logger)
+	sched.SetConnectPhase2(connectIngestor, useCases.Connect, useCases.Connect)
 
 	// Media store wraps MinIO + local-filesystem fallback so the
 	// http/media handler never has to branch between the two.

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -31,6 +32,55 @@ func (s *Scheduler) runMaintenance(ctx context.Context, jobID, userID string) {
 			s.logger.Info("maintenance: memory_compaction done",
 				zap.String("user_id", userID),
 				zap.Int64("deleted_rows", n))
+		}
+
+	case "connect_activity_ingest":
+		// Phase 2 Gmail/Calendar ingest. Skipped silently when the
+		// ingestor isn't wired (test/isolated environments).
+		if s.connectIngester == nil {
+			return
+		}
+		uid, err := uuid.Parse(userID)
+		if err != nil {
+			s.logger.Warn("maintenance: connect_activity_ingest bad user_id",
+				zap.String("user_id", userID), zap.Error(err))
+			return
+		}
+		inserted, err := s.connectIngester.RunForUser(ctx, uid)
+		if err != nil {
+			s.logger.Error("maintenance: connect_activity_ingest failed",
+				zap.String("user_id", userID), zap.Error(err))
+			return
+		}
+		if inserted > 0 {
+			s.logger.Info("maintenance: connect_activity_ingest done",
+				zap.String("user_id", userID),
+				zap.Int("inserted", inserted))
+		}
+
+	case "connect_score_recompute":
+		// Phase 2 nightly score recompute (UC-202). The connect
+		// usecase's RecomputeScoresForUser walks every connection
+		// and persists only those whose score visibly moved.
+		if s.connectScorer == nil {
+			return
+		}
+		uid, err := uuid.Parse(userID)
+		if err != nil {
+			s.logger.Warn("maintenance: connect_score_recompute bad user_id",
+				zap.String("user_id", userID), zap.Error(err))
+			return
+		}
+		changed, err := s.connectScorer.RecomputeScoresForUser(ctx, uid)
+		if err != nil {
+			s.logger.Error("maintenance: connect_score_recompute failed",
+				zap.String("user_id", userID), zap.Error(err))
+			return
+		}
+		if changed > 0 {
+			s.logger.Info("maintenance: connect_score_recompute done",
+				zap.String("user_id", userID),
+				zap.Int("scores_adjusted", changed))
 		}
 	}
 }
