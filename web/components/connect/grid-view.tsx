@@ -23,7 +23,7 @@ export default function GridView({
   const t = useTranslations('connect')
 
   return (
-    <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 p-4 overflow-y-auto h-full content-start">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 p-4 overflow-y-auto h-full content-start">
       {connections.map(conn => {
         const color = getCategoryColor(conn.category)
         const days = getDaysSinceContact(conn.lastContactDate)

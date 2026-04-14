@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Bell, ChevronRight, Loader2, Sparkles } from 'lucide-react'
+import { AlertTriangle, Bell, ChevronRight, Loader2, Sparkles, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { ConnectApiError, listReminders } from '@/lib/connect-api'
 import type { ReminderItem } from '@/lib/connect-data'
@@ -10,9 +10,13 @@ interface Props {
   /** Called when the user clicks a drift entry. Parent should select
    *  that connection and switch the right panel to persona view. */
   onSelect?: (connectionId: string) => void
+  /** Called when the user closes the panel on mobile. Rendered as
+   *  a close button in the header; hidden on desktop where the panel
+   *  is always visible in the master-detail split. */
+  onClose?: () => void
 }
 
-export default function RemindersPanel({ onSelect }: Props) {
+export default function RemindersPanel({ onSelect, onClose }: Props) {
   const t = useTranslations('connect.reminders')
   const [items, setItems] = useState<ReminderItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,9 +50,21 @@ export default function RemindersPanel({ onSelect }: Props) {
           <Bell className="w-4 h-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold text-foreground">{t('title')}</h3>
         </div>
-        {items.length > 0 && (
-          <span className="text-xs text-star-red font-mono">{items.length}</span>
-        )}
+        <div className="flex items-center gap-2">
+          {items.length > 0 && (
+            <span className="text-xs text-star-red font-mono">{items.length}</span>
+          )}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="lg:hidden text-muted-foreground hover:text-foreground"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (

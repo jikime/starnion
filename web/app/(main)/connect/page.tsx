@@ -77,6 +77,11 @@ export default function ConnectPage() {
   const [showNewDialog, setShowNewDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+  // Tracks whether the mobile full-screen overlay is open. The
+  // desktop aside is always visible at lg+ regardless; this flag
+  // only controls the below-lg rendering so opening the
+  // PersonaCard or RemindersPanel from mobile is an explicit action.
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
 
   const [connections, setConnections] = useState<Connection[]>([])
   const [selectedConnection, setSelectedConnection] = useState<Connection | null>(
@@ -166,6 +171,16 @@ export default function ConnectPage() {
     setSelectedId(id)
     setRightPanel('persona')
     setOpenSnsEdit(false)
+    setMobilePanelOpen(true)
+  }
+
+  const handleMobileOpenReminders = () => {
+    setRightPanel('reminders')
+    setMobilePanelOpen(true)
+  }
+
+  const handleMobileClose = () => {
+    setMobilePanelOpen(false)
   }
 
   const handleConnectionUpdated = useCallback((updated: Connection) => {
@@ -298,7 +313,7 @@ export default function ConnectPage() {
 
         <button
           onClick={() => setShowFilters(v => !v)}
-          className={`flex items-center gap-1.5 h-8 px-3 text-xs rounded-lg border transition-colors ${
+          className={`flex items-center gap-1.5 h-8 px-3 text-xs rounded-lg border transition-colors shrink-0 ${
             showFilters || filterCategory !== 'all' || sortMode !== DEFAULT_SORT
               ? 'border-primary/40 text-primary bg-primary/8'
               : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
@@ -306,9 +321,28 @@ export default function ConnectPage() {
           aria-expanded={showFilters}
         >
           <SlidersHorizontal className="w-3.5 h-3.5" />
-          {t('filter')}
+          <span className="hidden sm:inline">{t('filter')}</span>
           {filterCategory !== 'all' && (
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+          )}
+        </button>
+
+        {/* Mobile-only Reminders trigger — the aside tab toggle is
+            hidden below lg, so on small screens the user needs a
+            dedicated entry point into the drift list. */}
+        <button
+          onClick={handleMobileOpenReminders}
+          className={`lg:hidden relative flex items-center gap-1.5 h-8 px-3 text-xs rounded-lg border transition-colors shrink-0 ${
+            nudgeCount > 0
+              ? 'border-star-red/40 text-star-red bg-star-red/5'
+              : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
+          }`}
+          aria-label={t('toolbar.reminders')}
+        >
+          <Bell className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">{t('toolbar.reminders')}</span>
+          {nudgeCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-star-gold rounded-full" />
           )}
         </button>
 
@@ -433,15 +467,31 @@ export default function ConnectPage() {
           )}
         </main>
 
+        {/*
+          Responsive aside. ONE element that switches presentation:
+            - lg+ : side panel, always visible (master-detail)
+            - <lg : full-screen overlay, only visible when
+                    `mobilePanelOpen` is true
+          Keeping it a single element means PersonaCard mounts once
+          regardless of viewport, so the shared activity fetch is
+          not duplicated on viewport change.
+        */}
         <aside
-          className="hidden lg:flex flex-col w-80 xl:w-96 2xl:w-[28rem] shrink-0 border-l border-border bg-card/50 overflow-hidden"
+          className={`
+            flex-col bg-card/50 overflow-hidden
+            lg:flex lg:relative lg:shrink-0 lg:w-80 xl:w-96 2xl:w-[28rem] lg:border-l lg:border-border
+            ${mobilePanelOpen ? 'fixed inset-0 z-40 flex' : 'hidden'}
+          `}
           aria-label={rightPanel === 'persona' ? t('empty.personaAria') : t('empty.remindersAria')}
         >
           {rightPanel === 'persona' ? (
             selectedConnection ? (
               <PersonaCard
                 connection={selectedConnection}
-                onClose={() => setSelectedId(null)}
+                onClose={() => {
+                  setSelectedId(null)
+                  handleMobileClose()
+                }}
                 onSubmitSocial={handleSocialSubmit}
                 onDelete={handleDelete}
                 onEdit={() => setShowEditDialog(true)}
@@ -455,9 +505,12 @@ export default function ConnectPage() {
             )
           ) : (
             <RemindersPanel
+              onClose={handleMobileClose}
               onSelect={id => {
                 setSelectedId(id)
                 setRightPanel('persona')
+                // Stay in overlay — on mobile this swaps to PersonaCard,
+                // on desktop it's ignored.
               }}
             />
           )}
