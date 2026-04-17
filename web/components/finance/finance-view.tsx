@@ -408,7 +408,7 @@ export function FinanceView() {
   const chartData =
     summary?.monthly_chart?.map((p) => ({
       ...p,
-      label: p.month.slice(5),
+      label: (p.month ?? '').slice(5) || '??',
     })) ?? []
 
   const pieData = summary?.category_breakdown ?? []
