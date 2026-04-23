@@ -22,15 +22,15 @@ type Transaction struct {
 // MonthFlow is one bar in the 6-month income/expense chart returned by
 // the /finance/summary endpoint.
 type MonthFlow struct {
-	Month   string // "YYYY-MM"
-	Income  int64
-	Expense int64 // returned as positive
+	Month   string `json:"month"`   // "YYYY-MM"
+	Income  int64  `json:"income"`
+	Expense int64  `json:"expense"` // returned as positive
 }
 
 // CategoryAmount is one slice of the expense-breakdown donut chart.
 type CategoryAmount struct {
-	Category string
-	Amount   int64
+	Category string `json:"category"`
+	Amount   int64  `json:"amount"`
 }
 
 // TransactionFilter bundles the optional query-string filters the HTTP
